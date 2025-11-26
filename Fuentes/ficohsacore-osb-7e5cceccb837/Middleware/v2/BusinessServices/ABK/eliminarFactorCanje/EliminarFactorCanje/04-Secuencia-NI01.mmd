@@ -1,0 +1,83 @@
+sequenceDiagram
+    participant Cliente as Cliente/Aplicación
+    participant ProxyNI as EliminarFactorCanjeNI<br/>(Proxy Service)
+    participant XQueryNI as eliminarFactorCanjeIn.xq<br/>(Transformación)
+    participant BizNI as eliminarFactorCanje_db<br/>(Business Service PXYNIC)
+    participant DBNI as Oracle Database NI<br/>(ConnectionProxyNI)
+
+    Note over Cliente,DBNI: Región: Nicaragua (NI01)
+    Note over Cliente,DBNI: Esquema: PROXYNICARAGUA
+    Note over Cliente,DBNI: Provider: http (URI: /Middleware/v2/ProxyServices/EliminarFactorCanjeNI)
+    Note over Cliente,DBNI: Selector: SOAP action + all-headers=false
+
+    Cliente->>ProxyNI: HTTP/SOAP Request + SOAPAction Header
+    Note right of Cliente: HTTP Header: SOAPAction<br/>SOAP Header: UserName=ADMIN_NI<br/>SOAP Body: PROMO_ID=PROMO_NI_2024_001<br/>Provider: http<br/>all-headers: false (headers personalizados se pierden)
+
+    activate ProxyNI
+    Note over ProxyNI: Pipeline: NI01_EliminarFactorCanje_request<br/>Stage: FlujoEntrada
+
+    ProxyNI->>XQueryNI: Transformar Request
+    Note right of ProxyNI: Parámetros:<br/>$eliminarFactorCanje1<br/>$userName<br/>(usando fn:string)
+
+    activate XQueryNI
+    Note over XQueryNI: Mapeo de Campos:<br/>PROMO_ID → PV_IDPROMOCION<br/>upper-case(UserName) → PV_USUARIO
+
+    XQueryNI-->>ProxyNI: InputParameters XML
+    Note left of XQueryNI: PV_IDPROMOCION=PROMO_NI_2024_001<br/>PV_USUARIO=ADMIN_NI
+    deactivate XQueryNI
+
+    ProxyNI->>BizNI: wsCallout (eliminarFactorCanje)
+    Note right of ProxyNI: Request: $REQeliminarFactorCanje
+
+    activate BizNI
+    Note over BizNI: JCA Adapter<br/>Connection: ConnectionProxyNI<br/>Schema: PROXYNICARAGUA<br/>Operation: eliminarFactorCanje
+
+    BizNI->>DBNI: CALL PROXYNICARAGUA.PL_P_ELIMINAR_FACTOR_CANJE
+    Note right of BizNI: IN: PV_IDPROMOCION='PROMO_NI_2024_001'<br/>IN: PV_USUARIO='ADMIN_NI'
+
+    activate DBNI
+    Note over DBNI: Stored Procedure Execution<br/>Schema: PROXYNICARAGUA<br/>Procedure: PL_P_ELIMINAR_FACTOR_CANJE
+
+    alt Promoción Eliminada Exitosamente
+        DBNI-->>BizNI: OutputParameters
+        Note left of DBNI: OUT: PV_CODIGOMENSAJE='SUCCESS'<br/>OUT: PV_DESCRIPCIONMENSAJE='Eliminación exitosa'
+        deactivate DBNI
+
+        BizNI-->>ProxyNI: Response XML
+        deactivate BizNI
+
+        Note over ProxyNI: Extracción con fn:string:<br/>$errorCode=fn:string(PV_CODIGOMENSAJE)<br/>$validationMessage=fn:string(PV_DESCRIPCIONMENSAJE)
+
+        Note over ProxyNI: Pipeline: NI01_EliminarFactorCanje_response<br/>Stage: FlujoSalida<br/>Evaluación: $errorCode = 'SUCCESS'
+
+        ProxyNI-->>Cliente: SOAP Response (Success)
+        Note left of ProxyNI: Header: successIndicator=Success<br/>Body: <eliminarFactorCanjeResponse/>
+
+    else Error de Negocio
+        DBNI-->>BizNI: OutputParameters
+        Note left of DBNI: OUT: PV_CODIGOMENSAJE='ERROR'<br/>OUT: PV_DESCRIPCIONMENSAJE='Error en Nicaragua'
+        deactivate DBNI
+
+        BizNI-->>ProxyNI: Response XML
+        deactivate BizNI
+
+        Note over ProxyNI: Evaluación: $errorCode != 'SUCCESS'
+
+        ProxyNI-->>Cliente: SOAP Response (Error)
+        Note left of ProxyNI: Header: successIndicator=ERROR<br/>messages='Error en Nicaragua'
+
+    else Error Técnico
+        DBNI-->>BizNI: Exception
+        deactivate DBNI
+        BizNI-->>ProxyNI: Fault
+        deactivate BizNI
+
+        Note over ProxyNI: Error Handler: _onErrorHandler<br/>Stage: ManejoError
+
+        ProxyNI-->>Cliente: SOAP Response (Exception)
+        Note left of ProxyNI: Header: messageId=-1<br/>successIndicator=ERROR
+    end
+
+    deactivate ProxyNI
+
+    Note over Cliente,DBNI: Diferencias CRÍTICAS con otras regiones:<br/>1. Provider: http (no local)<br/>2. URI explícito: /Middleware/v2/ProxyServices/EliminarFactorCanjeNI<br/>3. all-headers: false (pérdida de headers personalizados)<br/>4. Selector: SOAP action<br/>5. Business Service: PXYNIC (no ABKNI)<br/>6. XQuery: eliminarFactorCanjeIn.xq (sin sufijo NI)<br/>7. Uso de fn:string explícito<br/>8. Esquema: PROXYNICARAGUA

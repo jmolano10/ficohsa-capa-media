@@ -1,0 +1,132 @@
+flowchart TD
+    Start([Cliente SOAP Request]) --> ValidacionXSD[Validación XSD]
+    
+    ValidacionXSD -->|Schema válido| ConsultaRuta[Consulta Ruta Regional]
+    ValidacionXSD -->|Schema inválido| ErrorXSD[Error de Validación XSD]
+    ErrorXSD --> ErrorHandler[Error Handler]
+    
+    ConsultaRuta --> PrepararConsulta[Preparar Request consultaRutaRegional]
+    
+    PrepararConsulta --> AsignarServiceId[Asignar serviceId = 'FICBCO0275']
+    AsignarServiceId --> TransformConsulta[XQuery Transform: consultaRutaRegionalIn]
+    
+    TransformConsulta --> InvocarConsulta[Invocar consultaRutaRegional_db]
+    
+    InvocarConsulta --> EvaluarRespuesta{PV_CODIGO_ERROR<br/>== 'SUCCESS'?}
+    
+    EvaluarRespuesta -->|No| ErrorRegional[Error Regional]
+    ErrorRegional --> ConstruirErrorRegional[Construir Response Header ERROR]
+    ConstruirErrorRegional --> RespuestaErrorRegional[Response con Error Regional]
+    RespuestaErrorRegional --> End([Fin])
+    
+    EvaluarRespuesta -->|Sí| AplicarDefectos[Aplicar Valores Por Defecto Región]
+    AplicarDefectos --> ExtraerRuta[Extraer $route = PV_UBICACION]
+    
+    ExtraerRuta --> EnrutamientoDinamico{Enrutamiento<br/>Dinámico<br/>$route}
+    
+    EnrutamientoDinamico -->|HN01| ProxyHN[EliminarFactorCanjeHN]
+    EnrutamientoDinamico -->|GT01| ProxyGT[EliminarFactorCanjeGT]
+    EnrutamientoDinamico -->|PA01| ProxyPA[EliminarFactorCanjePA]
+    EnrutamientoDinamico -->|NI01| ProxyNI[EliminarFactorCanjeNI]
+    
+    %% Flujo Honduras
+    ProxyHN --> TransformHN[XQuery: eliminarFactorCanjeHNIn.xq]
+    TransformHN --> MapeoHN[Mapeo:<br/>PROMO_ID → PV_IDPROMOCION<br/>upper-case UserName → PV_USUARIO]
+    MapeoHN --> BizHN[Business Service ABK]
+    BizHN --> ConnHN[Connection: ConnectionProxyAbanksHN<br/>Schema: default]
+    ConnHN --> SPHN[SP: PL_P_ELIMINAR_FACTOR_CANJE]
+    SPHN --> RespHN{PV_CODIGOMENSAJE<br/>== 'SUCCESS'?}
+    RespHN -->|Sí| SuccessHN[successIndicator = Success]
+    RespHN -->|No| ErrorHN[successIndicator = ERROR<br/>messages = PV_DESCRIPCIONMENSAJE]
+    SuccessHN --> ResponseHN[Response HN]
+    ErrorHN --> ResponseHN
+    ResponseHN --> EvalMapeoError
+    
+    %% Flujo Guatemala
+    ProxyGT --> TransformGT[XQuery: eliminarFactorCanjeGTIn.xq]
+    TransformGT --> MapeoGT[Mapeo:<br/>PROMO_ID → PV_IDPROMOCION<br/>upper-case UserName → PV_USUARIO]
+    MapeoGT --> BizGT[Business Service ABKGT]
+    BizGT --> ConnGT[Connection: ConnectionProxyAbanksGT<br/>Schema: PROXYABANKSGT]
+    ConnGT --> SPGT[SP: PL_P_ELIMINAR_FACTOR_CANJE]
+    SPGT --> RespGT{PV_CODIGOMENSAJE<br/>== 'SUCCESS'?}
+    RespGT -->|Sí| SuccessGT[successIndicator = Success]
+    RespGT -->|No| ErrorGT[successIndicator = ERROR<br/>messages = PV_DESCRIPCIONMENSAJE]
+    SuccessGT --> ResponseGT[Response GT]
+    ErrorGT --> ResponseGT
+    ResponseGT --> EvalMapeoError
+    
+    %% Flujo Panamá
+    ProxyPA --> ValidarSOAPActionPA[Validar SOAPAction Header]
+    ValidarSOAPActionPA --> TransformPA[XQuery: eliminarFactorCanjePAIn.xq]
+    TransformPA --> MapeoPA[Mapeo:<br/>PROMO_ID → PV_IDPROMOCION<br/>upper-case UserName → PV_USUARIO]
+    MapeoPA --> BizPA[Business Service ABKPA]
+    BizPA --> ConnPA[Connection: ConnectionProxyAbanksPA<br/>Schema: PROXYABANKSPA]
+    ConnPA --> SPPA[SP: PL_P_ELIMINAR_FACTOR_CANJE]
+    SPPA --> RespPA{PV_CODIGOMENSAJE<br/>== 'SUCCESS'?}
+    RespPA -->|Sí| SuccessPA[successIndicator = Success]
+    RespPA -->|No| ErrorPA[successIndicator = ERROR<br/>messages = PV_DESCRIPCIONMENSAJE]
+    SuccessPA --> ResponsePA[Response PA]
+    ErrorPA --> ResponsePA
+    ResponsePA --> EvalMapeoError
+    
+    %% Flujo Nicaragua
+    ProxyNI --> ValidarHTTPNI[Validar HTTP Provider<br/>URI: /Middleware/v2/ProxyServices/EliminarFactorCanjeNI<br/>all-headers: false]
+    ValidarHTTPNI --> ValidarSOAPActionNI[Validar SOAPAction Header]
+    ValidarSOAPActionNI --> TransformNI[XQuery: eliminarFactorCanjeIn.xq]
+    TransformNI --> MapeoNI[Mapeo:<br/>PROMO_ID → PV_IDPROMOCION<br/>upper-case UserName → PV_USUARIO<br/>usando fn:string]
+    MapeoNI --> BizNI[Business Service PXYNIC]
+    BizNI --> ConnNI[Connection: ConnectionProxyNI<br/>Schema: PROXYNICARAGUA]
+    ConnNI --> SPNI[SP: PL_P_ELIMINAR_FACTOR_CANJE]
+    SPNI --> RespNI{PV_CODIGOMENSAJE<br/>== 'SUCCESS'?}
+    RespNI -->|Sí| SuccessNI[successIndicator = Success]
+    RespNI -->|No| ErrorNI[successIndicator = ERROR<br/>messages = PV_DESCRIPCIONMENSAJE]
+    SuccessNI --> ResponseNI[Response NI]
+    ErrorNI --> ResponseNI
+    ResponseNI --> EvalMapeoError
+    
+    %% Evaluación de Mapeo de Errores
+    EvalMapeoError{successIndicator<br/>!= 'SUCCESS'?}
+    EvalMapeoError -->|Sí| InvocarMapeoError[Invocar MapeoErrores Proxy]
+    EvalMapeoError -->|No| RespuestaFinal[Response Final al Cliente]
+    
+    InvocarMapeoError --> PrepararMapeo[Preparar Request MapeoErrores]
+    PrepararMapeo --> ConcatMensaje[Concatenar: 'FICBCO0275' + '$#$' + messages]
+    ConcatMensaje --> TransformMapeo[XQuery: mapeoErroresUsageIn]
+    TransformMapeo --> LlamarMapeo[Llamar MapeoErrores.mapeoErrores]
+    LlamarMapeo --> TransformMapeoOut[XQuery: mapeoErroresUsageOut]
+    TransformMapeoOut --> ActualizarHeader[Actualizar Response Header con Error Mapeado]
+    ActualizarHeader --> RespuestaFinal
+    
+    RespuestaFinal --> End
+    
+    %% Error Handler Global
+    ErrorHandler --> CapturarFault[Capturar $fault]
+    CapturarFault --> ExtraerErrorCode[Extraer errorCode y errorMessage]
+    ExtraerErrorCode --> InvocarMapeoErrorFault[Invocar MapeoErrores]
+    InvocarMapeoErrorFault --> ConstruirHeaderError[Construir Response Header ERROR]
+    ConstruirHeaderError --> ConstruirBodyVacio[Construir Body Vacío]
+    ConstruirBodyVacio --> Reply[Reply al Cliente]
+    Reply --> End
+    
+    %% Estilos
+    classDef proxyClass fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef transformClass fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef bizClass fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef dbClass fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef errorClass fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+    classDef decisionClass fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class ProxyHN,ProxyGT,ProxyPA,ProxyNI proxyClass
+    class TransformHN,TransformGT,TransformPA,TransformNI,TransformConsulta,TransformMapeo,TransformMapeoOut transformClass
+    class BizHN,BizGT,BizPA,BizNI bizClass
+    class SPHN,SPGT,SPPA,SPNI,ConnHN,ConnGT,ConnPA,ConnNI dbClass
+    class ErrorXSD,ErrorRegional,ErrorHandler,ErrorHN,ErrorGT,ErrorPA,ErrorNI errorClass
+    class EvaluarRespuesta,EnrutamientoDinamico,RespHN,RespGT,RespPA,RespNI,EvalMapeoError decisionClass
+    
+    %% Notas adicionales
+    note1[Nota: Proxy Principal usa Service ID FICBCO0275<br/>para consultar ruta regional]
+    note2[Nota: HN y GT usan selector SOAP body<br/>PA y NI usan selector SOAP action]
+    note3[Nota: NI es el único con provider http<br/>y all-headers false]
+    note4[Nota: Todos los SP tienen la misma firma:<br/>IN: PV_IDPROMOCION, PV_USUARIO<br/>OUT: PV_CODIGOMENSAJE, PV_DESCRIPCIONMENSAJE]
+    note5[Nota: Response Body siempre vacío:<br/><eliminarFactorCanjeResponse/>]
+    note6[Nota: Retry Count = 0 en todas las regiones<br/>No hay reintentos automáticos]
