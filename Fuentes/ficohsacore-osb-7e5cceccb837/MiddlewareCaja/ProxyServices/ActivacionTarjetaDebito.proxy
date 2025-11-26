@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false" isAutoPublish="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="MiddlewareCaja/Resources/wsdls/ActivacionTarjetaDebito"/>
+      <con:port>
+        <con:name>T24WebServicesImplPort</con:name>
+        <con:namespace>T24WebServicesImpl</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+      <con:WSI-compliant>false</con:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/MiddlewareCaja/ActivacionTarjetaDebito</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-2384409316698514622--736b363.13cb5f6f6ac.-7154">
+    <con:pipeline type="request" name="Flujo Principal_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="Etapa de Entrada">
+        <con:comment>Se realiza el siguiente proceso:
+ 1. Consulta Maestra de Tarjeta Debito 
+ 2. Activación de Tarjeta Debito</con:comment>
+        <con:context>
+          <con1:varNsDecl namespace="T24WebServicesImpl" prefix="t24" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Consulta el tipo de producto de la tarjeta</con2:comment>
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7ebb</con2:id>
+            <con1:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/TarjetaDebito" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con1:operation>ConsultaMaestraTarjetaDebito</con1:operation>
+            <con1:request>
+              <con1:body>$REQUESTConsultaMaestraTarjetaDebito</con1:body>
+            </con1:request>
+            <con1:response>
+              <con1:body>RESPONSEConsultaMaestraTarjetaDebito</con1:body>
+            </con1:response>
+            <con1:requestTransform>
+              <con1:assign varName="REQUESTConsultaMaestraTarjetaDebito">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7e83</con2:id>
+                <con1:expr>
+                  <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                    <con2:resource ref="MiddlewareCaja/Resources/xqueries/ActivacionTarjetaDebito/ConsultaMaestraTarjetaDebitoIn"/>
+                    <con2:param name="activaciondetarjetadedebito">
+                      <con2:path>$body/t24:Activaciondetarjetadedebito</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+            </con1:requestTransform>
+            <con1:responseTransform>
+              <con1:assign varName="message">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7e15</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">let $status := fn:string($RESPONSEConsultaMaestraTarjetaDebito/Status/successIndicator/text())
+let $zeroRecords := fn:string($RESPONSEConsultaMaestraTarjetaDebito/WSFICODEBITCARDCUSTOMERType/ZERORECORDS/text())
+let $message := fn:string($RESPONSEConsultaMaestraTarjetaDebito/Status/messages/text())
+return
+	if ($status = "Success" and $zeroRecords = "") then (
+		""
+	) else if($status != "Success") then (
+		$message
+	) else (
+		$zeroRecords
+	)</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+            </con1:responseTransform>
+          </con1:wsCallout>
+          <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7ddd</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$message = ""</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:assign varName="cardNumber">
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7bc8</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">concat(	fn:string($RESPONSEConsultaMaestraTarjetaDebito/WSFICODEBITCARDCUSTOMERType/gWSFICODEBITCARDCUSTOMERDetailType/mWSFICODEBITCARDCUSTOMERDetailType/PRODUCTTYPE/text()),
+		".",
+		xs:long(fn:string($body/t24:Activaciondetarjetadedebito/LATAMCARDORDERACTIVEType/@id)))</con2:xqueryText>
+                  </con1:expr>
+                </con1:assign>
+                <con1:wsCallout>
+                  <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Se Activa la tarjeta</con2:comment>
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7d37</con2:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/TarjetaDebito" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>Activaciondetarjetadedebito</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQUESTActivaciondetarjetadedebito</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RESPONSEActivaciondetarjetadedebito</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:replace contents-only="true" varName="body">
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7b90</con2:id>
+                      <con1:location>
+                        <con2:xpathText xmlns:con2="http://www.bea.com/wli/sb/stages/config">./t24:Activaciondetarjetadedebito/LATAMCARDORDERACTIVEType/@id</con2:xpathText>
+                      </con1:location>
+                      <con1:expr>
+                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$cardNumber</con2:xqueryText>
+                      </con1:expr>
+                    </con1:replace>
+                    <con1:assign varName="REQUESTActivaciondetarjetadedebito">
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7cff</con2:id>
+                      <con1:expr>
+                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                          <con2:resource ref="MiddlewareCaja/Resources/xqueries/ActivacionTarjetaDebito/ActivacionTarjetaDebitoIn"/>
+                          <con2:param name="activaciondetarjetadedebito">
+                            <con2:path>$body/t24:Activaciondetarjetadedebito</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform/>
+                </con1:wsCallout>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con2:skip xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                <con2:id>_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7da5</con2:id>
+              </con2:skip>
+            </con1:default>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="Flujo Principal_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="Etapa de Salida">
+        <con:context>
+          <con1:varNsDecl namespace="T24WebServicesImpl" prefix="t24" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7cc7</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$message = ""</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace contents-only="true" varName="body">
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7c72</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$RESPONSEActivaciondetarjetadedebito</con2:xqueryText>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:replace contents-only="true" varName="body">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8668686979487548048-7851913c.13c5e4aa15c.-7c02</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config"><![CDATA[<ns2:ActivaciondetarjetadedebitoResponse xmlns:ns2="T24WebServicesImpl" xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+	<Status>
+		<successIndicator>T24Error</successIndicator>
+		<messages>{ $message }</messages>
+	</Status>
+</ns2:ActivaciondetarjetadedebitoResponse>]]></con2:xqueryText>
+                </con1:expr>
+              </con1:replace>
+            </con1:default>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con1:pipeline type="error" name="_onErrorHandler-2384409316698514622--736b363.13cb5f6f6ac.-7154">
+      <con1:stage name="Etapa de Error">
+        <con3:context xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+          <con2:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+        </con3:context>
+        <con3:actions xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+          <con1:replace varName="body">
+            <con2:id>_ActionId-2384409316698514622--736b363.13cb5f6f6ac.-711b</con2:id>
+            <con1:expr>
+              <con2:xqueryText><![CDATA[<t24:ActivaciondetarjetadedebitoResponse>
+	<Status>
+		<successIndicator>TWSError</successIndicator>
+		<messages>{ concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) }</messages>
+	</Status>
+</t24:ActivaciondetarjetadedebitoResponse>]]></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con2:reply>
+            <con2:id>_ActionId-2384409316698514622--736b363.13cb5f6f6ac.-711a</con2:id>
+          </con2:reply>
+        </con3:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:pipeline-node name="Flujo Principal">
+        <con:request>Flujo Principal_request</con:request>
+        <con:response>Flujo Principal_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

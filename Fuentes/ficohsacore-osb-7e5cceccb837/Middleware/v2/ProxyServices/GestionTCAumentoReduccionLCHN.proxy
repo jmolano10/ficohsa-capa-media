@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/GestionTCAumentoReduccionLC/wsdl/gestionTCAumentoReduccionLCPS"/>
+      <con:port>
+        <con:name>gestionTCAumentoReduccionLCPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/gestionTCAumentoReduccionLCPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP action"/>
+      <con:WSI-compliant>false</con:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-8016849906075864285-1a369eb2.17d7ca7082b.-7aee">
+    <con:pipeline type="request" name="GestionTCAumentoReduccionLCHN_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="consultaDatosTarjeta">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionTCAumentoReduccionLCTypes" prefix="ges" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:assign varName="codigoPais" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8016849906075864285-1a369eb2.17d7ca7082b.-7c90</con2:id>
+            <con1:expr>
+              <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                <con2:param name="sentidoConversion">
+                  <con2:path>"OSB-ISO3"</con2:path>
+                </con2:param>
+                <con2:param name="codigoPais">
+                  <con2:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con1:expr>
+          </con1:assign>
+          <con2:assign varName="TYPE_ORG">
+            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1006441890870307727-600b8846.1803df42103.-7bd6</con3:id>
+            <con2:expr>
+              <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($body/ges:gestionTCAumentoReduccionLC/TYPE_ORG/text())</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1006441890870307727-600b8846.1803df42103.-7b31</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$TYPE_ORG = 'BASE' or $TYPE_ORG = 'ALT'</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con1:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                  <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1006441890870307727-600b8846.1803df42103.-7a2d</con3:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoTarjeta/biz/conDatoTarjeta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>conDatoTarjeta</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQconDatoTarjeta</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RSPconDatoTarjeta</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQconDatoTarjeta">
+                      <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1006441890870307727-600b8846.1803df42103.-7a31</con3:id>
+                      <con1:expr>
+                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                          <con2:resource ref="Middleware/v2/Resources/MasterDataHN/xq/conDatoTarjetaIn"/>
+                          <con2:param name="cardNumber">
+                            <con2:path>fn:string($body/ges:gestionTCAumentoReduccionLC/CARD_NUMBER/text())</con2:path>
+                          </con2:param>
+                          <con2:param name="codigoPais">
+                            <con2:path>$codigoPais</con2:path>
+                          </con2:param>
+                          <con2:param name="org">
+                            <con2:path>''</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform>
+                    <con1:assign varName="sequence">
+                      <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1006441890870307727-600b8846.1803df42103.-7a30</con3:id>
+                      <con1:expr>
+                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($RSPconDatoTarjeta/con:RowSet/con:Row[1]/con:Column[@name = 'seqcard']/text())</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="errorCode">
+                      <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1006441890870307727-600b8846.1803df42103.-7a2f</con3:id>
+                      <con1:expr>
+                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:string($RSPconDatoTarjeta/con:CodigoError/text())</con3:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="validationMessage">
+                      <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1006441890870307727-600b8846.1803df42103.-7a2e</con3:id>
+                      <con1:expr>
+                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if( not($errorCode = '-1')) then(
+	string($RSPconDatoTarjeta/con:MensajeError/text())
+) else ('')</con3:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:responseTransform>
+                </con1:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default></con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ConsultaVisionPlus">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.procesa.com/fdcs" prefix="fdcs" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionTCAumentoReduccionLCTypes" prefix="ges" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-7fc9</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$TYPE_ORG = 'BASE' or $TYPE_ORG = 'ALT'</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                  <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-7d6c</con3:id>
+                  <con1:case>
+                    <con1:condition>
+                      <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con2:xqueryText>
+                    </con1:condition>
+                    <con1:actions>
+                      <con1:assign varName="org">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-7d6b</con3:id>
+                        <con1:expr>
+                          <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">let $tipoOrg := string($body/ges:gestionTCAumentoReduccionLC/TYPE_ORG/text())
+		for $row in $RSPconDatoTarjeta/con:RowSet/con:Row
+		where $row/con:Column[upper-case(@name) = 'TIPOORG' and  text() = $tipoOrg]
+		return 
+			data($row/con:Column[upper-case(@name) = 'ORG'])</con2:xqueryText>
+                        </con1:expr>
+                      </con1:assign>
+                      <con1:assign varName="foreignUse">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-7d6a</con3:id>
+                        <con1:expr>
+                          <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">let $tipoOrg := string($body/ges:gestionTCAumentoReduccionLC/TYPE_ORG/text())
+return 
+if($tipoOrg = 'BASE') then(
+	'0'
+)else(
+	'1'
+)</con3:xqueryText>
+                        </con1:expr>
+                      </con1:assign>
+                    </con1:actions>
+                  </con1:case>
+                  <con1:default/>
+                </con1:ifThenElse>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$TYPE_ORG != 'BASE' or $TYPE_ORG != 'ALT'or $TYPE_ORG != ''</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="sequence">
+                  <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-7c28</con3:id>
+                  <con2:expr>
+                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">'1'</con3:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:assign varName="org">
+                  <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-7c26</con3:id>
+                  <con2:expr>
+                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$TYPE_ORG</con3:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:assign varName="foreignUse">
+                  <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-7c24</con3:id>
+                  <con2:expr>
+                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if($TYPE_ORG = '341') then(
+	'1'
+) else(
+	'0'
+)</con3:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+          <con1:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-79d6</con3:id>
+            <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con1:operation>CardSpendingLimitsUpdate</con1:operation>
+            <con1:request>
+              <con1:body>$REQCardSpendingLimitsUpdate</con1:body>
+            </con1:request>
+            <con1:response>
+              <con1:body>RSPCardSpendingLimitsUpdate</con1:body>
+            </con1:response>
+            <con1:requestTransform>
+              <con1:assign varName="REQCardSpendingLimitsUpdate">
+                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-79d9</con3:id>
+                <con1:expr>
+                  <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                    <con2:resource ref="Middleware/v2/Resources/GestionTCAumentoReduccionLC/xq/cardSpendingLimitsUpdateIn"/>
+                    <con2:param name="foreignUse">
+                      <con2:path>$foreignUse</con2:path>
+                    </con2:param>
+                    <con2:param name="cardSequence">
+                      <con2:path>$sequence</con2:path>
+                    </con2:param>
+                    <con2:param name="gestionTCAumentoReduccionLC">
+                      <con2:path>$body/ges:gestionTCAumentoReduccionLC</con2:path>
+                    </con2:param>
+                    <con2:param name="org">
+                      <con2:path>$org</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+            </con1:requestTransform>
+            <con1:responseTransform>
+              <con1:assign varName="errorCode">
+                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-79d8</con3:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">let $returnCode := string($RSPCardSpendingLimitsUpdate/ServiceReturnCode/text())
+return
+if($returnCode != "P")then(
+	fn:string($RSPCardSpendingLimitsUpdate/fdcs:ReturnCodes/RC[1]/Code/text())
+)else($returnCode)</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="validationMessage">
+                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-649845384725312738-18617500.1804287587a.-79d7</con3:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if( not($errorCode = 'P')) then(
+	string($RSPCardSpendingLimitsUpdate/fdcs:ReturnCodes/RC[1]/Desc/text())
+) 
+else(
+	''
+)</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+            </con1:responseTransform>
+          </con1:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="GestionTCAumentoReduccionLCHN_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionTCAumentoReduccionLCTypes" prefix="ges" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8016849906075864285-1a369eb2.17d7ca7082b.-7b58</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace contents-only="true" varName="header">
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8016849906075864285-1a369eb2.17d7ca7082b.-7b3f</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:replace contents-only="true" varName="header">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8016849906075864285-1a369eb2.17d7ca7082b.-7b21</con2:id>
+                <con1:expr>
+                  <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                </con1:expr>
+              </con1:replace>
+            </con1:default>
+          </con1:ifThenElse>
+          <con1:replace contents-only="true" varName="body" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8016849906075864285-1a369eb2.17d7ca7082b.-7aef</con2:id>
+            <con1:expr>
+              <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;ges:gestionTCAumentoReduccionLCResponse/></con3:xqueryText>
+            </con1:expr>
+          </con1:replace>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con1:pipeline type="error" name="_onErrorHandler-8016849906075864285-1a369eb2.17d7ca7082b.-7aee">
+      <con1:stage name="ManejoError">
+        <con1:context>
+          <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionTCAumentoReduccionLCTypes" prefix="ges"/>
+        </con1:context>
+        <con1:actions>
+          <con2:replace contents-only="true" varName="header">
+            <con:id>_ActionId-8016849906075864285-1a369eb2.17d7ca7082b.-7acd</con:id>
+            <con2:expr>
+              <con:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body">
+            <con:id>_ActionId-8016849906075864285-1a369eb2.17d7ca7082b.-7ab3</con:id>
+            <con2:expr>
+              <con:xqueryText>&lt;ges:gestionTCAumentoReduccionLCResponse/></con:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con:reply>
+            <con:id>_ActionId-8016849906075864285-1a369eb2.17d7ca7082b.-7a9a</con:id>
+          </con:reply>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:pipeline-node name="GestionTCAumentoReduccionLCHN">
+        <con:request>GestionTCAumentoReduccionLCHN_request</con:request>
+        <con:response>GestionTCAumentoReduccionLCHN_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

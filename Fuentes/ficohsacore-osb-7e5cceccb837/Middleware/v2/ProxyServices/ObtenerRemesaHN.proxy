@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/ObtenerRemesa/wsdl/obtenerRemesaPS"/>
+      <con:port>
+        <con:name>obtenerRemesaPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/obtenerRemesaPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-1814294432040557696--35a0189b.1880165e803.6bb0">
+    <con:pipeline type="request" name="PipelinePairNode1_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="ObtenerRemesa">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/sincronizacionRemesasT24" prefix="sin"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/obtenerRemesaTypes" prefix="obt"/>
+        </con:context>
+        <con:actions>
+          <con3:wsCallout xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6ab5</con1:id>
+            <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/INTFC/sincronizacionRemesasT24/biz/sincronizacionRemesasT24_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>sincronizacionRemesasT24</con3:operation>
+            <con3:request>
+              <con3:body>$REQObtenerRemesa</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>RSPObtenerRemesa</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="REQObtenerRemesa">
+                <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6ad9</con1:id>
+                <con3:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/ObtenerRemesa/xq/obtenerRemesaHNIn"/>
+                    <con1:param name="obtenerRemesa">
+                      <con1:path>$body/obt:obtenerRemesa</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+            </con3:requestTransform>
+            <con3:responseTransform>
+              <con3:assign varName="errorCode">
+                <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6aea</con1:id>
+                <con3:expr>
+                  <con1:xqueryText>let $errorCode := string($RSPObtenerRemesa/sin:PV_SUCCESS/text())
+return
+if($errorCode = 'SUCCESS')then(
+	'Success'
+)else(
+	'ERROR'
+)</con1:xqueryText>
+                </con3:expr>
+              </con3:assign>
+              <con3:assign varName="validationMessage">
+                <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6b11</con1:id>
+                <con3:expr>
+                  <con1:xqueryText>if(upper-case($errorCode) = 'SUCCESS')then(
+	''
+)else(
+	string($RSPObtenerRemesa/sin:PV_MESSAGE/text())
+)</con1:xqueryText>
+                </con3:expr>
+              </con3:assign>
+            </con3:responseTransform>
+          </con3:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="PipelinePairNode1_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/obtenerRemesaTypes" prefix="obt"/>
+        </con:context>
+        <con:actions>
+          <con3:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6b2f</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>$validationMessage = ""</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:replace contents-only="true" varName="header">
+                  <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6b67</con1:id>
+                  <con3:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con3:expr>
+                </con3:replace>
+                <con3:replace varName="body" contents-only="true">
+                  <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6ba0</con1:id>
+                  <con3:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/ObtenerRemesa/xq/obtenerRemesaHNOut"/>
+                      <con1:param name="outputParameters">
+                        <con1:path>$RSPObtenerRemesa</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+              </con3:actions>
+            </con3:case>
+            <con3:default>
+              <con3:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6b83</con1:id>
+                <con3:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con3:expr>
+              </con3:replace>
+              <con3:replace varName="body" contents-only="true">
+                <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6baf</con1:id>
+                <con3:expr>
+                  <con1:xqueryText>&lt;obt:obtenerRemesaResponse/></con1:xqueryText>
+                </con3:expr>
+              </con3:replace>
+            </con3:default>
+          </con3:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con2:pipeline type="error" name="_onErrorHandler-1814294432040557696--35a0189b.1880165e803.6bb0">
+      <con2:stage name="stage1">
+        <con2:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/obtenerRemesaTypes" prefix="obt"/>
+        </con2:context>
+        <con2:actions>
+          <con:replace varName="header" contents-only="true">
+            <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6bc1</con1:id>
+            <con:expr>
+              <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{string($fault/ctx:errorCode/text())}</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+            </con:expr>
+          </con:replace>
+          <con:replace varName="body" contents-only="true">
+            <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6be6</con1:id>
+            <con:expr>
+              <con1:xqueryText>&lt;obt:obtenerRemesaResponse/></con1:xqueryText>
+            </con:expr>
+          </con:replace>
+          <con1:reply>
+            <con1:id>_ActionId-1814294432040557696--35a0189b.1880165e803.6c07</con1:id>
+          </con1:reply>
+        </con2:actions>
+      </con2:stage>
+    </con2:pipeline>
+    <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:pipeline-node name="PipelinePairNode1">
+        <con:request>PipelinePairNode1_request</con:request>
+        <con:response>PipelinePairNode1_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

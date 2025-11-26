@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/ConsultaDetalleIntra/wsdl/consultaDetalleIntraPS"/>
+      <con:port>
+        <con:name>consultaDetalleIntraPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaDetalleIntraPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-17172394964498363-2b92d08f.17b0cb0815e.-7d78">
+    <con:pipeline type="request" name="HN01_ConsultaDetalleIntra_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDetalleComprasCuotas" prefix="con1"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetalleIntraTypes" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="codigoPais">
+            <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7e8a</con1:id>
+            <con2:expr>
+              <con1:xqueryTransform>
+                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                <con1:param name="codigoPais">
+                  <con1:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                </con1:param>
+                <con1:param name="sentidoConversion">
+                  <con1:path>'OSB-ISO3'</con1:path>
+                </con1:param>
+              </con1:xqueryTransform>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7e66</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conDetalleComprasCuotas/biz/conDetalleComprasCuotas_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>conDetalleComprasCuotas</con2:operation>
+            <con2:request>
+              <con2:body>$REQConDetalleComprasCuotas</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPConDetalleComprasCuotas</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQConDetalleComprasCuotas">
+                <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7e3e</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MasterDataHN/xq/conDetalleComprasCuotasHNIn"/>
+                    <con1:param name="tipo">
+                      <con1:path>string($body/con:consultaDetalleIntra/SEARCH_CRITERIA/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="originalInstall">
+                      <con1:path>string($body/con:consultaDetalleIntra/INTRAFINANCING_ID/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="org">
+                      <con1:path>''</con1:path>
+                    </con1:param>
+                    <con1:param name="pais">
+                      <con1:path>$codigoPais</con1:path>
+                    </con1:param>
+                    <con1:param name="numCuenta">
+                      <con1:path>string($body/con:consultaDetalleIntra/SEARCH_VALUE/text())</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+              <con2:validate>
+                <con1:id>_ActionId-1936724632990058240-62071e8e.17b2b30977a.-7ddb</con1:id>
+                <con2:schema ref="Middleware/v2/BusinessServices/MasterDataHN/conDetalleComprasCuotas/xsd/conDetalleComprasCuotas_sp"/>
+                <con2:schemaElement xmlns:con3="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDetalleComprasCuotas">con3:InputParameters</con2:schemaElement>
+                <con2:varName>REQConDetalleComprasCuotas</con2:varName>
+              </con2:validate>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="countRow">
+                <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7e1b</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>let $items := $RSPConDetalleComprasCuotas/con1:RowSet/con1:Row
+let $count := count($items)
+return 
+	$count</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="codigoError">
+                <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7e04</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>let $errorCode := string($RSPConDetalleComprasCuotas/con1:CodigoError/text())
+return
+	if($countRow  = '0' and $errorCode = '-1')then(
+		'NO RECORDS'
+	)else(
+		$errorCode
+	)</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="validationMessage">
+                <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7dde</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>if($codigoError = '-1')then(
+	''
+)else(
+	fn:string($RSPConDetalleComprasCuotas/con1:MensajeError/text())
+)</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="HN01_ConsultaDetalleIntra_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetalleIntraTypes" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7dce</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = '' and $codigoError = '-1'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7d79</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace varName="body" contents-only="true">
+                  <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7ce6</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/ConsultaDetalleIntra/xq/consultaDetalleIntraGTOut"/>
+                      <con1:param name="outputParameters">
+                        <con1:path>$RSPConDetalleComprasCuotas</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace varName="header" contents-only="true">
+                <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7db8</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{$codigoError}</successIndicator>
+	<messages>{$validationMessage}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace varName="body" contents-only="true">
+                <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7d93</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;con:consultaDetalleIntraResponse/></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-17172394964498363-2b92d08f.17b0cb0815e.-7d78">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetalleIntraTypes" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con2:replace varName="header" contents-only="true">
+            <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7d05</con1:id>
+            <con2:expr>
+              <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+    <successIndicator>{string($fault/ctx:errorCode/text())}</successIndicator>
+    <messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7d04</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;con:consultaDetalleIntraResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-17172394964498363-2b92d08f.17b0cb0815e.-7d03</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="HN01_ConsultaDetalleIntra">
+        <con:request>HN01_ConsultaDetalleIntra_request</con:request>
+        <con:response>HN01_ConsultaDetalleIntra_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

@@ -1,0 +1,894 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isAutoPublish="false" isTracingEnabled="false">
+    <ser:security/>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con3:SoapBindingType" xmlns:con3="http://www.bea.com/wli/sb/services/bindings/config">
+      <con3:wsdl ref="Middleware/v2/Resources/PagoRecaudoCB/wsdl/PagoRecaudoCB"/>
+      <con3:port>
+        <con3:name>pagoRecaudoPSSOAP</con3:name>
+        <con3:namespace>http://www.ficohsa.com.hn/middleware.services/pagoRecaudo/</con3:namespace>
+      </con3:port>
+      <con3:selector type="SOAP body"/>
+      <con3:WSI-compliant>false</con3:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/SMiddleware/OperationsAndExecution/Payments/PagoRecaudoCBS</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific xsi:type="http:HttpEndPointConfiguration">
+      <http:inbound-properties>
+        <http:use-https>true</http:use-https>
+      </http:inbound-properties>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-104776337268468776--2de47d6a.1569960ecdb.-622c">
+    <con:pipeline type="error" name="_onErrorHandler-104776337268468776--2de47d6a.1569960ecdb.-622c">
+      <con:stage name="ExceptionHandler">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes" prefix="pag"/>
+        </con:context>
+        <con:actions>
+          <con4:log xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+            <con1:id>_ActionId-2414871139748681568--6c155157.156c301061a.-6fa6</con1:id>
+            <con4:logLevel>debug</con4:logLevel>
+            <con4:expr>
+              <con1:xqueryText>fn:concat("ERROR_OSB: FICBCO0214 - ", fn:string($fault/ctx:errorCode/text()))</con1:xqueryText>
+            </con4:expr>
+            <con4:message>&lt;&lt;&lt; Error Interno de Servicio >>></con4:message>
+          </con4:log>
+          <con2:ifThenElse xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+            <con1:comment>Condicion para evaluar el tipo de error y determinar el curso de acción. Los posibles resultados son:
+* MW-0001: Se ha excedido cuota de uso de servicio. Se debe mostrar un error pero no se debe liberar el cupo de uso de servicio.
+* BEA-382505: Error es producto de validación de request. En este caso se debe devolver un error indicando que partes del request están inválidos. No se debe liberar el cupo de servicio ya que aún no se ha tomado un cupo.</con1:comment>
+            <con1:id>_ActionId-2414871139748681568--6c155157.156c301061a.-6f21</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>fn:string($fault/ctx:errorCode/text()) = "BEA-382505"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-2414871139748681568--6c155157.156c301061a.-6f20</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/Genericos/mapeoErrorValidate"/>
+                      <con1:param name="anyType1">
+                        <con1:path>$fault</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>fn:string($fault/ctx:errorCode/text()) = "MW-0001"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-2414871139748681568--6c155157.156c301061a.-6f1f</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>fn:string($fault/ctx:errorCode/text()) = "MW-0002"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-2414871139748681568--6c155157.156c301061a.-6f1e</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con3:route>
+                <con1:id>_ActionId-2414871139748681568--6c155157.156c301061a.-6f1d</con1:id>
+                <con3:service ref="Middleware/Business_Resources/general/Resources/RegistrarUsoServicio/registrarUsoServicio_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                <con3:operation>registrarUsoServicio</con3:operation>
+                <con3:outboundTransform>
+                  <con2:replace varName="body" contents-only="true">
+                    <con1:id>_ActionId-2414871139748681568--6c155157.156c301061a.-6f1c</con1:id>
+                    <con2:expr>
+                      <con1:xqueryTransform>
+                        <con1:resource ref="Middleware/Business_Resources/general/UsoServicio/registroUsoServicioIn"/>
+                        <con1:param name="idServicio">
+                          <con1:path>$serviceId</con1:path>
+                        </con1:param>
+                        <con1:param name="idUsuario">
+                          <con1:path>$username</con1:path>
+                        </con1:param>
+                        <con1:param name="bancoOrigen">
+                          <con1:path>$sourceBank</con1:path>
+                        </con1:param>
+                        <con1:param name="operacion">
+                          <con1:path>"2"</con1:path>
+                        </con1:param>
+                      </con1:xqueryTransform>
+                    </con2:expr>
+                  </con2:replace>
+                </con3:outboundTransform>
+              </con3:route>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ManejoError">
+        <con4:context xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+          <con5:userNsDecl namespace="urn:entrust.com:ig:authenticationV6:wsdl" prefix="ns1" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+          <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validacionTokenTypes" prefix="val" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+          <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+          <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionTokenTypes" prefix="val1" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+          <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/cambioFactorSeguridadTypes" prefix="cam" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes" prefix="pag"/>
+        </con4:context>
+        <con4:actions xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+          <con5:assign varName="errorCode" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7caf</con1:id>
+            <con5:expr>
+              <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($fault/ctx:errorCode/text())</con5:xqueryText>
+            </con5:expr>
+          </con5:assign>
+          <con5:assign varName="errorMessage" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7cae</con1:id>
+            <con5:expr>
+              <con6:xqueryText xmlns:con6="http://www.bea.com/wli/sb/stages/config">fn:string($fault/ctx:reason/text())</con6:xqueryText>
+            </con5:expr>
+          </con5:assign>
+          <con5:wsCallout xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7cab</con1:id>
+            <con5:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con5:operation>mapeoErrores</con5:operation>
+            <con5:request>
+              <con5:body>$reqMapeoErrores</con5:body>
+            </con5:request>
+            <con5:response>
+              <con5:body>respMapeoErrores</con5:body>
+            </con5:response>
+            <con5:requestTransform>
+              <con5:assign varName="reqMapeoErrores">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7cad</con1:id>
+                <con5:expr>
+                  <con6:xqueryTransform xmlns:con6="http://www.bea.com/wli/sb/stages/config">
+                    <con6:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con6:param name="MENSAJE_ERROR">
+                      <con6:path>fn:concat("FICBCO0214", "$#$", $errorMessage)</con6:path>
+                    </con6:param>
+                    <con6:param name="CODIGO_ERROR">
+                      <con6:path>$errorCode</con6:path>
+                    </con6:param>
+                  </con6:xqueryTransform>
+                </con5:expr>
+              </con5:assign>
+            </con5:requestTransform>
+            <con5:responseTransform>
+              <con5:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7cac</con1:id>
+                <con5:expr>
+                  <con6:xqueryTransform xmlns:con6="http://www.bea.com/wli/sb/stages/config">
+                    <con6:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con6:param name="mapeoErroresResponse1">
+                      <con6:path>$respMapeoErrores</con6:path>
+                    </con6:param>
+                    <con6:param name="successIndicator">
+                      <con6:path>$errorCode</con6:path>
+                    </con6:param>
+                  </con6:xqueryTransform>
+                </con5:expr>
+              </con5:replace>
+            </con5:responseTransform>
+          </con5:wsCallout>
+          <con5:replace varName="body" contents-only="true" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7caa</con1:id>
+            <con5:expr>
+              <con1:xqueryText>&lt;pag:pagoRecaudoResponse/></con1:xqueryText>
+            </con5:expr>
+          </con5:replace>
+          <con5:reply xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+            <con5:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7ca9</con5:id>
+          </con5:reply>
+        </con4:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ValidacionesGenerales_request">
+      <con:stage name="ValidacionRequest">
+        <con:context xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config">
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes" prefix="pag"/>
+        </con:context>
+        <con:actions xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config">
+          <con2:validate>
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7c70</con1:id>
+            <con2:schema ref="Middleware/v2/Resources/PagoRecaudoCB/xsd/pagoRecaudoCBTypes"/>
+            <con2:schemaElement xmlns:pag="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes">pag:pagoRecaudo</con2:schemaElement>
+            <con2:varName>body</con2:varName>
+            <con2:location>
+              <con1:xpathText>./pag:pagoRecaudo</con1:xpathText>
+            </con2:location>
+          </con2:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionRegional">
+        <con:context xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config">
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes" prefix="pag"/>
+        </con:context>
+        <con:actions xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config">
+          <con2:wsCallout>
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7bda</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>ValidaServicioRegional</con2:operation>
+            <con2:request>
+              <con2:body>$REQValidaRegional</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPValidaRegional</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQValidaRegional">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7be0</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                    <con1:param name="requestHeader1">
+                      <con1:path>$header/aut:RequestHeader</con1:path>
+                    </con1:param>
+                    <con1:param name="serviceId">
+                      <con1:path>"FICBCO0214"</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:ifThenElse>
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7bdf</con1:id>
+                <con2:case>
+                  <con2:condition>
+                    <con1:xqueryText>fn:string($RSPValidaRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7bde</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($RSPValidaRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7bdd</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>&lt;pag:pagoRecaudoResponse/></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7bdc</con1:id>
+                    </con1:reply>
+                  </con2:actions>
+                </con2:case>
+                <con2:default>
+                  <con2:replace varName="header" contents-only="true">
+                    <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7bdb</con1:id>
+                    <con2:expr>
+                      <con1:xqueryTransform>
+                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegionCB"/>
+                        <con1:param name="requestHeader">
+                          <con1:path>$header/aut:RequestHeader</con1:path>
+                        </con1:param>
+                      </con1:xqueryTransform>
+                    </con2:expr>
+                  </con2:replace>
+                </con2:default>
+              </con2:ifThenElse>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+      <con:stage name="validarCorresponsal">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultarCorresponsalB" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRecaudoTypes" prefix="con1"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes" prefix="pag"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="sourceBank">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e9d</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="codCorresponsal">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e9c</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($header/aut:RequestHeader/BankingCorrespondent/Id/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e8f</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/consultarCorresponsalB/biz/consultarCorresponsalB_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>consultarCorresponsalB</con2:operation>
+            <con2:request>
+              <con2:body>$REQConsultaCorresponsal</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPConsultaCorresponsal</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQConsultaCorresponsal">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e9b</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/Genericos/consultarCorresponsalBIn"/>
+                    <con1:param name="bankingCorrespId">
+                      <con1:path>$codCorresponsal</con1:path>
+                    </con1:param>
+                    <con1:param name="transactionType">
+                      <con1:path>"3"</con1:path>
+                    </con1:param>
+                    <con1:param name="sourceBank">
+                      <con1:path>$sourceBank</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="successIndCorrespB">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e9a</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPConsultaCorresponsal/con:PV_CODIGO_MENSAJE/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:ifThenElse>
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e99</con1:id>
+                <con2:case>
+                  <con2:condition>
+                    <con1:xqueryText>$successIndCorrespB != 'SUCCESS'</con1:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e98</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $successIndCorrespB }</successIndicator>
+	<messages>{ fn:string($RSPConsultaCorresponsal/con:PV_MENSAJE_ERROR/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e97</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>&lt;pag:pagoRecaudoResponse/></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e96</con1:id>
+                    </con1:reply>
+                  </con2:actions>
+                </con2:case>
+                <con2:default>
+                  <con2:assign varName="cuentaDebito">
+                    <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e95</con1:id>
+                    <con2:expr>
+                      <con1:xqueryText>fn:string($RSPConsultaCorresponsal/con:PV_CUENTA_DEBITO/text())</con1:xqueryText>
+                    </con2:expr>
+                  </con2:assign>
+                  <con2:assign varName="monedaValida" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                    <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e94</con1:id>
+                    <con2:expr>
+                      <con1:xqueryText>fn:string($RSPConsultaCorresponsal/con:PV_MONEDA_PERMITIDA/text())</con1:xqueryText>
+                    </con2:expr>
+                  </con2:assign>
+                  <con2:ifThenElse xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                    <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e93</con1:id>
+                    <con2:case>
+                      <con2:condition>
+                        <con1:xqueryText>$body/pag:pagoRecaudo/PAYMENT_INFORMATION/PAYMENT_CURRENCY/text() != $monedaValida</con1:xqueryText>
+                      </con2:condition>
+                      <con2:actions>
+                        <con2:assign varName="successIndCorrespB">
+                          <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e92</con1:id>
+                          <con2:expr>
+                            <con1:xqueryText>'ERROR'</con1:xqueryText>
+                          </con2:expr>
+                        </con2:assign>
+                        <con2:replace varName="header" contents-only="true">
+                          <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e91</con1:id>
+                          <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $successIndCorrespB }</successIndicator>
+	<messages>{ 'MONEDA INVALIDA PARA TRANSACCION' }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                          </con2:expr>
+                        </con2:replace>
+                        <con2:replace varName="body" contents-only="true">
+                          <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e90</con1:id>
+                          <con2:expr>
+                            <con1:xqueryText>&lt;pag:pagoRecaudoResponse/></con1:xqueryText>
+                          </con2:expr>
+                        </con2:replace>
+                        <con1:reply>
+                          <con1:id>_ActionId-6202391981550097452--67a00edf.15a28f39e33.-7f3a</con1:id>
+                        </con1:reply>
+                      </con2:actions>
+                    </con2:case>
+                    <con2:default/>
+                  </con2:ifThenElse>
+                </con2:default>
+              </con2:ifThenElse>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionUsoServicio">
+        <con:context xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/registrarUsoServicio" prefix="osb"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoPrestamoTypes" prefix="pag"/>
+        </con:context>
+        <con:actions xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+          <con2:assign varName="username">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e8e</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($header/aut:RequestHeader/Authentication/UserName/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="sourceBank">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e8d</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="serviceId">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e8c</con1:id>
+            <con2:expr>
+              <con1:xqueryText>"FICBCO0214"</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e89</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/RegistrarUsoServicio/registrarUsoServicio_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>registrarUsoServicio</con2:operation>
+            <con2:request>
+              <con2:body>$REQRegUsoSvc</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPRegUsoSvc</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQRegUsoSvc">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e8b</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/Business_Resources/general/UsoServicio/registroUsoServicioIn"/>
+                    <con1:param name="idServicio">
+                      <con1:path>$serviceId</con1:path>
+                    </con1:param>
+                    <con1:param name="idUsuario">
+                      <con1:path>$username</con1:path>
+                    </con1:param>
+                    <con1:param name="bancoOrigen">
+                      <con1:path>$sourceBank</con1:path>
+                    </con1:param>
+                    <con1:param name="operacion">
+                      <con1:path>"1"</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="statusUsoServicio">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e8a</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPRegUsoSvc/osb:PN_CODIGO_ERROR/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e88</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$statusUsoServicio != "0"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e87</con1:id>
+                  <con2:errCode>MW-0001</con2:errCode>
+                  <con2:message>SERVICE QUOTA EXCEEDED</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionesGenerales_response">
+      <con:stage name="MapeoError">
+        <con4:context xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+          <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+        </con4:context>
+        <con4:actions xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+          <con5:ifThenElse xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7d05</con1:id>
+            <con5:case>
+              <con5:condition>
+                <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con5:xqueryText>
+              </con5:condition>
+              <con5:actions>
+                <con5:wsCallout>
+                  <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7d02</con1:id>
+                  <con5:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con5:operation>mapeoErrores</con5:operation>
+                  <con5:request>
+                    <con5:body>$REQMapeoErrores</con5:body>
+                  </con5:request>
+                  <con5:response>
+                    <con5:body>RSPMapeoErrores</con5:body>
+                  </con5:response>
+                  <con5:requestTransform>
+                    <con5:assign varName="REQMapeoErrores">
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7d04</con1:id>
+                      <con5:expr>
+                        <con5:xqueryTransform xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                          <con5:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                          <con5:param name="CODIGO_ERROR">
+                            <con5:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con5:path>
+                          </con5:param>
+                          <con5:param name="MENSAJE_ERROR">
+                            <con5:path>fn:concat("FICBCO0214","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con5:path>
+                          </con5:param>
+                        </con5:xqueryTransform>
+                      </con5:expr>
+                    </con5:assign>
+                  </con5:requestTransform>
+                  <con5:responseTransform>
+                    <con5:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7d03</con1:id>
+                      <con5:expr>
+                        <con5:xqueryTransform xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                          <con5:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                          <con5:param name="mapeoErroresResponse1">
+                            <con5:path>$RSPMapeoErrores</con5:path>
+                          </con5:param>
+                          <con5:param name="successIndicator">
+                            <con5:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con5:path>
+                          </con5:param>
+                        </con5:xqueryTransform>
+                      </con5:expr>
+                    </con5:replace>
+                  </con5:responseTransform>
+                </con5:wsCallout>
+              </con5:actions>
+            </con5:case>
+            <con5:default/>
+          </con5:ifThenElse>
+        </con4:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="HN01_PagoRecaudo_request">
+      <con:stage name="proxyRequest">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes" prefix="pag"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e27</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v3/ProxyServices/PagoRecaudo" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>pagoRecaudo</con2:operation>
+            <con2:request>
+              <con2:body>$REQPagoRecaudo</con2:body>
+              <con2:header>$REQHdrPagoRecaudo</con2:header>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPPagoRecaudo</con2:body>
+              <con2:header>RSPHdrPagoRecaudo</con2:header>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="tipoPago">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e32</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($body/pag:pagoRecaudo/PAYMENT_INFORMATION/PAYMENT_METHOD/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="REQHdrPagoRecaudo">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e31</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>$header</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:ifThenElse xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e30</con1:id>
+                <con2:case>
+                  <con2:condition>
+                    <con1:xqueryText>$tipoPago = 'CASH'</con1:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e2f</con1:id>
+                      <con2:location>
+                        <con1:xpathText>./pag:pagoRecaudo/PAYMENT_INFORMATION/DEBIT_ACCOUNT</con1:xpathText>
+                      </con2:location>
+                      <con2:expr>
+                        <con1:xqueryText>$cuentaDebito</con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e2e</con1:id>
+                      <con2:location>
+                        <con1:xpathText>./pag:pagoRecaudo/PAYMENT_INFORMATION/PAYMENT_METHOD</con1:xpathText>
+                      </con2:location>
+                      <con2:expr>
+                        <con1:xqueryText>'ACCT_DEBIT'</con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:actions>
+                </con2:case>
+                <con2:default>
+                  <con2:Error>
+                    <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e2d</con1:id>
+                    <con2:errCode>MW-0002</con2:errCode>
+                    <con2:message>Los tipos de pago de Recaudo permitidos deben ser Cash</con2:message>
+                  </con2:Error>
+                </con2:default>
+              </con2:ifThenElse>
+              <con2:assign varName="REQPagoRecaudo">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e2c</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/PagoRecaudoCB/xq/PagoRecaudoCBInn"/>
+                    <con1:param name="pagoRecaudo1">
+                      <con1:path>$body/pag:pagoRecaudo</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="successIndicatorPagoRecaudo" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e2b</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:upper-case(fn:string($RSPHdrPagoRecaudo/aut:ResponseHeader/successIndicator/text()))</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="messageIdjPagoRecaudo" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e2a</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:upper-case(fn:string($RSPHdrPagoRecaudo/aut:ResponseHeader/messages/text()))</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="transactionIdFT" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e29</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPHdrPagoRecaudo/aut:ResponseHeader/transactionId/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="secTranCB" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7e28</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($body/pag:pagoRecaudo/TRANSACTION_ID_BC/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+      <con:stage name="RegistroTxn" errorHandler="_onErrorHandler-6202391981550097452--67a00edf.15a28f39e33.-7e18">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes" prefix="pag"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+            <con1:id>_ActionId-6202391981550097452--67a00edf.15a28f39e33.-7e19</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/registrarTxnCorresponsalB/biz/registrarTxnCorresponsalB_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>registrarTxnCorresponsalB</con2:operation>
+            <con2:request>
+              <con2:body>$REQRegTxnCor</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPRegTxnCor</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQRegTxnCor">
+                <con1:id>_ActionId-6202391981550097452--67a00edf.15a28f39e33.-7e1a</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/registrarTxnCorresponsalBancIn"/>
+                    <con1:param name="Moneda">
+                      <con1:path>fn:string($body/pag:pagoRecaudo/PAYMENT_INFORMATION/PAYMENT_CURRENCY/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="FechaTrans">
+                      <con1:path>fn:string($RSPHdrPagoRecaudo/aut:ResponseHeader/valueDate/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="CodigoCorresponsal">
+                      <con1:path>fn:string($header/aut:RequestHeader/BankingCorrespondent/Id/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="monedaComision">
+                      <con1:path>""</con1:path>
+                    </con1:param>
+                    <con1:param name="TokenId">
+                      <con1:path>""</con1:path>
+                    </con1:param>
+                    <con1:param name="SubPuntoVenta">
+                      <con1:path>fn:string($header/aut:RequestHeader/BankingCorrespondent/SubPointOfSale/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="CodigoTransaccion">
+                      <con1:path>3</con1:path>
+                    </con1:param>
+                    <con1:param name="CodigoPais">
+                      <con1:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="EstadoTrans">
+                      <con1:path>fn:concat($successIndicatorPagoRecaudo,"|",$messageIdjPagoRecaudo)</con1:path>
+                    </con1:param>
+                    <con1:param name="IdentidadSolicitante">
+                      <con1:path>''</con1:path>
+                    </con1:param>
+                    <con1:param name="NumeroCuenta">
+                      <con1:path>''</con1:path>
+                    </con1:param>
+                    <con1:param name="SecuenciaTrans">
+                      <con1:path>$transactionIdFT</con1:path>
+                    </con1:param>
+                    <con1:param name="NombreSolicitante">
+                      <con1:path>''</con1:path>
+                    </con1:param>
+                    <con1:param name="Monto">
+                      <con1:path>fn:string($body/pag:pagoRecaudo/PAYMENT_INFORMATION/PAYMENT_AMOUNT/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="IdUnicoTrans">
+                      <con1:path>$secTranCB</con1:path>
+                    </con1:param>
+                    <con1:param name="ClavePrimaria">
+                      <con1:path>fn:string($body/pag:pagoRecaudo/DEBTOR_CODE/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="montoComision">
+                      <con1:path>""</con1:path>
+                    </con1:param>
+                    <con1:param name="PuntoVenta">
+                      <con1:path>fn:string($header/aut:RequestHeader/BankingCorrespondent/PointOfSale/text())</con1:path>
+                    </con1:param>
+                    <con1:param name="IdTransaccionComision">
+                      <con1:path>""</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform/>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="HN01_PagoRecaudo_response">
+      <con:stage name="proxyResponse">
+        <con:context/>
+        <con:actions>
+          <con2:replace varName="header">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7db4</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$RSPHdrPagoRecaudo</con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace varName="body" contents-only="true">
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7db3</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$RSPPagoRecaudo</con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="Default_PagoRecaudo_request">
+      <con:stage name="ProxyRequest" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config">
+        <con:context/>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="Default_PagoRecaudo_response">
+      <con:stage name="FlujoSalida" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config">
+        <con:comment/>
+        <con:context xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config"/>
+        <con:actions xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config">
+          <con2:Error>
+            <con1:id>_ActionId-2040038364613723861--21a8fefd.15a152dd0a7.-7d44</con1:id>
+            <con2:errCode>MW-0008</con2:errCode>
+            <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+          </con2:Error>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-6202391981550097452--67a00edf.15a28f39e33.-7e18">
+      <con:stage name="ErroRegistroTxn">
+        <con:context xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con5="http://www.bea.com/wli/sb/services/security/config"/>
+        <con:actions xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con5="http://www.bea.com/wli/sb/services/security/config">
+          <con4:log>
+            <con1:id>_ActionId-6202391981550097452--67a00edf.15a28f39e33.-7ddf</con1:id>
+            <con4:logLevel>debug</con4:logLevel>
+            <con4:expr>
+              <con1:xqueryText>fn:concat("ERROR_OSB: FICBCO0214 - ", fn:string($fault/ctx:errorCode/text()))</con1:xqueryText>
+            </con4:expr>
+            <con4:message>&lt;&lt;&lt; Error Registro Txn CB >>></con4:message>
+          </con4:log>
+          <con1:resume>
+            <con1:id>_ActionId-6202391981550097452--67a00edf.15a28f39e33.-7dde</con1:id>
+          </con1:resume>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="ValidacionesGenerales">
+        <con:request>ValidacionesGenerales_request</con:request>
+        <con:response>ValidacionesGenerales_response</con:response>
+      </con:pipeline-node>
+      <con:branch-node type="condition" name="Regionalizacion">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes" prefix="pag"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:branch-table variable="header">
+          <con:xpath>
+            <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+          </con:xpath>
+          <con:branch name="HN01">
+            <con:operator>equals</con:operator>
+            <con:value>'HN01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="HN01_PagoRecaudo">
+                <con:request>HN01_PagoRecaudo_request</con:request>
+                <con:response>HN01_PagoRecaudo_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow>
+              <con:pipeline-node name="Default_PagoRecaudo">
+                <con:request>Default_PagoRecaudo_request</con:request>
+                <con:response>Default_PagoRecaudo_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

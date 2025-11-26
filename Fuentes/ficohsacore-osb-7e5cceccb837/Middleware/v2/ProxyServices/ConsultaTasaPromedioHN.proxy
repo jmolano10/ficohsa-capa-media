@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con3:SoapBindingType" xmlns:con3="http://www.bea.com/wli/sb/services/bindings/config">
+      <con3:wsdl ref="Middleware/v2/Resources/ConsultaTasaPromedio/wsdl/consultaTasaPromedioPS"/>
+      <con3:port>
+        <con3:name>consultaTasaPromedioPSSOAP</con3:name>
+        <con3:namespace>http://www.ficohsa.com.hn/middleware.services/consultaTasaPromedioPS/</con3:namespace>
+      </con3:port>
+      <con3:selector type="SOAP action"/>
+      <con3:WSI-compliant>false</con3:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-1376020250393583994--7a692de3.184435f6add.-7e9d">
+    <con:pipeline type="request" name="ConsultaTasaPromedio_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaTasaPromedioTypes" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-6341672503401099359--12fa01a0.1847c1dcb89.-7ecc</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ConsultaTasaPromedio/biz/fxConsultaDivisas_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>fxConsultaDivisas</con2:operation>
+            <con2:request>
+              <con2:body>$REQfxConsultaDivisas</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPfxConsultaDivisas</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQfxConsultaDivisas">
+                <con1:id>_ActionId-3647200388242972130--72872fe1.1848c66e6ed.-7f77</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/ConsultaTasaPromedio/xq/consultaDivisasHNIn"/>
+                    <con1:param name="consultaTasaPromedioRequest">
+                      <con1:path>$body/con:consultaTasaPromedioRequest</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform/>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ConsultaTasaPromedio_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaTasaPromedioTypes" prefix="con"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/fxConsultaDivisas" prefix="fxc"/>
+        </con:context>
+        <con:actions>
+          <con2:replace contents-only="true" varName="header">
+            <con1:id>_ActionId-6341672503401099359--12fa01a0.1847c1dcb89.-7da6</con1:id>
+            <con2:expr>
+              <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+		{
+		   	let $rowSet := $RSPfxConsultaDivisas/fxc:RowSet[1]
+				return(
+					if(count($rowSet/*) > 0)then(
+			   			<successIndicator>Success</successIndicator>
+					)else(
+		   				 <successIndicator>NO RECORS</successIndicator>,
+						 <messages>NO RECORDS FOUND</messages>
+					)
+				)
+		}
+</aut:ResponseHeader>]]></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-1376020250393583994--7a692de3.184435f6add.-7ce3</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>string($header/aut:ResponseHeader/successIndicator/text()) = 'Success'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="body" contents-only="true">
+                  <con1:id>_ActionId-6341672503401099359--12fa01a0.1847c1dcb89.-7da2</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/ConsultaTasaPromedio/xq/consultaDivisasHNOut"/>
+                      <con1:param name="outputParameters1">
+                        <con1:path>$RSPfxConsultaDivisas</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-1376020250393583994--7a692de3.184435f6add.-7b0e</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;con:consultaTasaPromedioResponse/></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-1376020250393583994--7a692de3.184435f6add.-7e9d">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaTasaPromedioTypes" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con2:replace varName="header" contents-only="true">
+            <con1:id>_ActionId-1376020250393583994--7a692de3.184435f6add.-7e2f</con1:id>
+            <con2:expr>
+              <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-1376020250393583994--7a692de3.184435f6add.-7e12</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;con:consultaTasaPromedioResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-1376020250393583994--7a692de3.184435f6add.-7df5</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="ConsultaTasaPromedio">
+        <con:request>ConsultaTasaPromedio_request</con:request>
+        <con:response>ConsultaTasaPromedio_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

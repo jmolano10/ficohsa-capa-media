@@ -1,0 +1,844 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isAutoPublish="false" isTracingEnabled="false">
+    <ser:security>
+      <con:custom-token-authentication>
+        <con:username-password>
+          <con:username-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/UserName/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:username-selector>
+          <con:password-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/Password/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:password-selector>
+        </con:username-password>
+      </con:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con5:SoapBindingType" xmlns:con5="http://www.bea.com/wli/sb/services/bindings/config">
+      <con5:wsdl ref="Middleware/v2/Resources/PagoRemesaCB/wsdl/pagoRemesaCB"/>
+      <con5:port>
+        <con5:name>pagoRemesasCBPSSOAP</con5:name>
+        <con5:namespace>http://www.ficohsa.com.hn/middleware.services/pagoRemesasCB/</con5:namespace>
+      </con5:port>
+      <con5:selector type="SOAP body"/>
+      <con5:WSI-compliant>false</con5:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/OperationsAndExecution/Payments/PagoRemesaCB</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific xsi:type="http:HttpEndPointConfiguration">
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-4956844766259047161--18269cc5.16d6e32b183.-69b">
+    <con1:pipeline type="response" name="Validaciones Generales_response">
+      <con1:stage name="Proxy Response">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+        </con1:context>
+        <con1:actions>
+          <con2:replace varName="header" contents-only="false">
+            <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.1fca</con3:id>
+            <con2:expr>
+              <con3:xqueryText>$RSPHeaderpagoRemesas</con3:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace varName="body" contents-only="true">
+            <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.1fdc</con3:id>
+            <con2:expr>
+              <con3:xqueryTransform>
+                <con3:resource ref="Middleware/v2/Resources/PagoRemesaCB/xq/pagoRemesaCBOut"/>
+                <con3:param name="pagoRemesasResponse">
+                  <con3:path>$RSPpagoRemesas</con3:path>
+                </con3:param>
+              </con3:xqueryTransform>
+            </con2:expr>
+          </con2:replace>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="Actualizar Limite transaccional">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="Respuesta">
+            <con3:id>_ActionId-1333721610239725282-6982eb19.1891e4fca38.-7fe0</con3:id>
+            <con2:expr>
+              <con3:xqueryText>$RSPHeaderpagoRemesas/aut:ResponseHeader/successIndicator/text()</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.233d</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText>fn:upper-case($Respuesta) = "SUCCESS"</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con4:route>
+                  <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.2340</con3:id>
+                  <con4:service ref="Middleware/v2/BusinessServices/MDW/LimitesTransaccionalesTNG/limitesTransaccionalesActualizar/biz/limitesTransaccionalesActualizar_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con4:operation>limitesTransaccionalesActualizar</con4:operation>
+                  <con4:outboundTransform>
+                    <con2:replace varName="body" contents-only="true">
+                      <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.2341</con3:id>
+                      <con2:expr>
+                        <con3:xqueryTransform>
+                          <con3:resource ref="Middleware/v2/Resources/PagoRemesaCB/xq/limiteTransaccionalActOut"/>
+                          <con3:param name="pagoRemesasResponse1">
+                            <con3:path>$body/pag:pagoRemesasResponse</con3:path>
+                          </con3:param>
+                        </con3:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con4:outboundTransform>
+                </con4:route>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="error" name="_onErrorHandler-4956844766259047161--18269cc5.16d6e32b183.-69b">
+      <con1:stage name="ExceptionHandler">
+        <con1:context>
+          <con3:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+        </con1:context>
+        <con1:actions>
+          <con4:route>
+            <con3:id>_ActionId-4136131018154123095-4b2c7b0a.184d4b3cf3e.-7f90</con3:id>
+            <con4:service ref="Middleware/v2/BusinessServices/MDW/ActualizaEstadoTransaccion/biz/actualizaEstadoTransaccion_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>actualizaEstadoTransaccion</con4:operation>
+            <con4:outboundTransform>
+              <con2:replace contents-only="true" varName="body">
+                <con3:id>_ActionId-4136131018154123095-4b2c7b0a.184d4b3cf3e.-7f8d</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/PagoRemesaCB/xq/actualizaEstadoTransaccionRemesa"/>
+                    <con3:param name="tipoTransaccion">
+                      <con3:path>'PAGO_REMESA'</con3:path>
+                    </con3:param>
+                    <con3:param name="estadoTransaccion">
+                      <con3:path>if($estadoFinal = 'Success')then
+'TRANSACCION_EXITOSA'
+else
+'FALLIDA'</con3:path>
+                    </con3:param>
+                    <con3:param name="codigoOperacion">
+                      <con3:path>$codCorresponsal</con3:path>
+                    </con3:param>
+                    <con3:param name="FT">
+                      <con3:path>if($estadoFinal = 'Success')then
+$transaccionId
+else
+''</con3:path>
+                    </con3:param>
+                    <con3:param name="refT24">
+                      <con3:path>''</con3:path>
+                    </con3:param>
+                    <con3:param name="tipoActualizacion">
+                      <con3:path>'TENGO'</con3:path>
+                    </con3:param>
+                    <con3:param name="tipoConsulta">
+                      <con3:path>1</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con4:outboundTransform>
+          </con4:route>
+          <con2:replace varName="header" contents-only="true">
+            <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-67f</con3:id>
+            <con2:expr>
+              <con3:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>
+      { 
+      		concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) 
+      }
+      </messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace varName="body" contents-only="true">
+            <con3:id>_ActionId-8082133289356711480-131ab9d0.16d74373ad0.-5463</con3:id>
+            <con2:expr>
+              <con3:xqueryText>&lt;pag:pagoRemesas/></con3:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con3:reply>
+            <con3:id>_ActionId-8082133289356711480-131ab9d0.16d74373ad0.-544d</con3:id>
+          </con3:reply>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="request" name="Validaciones Generales_request">
+      <con1:stage name="ValidacionRequest">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+        </con1:context>
+        <con1:actions>
+          <con2:validate>
+            <con3:id>_ActionId-8082133289356711480-131ab9d0.16d74373ad0.-53c2</con3:id>
+            <con2:schema ref="Middleware/v2/Resources/PagoRemesaCB/xsd/pagoRemesaCB"/>
+            <con2:schemaElement xmlns:pag="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes">pag:pagoRemesas</con2:schemaElement>
+            <con2:varName>body</con2:varName>
+            <con2:location>
+              <con3:xpathText>./pag:pagoRemesas</con3:xpathText>
+            </con2:location>
+          </con2:validate>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="RegistraTransaccionTengo">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="codCorresponsal">
+            <con3:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-7ab8</con3:id>
+            <con2:expr>
+              <con3:xqueryText>$body/pag:pagoRemesas/REMITTANCE_ID/text()</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con4:route>
+            <con3:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-7adb</con3:id>
+            <con4:service ref="Middleware/v2/BusinessServices/MDW/registraEstadoTransaccion/biz/registraEstadoTransaccion_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>registraEstadoTransaccion</con4:operation>
+            <con4:outboundTransform>
+              <con2:replace contents-only="true" varName="body">
+                <con3:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-7a3c</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/PagoRemesaCB/xq/registraTransaccionRemesa"/>
+                    <con3:param name="tipoTransaccion">
+                      <con3:path>'9'</con3:path>
+                    </con3:param>
+                    <con3:param name="pagoRemesasCB">
+                      <con3:path>$body/pag:pagoRemesas</con3:path>
+                    </con3:param>
+                    <con3:param name="estadoTransaccion">
+                      <con3:path>'REGISTRADO'</con3:path>
+                    </con3:param>
+                    <con3:param name="codigoCanal">
+                      <con3:path>'1'</con3:path>
+                    </con3:param>
+                    <con3:param name="referenciaT24">
+                      <con3:path>''</con3:path>
+                    </con3:param>
+                    <con3:param name="requestHeaderCB">
+                      <con3:path>$header/aut:RequestHeader</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con4:outboundTransform>
+          </con4:route>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="Consultar Limite">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+          <con3:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/limiteTrxConsultarRem" prefix="lim"/>
+        </con1:context>
+        <con1:actions>
+          <con2:wsCallout>
+            <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.1daf</con3:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/LimitesTransaccionalesTNG/limiteTrxConsultar/biz/limiteTrxConsultarRem_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>limiteTrxConsultarRem</con2:operation>
+            <con2:request>
+              <con2:body>$REQConsultaTransaccion</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPConsultaTransacción</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQConsultaTransaccion">
+                <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.1dce</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/PagoRemesaCB/xq/limiteTransaccionalConsultaIn"/>
+                    <con3:param name="requestHeader">
+                      <con3:path>$header/aut:RequestHeader</con3:path>
+                    </con3:param>
+                    <con3:param name="pagoRemesas">
+                      <con3:path>$body/pag:pagoRemesas</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="errorCode">
+                <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.1e1d</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>string($RSPConsultaTransacción/lim:PV_CODIGO_ERROR/text())</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="validationMessage">
+                <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.1e4b</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>string($RSPConsultaTransacción/lim:PV_MENSAJE_ERROR/text())</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:ifThenElse>
+                <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.23d3</con3:id>
+                <con2:case>
+                  <con2:condition>
+                    <con3:xqueryText>$errorCode ='ERROR'</con3:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:replace varName="header" contents-only="true">
+                      <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.2407</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText><![CDATA[<aut:ResponseHeader>
+    <successIndicator>{$errorCode }</successIndicator>
+    <messages>{$validationMessage }</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.2435</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>&lt;pag:pagoRemesasResponse/></con3:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con3:reply>
+                      <con3:id>_ActionId-3292929633258028569-4a9730d5.1888d64a78e.2449</con3:id>
+                    </con3:reply>
+                  </con2:actions>
+                </con2:case>
+                <con2:default/>
+              </con2:ifThenElse>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="Validar Corresponsal">
+        <con1:context>
+          <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultarCorresponsalB" prefix="con"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="sourceBank">
+            <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-ae3</con3:id>
+            <con2:expr>
+              <con3:xqueryText>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="codCorresponsal">
+            <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-abb</con3:id>
+            <con2:expr>
+              <con3:xqueryText>fn:string($header/aut:RequestHeader/BankingCorrespondent/Id/text())</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-a5e</con3:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/consultarCorresponsalB/biz/consultarCorresponsalB_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>consultarCorresponsalB</con2:operation>
+            <con2:request>
+              <con2:body wrapped="false">$REQConsultaCorresponsal</con2:body>
+              <con2:header/>
+            </con2:request>
+            <con2:response>
+              <con2:body wrapped="false">RSPConsultaCorresponsal</con2:body>
+              <con2:header/>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="estadotrxTengo">
+                <con3:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-7a3a</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>'OBTENIENDO_INFORMACION_CORRESPONSAL'</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="REQConsultaCorresponsal">
+                <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-a3f</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/Genericos/consultarCorresponsalBIn"/>
+                    <con3:param name="transactionType">
+                      <con3:path>"9"</con3:path>
+                    </con3:param>
+                    <con3:param name="bankingCorrespId">
+                      <con3:path>$codCorresponsal</con3:path>
+                    </con3:param>
+                    <con3:param name="sourceBank">
+                      <con3:path>$sourceBank</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="successIndCorrespB">
+                <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-7ae</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>fn:string($RSPConsultaCorresponsal/con:PV_CODIGO_MENSAJE/text())</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:ifThenElse>
+                <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-799</con3:id>
+                <con2:case>
+                  <con2:condition>
+                    <con3:xqueryText>$successIndCorrespB != 'SUCCESS'</con3:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:assign varName="estadotrxTengo">
+                      <con3:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-7a11</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>'ERROR_AL_OBTENER_PARAMETRIZACION'</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:replace varName="header" contents-only="true">
+                      <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-77d</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $successIndCorrespB }</successIndicator>
+	<messages>{ fn:string($RSPConsultaCorresponsal/con:PV_MENSAJE_ERROR/text()) }</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-75e</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>&lt;pag:pagoRemesasResponse/></con3:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con3:reply isError="false">
+                      <con3:id>_ActionId-4956844766259047161--18269cc5.16d6e32b183.-73e</con3:id>
+                    </con3:reply>
+                  </con2:actions>
+                </con2:case>
+                <con2:default>
+                  <con2:assign varName="estadotrxTengo">
+                    <con3:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-7a22</con3:id>
+                    <con2:expr>
+                      <con3:xqueryText>'PARAMETRIZACION_OBTENIDA'</con3:xqueryText>
+                    </con2:expr>
+                  </con2:assign>
+                  <con2:assign varName="CredAccount">
+                    <con3:id>_ActionId-2741765617951264246-5e3e42f1.174eb625a68.-7d9d</con3:id>
+                    <con2:expr>
+                      <con3:xqueryText>fn:string($RSPConsultaCorresponsal/con:PV_CUENTA_CREDITO/text())</con3:xqueryText>
+                    </con2:expr>
+                  </con2:assign>
+                  <con2:replace varName="body" contents-only="true">
+                    <con3:id>_ActionId-2741765617951264246-5e3e42f1.174eb625a68.-7d55</con3:id>
+                    <con2:location>
+                      <con3:xpathText>./pag:pagoRemesas/CREDIT_ACCOUNT</con3:xpathText>
+                    </con2:location>
+                    <con2:expr>
+                      <con:xqueryText xmlns:con="http://www.bea.com/wli/sb/stages/config">$CredAccount</con:xqueryText>
+                    </con2:expr>
+                  </con2:replace>
+                </con2:default>
+              </con2:ifThenElse>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="OperacionesCriptograficas">
+        <con4:context xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/opaque/" prefix="opaq"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesCriptograficasTypes" prefix="oper"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasCBTypes" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+        </con4:context>
+        <con4:actions xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+          <con2:assign varName="LOGINUSER">
+            <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3617</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($body/pag:pagoRemesas/ADDITIONAL_INFO/INFO/NAME[text()='LOGINUSER'])</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="LOGINPASS">
+            <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3616</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($body/pag:pagoRemesas/ADDITIONAL_INFO/INFO/NAME[text()='LOGINPASS'])</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="tempBody">
+            <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3615</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$body</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="ADDITIONALINFORSP">
+            <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3614</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;ADDITIONAL_INFO>
+&lt;/ADDITIONAL_INFO></con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="estadotrxTengo">
+            <con1:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-79e8</con1:id>
+            <con2:expr>
+              <con1:xqueryText>'LLAMANDO_A_OPERACIONES_CRIPTOGRAFICAS'</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3613</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryConditionExpr>
+                  <con1:boolExpr operator="and">
+                    <con1:compExpr operator="!=">
+                      <con1:leftPath>$LOGINPASS</con1:leftPath>
+                      <con1:rightPath>""</con1:rightPath>
+                    </con1:compExpr>
+                    <con1:compExpr operator="!=">
+                      <con1:leftPath>$LOGINUSER</con1:leftPath>
+                      <con1:rightPath>""</con1:rightPath>
+                    </con1:compExpr>
+                  </con1:boolExpr>
+                </con1:xqueryConditionExpr>
+              </con2:condition>
+              <con2:actions>
+                <con2:foreach>
+                  <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3606</con1:id>
+                  <con2:variable>tempBody</con2:variable>
+                  <con2:expression>
+                    <con1:xpathText>./pag:pagoRemesas/ADDITIONAL_INFO/INFO</con1:xpathText>
+                  </con2:expression>
+                  <con2:value-variable>info</con2:value-variable>
+                  <con2:index-variable>i</con2:index-variable>
+                  <con2:total-variable>conteo</con2:total-variable>
+                  <con2:actions>
+                    <con2:assign varName="value">
+                      <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3612</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>$info/VALUE/text()</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="name">
+                      <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3611</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>$info/NAME/text()</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                      <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3610</con1:id>
+                      <con2:case>
+                        <con2:condition>
+                          <con1:xqueryText>$name="LOGINUSER" or $name ="LOGINPASS" and $value!= ""</con1:xqueryText>
+                        </con2:condition>
+                        <con2:actions>
+                          <con2:wsCallout>
+                            <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3608</con1:id>
+                            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/OperacionesCriptograficas" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                            <con2:operation>cifrarDatos</con2:operation>
+                            <con2:request>
+                              <con2:body wrapped="false">$REQdescifrarDatos</con2:body>
+                              <con2:header>$REQHeaderdescifrarDatos</con2:header>
+                            </con2:request>
+                            <con2:response>
+                              <con2:body wrapped="false">RSPdescifrarDatos</con2:body>
+                              <con2:header>RSPHeaderdescifrarDatos</con2:header>
+                            </con2:response>
+                            <con2:requestTransform>
+                              <con2:assign varName="REQHeaderdescifrarDatos">
+                                <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-360f</con1:id>
+                                <con2:expr>
+                                  <con1:xqueryText>$header</con1:xqueryText>
+                                </con2:expr>
+                              </con2:assign>
+                              <con2:assign varName="REQdescifrarDatos">
+                                <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-360e</con1:id>
+                                <con2:expr>
+                                  <con1:xqueryTransform>
+                                    <con1:resource ref="Middleware/v2/Resources/OperacionesCriptograficas/xq/descifrarDatosIn"/>
+                                    <con1:param name="cipher">
+                                      <con1:path>"RSA"</con1:path>
+                                    </con1:param>
+                                    <con1:param name="encryptedData">
+                                      <con1:path>$value</con1:path>
+                                    </con1:param>
+                                    <con1:param name="keyAlias">
+                                      <con1:path>"ONE-TIME-PASSWORD"</con1:path>
+                                    </con1:param>
+                                  </con1:xqueryTransform>
+                                </con2:expr>
+                              </con2:assign>
+                            </con2:requestTransform>
+                            <con2:responseTransform>
+                              <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-360d</con1:id>
+                                <con2:expr>
+                                  <con1:xqueryText>fn:string($RSPHeaderdescifrarDatos/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                </con2:expr>
+                              </con2:assign>
+                              <con2:assign varName="validationMessagetext">
+                                <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-360c</con1:id>
+                                <con2:expr>
+                                  <con1:xqueryText>fn:string($RSPHeaderdescifrarDatos/aut:ResponseHeader/messages/text())</con1:xqueryText>
+                                </con2:expr>
+                              </con2:assign>
+                              <con2:ifThenElse>
+                                <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-360b</con1:id>
+                                <con2:case>
+                                  <con2:condition>
+                                    <con:xqueryConditionExpr xmlns:con="http://www.bea.com/wli/sb/stages/config">
+                                      <con:boolExpr operator="or">
+                                        <con:compExpr operator="=">
+                                          <con:leftPath>$validationMessage</con:leftPath>
+                                          <con:rightPath>"Success"</con:rightPath>
+                                        </con:compExpr>
+                                        <con:compExpr operator="=">
+                                          <con:leftPath>$validationMessage</con:leftPath>
+                                          <con:rightPath>"SUCCESS"</con:rightPath>
+                                        </con:compExpr>
+                                      </con:boolExpr>
+                                    </con:xqueryConditionExpr>
+                                  </con2:condition>
+                                  <con2:actions>
+                                    <con2:assign varName="lauKeydecrypted" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+                                      <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-360a</con1:id>
+                                      <con2:expr>
+                                        <con1:xqueryText>string($RSPdescifrarDatos/oper:DECRYPTED_DATA/text())</con1:xqueryText>
+                                      </con2:expr>
+                                    </con2:assign>
+                                    <con2:insert varName="ADDITIONALINFORSP">
+                                      <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3609</con1:id>
+                                      <con2:location>
+                                        <con1:xpathText>.</con1:xpathText>
+                                      </con2:location>
+                                      <con2:where>last-child</con2:where>
+                                      <con2:expr>
+                                        <con1:xqueryText><![CDATA[<INFO>
+	<NAME>{$name}</NAME>
+	<VALUE>{$lauKeydecrypted}</VALUE>
+</INFO>]]></con1:xqueryText>
+                                      </con2:expr>
+                                    </con2:insert>
+                                  </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                              </con2:ifThenElse>
+                            </con2:responseTransform>
+                          </con2:wsCallout>
+                        </con2:actions>
+                      </con2:case>
+                      <con2:default>
+                        <con2:insert varName="ADDITIONALINFORSP">
+                          <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3607</con1:id>
+                          <con2:location>
+                            <con1:xpathText>.</con1:xpathText>
+                          </con2:location>
+                          <con2:where>last-child</con2:where>
+                          <con2:expr>
+                            <con1:xqueryText><![CDATA[<INFO>
+	<NAME>{$name}</NAME>
+	<VALUE>{$value}</VALUE>
+</INFO>]]></con1:xqueryText>
+                          </con2:expr>
+                        </con2:insert>
+                      </con2:default>
+                    </con2:ifThenElse>
+                  </con2:actions>
+                </con2:foreach>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con4:actions>
+      </con1:stage>
+      <con1:stage name="proxyRequest">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse>
+            <con3:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3438</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText>$lauKeydecrypted!=""</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="body" contents-only="false" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+                  <con1:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-3437</con1:id>
+                  <con2:location>
+                    <con1:xpathText>./pag:pagoRemesas/ADDITIONAL_INFO</con1:xpathText>
+                  </con2:location>
+                  <con2:expr>
+                    <con1:xqueryText>$ADDITIONALINFORSP</con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+          <con2:assign varName="estadotrxTengo">
+            <con3:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-79cb</con3:id>
+            <con2:expr>
+              <con3:xqueryText>'LLAMANDO_A_PAGO_REMESA'</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con3:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-34e0</con3:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/PagoRemesa" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>pagoRemesas</con2:operation>
+            <con2:request>
+              <con2:body>$REQpagoRemesas</con2:body>
+              <con2:header>$REQHeaderpagoRemesas</con2:header>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPpagoRemesas</con2:body>
+              <con2:header>RSPHeaderpagoRemesas</con2:header>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQHeaderpagoRemesas">
+                <con3:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-34e3</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>$header</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:replace varName="REQHeaderpagoRemesas" contents-only="true">
+                <con3:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-34e2</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/PagoRemesaCB/xq/pagoRemesaCBHeaderIn"/>
+                    <con3:param name="requestHeader">
+                      <con3:path>$header/aut:RequestHeader</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+              <con2:assign varName="REQpagoRemesas">
+                <con3:id>_ActionId-2223552921391849399-20421edd.17b3893b37f.-34e1</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/PagoRemesaCB/xq/pagoRemesaCBIn"/>
+                    <con3:param name="pagoRemesas">
+                      <con3:path>$body/pag:pagoRemesas</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="transaccionId">
+                <con3:id>_ActionId-4136131018154123095-4b2c7b0a.184d4b3cf3e.-7fec</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>fn:string($RSPHeaderpagoRemesas/aut:ResponseHeader/transactionId/text())</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="estadoFinal">
+                <con3:id>_ActionId-4136131018154123095-4b2c7b0a.184d4b3cf3e.-7fd8</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>fn:string($RSPHeaderpagoRemesas/aut:ResponseHeader/successIndicator/text())</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="codCorresponsal">
+                <con3:id>_ActionId-4136131018154123095-4b2c7b0a.184d4b3cf3e.-7f0d</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>fn:string($REQpagoRemesas/pag:pagoRemesas/REMITTANCE_ID/text())</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ActualizaEstadoTransaccionFin">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasCBTypes" prefix="pag"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="estadoact">
+            <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7e79</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if($estadoFinal = 'Success')then
+'TRANSACCION_EXITOSA'
+else('FALLIDA')</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="ftact">
+            <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7e75</con3:id>
+            <con2:expr>
+              <con3:xqueryText>$transaccionId</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="idtrxact">
+            <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7e6d</con3:id>
+            <con2:expr>
+              <con3:xqueryText>fn:string($body/pag:pagoRemesas/REMITTANCE_ID/text())</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con4:route>
+            <con3:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-79b4</con3:id>
+            <con4:service ref="Middleware/v2/BusinessServices/MDW/ActualizaEstadoTransaccion/biz/actualizaEstadoTransaccion_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>actualizaEstadoTransaccion</con4:operation>
+            <con4:outboundTransform>
+              <con2:replace contents-only="true" varName="body">
+                <con3:id>_ActionId-4931609677002278306-3cb450bb.1847dded19f.-799b</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/PagoRemesaCB/xq/actualizaEstadoTransaccionRemesa"/>
+                    <con3:param name="tipoTransaccion">
+                      <con3:path>'PAGO_REMESA'</con3:path>
+                    </con3:param>
+                    <con3:param name="estadoTransaccion">
+                      <con3:path>$estadoact</con3:path>
+                    </con3:param>
+                    <con3:param name="codigoOperacion">
+                      <con3:path>$idtrxact</con3:path>
+                    </con3:param>
+                    <con3:param name="FT">
+                      <con3:path>$ftact</con3:path>
+                    </con3:param>
+                    <con3:param name="refT24">
+                      <con3:path>''</con3:path>
+                    </con3:param>
+                    <con3:param name="tipoActualizacion">
+                      <con3:path>'TENGO'</con3:path>
+                    </con3:param>
+                    <con3:param name="tipoConsulta">
+                      <con3:path>1</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con4:outboundTransform>
+          </con4:route>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:flow>
+      <con1:pipeline-node name="Validaciones Generales">
+        <con1:request>Validaciones Generales_request</con1:request>
+        <con1:response>Validaciones Generales_response</con1:response>
+      </con1:pipeline-node>
+    </con1:flow>
+  </ser:router>
+</xml-fragment>

@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false" isAutoPublish="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="MiddlewareCaja/Resources/wsdls/TransferenciaEntreCuentas"/>
+      <con:port>
+        <con:name>T24WebServicesImplPort</con:name>
+        <con:namespace>T24WebServicesImpl</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/MiddlewareCaja/TransferenciaEntreCuentas</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-2384409316698514622--736b363.13cb5f6f6ac.-72cb">
+    <con:pipeline type="request" name="FlujoPrincipal_request">
+      <con:stage name="EtapaPrincipalEntrada">
+        <con:comment>Se realiza el siguiente proceso:
+ 1. Transferencia entre cuentas
+ 2. Consulta de detalle de la cuenta(Debito)
+ 3. Consulta de detalle de la cuenta(Credito)
+ 4. Consulta de usuario del sistema</con:comment>
+        <con:context>
+          <con1:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-71f9</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/Transferencias" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>Transferenciaentrecuentas</con2:operation>
+            <con2:request>
+              <con2:body>$REQUESTTransferenciaentrecuentas</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RESPONSETransferenciaentrecuentas</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQUESTTransferenciaentrecuentas">
+                <con1:comment>Se asigna el request</con1:comment>
+                <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7055</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="MiddlewareCaja/Resources/xqueries/TransferenciaEntreCuentas/TransferenciaEntreCuentasIn"/>
+                    <con1:param name="transferenciaentrecuentasRequest">
+                      <con1:path>$body/t24:Transferenciaentrecuentas</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="successIndicatorTransferenciaentrecuentas">
+                <con1:comment>se obtiene el estado "successIndicator" de la respuesta</con1:comment>
+                <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-701d</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RESPONSETransferenciaentrecuentas/Status/successIndicator)</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="DEBIT_ACCOUNT">
+                <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-6f8f</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RESPONSETransferenciaentrecuentas/FUNDSTRANSFERType/DEBITACCTNO)</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="CREDIT_ACCOUNT">
+                <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-6f72</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RESPONSETransferenciaentrecuentas/FUNDSTRANSFERType/CREDITACCTNO)</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+          <con2:ifThenElse>
+            <con1:comment>Si hubo error se termina el proceso. Si no hubo error se procede con el proceso</con1:comment>
+            <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-71c1</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$successIndicatorTransferenciaentrecuentas = "Success"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:comment>Consulta de detalle de la cuenta de Debito</con1:comment>
+                  <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7189</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/ConsultasCuenta" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>Consultadedetallesdelacuenta</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQUESTConsultadedetallesdelacuentaDebito</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RESPONSEConsultadedetallesdelacuentaDebito</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQUESTConsultadedetallesdelacuentaDebito">
+                      <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-6fad</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="MiddlewareCaja/Resources/xqueries/TransferenciaEntreCuentas/ConsultaDeDetallesDeLaCuentaIn"/>
+                          <con1:param name="transferenciaentrecuentas">
+                            <con1:path>$REQUESTTransferenciaentrecuentas</con1:path>
+                          </con1:param>
+                          <con1:param name="ACCOUNT">
+                            <con1:path>$DEBIT_ACCOUNT</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="SHORTITLE_DEBIT">
+                      <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-6ecb</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>fn:string($RESPONSEConsultadedetallesdelacuentaDebito/WSACCOUNTLISTType/gWSACCOUNTLISTDetailType/mWSACCOUNTLISTDetailType/SHORTTITLE)</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="ALT_ACCOUNT_DEBIT">
+                      <con1:id>_ActionId-6688109090283425355-3d9f89d2.13f0ff0adf3.-7dd7</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>fn:string($RESPONSEConsultadedetallesdelacuentaDebito/WSACCOUNTLISTType/gWSACCOUNTLISTDetailType/mWSACCOUNTLISTDetailType[1]/ALTACCTID/text())</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+                <con2:wsCallout>
+                  <con1:comment>Consulta de detalle de la cuenta de Credito</con1:comment>
+                  <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7151</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/ConsultasCuenta" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>Consultadedetallesdelacuenta</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQUESTConsultadedetallesdelacuentaCredito</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RESPONSEConsultadedetallesdelacuentaCredito</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQUESTConsultadedetallesdelacuentaCredito">
+                      <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-6f39</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="MiddlewareCaja/Resources/xqueries/TransferenciaEntreCuentas/ConsultaDeDetallesDeLaCuentaIn"/>
+                          <con1:param name="transferenciaentrecuentas">
+                            <con1:path>$REQUESTTransferenciaentrecuentas</con1:path>
+                          </con1:param>
+                          <con1:param name="ACCOUNT">
+                            <con1:path>$CREDIT_ACCOUNT</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="SHORTITLE_CREDIT">
+                      <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-6ec8</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>fn:string($RESPONSEConsultadedetallesdelacuentaCredito/WSACCOUNTLISTType/gWSACCOUNTLISTDetailType/mWSACCOUNTLISTDetailType/SHORTTITLE)</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="ALT_ACCOUNT_CREDIT">
+                      <con1:id>_ActionId-6688109090283425355-3d9f89d2.13f0ff0adf3.-7dba</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>fn:string($RESPONSEConsultadedetallesdelacuentaCredito/WSACCOUNTLISTType/gWSACCOUNTLISTDetailType/mWSACCOUNTLISTDetailType[1]/ALTACCTID/text())</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+                <con2:wsCallout>
+                  <con1:comment>Consulta de usuario del sistema</con1:comment>
+                  <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7119</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/Core" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>Consultadeusuariosdelsistema</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQUESTConsultadeusuariosdelsistema</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RESPONSEConsultadeusuariosdelsistema</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con1:assign varName="REQUESTConsultadeusuariosdelsistema" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                      <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2362650550315428768-15e3e915.13a743f3d73.-6ec5</con3:id>
+                      <con1:expr>
+                        <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                          <con3:resource ref="MiddlewareCaja/Resources/xqueries/TransferenciaEntreCuentas/ConsultaDeUsuariosDelSistemaIn"/>
+                          <con3:param name="transferenciaentrecuentasRequest">
+                            <con3:path>$REQUESTTransferenciaentrecuentas</con3:path>
+                          </con3:param>
+                          <con3:param name="transferenciaentrecuentasResponse">
+                            <con3:path>$RESPONSETransferenciaentrecuentas</con3:path>
+                          </con3:param>
+                        </con3:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con1:assign varName="BRANCHNAME" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                      <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2362650550315428768-15e3e915.13a743f3d73.-6ec2</con3:id>
+                      <con1:expr>
+                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:string($RESPONSEConsultadeusuariosdelsistema/WSUSERType/gWSUSERDetailType/mWSUSERDetailType/BRANCHNAME)</con3:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="FlujoPrincipal_response">
+      <con:stage name="EtapaPrincipalSalida">
+        <con:context>
+          <con1:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+        </con:context>
+        <con:actions>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-70e1</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$RESPONSETransferenciaentrecuentas</con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-6688109090283425355-3d9f89d2.13f0ff0adf3.-7cf0</con1:id>
+            <con2:location>
+              <con1:xpathText>./t24:TransferenciaentrecuentasResponse/FUNDSTRANSFERType/DEBITACCTNO</con1:xpathText>
+            </con2:location>
+            <con2:expr>
+              <con1:xqueryText>if(fn:string($ALT_ACCOUNT_DEBIT) != "") then (
+	fn:string($ALT_ACCOUNT_DEBIT)
+) else (
+	fn:string($body/t24:TransferenciaentrecuentasResponse/FUNDSTRANSFERType/DEBITACCTNO/text())
+)</con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-6688109090283425355-3d9f89d2.13f0ff0adf3.-7d48</con1:id>
+            <con2:location>
+              <con1:xpathText>./t24:TransferenciaentrecuentasResponse/FUNDSTRANSFERType/CREDITACCTNO</con1:xpathText>
+            </con2:location>
+            <con2:expr>
+              <con1:xqueryText>if(fn:string($ALT_ACCOUNT_CREDIT) != "") then (
+	fn:string($ALT_ACCOUNT_CREDIT)
+) else (
+	fn:string($body/t24:TransferenciaentrecuentasResponse/FUNDSTRANSFERType/CREDITACCTNO/text())
+)</con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:insert varName="body">
+            <con1:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-70c4</con1:id>
+            <con2:location>
+              <con1:xpathText>./t24:TransferenciaentrecuentasResponse/FUNDSTRANSFERType</con1:xpathText>
+            </con2:location>
+            <con2:where>first-child</con2:where>
+            <con2:expr>
+              <con1:xqueryTransform>
+                <con1:resource ref="MiddlewareCaja/Resources/xqueries/TransferenciaEntreCuentas/TransferenciaEntreCuentasAddOut"/>
+                <con1:param name="BRANCHNAME">
+                  <con1:path>fn:string($BRANCHNAME)</con1:path>
+                </con1:param>
+                <con1:param name="DEBITCUSTOMERNAME">
+                  <con1:path>fn:string($SHORTITLE_DEBIT)</con1:path>
+                </con1:param>
+                <con1:param name="CREDITCUSTOMERNAME">
+                  <con1:path>fn:string($SHORTITLE_CREDIT)</con1:path>
+                </con1:param>
+              </con1:xqueryTransform>
+            </con2:expr>
+          </con2:insert>
+          <con2:insert varName="body">
+            <con1:id>_ActionId-1587027157399032175--191fdafc.13d11da92c2.-7fe4</con1:id>
+            <con2:location>
+              <con1:xpathText>./t24:TransferenciaentrecuentasResponse/FUNDSTRANSFERType</con1:xpathText>
+            </con2:location>
+            <con2:where>last-child</con2:where>
+            <con2:expr>
+              <con1:xqueryText>let $LRCUSTRATE := fn:string($body/t24:TransferenciaentrecuentasResponse/FUNDSTRANSFERType/LRCUSTRATE/text())
+let $CREDITCURRENCY := fn:string($body/t24:TransferenciaentrecuentasResponse/FUNDSTRANSFERType/CREDITCURRENCY/text())
+let $DEBITCURRENCY := fn:string($body/t24:TransferenciaentrecuentasResponse/FUNDSTRANSFERType/DEBITCURRENCY/text())
+return
+	if ($CREDITCURRENCY = $DEBITCURRENCY) then (
+		&lt;EXCHANGE_RATE>1.0000&lt;/EXCHANGE_RATE>
+	) else (
+		&lt;EXCHANGE_RATE>{ data($LRCUSTRATE) }&lt;/EXCHANGE_RATE>
+	)</con1:xqueryText>
+            </con2:expr>
+          </con2:insert>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-2384409316698514622--736b363.13cb5f6f6ac.-72cb">
+      <con:stage name="Etapa de Error">
+        <con:context>
+          <con1:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+        </con:context>
+        <con:actions>
+          <con2:replace varName="body">
+            <con1:id>_ActionId-2384409316698514622--736b363.13cb5f6f6ac.-7293</con1:id>
+            <con2:expr>
+              <con1:xqueryText><![CDATA[<t24:TransferenciaentrecuentasResponse>
+	<Status>
+		<successIndicator>TWSError</successIndicator>
+		<messages>{ concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) }</messages>
+	</Status>
+</t24:TransferenciaentrecuentasResponse>]]></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-2384409316698514622--736b363.13cb5f6f6ac.-7276</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="FlujoPrincipal">
+        <con:request>FlujoPrincipal_request</con:request>
+        <con:response>FlujoPrincipal_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

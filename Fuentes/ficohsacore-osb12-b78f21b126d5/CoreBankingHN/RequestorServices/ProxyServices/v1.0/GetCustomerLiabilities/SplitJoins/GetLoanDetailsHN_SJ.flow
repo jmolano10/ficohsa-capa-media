@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpel:process name="GetLoanDetailsHN_SJ"
+              targetNamespace="http://xmlns.oracle.com/DynamoMigrate/CoreBankingHN/"
+              xmlns:tns="http://xmlns.oracle.com/DynamoMigrate/CoreBankingHN/"
+              xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable"
+              xmlns:rescon="http://www.bea.com/alsb/flow/resources/config"
+              xmlns:bea="http://www.bea.com/bpel/ui/extensions"
+              xmlns:ext="http://www.bea.com/bpel/extensions"
+              xmlns:expr="http://www.bea.com/wli/sb/stages/config"
+              xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config"
+              xmlns:bind="http://www.ficohsa.com.hn/middleware.services/GetLoanDetailsHN_SJ" 
+              bea:name="GetLoanDetailsHN_SJ"
+              rescon:snippetVersion="1.0"
+              xmlns:get="http://www.ficohsa.com.hn/middleware.services/getLoanDetailsHN_SJ"
+              xmlns:ns0="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xmlns:ns1="http://xmlns.oracle.com/Dynamo/MWBanking/GetLoanDetails_PS"
+              xmlns:ns2="http://xmlns.oracle.com/pcbpel/adapter/db/MigrationDynamo/CommonResources/SetLogInfoService_BS">
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="GetLoanDetailsHN_SJ" partnerLinkType="tns:GetLoanDetailsHN_SJ"
+                          myRole="GetLoanDetailsHN_SJ">
+	       </bpel:partnerLink>
+        <bpel:partnerLink name="GetLoanDetailsHN_PS" partnerLinkType="tns:GetLoanDetailsHN_PS"
+                          partnerRole="GetLoanDetailsHN_PS"/>
+        <bpel:partnerLink name="SetLogInfoService_BS" partnerLinkType="tns:SetLogInfoService_BS"
+                          partnerRole="SetLogInfoService_BS"/>
+    </bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request"
+	                      messageType="bind:getLoanDetailsHN_SJRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response"
+                       messageType="bind:getLoanDetailsHN_SJResponse">
+	       </bpel:variable>
+        <bpel:variable name="getLoanDetailsREQ" messageType="ns1:getLoanDetails_inputMessage"/>
+        <bpel:variable name="getLoanDetailsRSP" messageType="ns1:getLoanDetails_outputMessage"/>
+        <bpel:variable name="bodyReqLog" messageType="ns2:args_in_msg"/>
+        <bpel:variable name="bodyRspLog" messageType="ns2:args_out_msg"/>
+    </bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="GetLoanDetailsHN_SJ" operation="consultaPrestamos" variable="request" createInstance="yes">
+	           <rescon:receiveInfo>
+                <rescon:wsdl ref="CoreBankingHN/RequestorServices/ProxyServices/v1.0/GetCustomerLiabilities/WSDL/GetLoanDetailsHN_SJ" binding="bind:GetLoanDetailsHN_SJSOAP"/>
+            </rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:assign>
+            <bpel:extensionAssignOperation>
+                <trf:assign varName="response.outputParameters">
+                    <trf:expr>
+                        <expr:xqueryText>&lt;get:getLoanDetailsHN_SJResponse&gt;
+
+&lt;/get:getLoanDetailsHN_SJResponse&gt;</expr:xqueryText>
+                    </trf:expr>
+                </trf:assign>
+            </bpel:extensionAssignOperation>
+        </bpel:assign>
+        <bpel:forEach parallel="yes" counterName="counter">
+            <bpel:startCounterValue>number(1)</bpel:startCounterValue>
+            <bpel:finalCounterValue>count($request.inputParameters/get:LOANS/get:LOAN_ID)</bpel:finalCounterValue>
+            <bpel:scope>
+                <bpel:variables>
+                    <bpel:variable name="loanDetail" type="get:consultaListaPrestamosResponseType"/>
+                </bpel:variables>
+                <bpel:sequence>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="getLoanDetailsREQ.request">
+                                <trf:expr>
+                                    <expr:xqueryTransform>
+                                        <expr:resource ref="CoreBankingHN/RequestorServices/ProxyServices/v1.0/GetCustomerLiabilities/XQ/sjGetLoanDetailsHN"/>
+                                        <expr:param name="counter">
+                                            <expr:path>$counter</expr:path>
+                                        </expr:param>
+                                        <expr:param name="getLoanDetailsHN_SJRequest">
+                                            <expr:path>$request.inputParameters</expr:path>
+                                        </expr:param>
+                                    </expr:xqueryTransform>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="bodyReqLog.InputParameters">
+                                <trf:expr>
+                                    <expr:xqueryTransform>
+                                        <expr:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                        <expr:param name="codigoAplicacion">
+                                            <expr:path>1</expr:path>
+                                        </expr:param>
+                                        <expr:param name="codigoServicio">
+                                            <expr:path>2</expr:path>
+                                        </expr:param>
+                                        <expr:param name="codigoError">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="contenido">
+                                            <expr:path>fn-bea:serialize($getLoanDetailsREQ.request)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="estado">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="codigoSistema">
+                                            <expr:path>3</expr:path>
+                                        </expr:param>
+                                        <expr:param name="nombreFlujoError">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="fechaHora">
+                                            <expr:path>fn:current-dateTime()</expr:path>
+                                        </expr:param>
+                                        <expr:param name="parametros">
+                                            <expr:path>fn-bea:serialize($getLoanDetailsREQ.request)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="uuid">
+                                            <expr:path>fn:data($request.inputParameters/get:UUID)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="version">
+                                            <expr:path>'1'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="operacionServicio">
+                                            <expr:path>'ObtenerDetallePrestamo'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="bancoDestino">
+                                            <expr:path>fn:data($request.inputParameters/get:DESTINATION_BANK)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="endpoint">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="bancoOrigen">
+                                            <expr:path>fn:data($request.inputParameters/get:SOURCE_BANK)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="fechaTX">
+                                            <expr:path>fn:current-dateTime()</expr:path>
+                                        </expr:param>
+                                        <expr:param name="usuario">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="descripcionError">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="tipoMensaje">
+                                            <expr:path>'Request'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="metodo">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                    </expr:xqueryTransform>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                    <bpel:invoke partnerLink="SetLogInfoService_BS" operation="SetLogInfoService_BS"
+                                 inputVariable="bodyReqLog" outputVariable="bodyRspLog">
+                        <rescon:invokeInfo>
+                            <rescon:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS"
+                                            xsi:type="ns0:BusinessServiceRef"/>
+                        </rescon:invokeInfo>
+                    </bpel:invoke>
+                    <bpel:invoke partnerLink="GetLoanDetailsHN_PS" operation="getLoanDetails"
+                                 inputVariable="getLoanDetailsREQ" outputVariable="getLoanDetailsRSP">
+                        <rescon:invokeInfo>
+                            <rescon:service ref="LegacyCoreBankingHN/RequestorServices/ProxyServices/v1.0/GetLoanDetails/ProxyServices/GetLoanDetailsHN_PS"
+                                            xsi:type="ns0:ProxyRef"/>
+                        </rescon:invokeInfo>
+                    </bpel:invoke>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="loanDetail">
+                                <trf:expr>
+                                    <expr:xqueryTransform>
+                                        <expr:resource ref="CoreBankingHN/RequestorServices/ProxyServices/v1.0/GetCustomerLiabilities/XQ/sjSetLoanDetail"/>
+                                        <expr:param name="getLoanDetailsResponse">
+                                            <expr:path>$getLoanDetailsRSP.reply</expr:path>
+                                        </expr:param>
+                                        <expr:param name="liabilityNumber">
+                                            <expr:path>fn:data($request.inputParameters/get:LOANS/get:LOAN_ID[$counter])</expr:path>
+                                        </expr:param>
+                                    </expr:xqueryTransform>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="bodyReqLog.InputParameters">
+                                <trf:expr>
+                                    <expr:xqueryTransform>
+                                        <expr:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                        <expr:param name="codigoAplicacion">
+                                            <expr:path>1</expr:path>
+                                        </expr:param>
+                                        <expr:param name="codigoServicio">
+                                            <expr:path>2</expr:path>
+                                        </expr:param>
+                                        <expr:param name="codigoError">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="contenido">
+                                            <expr:path>fn-bea:serialize($getLoanDetailsRSP.reply)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="estado">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="codigoSistema">
+                                            <expr:path>3</expr:path>
+                                        </expr:param>
+                                        <expr:param name="nombreFlujoError">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="fechaHora">
+                                            <expr:path>fn:current-dateTime()</expr:path>
+                                        </expr:param>
+                                        <expr:param name="parametros">
+                                            <expr:path>fn-bea:serialize($getLoanDetailsRSP.reply)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="uuid">
+                                            <expr:path>fn:data($request.inputParameters/get:UUID)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="version">
+                                            <expr:path>'1'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="operacionServicio">
+                                            <expr:path>'ObtenerDetallePrestamo'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="bancoDestino">
+                                            <expr:path>fn:data($request.inputParameters/get:DESTINATION_BANK)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="endpoint">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="bancoOrigen">
+                                            <expr:path>fn:data($request.inputParameters/get:SOURCE_BANK)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="fechaTX">
+                                            <expr:path>fn:current-dateTime()</expr:path>
+                                        </expr:param>
+                                        <expr:param name="usuario">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="descripcionError">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="tipoMensaje">
+                                            <expr:path>'Response'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="metodo">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                    </expr:xqueryTransform>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                    <bpel:invoke partnerLink="SetLogInfoService_BS" operation="SetLogInfoService_BS"
+                                 inputVariable="bodyReqLog" outputVariable="bodyRspLog">
+                        <rescon:invokeInfo>
+                            <rescon:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS"
+                                            xsi:type="ns0:BusinessServiceRef"/>
+                        </rescon:invokeInfo>
+                    </bpel:invoke>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:insert varName="response.outputParameters">
+                                <trf:location>
+                                    <expr:xpathText>.</expr:xpathText>
+                                </trf:location>
+                                <trf:where>last-child</trf:where>
+                                <trf:expr>
+                                    <expr:xqueryText>$loanDetail/*</expr:xqueryText>
+                                </trf:expr>
+                            </trf:insert>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                </bpel:sequence>
+            </bpel:scope>
+        </bpel:forEach>
+        <bpel:reply partnerLink="GetLoanDetailsHN_SJ" operation="consultaPrestamos" variable="response"></bpel:reply>
+    </bpel:sequence>
+</bpel:process>

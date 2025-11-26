@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpel:process name="CollectionContractDetail_SJ"
+              targetNamespace="http://xmlns.oracle.com/DynamoMigrate/CoreBankingHN/"
+              xmlns:tns="http://xmlns.oracle.com/DynamoMigrate/CoreBankingHN/"
+              xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable"
+              xmlns:rescon="http://www.bea.com/alsb/flow/resources/config"
+              xmlns:bea="http://www.bea.com/bpel/ui/extensions"
+              xmlns:ext="http://www.bea.com/bpel/extensions"
+              xmlns:expr="http://www.bea.com/wli/sb/stages/config"
+              xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config"
+              xmlns:bind="http://xmlns.oracle.com/CollectionContractDetail_SJ" 
+              bea:name="CollectionContractDetail_SJ"
+              rescon:snippetVersion="1.0"
+              xmlns:ns1="T24WebServicesImpl"
+              xmlns:col="http://www.ficohsa.com.hn/middleware.services/collectionContractDetailTypes"
+              xmlns:ns0="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+              xmlns:ns2="http://xmlns.oracle.com/pcbpel/adapter/db/DynamoMigrate/CoreBankingHN/GetReferencedContract"
+              xmlns:get="http://xmlns.oracle.com/pcbpel/adapter/db/sp/GetReferencedContract"
+              xmlns:ns3="http://xmlns.oracle.com/pcbpel/adapter/db/DynamoMigrate/CoreBankingHN/GetReferencedCollectionOnline"
+              xmlns:get1="http://xmlns.oracle.com/pcbpel/adapter/db/sp/GetReferencedCollectionOnline">
+    <rescon:importInfo>
+        <rescon:schema-import ref="CoreBankingHN/ProviderServices/XSD/ContractsAgreements/ContractsAgreements"/>
+    </rescon:importInfo>
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="CollectionContractDetail_SJ" partnerLinkType="tns:CollectionContractDetail_SJ"
+                          myRole="CollectionContractDetail_SJ">
+	       </bpel:partnerLink>
+        <bpel:partnerLink name="ContractsAgreements_BS" partnerLinkType="tns:ContractsAgreements_BS"
+                          partnerRole="ContractsAgreements_BS"/>
+        <bpel:partnerLink name="GetReferencedContract_BS" partnerLinkType="tns:GetReferencedContract_BS"
+                          partnerRole="GetReferencedContract_BS"/>
+        <bpel:partnerLink name="GetReferencedCollectionOnline_BS" partnerLinkType="tns:GetReferencedCollectionOnline_BS"
+                          partnerRole="GetReferencedCollectionOnline_BS"/>
+    </bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request"
+	                      messageType="bind:CollectionContractDetail_inputParams">
+	       </bpel:variable>
+	       <bpel:variable name="response"
+                       messageType="bind:CollectionContractDetail_outputParams">
+	       </bpel:variable>
+        <bpel:variable name="REQContractsAgreements" messageType="ns1:Consultadetallecontratorecaudo"/>
+        <bpel:variable name="RSPContractsAgreements" messageType="ns1:ConsultadetallecontratorecaudoResponse"/>
+        <bpel:variable name="bodyTemp" type="xsd:anyType"/>
+        <bpel:variable name="cardCounter" type="xsd:string"/>
+    </bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="CollectionContractDetail_SJ" operation="CollectionContractDetail" variable="request" createInstance="yes">
+	           <rescon:receiveInfo>
+                <rescon:wsdl ref="CoreBankingHN/RequestorServices/v1.0/GetCollection/WSDL/CollectionContractDetail_SJ" binding="bind:CollectionContractDetail_SJ_ptt-binding"/>
+            </rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:assign>
+            <bpel:extensionAssignOperation>
+                <trf:assign varName="REQContractsAgreements.parameters">
+                    <trf:expr>
+                        <expr:xqueryTransform>
+                            <expr:resource ref="CoreBankingHN/RequestorServices/v1.0/GetCollection/XQ/ContractsAgreementsIn"/>
+                            <expr:param name="CollectionContractDetailRequest">
+                                <expr:path>$request.InputParameters</expr:path>
+                            </expr:param>
+                        </expr:xqueryTransform>
+                    </trf:expr>
+                </trf:assign>
+            </bpel:extensionAssignOperation>
+        </bpel:assign>
+        <bpel:invoke partnerLink="ContractsAgreements_BS" operation="Consultadetallecontratorecaudo"
+                     inputVariable="REQContractsAgreements" outputVariable="RSPContractsAgreements">
+            <rescon:invokeInfo>
+                <rescon:service ref="CoreBankingHN/ProviderServices/BusinessServices/ContractsAgreements/ContractsAgreements_BS"
+                                xsi:type="ns0:BusinessServiceRef"/>
+            </rescon:invokeInfo>
+        </bpel:invoke>
+        <bpel:assign>
+            <bpel:extensionAssignOperation>
+                <trf:assign varName="bodyTemp">
+                    <trf:expr>
+                        <expr:xqueryTransform>
+                            <expr:resource ref="CoreBankingHN/RequestorServices/v1.0/GetCollection/XQ/ContractsAgreementsOut"/>
+                            <expr:param name="ContractsAgreementsResponse">
+                                <expr:path>$RSPContractsAgreements.parameters</expr:path>
+                            </expr:param>
+                        </expr:xqueryTransform>
+                    </trf:expr>
+                </trf:assign>
+            </bpel:extensionAssignOperation>
+            <bpel:extensionAssignOperation>
+                <trf:assign varName="response.OutputParameters">
+                    <trf:expr>
+                        <expr:xqueryText>&lt;col:CollectionContractDetailResponse/&gt;</expr:xqueryText>
+                    </trf:expr>
+                </trf:assign>
+            </bpel:extensionAssignOperation>
+            <bpel:extensionAssignOperation>
+                <trf:replace contents-only="false" varName="response.OutputParameters">
+                    <trf:expr>
+                        <expr:xqueryText>$bodyTemp</expr:xqueryText>
+                    </trf:expr>
+                </trf:replace>
+            </bpel:extensionAssignOperation>
+        </bpel:assign>
+        <bpel:if bea:name="DefinicionTipoContrato">
+            <bpel:condition>string($RSPContractsAgreements.parameters/Status/successIndicator/text()) = 'Success'</bpel:condition>
+            <bpel:sequence>
+                <bpel:empty/>
+                <bpel:assign>
+                    <bpel:extensionAssignOperation>
+                        <trf:delete varName="response.OutputParameters">
+                            <trf:location>
+                                <expr:xpathText>./col:CollectionContractDetailResponseType/col:CollectionContractDetailResponseRecordType</expr:xpathText>
+                            </trf:location>
+                        </trf:delete>
+                    </bpel:extensionAssignOperation>
+                </bpel:assign>
+                <bpel:forEach parallel="yes" counterName="counter">
+                    <bpel:startCounterValue>number(1)</bpel:startCounterValue>
+                    <bpel:finalCounterValue>count($bodyTemp/col:CollectionContractDetailResponseType/col:CollectionContractDetailResponseRecordType)</bpel:finalCounterValue>
+                    <bpel:scope>
+                        <bpel:variables>
+                            <bpel:variable name="validationMessage" type="xsd:string"/>
+                            <bpel:variable name="Record" type="xsd:anyType"/>
+                            <bpel:variable name="infoExchangeType" type="xsd:string"/>
+                            <bpel:variable name="collectionType" type="xsd:string"/>
+                            <bpel:variable name="contractId" type="xsd:string"/>
+                            <bpel:variable name="type" type="xsd:string"/>
+                            <bpel:variable name="REQGetReferencedContract" messageType="ns2:args_in_msg"/>
+                            <bpel:variable name="RSPGetReferencedContract" messageType="ns2:args_out_msg"/>
+                            <bpel:variable name="REQGetReferencedCollectionOnline" messageType="ns3:args_in_msg"/>
+                            <bpel:variable name="RSPGetReferencedCollectionOnline" messageType="ns3:args_out_msg"/>
+                            <bpel:variable name="errorCode" type="xsd:string"/>
+                        </bpel:variables>
+                        <bpel:sequence>
+                            <bpel:assign>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="cardCounter">
+                                        <trf:expr>
+                                            <expr:xqueryText>$counter</expr:xqueryText>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="validationMessage">
+                                        <trf:expr>
+                                            <expr:xqueryText>' '</expr:xqueryText>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                                <bpel:copy keepSrcElementName="yes">
+                                    <bpel:from>$bodyTemp/col:CollectionContractDetailResponseType/col:CollectionContractDetailResponseRecordType[$counter]</bpel:from>
+                                    <bpel:to variable="Record"/>
+                                </bpel:copy>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="infoExchangeType">
+                                        <trf:expr>
+                                            <expr:xqueryText>fn:data($Record/col:InfoExchangeType)</expr:xqueryText>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="collectionType">
+                                        <trf:expr>
+                                            <expr:xqueryText>if (string($RSPContractsAgreements.parameters/WSCOLLECTIONCONDSType/gWSCOLLECTIONCONDSDetailType/mWSCOLLECTIONCONDSDetailType/COLLECTIONTYPE/text()) = "") then (
+	" "
+) else (
+	string($RSPContractsAgreements.parameters/WSCOLLECTIONCONDSType/gWSCOLLECTIONCONDSDetailType/mWSCOLLECTIONCONDSDetailType/COLLECTIONTYPE/text())
+)</expr:xqueryText>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="contractId">
+                                        <trf:expr>
+                                            <expr:xqueryText>fn:string($Record/col:ContractId/text())</expr:xqueryText>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                            </bpel:assign>
+                            <bpel:if>
+                                <bpel:condition>$collectionType = 'MOBILE.RECHARGE'
+or
+$collectionType = 'MOBILE.PACKAGE'</bpel:condition>
+                                <bpel:sequence>
+                                    <bpel:empty/>
+                                    <bpel:if>
+                                        <bpel:condition>$collectionType = 'MOBILE.RECHARGE'</bpel:condition>
+                                        <bpel:sequence>
+                                            <bpel:empty/>
+                                            <bpel:assign>
+                                                <bpel:extensionAssignOperation>
+                                                    <trf:assign varName="type">
+                                                        <trf:expr>
+                                                            <expr:xqueryText>'MOBILE_RECHARGE'</expr:xqueryText>
+                                                        </trf:expr>
+                                                    </trf:assign>
+                                                </bpel:extensionAssignOperation>
+                                            </bpel:assign>
+                                        </bpel:sequence>
+                                        <bpel:else>
+                                            <bpel:sequence>
+                                                <bpel:empty/>
+                                                <bpel:assign>
+                                                    <bpel:extensionAssignOperation>
+                                                        <trf:assign varName="type">
+                                                            <trf:expr>
+                                                                <expr:xqueryText>'MOBILE_PACKAGE'</expr:xqueryText>
+                                                            </trf:expr>
+                                                        </trf:assign>
+                                                    </bpel:extensionAssignOperation>
+                                                </bpel:assign>
+                                            </bpel:sequence>
+                                        </bpel:else>
+                                    </bpel:if>
+                                </bpel:sequence>
+                                <bpel:else>
+                                    <bpel:sequence>
+                                        <bpel:empty/>
+                                        <bpel:assign>
+                                            <bpel:extensionAssignOperation>
+                                                <trf:assign varName="type">
+                                                    <trf:expr>
+                                                        <expr:xqueryText>$infoExchangeType</expr:xqueryText>
+                                                    </trf:expr>
+                                                </trf:assign>
+                                            </bpel:extensionAssignOperation>
+                                        </bpel:assign>
+                                        <bpel:if>
+                                            <bpel:condition>$type = 'REFERENCED'</bpel:condition>
+                                            <bpel:sequence>
+                                                <bpel:empty/>
+                                                <bpel:assign>
+                                                    <bpel:extensionAssignOperation>
+                                                        <trf:assign varName="REQGetReferencedContract.InputParameters">
+                                                            <trf:expr>
+                                                                <expr:xqueryTransform>
+                                                                    <expr:resource ref="CoreBankingHN/RequestorServices/v1.0/GetCollection/XQ/GetReferencedContractIn"/>
+                                                                    <expr:param name="ContractId">
+                                                                        <expr:path>$contractId</expr:path>
+                                                                    </expr:param>
+                                                                </expr:xqueryTransform>
+                                                            </trf:expr>
+                                                        </trf:assign>
+                                                    </bpel:extensionAssignOperation>
+                                                </bpel:assign>
+                                                <bpel:invoke partnerLink="GetReferencedContract_BS"
+                                                             operation="GetReferencedContract"
+                                                             inputVariable="REQGetReferencedContract"
+                                                             outputVariable="RSPGetReferencedContract">
+                                                    <rescon:invokeInfo>
+                                                        <rescon:service ref="CoreBankingHN/ProviderServices/BusinessServices/GetReferencedContract/GetReferencedContract_BS"
+                                                                        xsi:type="ns0:BusinessServiceRef"/>
+                                                    </rescon:invokeInfo>
+                                                </bpel:invoke>
+                                                <bpel:if>
+                                                    <bpel:condition>$RSPGetReferencedContract.OutputParameters/get:TIPO_CONTRATO/text() = 'REFERENCED_LOCAL'
+</bpel:condition>
+                                                    <bpel:sequence>
+                                                        <bpel:empty/>
+                                                        <bpel:assign>
+                                                            <bpel:extensionAssignOperation>
+                                                                <trf:assign varName="type">
+                                                                    <trf:expr>
+                                                                        <expr:xqueryText>'REFERENCED_LOCAL'</expr:xqueryText>
+                                                                    </trf:expr>
+                                                                </trf:assign>
+                                                            </bpel:extensionAssignOperation>
+                                                        </bpel:assign>
+                                                    </bpel:sequence>
+                                                    <bpel:else>
+                                                        <bpel:sequence>
+                                                            <bpel:empty/>
+                                                            <bpel:assign>
+                                                                <bpel:extensionAssignOperation>
+                                                                    <trf:assign varName="REQGetReferencedCollectionOnline.InputParameters">
+                                                                        <trf:expr>
+                                                                            <expr:xqueryTransform>
+                                                                                <expr:resource ref="CoreBankingHN/RequestorServices/v1.0/GetCollection/XQ/GetReferencedCollectionOnlineIn"/>
+                                                                                <expr:param name="ContractId">
+                                                                                    <expr:path>$contractId</expr:path>
+                                                                                </expr:param>
+                                                                            </expr:xqueryTransform>
+                                                                        </trf:expr>
+                                                                    </trf:assign>
+                                                                </bpel:extensionAssignOperation>
+                                                            </bpel:assign>
+                                                            <bpel:invoke partnerLink="GetReferencedCollectionOnline_BS"
+                                                                         operation="GetReferencedCollectionOnline"
+                                                                         inputVariable="REQGetReferencedCollectionOnline"
+                                                                         outputVariable="RSPGetReferencedCollectionOnline">
+                                                                <rescon:invokeInfo>
+                                                                    <rescon:service ref="CoreBankingHN/ProviderServices/BusinessServices/GetReferencedCollectionOnline/GetReferencedCollectionOnline_BS"
+                                                                                    xsi:type="ns0:BusinessServiceRef"/>
+                                                                </rescon:invokeInfo>
+                                                            </bpel:invoke>
+                                                            <bpel:assign>
+                                                                <bpel:extensionAssignOperation>
+                                                                    <trf:assign varName="errorCode">
+                                                                        <trf:expr>
+                                                                            <expr:xqueryText>fn:data($RSPGetReferencedCollectionOnline.OutputParameters/get1:CODIGO_RESPUESTA)</expr:xqueryText>
+                                                                        </trf:expr>
+                                                                    </trf:assign>
+                                                                </bpel:extensionAssignOperation>
+                                                            </bpel:assign>
+                                                            <bpel:if>
+                                                                <bpel:condition>$errorCode ='SUCCESS'</bpel:condition>
+                                                                <bpel:sequence>
+                                                                    <bpel:empty/>
+                                                                    <bpel:assign>
+                                                                        <bpel:extensionAssignOperation>
+                                                                            <trf:assign varName="type">
+                                                                                <trf:expr>
+                                                                                    <expr:xqueryText>'REFERENCED_ONLINE'</expr:xqueryText>
+                                                                                </trf:expr>
+                                                                            </trf:assign>
+                                                                        </bpel:extensionAssignOperation>
+                                                                    </bpel:assign>
+                                                                </bpel:sequence>
+                                                                <bpel:elseif>
+                                                                    <bpel:condition>$errorCode ='NO_DATA_FOUND'</bpel:condition>
+                                                                    <bpel:sequence>
+                                                                        <bpel:empty/>
+                                                                    </bpel:sequence>
+                                                                </bpel:elseif>
+                                                                <bpel:else>
+                                                                    <bpel:sequence>
+                                                                        <bpel:empty/>
+                                                                        <bpel:assign>
+                                                                            <bpel:extensionAssignOperation>
+                                                                                <trf:assign varName="validationMessage">
+                                                                                    <trf:expr>
+                                                                                        <expr:xqueryText>fn:data($RSPGetReferencedCollectionOnline.OutputParameters/get1:MENSAJE_RESPUESTA)</expr:xqueryText>
+                                                                                    </trf:expr>
+                                                                                </trf:assign>
+                                                                            </bpel:extensionAssignOperation>
+                                                                        </bpel:assign>
+                                                                    </bpel:sequence>
+                                                                </bpel:else>
+                                                            </bpel:if>
+                                                        </bpel:sequence>
+                                                    </bpel:else>
+                                                </bpel:if>
+                                            </bpel:sequence>
+                                            <bpel:else>
+                                                <bpel:sequence>
+                                                    <bpel:empty/>
+                                                </bpel:sequence>
+                                            </bpel:else>
+                                        </bpel:if>
+                                    </bpel:sequence>
+                                </bpel:else>
+                            </bpel:if>
+                            <bpel:if>
+                                <bpel:condition>$validationMessage != ' '</bpel:condition>
+                                <bpel:sequence>
+                                    <bpel:empty/>
+                                    <bpel:assign>
+                                        <bpel:extensionAssignOperation>
+                                            <trf:replace contents-only="true" varName="response.OutputParameters">
+                                                <trf:expr>
+                                                    <expr:xqueryText>&lt;col:CollectionContractDetailResponse&gt;
+    &lt;col:ResponseCode&gt;Error&lt;/col:ResponseCode&gt;
+    &lt;col:ResponseMessage&gt;{ fn:data($validationMessage) }&lt;/col:ResponseMessage&gt;
+&lt;/col:CollectionContractDetailResponse&gt;</expr:xqueryText>
+                                                </trf:expr>
+                                            </trf:replace>
+                                        </bpel:extensionAssignOperation>
+                                    </bpel:assign>
+                                    <bpel:reply operation="CollectionContractDetail"
+                                                partnerLink="CollectionContractDetail_SJ" variable="response"/>
+                                    <bpel:exit/>
+                                </bpel:sequence>
+                                <bpel:else>
+                                    <bpel:sequence>
+                                        <bpel:empty/>
+                                        <bpel:assign>
+                                            <bpel:extensionAssignOperation>
+                                                <trf:insert varName="response.OutputParameters">
+                                                    <trf:location>
+                                                        <expr:xpathText>./col:CollectionContractDetailResponseType</expr:xpathText>
+                                                    </trf:location>
+                                                    <trf:where>first-child</trf:where>
+                                                    <trf:expr>
+                                                        <expr:xqueryText>$Record</expr:xqueryText>
+                                                    </trf:expr>
+                                                </trf:insert>
+                                            </bpel:extensionAssignOperation>
+                                            <bpel:extensionAssignOperation>
+                                                <trf:replace varName="response.OutputParameters" contents-only="true">
+                                                    <trf:location>
+                                                        <expr:xpathText>./col:CollectionContractDetailResponseType/col:CollectionContractDetailResponseRecordType/col:ContractType</expr:xpathText>
+                                                    </trf:location>
+                                                    <trf:expr>
+                                                        <expr:xqueryText>$type</expr:xqueryText>
+                                                    </trf:expr>
+                                                </trf:replace>
+                                            </bpel:extensionAssignOperation>
+                                        </bpel:assign>
+                                    </bpel:sequence>
+                                </bpel:else>
+                            </bpel:if>
+                        </bpel:sequence>
+                    </bpel:scope>
+                </bpel:forEach>
+            </bpel:sequence>
+            <bpel:else>
+                <bpel:sequence>
+                    <bpel:empty/>
+                </bpel:sequence>
+            </bpel:else>
+        </bpel:if>
+        <bpel:reply partnerLink="CollectionContractDetail_SJ" operation="CollectionContractDetail" variable="response"></bpel:reply>
+    </bpel:sequence>
+</bpel:process>

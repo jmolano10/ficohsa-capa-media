@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con3:SoapBindingType" xmlns:con3="http://www.bea.com/wli/sb/services/bindings/config">
+      <con3:wsdl ref="MWCaja/v1/Resources/CreditCardOperations/CreditCardWithdrawal/wsdl/CreditCardWithdrawal"/>
+      <con3:port>
+        <con3:name>CreditCardWithdrawalPSSOAP</con3:name>
+        <con3:namespace>http://www.ficohsa.com.hn/middleware.services/CreditCardWithdrawalPS/</con3:namespace>
+      </con3:port>
+      <con3:selector type="SOAP body"/>
+      <con3:WSI-compliant>false</con3:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-2569570050749831340--4df4f678.17068820407.-7529">
+    <con:pipeline type="request" name="CreditCardWithdrawalGT_request">
+      <con:stage name="ValidaciónXSD">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/creditCardOperationsTypes" prefix="cred"/>
+        </con:context>
+        <con:actions>
+          <con2:validate>
+            <con1:id>_ActionId-4298451933363468199-26eebbf0.16bb426bc4a.-45d0</con1:id>
+            <con2:schema ref="MWCaja/v1/Resources/CreditCardOperations/xsd/CreditCardOperationsTypes"/>
+            <con2:schemaElement xmlns:cred="http://www.ficohsa.com.hn/middleware.services/creditCardOperationsTypes">cred:creditCardWithdrawal</con2:schemaElement>
+            <con2:varName>body</con2:varName>
+            <con2:location>
+              <con1:xpathText>./cred:creditCardWithdrawal</con1:xpathText>
+            </con2:location>
+          </con2:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="GuardarDatosOriginales">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="OriginalBody">
+            <con1:id>_ActionId-6911246849118594238--1ecc98bd.171313c87af.-7e80</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$body</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:replace contents-only="true" varName="header">
+            <con1:id>_ActionId-8501806485692981954-53eae005.171a3353a93.-7fed</con1:id>
+            <con2:expr>
+              <con1:xqueryTransform>
+                <con1:resource ref="MWCaja/v1/Resources/General/xq/mwCajaHeaderToMiddlewareRGHeader"/>
+                <con1:param name="requestHeader">
+                  <con1:path>$header/aut:RequestHeader</con1:path>
+                </con1:param>
+              </con1:xqueryTransform>
+            </con2:expr>
+          </con2:replace>
+          <con2:assign varName="OriginalHeader">
+            <con1:id>_ActionId-6911246849118594238--1ecc98bd.171313c87af.-7e68</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$header</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="CreditCardWithdrawalGT_response">
+      <con:stage name="RetiroEfectivoTC">
+        <con:context>
+          <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/MCRepRetiroTC" prefix="mcr"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/creditCardOperationsTypes" prefix="cred"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/generalTypes" prefix="gen"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-4960923074051327975-26bd9d57.1710cf95c0b.-7c75</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>($errorCode = 'Success' or $validationMessage = '') and $ctr = 'NO'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-4960923074051327975-26bd9d57.1710cf95c0b.-7c6b</con1:id>
+                  <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/RetiroEfectivoTCGT" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>retiroEfectivoTC</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQRetiroEfectivoTC</con2:body>
+                    <con2:header>$REQHeaderRetiroEfectivoTC</con2:header>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPRetiroEfectivoTC</con2:body>
+                    <con2:header>RSPHeaderRetiroEfectivoTC</con2:header>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQHeaderRetiroEfectivoTC">
+                      <con1:id>_ActionId-4960923074051327975-26bd9d57.1710cf95c0b.-7c6f</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>$OriginalHeader</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="REQRetiroEfectivoTC">
+                      <con1:id>_ActionId-4960923074051327975-26bd9d57.1710cf95c0b.-7c6e</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="MWCaja/v2/Resources/CreditCardOperations/CreditCardWithdrawal/xq/retiroEfectivoGTIn"/>
+                          <con1:param name="creditCardWithdrawal">
+                            <con1:path>$OriginalBody/cred:creditCardWithdrawal</con1:path>
+                          </con1:param>
+                          <con1:param name="REFERENCE_NUMBER">
+                            <con1:path>$body/mcr:OutputParameters/mcr:PR_TRANSACTION_INFO/mcr:TXN_REF_ID/text()</con1:path>
+                          </con1:param>
+                          <con1:param name="MERCHANT_NUMBER">
+                            <con1:path>'999999998'</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="errorCode">
+                      <con1:id>_ActionId-4960923074051327975-26bd9d57.1710cf95c0b.-7c6d</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>fn:upper-case(string($RSPHeaderRetiroEfectivoTC/aut:ResponseHeader/successIndicator/text()))</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="validationMessage">
+                      <con1:id>_ActionId-4391905506889038184-2b5802a4.171a9842bca.-7fd6</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>fn:upper-case(string($RSPHeaderRetiroEfectivoTC/aut:ResponseHeader/messages/text()))</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ReversionTransaccionAbanks" errorHandler="_onErrorHandler-3010814489909354742--6037f5c6.177d068c146.-7f8d">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/creditCardOperationsTypes" prefix="cred"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/MCRepRetiroTC" prefix="mcr"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/MCReversionTXN" prefix="mcr1"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-3010814489909354742--6037f5c6.177d068c146.-7f69</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>upper-case($validationMessage) = 'DECLINED'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-3010814489909354742--6037f5c6.177d068c146.-7f65</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="MWCaja/v1/BusinessServices/AbanksGT/ReversionTXN/biz/MCReversionTXN_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>MCReversionTXN</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQMCReversionTXN</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPMCReversionTXN</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQMCReversionTXN">
+                      <con1:id>_ActionId-3010814489909354742--6037f5c6.177d068c146.-7f66</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="MWCaja/v2/Resources/CreditCardOperations/CreditCardWithdrawal/xq/reversionTXNGTIn"/>
+                          <con1:param name="creditCardWithdrawal">
+                            <con1:path>$OriginalBody/cred:creditCardWithdrawal</con1:path>
+                          </con1:param>
+                          <con1:param name="transacionId">
+                            <con1:path>$transactionId</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="errorCode">
+                      <con1:id>_ActionId-3010814489909354742--6037f5c6.177d068c146.-7ecf</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>let $errorCode := string($RSPMCReversionTXN/mcr1:PV_CODIGO_ESTADO/text())
+return
+if(upper-case($errorCode) = 'SUCCESS')then(
+	'DECLINED'
+)else(
+	$errorCode
+)</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="validationMessage">
+                      <con1:id>_ActionId-3010814489909354742--6037f5c6.177d068c146.-7e42</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>if(upper-case($errorCode) = 'DECLINED')then(
+	'DECLINED'
+)else(
+	concat('La transaccion fue declinada y no se pudo reversar en Abanks: ', string($RSPMCReversionTXN/mcr1:PV_MENSAJE_ESTADO/text()))
+)</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+      <con:stage name="CreditCardWithdrawalGT">
+        <con:context>
+          <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/MCRepRetiroTC" prefix="mcr"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/creditCardOperationsTypes" prefix="cred"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+            <con1:id>_ActionId-4960923074051327975-26bd9d57.1710cf95c0b.-7b5f</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>($validationMessage = '') or (fn:replace($validationMessage, " ", "") = 'APPROVED')</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace contents-only="true" varName="header">
+                  <con1:id>_ActionId-1271396761195710592-6545bb43.171ad0fe67c.-7fff</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+			<TRANSACTION_ID>{fn:string($RSPRetiroEfectivoTC/REFERENCE_NUMBER/text())}</TRANSACTION_ID>
+			<SUCCESS_INDICATOR>Success</SUCCESS_INDICATOR>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-4960923074051327975-26bd9d57.1710cf95c0b.-7b5e</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="MWCaja/v2/Resources/CreditCardOperations/CreditCardWithdrawal/xq/creditCardWithdrawalGTOut"/>
+                      <con1:param name="outputParameters">
+                        <con1:path>$body/mcr:OutputParameters</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = "DECLINED"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace contents-only="true" varName="header">
+                  <con1:id>_ActionId-1271396761195710592-6545bb43.171ad0fe67c.-7fcb</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <SUCCESS_INDICATOR>Error</SUCCESS_INDICATOR>
+      <MESSAGES>{$validationMessage}</MESSAGES>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-1271396761195710592-6545bb43.171ad0fe67c.-7fb9</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;cred:creditCardWithdrawalResponse/></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-1271396761195710592-6545bb43.171ad0fe67c.-7faa</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <SUCCESS_INDICATOR>Error</SUCCESS_INDICATOR>
+      <MESSAGES>{$validationMessage}</MESSAGES>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-4960923074051327975-26bd9d57.1710cf95c0b.-7b5d</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;cred:creditCardWithdrawalResponse/></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-2569570050749831340--4df4f678.17068820407.-7529">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/creditCardOperationsTypes" prefix="cred"/>
+        </con:context>
+        <con:actions>
+          <con2:replace contents-only="true" varName="header">
+            <con1:id>_ActionId-2569570050749831340--4df4f678.17068820407.-74f1</con1:id>
+            <con2:expr>
+              <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<SUCCESS_INDICATOR>{string($fault/ctx:errorCode/text())}</SUCCESS_INDICATOR>
+	<MESSAGES>{ string($fault/ctx:reason/text()) }</MESSAGES>
+</aut:ResponseHeader>]]></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-2569570050749831340--4df4f678.17068820407.-74d4</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;cred:creditCardWithdrawalResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-2569570050749831340--4df4f678.17068820407.-749c</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-3010814489909354742--6037f5c6.177d068c146.-7f8d">
+      <con:stage name="ErrorAbanks">
+        <con:context/>
+        <con:actions>
+          <con2:assign varName="errorCode">
+            <con1:id>_ActionId-3010814489909354742--6037f5c6.177d068c146.-7e32</con1:id>
+            <con2:expr>
+              <con1:xqueryText>'ERROR'</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="validationMessage">
+            <con1:id>_ActionId-3010814489909354742--6037f5c6.177d068c146.-7e20</con1:id>
+            <con2:expr>
+              <con1:xqueryText>concat('La transaccion fue declinada y no se pudo reversar en Abanks: ', string($fault/ctx:reason/text()))</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con1:resume>
+            <con1:id>_ActionId-3010814489909354742--6037f5c6.177d068c146.-7f85</con1:id>
+          </con1:resume>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="CreditCardWithdrawalGT">
+        <con:request>CreditCardWithdrawalGT_request</con:request>
+        <con:response>CreditCardWithdrawalGT_response</con:response>
+      </con:pipeline-node>
+      <con:route-node name="Route_CreditCardWithdrawalGT">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/creditCardOperationsTypes" prefix="cred"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/MCRepRetiroTC" prefix="mcr"/>
+        </con:context>
+        <con:actions>
+          <con3:route xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+            <con1:id>_ActionId-7510792149741777610--5a137f0.16cd4c75457.-7f81</con1:id>
+            <con3:service ref="MWCaja/v1/BusinessServices/AbanksGT/RepRetiroTC/biz/MCRepRetiroTC_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>MCRepRetiroTC</con3:operation>
+            <con3:outboundTransform>
+              <con2:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-7510792149741777610--5a137f0.16cd4c75457.-7f49</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="MWCaja/v2/Resources/CreditCardOperations/CreditCardWithdrawal/xq/mcRepRetiroTCGTIn"/>
+                    <con1:param name="creditCardWithdrawal">
+                      <con1:path>$body/cred:creditCardWithdrawal</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con3:outboundTransform>
+            <con3:responseTransform>
+              <con2:assign varName="errorCode">
+                <con1:id>_ActionId-7510792149741777610--5a137f0.16cd4c75457.-7e0e</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($body/mcr:OutputParameters/mcr:PV_CODIGO_ESTADO/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="validationMessage">
+                <con1:id>_ActionId-7510792149741777610--5a137f0.16cd4c75457.-7df1</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($body/mcr:OutputParameters/mcr:PV_MENSAJE_ESTADO/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="ctr">
+                <con1:id>_ActionId-7079253424215681846--329c58b7.1739b03c7c3.-7f10</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>string($body/mcr:OutputParameters/mcr:PR_TRANSACTION_INFO/mcr:REQUIRES_CTR/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="transactionId">
+                <con1:id>_ActionId-3010814489909354742--6037f5c6.177d068c146.-7f8e</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>string($body/mcr:OutputParameters/mcr:PR_TRANSACTION_INFO/mcr:TXN_REF_ID/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con3:responseTransform>
+          </con3:route>
+        </con:actions>
+      </con:route-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/ConsultaIntrasPorCuenta/wsdl/consultaIntrasPorCuentaPS"/>
+      <con:port>
+        <con:name>consultaIntrasPorCuentaPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaIntrasPorCuentaPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-8765201257064690606-78520c46.17b07470915.-7f0c">
+    <con:pipeline type="request" name="NI01_ConsultaIntrasPorCuenta_request">
+      <con1:stage name="FlujoEntrada" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+        <con1:context>
+          <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conResumenComprasCuotas" prefix="con1"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaIntrasPorCuentaTypes" prefix="con"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con1:context>
+        <con1:actions>
+          <con3:assign varName="codigoPais">
+            <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f16</con2:id>
+            <con3:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                <con2:param name="sentidoConversion">
+                  <con2:path>'OSB-ISO3'</con2:path>
+                </con2:param>
+                <con2:param name="codigoPais">
+                  <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con3:expr>
+          </con3:assign>
+          <con3:wsCallout>
+            <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f11</con2:id>
+            <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterData/conResumenComprasCuotas/biz/conResumenComprasCuotas_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>conResumenComprasCuotas</con3:operation>
+            <con3:request>
+              <con3:body>$REQconResumenComprasCuotas</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>RSPconResumenComprasCuotas</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="REQconResumenComprasCuotas">
+                <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f15</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MasterData/xq/conResumenComprasCuotasIn"/>
+                    <con2:param name="numCuenta">
+                      <con2:path>string($body/con:consultaIntrasPorCuenta/SEARCH_VALUE/text())</con2:path>
+                    </con2:param>
+                    <con2:param name="pais">
+                      <con2:path>$codigoPais</con2:path>
+                    </con2:param>
+                    <con2:param name="tipo">
+                      <con2:path>string($body/con:consultaIntrasPorCuenta/SEARCH_CRITERIA/text())</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+              <con3:validate>
+                <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f14</con2:id>
+                <con3:schema ref="Middleware/v2/BusinessServices/MasterData/conResumenComprasCuotas/xsd/conResumenComprasCuotas_sp"/>
+                <con3:schemaElement xmlns:con4="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conResumenComprasCuotas">con4:InputParameters</con3:schemaElement>
+                <con3:varName>REQconResumenComprasCuotas</con3:varName>
+                <con3:location>
+                  <con2:xpathText>.</con2:xpathText>
+                </con3:location>
+              </con3:validate>
+            </con3:requestTransform>
+            <con3:responseTransform>
+              <con3:assign varName="errorCode">
+                <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f13</con2:id>
+                <con3:expr>
+                  <con2:xqueryText>let $error := string($RSPconResumenComprasCuotas/con1:CodigoError/text())
+let $cantidadRegistros := count($RSPconResumenComprasCuotas/con1:RowSet/con1:Row)
+return
+if($cantidadRegistros = 0 and $error = '-1') then (
+	'NO RECORDS'
+)else(
+	$error
+)</con2:xqueryText>
+                </con3:expr>
+              </con3:assign>
+              <con3:assign varName="validationMessage">
+                <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f12</con2:id>
+                <con3:expr>
+                  <con2:xqueryText>string($RSPconResumenComprasCuotas/con1:MensajeError/text())</con2:xqueryText>
+                </con3:expr>
+              </con3:assign>
+            </con3:responseTransform>
+          </con3:wsCallout>
+        </con1:actions>
+      </con1:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="NI01_ConsultaIntrasPorCuenta_response">
+      <con1:stage name="FlujoSalida" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+        <con1:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaIntrasPorCuentaTypes" prefix="con"/>
+        </con1:context>
+        <con1:actions>
+          <con3:replace contents-only="true" varName="header">
+            <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f10</con2:id>
+            <con3:expr>
+              <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+{
+	if($errorCode = "-1") then (
+		<successIndicator>Success</successIndicator>
+	)else(
+		<successIndicator>{ $errorCode }</successIndicator>,
+		<messages>{ $validationMessage }</messages>
+	)
+}
+</aut:ResponseHeader>]]></con2:xqueryText>
+            </con3:expr>
+          </con3:replace>
+          <con3:ifThenElse>
+            <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f0f</con2:id>
+            <con3:case>
+              <con3:condition>
+                <con2:xqueryText>$errorCode = "-1"</con2:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:replace contents-only="true" varName="body">
+                  <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f0e</con2:id>
+                  <con3:expr>
+                    <con2:xqueryTransform>
+                      <con2:resource ref="Middleware/v2/Resources/ConsultaIntrasPorCuenta/xq/consultaIntrasPorCuentaOut"/>
+                      <con2:param name="outputParameters1">
+                        <con2:path>$RSPconResumenComprasCuotas</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+              </con3:actions>
+            </con3:case>
+            <con3:default>
+              <con3:replace contents-only="true" varName="body">
+                <con2:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7f0d</con2:id>
+                <con3:expr>
+                  <con2:xqueryText>&lt;con:consultaIntrasPorCuentaResponse/></con2:xqueryText>
+                </con3:expr>
+              </con3:replace>
+            </con3:default>
+          </con3:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-8765201257064690606-78520c46.17b07470915.-7f0c">
+      <con:stage name="ManejoError">
+        <con1:context xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+          <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaIntrasPorCuentaTypes" prefix="con"/>
+          <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con1:context>
+        <con1:actions xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+          <con2:replace contents-only="true" varName="header">
+            <con:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7e99</con:id>
+            <con2:expr>
+              <con:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body">
+            <con:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7e98</con:id>
+            <con2:expr>
+              <con:xqueryText>&lt;con:consultaIntrasPorCuentaResponse/></con:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con:reply>
+            <con:id>_ActionId-8765201257064690606-78520c46.17b07470915.-7e97</con:id>
+          </con:reply>
+        </con1:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="NI01_ConsultaIntrasPorCuenta">
+        <con:request>NI01_ConsultaIntrasPorCuenta_request</con:request>
+        <con:response>NI01_ConsultaIntrasPorCuenta_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

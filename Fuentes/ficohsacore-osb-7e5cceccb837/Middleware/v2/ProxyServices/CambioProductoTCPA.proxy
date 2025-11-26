@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/CambioProductoTC/wsdl/cambioProductoTCPS"/>
+      <con:port>
+        <con:name>cambioProductoTCPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/cambioProductoTCPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-5795849822602876976-7d567fb7.16bdbefe604.-7bbd">
+    <con:pipeline type="request" name="CambioProductoTCPA_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta" prefix="cond" xmlns:con2="http://www.bea.com/wli/sb/stages/config"/>
+          <con2:userNsDecl namespace="http://www.procesa.com/fdcs" prefix="vis" xmlns:con2="http://www.bea.com/wli/sb/stages/config"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con2="http://www.bea.com/wli/sb/stages/config"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges" xmlns:con2="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:assign varName="codPais">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7bdc</con2:id>
+            <con1:expr>
+              <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                <con2:param name="codigoPais">
+                  <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                </con2:param>
+                <con2:param name="sentidoConversion">
+                  <con2:path>'OSB-ISO3'</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con1:expr>
+          </con1:assign>
+          <con1:wsCallout>
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7bcb</con2:id>
+            <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataPA/conDatoCuenta/biz/conDatoCuenta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con1:operation>conDatoCuenta</con1:operation>
+            <con1:request>
+              <con1:body>$REQconDatoCuenta</con1:body>
+            </con1:request>
+            <con1:response>
+              <con1:body>RSPconDatoCuenta</con1:body>
+            </con1:response>
+            <con1:requestTransform>
+              <con1:assign varName="REQconDatoCuenta">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7bbc</con2:id>
+                <con1:expr>
+                  <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                    <con2:resource ref="Middleware/v2/Resources/MasterDataPA/xq/conDatoCuentaPAIn"/>
+                    <con2:param name="countryCode">
+                      <con2:path>$codPais</con2:path>
+                    </con2:param>
+                    <con2:param name="accountNumber">
+                      <con2:path>string($body/ges:cambioProductoTC/ACCOUNT/text())</con2:path>
+                    </con2:param>
+                    <con2:param name="org">
+                      <con2:path>""</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+              <con1:validate>
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-78d0</con2:id>
+                <con1:schema ref="Middleware/v2/BusinessServices/MasterDataPA/conDatoCuenta/xsd/conDatoCuenta_sp"/>
+                <con2:schemaElement xmlns:con1="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">con1:InputParameters</con2:schemaElement>
+                <con1:varName>REQconDatoCuenta</con1:varName>
+              </con1:validate>
+            </con1:requestTransform>
+            <con1:responseTransform>
+              <con1:assign varName="errorCode">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7b9e</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if(string($RSPconDatoCuenta/cond:CodigoError/text()) != '-1')then(
+	string($RSPconDatoCuenta/cond:CodigoError/text())
+)else(
+	'Success'
+)</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="validationMessage">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7b52</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode != 'Success')then(
+	string($RSPconDatoCuenta/cond:MensajeError/text())
+)else(
+	''
+)</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="org">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7b74</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">let $row := $RSPconDatoCuenta/cond:RowSet/cond:Row[cond:Column[upper-case(@name) = 'TIPOORG']/text() = 'BASE']
+return
+	data($row/cond:Column[upper-case(@name) = 'ORG'])</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="ciclo">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7b64</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">let $row := $RSPconDatoCuenta/cond:RowSet/cond:Row[cond:Column[upper-case(@name) = 'TIPOORG']/text() = 'BASE']
+return
+	data($row/cond:Column[upper-case(@name) = 'CICLO'])</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+            </con1:responseTransform>
+          </con1:wsCallout>
+          <con1:ifThenElse>
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7b42</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:wsCallout>
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7b28</con2:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>AccountProductTransferUpdate</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQaccountProductTransferUpdate</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RSPaccountProductTransferUpdate</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQaccountProductTransferUpdate">
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7b18</con2:id>
+                      <con1:expr>
+                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                          <con2:resource ref="Middleware/v2/Resources/CambioProductoTC/xq/accountProductTransferUpdateIn"/>
+                          <con2:param name="org">
+                            <con2:path>$org</con2:path>
+                          </con2:param>
+                          <con2:param name="ciclo">
+                            <con2:path>$ciclo</con2:path>
+                          </con2:param>
+                          <con2:param name="cambioProductoTC1">
+                            <con2:path>$body/ges:cambioProductoTC</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                    <con1:validate>
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-78ee</con2:id>
+                      <con1:schema ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/xsd/XMLSchema_769155616"/>
+                      <con1:schemaElement xmlns:fdcs="http://www.procesa.com/fdcs">fdcs:AccountProductTransferUpdateRequest</con1:schemaElement>
+                      <con1:varName>REQaccountProductTransferUpdate</con1:varName>
+                    </con1:validate>
+                  </con1:requestTransform>
+                  <con1:responseTransform>
+                    <con1:assign varName="errorCode">
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7b03</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if(string($RSPaccountProductTransferUpdate/ServiceReturnCode/text()) != 'P')then(
+	string($RSPaccountProductTransferUpdate/ServiceReturnCode/text())
+)else(
+	'Success'
+)</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="validationMessage">
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-7af7</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode != 'Success')then(
+	string($RSPaccountProductTransferUpdate/vis:ReturnCodes/RC[1]/Desc[1]/text())
+)else(
+	''
+)</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:responseTransform>
+                </con1:wsCallout>
+              </con1:actions>
+            </con1:case>
+            <con1:default/>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="CambioProductoTCPA_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:replace varName="header" contents-only="true">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5795849822602876976-7d567fb7.16bdbefe604.-7b69</con2:id>
+            <con1:expr>
+              <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+{
+	if($validationMessage = '')then(
+		<successIndicator>Success</successIndicator>
+	)else(
+		<successIndicator>ERROR</successIndicator>,
+		<messages>{ $validationMessage }</messages>
+	)
+}
+</aut:ResponseHeader>]]></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con1:ifThenElse>
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-79cb</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace varName="body" contents-only="true">
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-79ab</con2:id>
+                  <con1:expr>
+                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                      <con2:resource ref="Middleware/v2/Resources/CambioProductoTC/xq/cambioProductoTCOut"/>
+                      <con2:param name="accountProductTransferUpdateResponse1">
+                        <con2:path>$RSPaccountProductTransferUpdate</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:replace varName="body" contents-only="true">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6395071343894070753-1cf33d27.16be1a409df.-79c9</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">&lt;ges:cambioProductoTCResponse/></con2:xqueryText>
+                </con1:expr>
+              </con1:replace>
+            </con1:default>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-5795849822602876976-7d567fb7.16bdbefe604.-7bbd" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:replace varName="header" contents-only="true">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5795849822602876976-7d567fb7.16bdbefe604.-7ba6</con2:id>
+            <con1:expr>
+              <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con1:replace contents-only="true" varName="body">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5795849822602876976-7d567fb7.16bdbefe604.-7b95</con2:id>
+            <con1:expr>
+              <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">&lt;ges:cambioProductoTCResponse/></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con1:reply xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+            <con1:id>_ActionId-5795849822602876976-7d567fb7.16bdbefe604.-7b81</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:pipeline-node name="CambioProductoTCPA">
+        <con:request>CambioProductoTCPA_request</con:request>
+        <con:response>CambioProductoTCPA_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

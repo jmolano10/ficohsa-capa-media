@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con3:SoapBindingType" xmlns:con3="http://www.bea.com/wli/sb/services/bindings/config">
+      <con3:wsdl ref="Middleware/v2/Resources/ActualizaEstadoTDSwitch/wsdl/actualizaEstadoTDSwitchPS"/>
+      <con3:port>
+        <con3:name>actualizaEstadoTDSwitchPSSOAP</con3:name>
+        <con3:namespace>http://www.ficohsa.com.hn/middleware.services/actualizaEstadoTDSwitchPS/</con3:namespace>
+      </con3:port>
+      <con3:selector type="SOAP body"/>
+      <con3:WSI-compliant>false</con3:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-6816725963607978856--35a0f41a.17aa507d832.-7802">
+    <con:pipeline type="request" name="ActualizaEstadoTDSwitchHN_request">
+      <con:stage name="CalculaBitmap">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/actualizaEstadoTDSwitchTypes" prefix="act"/>
+        </con:context>
+        <con:actions>
+          <con1:assign varName="positions">
+            <con2:id>_ActionId-5409787438914726005-3f135eea.17b87d2bda0.-7f93</con2:id>
+            <con1:expr>
+              <con2:xqueryText>let $positions := for $message at $i in $body/act:actualizaEstadoTDSwitch/BODY_MESSAGE_DETAILS/ITEM
+	return
+		(
+			if(data($message/KEY) != '') then(
+				fn:replace(
+					fn:substring(
+						data($message/KEY), 
+						2, 3), 
+						"([_][a-zA-Z]*)", ""
+					)
+			)else()
+		)
+		return fn:string-join($positions, " ")</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:javaCallout varName="bitmap">
+            <con2:id>_ActionId-5409787438914726005-3f135eea.17b87d2bda0.-7f91</con2:id>
+            <con1:archive ref="Middleware/v2/Resources/Utilities/Java/CalculaBitmap"/>
+            <con1:className>co.com.cidenet.calculabitmap.Application</con1:className>
+            <con1:method>public static java.lang.String getBitmap(java.lang.String)</con1:method>
+            <con1:expr>
+              <con2:xqueryText>$positions</con2:xqueryText>
+            </con1:expr>
+            <con1:return-param-as-ref>false</con1:return-param-as-ref>
+          </con1:javaCallout>
+          <con1:assign varName="errorCode">
+            <con2:id>_ActionId-5409787438914726005-3f135eea.17b87d2bda0.-7f50</con2:id>
+            <con1:expr>
+              <con2:xqueryText>if($bitmap != "") then(
+	"SUCCESS"
+)else("ERROR")</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="validationMessage">
+            <con2:id>_ActionId-5409787438914726005-3f135eea.17b87d2bda0.-7f33</con2:id>
+            <con1:expr>
+              <con2:xqueryText>if($errorCode != "SUCCESS") then(
+	"Error calculando el bitmap"
+)else("")</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ActualizaEstadoTD">
+        <con:context>
+          <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/actualizarEstadoTD" prefix="act"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/actualizaEstadoTDSwitchTypes" prefix="act1"/>
+        </con:context>
+        <con:actions>
+          <con1:ifThenElse>
+            <con2:id>_ActionId-5409787438914726005-3f135eea.17b87d2bda0.-7f75</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText>$validationMessage = ""</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:wsCallout>
+                  <con2:id>_ActionId-5409787438914726005-3f135eea.17b87d2bda0.-7f6d</con2:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/DEBITCARD/actualizarEstadoTD/biz/actualizarEstadoTD_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>actualizarEstadoTD</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQActualizarEstadoTD</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RSPActualizarEstadoTD</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQActualizarEstadoTD">
+                      <con2:id>_ActionId-5409787438914726005-3f135eea.17b87d2bda0.-7f70</con2:id>
+                      <con1:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="Middleware/v2/Resources/ActualizaEstadoTDSwitchHN/xq/actualizarEstadoTDIn"/>
+                          <con2:param name="actualizaEstadoTDSwitch">
+                            <con2:path>$body/act1:actualizaEstadoTDSwitch</con2:path>
+                          </con2:param>
+                          <con2:param name="bitmap">
+                            <con2:path>$bitmap</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform>
+                    <con1:assign varName="errorCode">
+                      <con2:id>_ActionId-5409787438914726005-3f135eea.17b87d2bda0.-7f6f</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText>fn:upper-case(fn:string($RSPActualizarEstadoTD/act:P_SUCCESS_INDICATOR/text()))</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="validationMessage">
+                      <con2:id>_ActionId-5409787438914726005-3f135eea.17b87d2bda0.-7f6e</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText>if($errorCode != "SUCCESS") then(
+	fn:string($RSPActualizarEstadoTD/act:P_DESC_MESSAGE/text())
+)else("")</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:responseTransform>
+                </con1:wsCallout>
+              </con1:actions>
+            </con1:case>
+            <con1:default/>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ActualizaEstadoTDSwitchHN_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/actualizaEstadoTDSwitchTypes" prefix="act"/>
+        </con:context>
+        <con:actions>
+          <con1:ifThenElse>
+            <con2:id>_ActionId-6816725963607978856--35a0f41a.17aa507d832.-7758</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText>$validationMessage = ""</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace contents-only="true" varName="header">
+                  <con2:id>_ActionId-6816725963607978856--35a0f41a.17aa507d832.-7720</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:replace contents-only="true" varName="header">
+                <con2:id>_ActionId-6816725963607978856--35a0f41a.17aa507d832.-76e8</con2:id>
+                <con1:expr>
+                  <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                </con1:expr>
+              </con1:replace>
+            </con1:default>
+          </con1:ifThenElse>
+          <con1:replace contents-only="true" varName="body">
+            <con2:id>_ActionId-6816725963607978856--35a0f41a.17aa507d832.-76ac</con2:id>
+            <con1:expr>
+              <con2:xqueryText>&lt;act:actualizaEstadoTDSwitchResponse/></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-6816725963607978856--35a0f41a.17aa507d832.-7802">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/actualizaEstadoTDSwitchTypes" prefix="act"/>
+        </con:context>
+        <con:actions>
+          <con1:replace contents-only="true" varName="header">
+            <con2:id>_ActionId-6816725963607978856--35a0f41a.17aa507d832.-77ca</con2:id>
+            <con1:expr>
+              <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con1:replace contents-only="true" varName="body">
+            <con2:id>_ActionId-6816725963607978856--35a0f41a.17aa507d832.-77ad</con2:id>
+            <con1:expr>
+              <con2:xqueryText>&lt;act:actualizaEstadoTDSwitchResponse/></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con2:reply>
+            <con2:id>_ActionId-6816725963607978856--35a0f41a.17aa507d832.-7790</con2:id>
+          </con2:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="ActualizaEstadoTDSwitchHN">
+        <con:request>ActualizaEstadoTDSwitchHN_request</con:request>
+        <con:response>ActualizaEstadoTDSwitchHN_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

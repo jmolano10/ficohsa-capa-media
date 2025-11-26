@@ -1,0 +1,690 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false" isAutoPublish="false">
+    <ser:security>
+      <con:custom-token-authentication>
+        <con:username-password>
+          <con:username-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:AutenticacionRequestHeader/UserName/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:username-selector>
+          <con:password-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:AutenticacionRequestHeader/Password/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:password-selector>
+        </con:username-password>
+      </con:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemesasPS"/>
+      <con:port>
+        <con:name>consultaRemesasPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaRemesasPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="true">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+    <ser:throttling enabled="false">
+      <ser:capacity>0</ser:capacity>
+      <ser:maxQueueLength>0</ser:maxQueueLength>
+      <ser:timeToLive>0</ser:timeToLive>
+    </ser:throttling>
+    <ser:messageTracing enabled="false">
+      <ser:detailsLevel>Terse</ser:detailsLevel>
+      <ser:maxSize>8192</ser:maxSize>
+    </ser:messageTracing>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/OperationsAndExecution/Payments/ConsultaRemesas</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-8159862051921316472--36937326.13df9560493.-7fee">
+    <con1:pipeline type="error" name="_onErrorHandler-8159862051921316472--36937326.13df9560493.-7fee">
+      <con1:stage name="proxyFault">
+        <con1:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasTypes" prefix="con"/>
+        </con1:context>
+        <con1:actions>
+          <con3:assign varName="errorList">
+            <con2:id>_ActionId-3072926349699007294-63ca9597.149cfb41290.-7bb6</con2:id>
+            <con3:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/v2/Resources/Generales/mensajesError"/>
+              </con2:xqueryTransform>
+            </con3:expr>
+          </con3:assign>
+          <con3:assign varName="osbError">
+            <con2:id>_ActionId-3072926349699007294-63ca9597.149cfb41290.-7b97</con2:id>
+            <con3:expr>
+              <con2:xqueryText>fn:string($errorList/ERROR_RECORD[CODE=fn:string($fault/ctx:errorCode/text())]/DESCRIPTION/text())</con2:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:replace contents-only="true" varName="header">
+            <con2:id>_ActionId-8159862051921316472--36937326.13df9560493.-7f80</con2:id>
+            <con3:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/Business_Resources/general/ServiceErrorId/obtenerServiceErrorId"/>
+                <con2:param name="string1">
+                  <con2:path>"0148"</con2:path>
+                </con2:param>
+                <con2:param name="string2">
+                  <con2:path>concat(fn:string($fault/ctx:errorCode/text()), ":", fn:string($fault/ctx:reason/text()), ":", $osbError)</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con3:expr>
+          </con3:replace>
+          <con3:replace contents-only="true" varName="body">
+            <con2:id>_ActionId-8159862051921316472--36937326.13df9560493.-7f63</con2:id>
+            <con3:expr>
+              <con2:xqueryText>&lt;con:consultaRemesasResponse/></con2:xqueryText>
+            </con3:expr>
+          </con3:replace>
+          <con2:reply>
+            <con2:id>_ActionId-8159862051921316472--36937326.13df9560493.-7f46</con2:id>
+          </con2:reply>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="request" name="VALIDATION_request">
+      <con1:stage name="valid_proxyRequest">
+        <con1:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasTypes" prefix="con"/>
+        </con1:context>
+        <con1:actions>
+          <con3:assign varName="queryType">
+            <con2:id>_ActionId-4177277513795904611-7f1e7c96.14a066cc028.-5adc</con2:id>
+            <con3:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/validarTipoConsulta"/>
+                <con2:param name="consultaRemesas1">
+                  <con2:path>$body/con:consultaRemesas</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con3:expr>
+          </con3:assign>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="response" name="VALIDATION_response"/>
+    <con1:pipeline type="request" name="ID_request">
+      <con1:stage name="ID_proxyRequest">
+        <con1:context>
+          <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasTypes" prefix="con"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con1:context>
+        <con1:actions>
+          <con3:assign varName="remittSource">
+            <con2:id>_ActionId-4177277513795904611-7f1e7c96.14a066cc028.-5a8c</con2:id>
+            <con3:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/validarTipoRemesadora"/>
+                <con2:param name="ClaveRemesa">
+                  <con2:path>fn:string($body/con:consultaRemesas/REMITTANCE_ID/text())</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con3:expr>
+          </con3:assign>
+          <con3:ifThenElse>
+            <con2:comment>Condición para determinar a que remesadora pertenece la remesa. Las opciones son:
+* BTS
+* Ficohsa Remesas
+* Moneygram
+* Pacific
+* Remesas Locales
+* Uniteller</con2:comment>
+            <con2:id>_ActionId-4177277513795904611-7f1e7c96.14a066cc028.-596e</con2:id>
+            <con3:case>
+              <con3:condition>
+                <con2:xqueryText>$remittSource = "REMESALOCAL"</con2:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:assign varName="localRemitType">
+                  <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7eeb</con2:id>
+                  <con3:expr>
+                    <con2:xqueryTransform>
+                      <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/validarTipoRemesaLocal"/>
+                      <con2:param name="ClaveRemesa">
+                        <con2:path>fn:string($body/con:consultaRemesas/REMITTANCE_ID/text())</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con3:expr>
+                </con3:assign>
+                <con3:wsCallout>
+                  <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7e01</con2:id>
+                  <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>obtenerParametrizacion</con3:operation>
+                  <con3:request>
+                    <con3:body>$REQObtenerParams</con3:body>
+                  </con3:request>
+                  <con3:response>
+                    <con3:body>RSPObtenerParams</con3:body>
+                  </con3:response>
+                  <con3:requestTransform>
+                    <con3:assign varName="REQObtenerParams">
+                      <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7ddc</con2:id>
+                      <con3:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                          <con2:param name="nombreParametros">
+                            <con2:path>fn:concat("T24C070.",$localRemitType,".REMITSOURCE")</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:requestTransform>
+                  <con3:responseTransform>
+                    <con3:assign varName="localRemitSource">
+                      <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7db6</con2:id>
+                      <con3:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/validarOrigenRemesaLocal"/>
+                          <con2:param name="outputParameters1">
+                            <con2:path>$RSPObtenerParams</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:responseTransform>
+                </con3:wsCallout>
+                <con3:ifThenElse>
+                  <con2:comment>Condición para determinar adonde buscar una remesa local. Las opciones son:
+* T24
+* Tablas FLink</con2:comment>
+                  <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7f1c</con2:id>
+                  <con3:case>
+                    <con3:condition>
+                      <con2:xqueryText>$localRemitSource = "T24"</con2:xqueryText>
+                    </con3:condition>
+                    <con3:actions>
+                      <con3:wsCallout>
+                        <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7e48</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/remesas/Resoruces/Remesas" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>Consultaderemesa</con3:operation>
+                        <con3:request>
+                          <con3:body>$REQConsultaRemT24</con3:body>
+                        </con3:request>
+                        <con3:response>
+                          <con3:body>RSPConsultaRemT24</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                          <con3:assign varName="REQConsultaRemT24">
+                            <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7e2e</con2:id>
+                            <con3:expr>
+                              <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemesasIn"/>
+                                <con2:param name="autenticacionRequestHeader">
+                                  <con2:path>$header/aut:AutenticacionRequestHeader</con2:path>
+                                </con2:param>
+                                <con2:param name="consultaRemesas">
+                                  <con2:path>$body/con:consultaRemesas</con2:path>
+                                </con2:param>
+                              </con2:xqueryTransform>
+                            </con3:expr>
+                          </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform/>
+                      </con3:wsCallout>
+                    </con3:actions>
+                  </con3:case>
+                  <con3:default>
+                    <con3:wsCallout>
+                      <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7cfe</con2:id>
+                      <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/remesas/Resoruces/consultarRemLocalId_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                      <con3:operation>consultarRemLocalId</con3:operation>
+                      <con3:request>
+                        <con3:body>$REQConsRemLocalId</con3:body>
+                      </con3:request>
+                      <con3:response>
+                        <con3:body>RSPConsRemLocalId</con3:body>
+                      </con3:response>
+                      <con3:requestTransform>
+                        <con3:assign varName="REQConsRemLocalId">
+                          <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7cff</con2:id>
+                          <con3:expr>
+                            <con2:xqueryTransform>
+                              <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemLocalIdIn"/>
+                              <con2:param name="consultaRemesas1">
+                                <con2:path>$body/con:consultaRemesas</con2:path>
+                              </con2:param>
+                            </con2:xqueryTransform>
+                          </con3:expr>
+                        </con3:assign>
+                      </con3:requestTransform>
+                      <con3:responseTransform/>
+                    </con3:wsCallout>
+                  </con3:default>
+                </con3:ifThenElse>
+              </con3:actions>
+            </con3:case>
+            <con3:case>
+              <con3:condition>
+                <con2:xqueryText>$remittSource = "FICOREMESA"</con2:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:wsCallout>
+                  <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7fc5</con2:id>
+                  <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/remesas/Resoruces/consultarRemFRemId_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>consultarRemFRemId</con3:operation>
+                  <con3:request>
+                    <con3:body>$REQConsRemFRemId</con3:body>
+                  </con3:request>
+                  <con3:response>
+                    <con3:body>RSPConsRemFRemId</con3:body>
+                  </con3:response>
+                  <con3:requestTransform>
+                    <con3:assign varName="REQConsRemFRemId">
+                      <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7faa</con2:id>
+                      <con3:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemFRemIdIn"/>
+                          <con2:param name="consultaRemesas1">
+                            <con2:path>$body/con:consultaRemesas</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:requestTransform>
+                  <con3:responseTransform/>
+                </con3:wsCallout>
+              </con3:actions>
+            </con3:case>
+            <con3:case>
+              <con3:condition>
+                <con2:xqueryText>$remittSource = ("BTS","MONEYGRAM","UNITELLER","PACIFIC")</con2:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:assign varName="remittParam">
+                  <con2:id>_ActionId-6472708763538456745-122b32c7.14a886dc152.-7de4</con2:id>
+                  <con3:expr>
+                    <con2:xqueryText>fn:concat("T24C070.",$remittSource,".CONTRACTID")</con2:xqueryText>
+                  </con3:expr>
+                </con3:assign>
+                <con3:wsCallout>
+                  <con2:id>_ActionId-6472708763538456745-122b32c7.14a886dc152.-7e8e</con2:id>
+                  <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>obtenerParametrizacion</con3:operation>
+                  <con3:request>
+                    <con3:body>$REQObtenerParams</con3:body>
+                  </con3:request>
+                  <con3:response>
+                    <con3:body>RSPObtenerParams</con3:body>
+                  </con3:response>
+                  <con3:requestTransform>
+                    <con3:assign varName="REQObtenerParams">
+                      <con2:id>_ActionId-6472708763538456745-122b32c7.14a886dc152.-7e52</con2:id>
+                      <con3:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                          <con2:param name="nombreParametros">
+                            <con2:path>$remittParam</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:requestTransform>
+                  <con3:responseTransform/>
+                </con3:wsCallout>
+                <con3:assign varName="parametersIn">
+                  <con2:id>_ActionId-6472708763538456745-122b32c7.14a886dc152.-7e3e</con2:id>
+                  <con3:expr>
+                    <con2:xqueryTransform>
+                      <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/requestEnrutador"/>
+                      <con2:param name="primaryKey">
+                        <con2:path>fn:string($body/con:consultaRemesas/REMITTANCE_ID/text())</con2:path>
+                      </con2:param>
+                      <con2:param name="user">
+                        <con2:path>fn:string($header/aut:AutenticacionRequestHeader/UserName/text())</con2:path>
+                      </con2:param>
+                      <con2:param name="contractId">
+                        <con2:path>fn:string($RSPObtenerParams/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$remittParam]/osb:VALUE/text())</con2:path>
+                      </con2:param>
+                      <con2:param name="remittSource">
+                        <con2:path>$remittSource</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con3:expr>
+                </con3:assign>
+                <con3:wsCallout>
+                  <con2:id>_ActionId-6472708763538456745-122b32c7.14a886dc152.-7ebc</con2:id>
+                  <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/enrutadorConvenios/biz/enrutadorConvenios" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>invoke</con3:operation>
+                  <con3:request>
+                    <con3:param>
+                      <con3:name>serviceRequest</con3:name>
+                      <con3:variable>$REQEnrututador</con3:variable>
+                    </con3:param>
+                  </con3:request>
+                  <con3:response>
+                    <con3:param>
+                      <con3:name>serviceResponse</con3:name>
+                      <con3:variable>RSPEnrututador</con3:variable>
+                    </con3:param>
+                  </con3:response>
+                  <con3:requestTransform>
+                    <con3:assign varName="REQEnrututador">
+                      <con2:id>_ActionId-6472708763538456745-122b32c7.14a886dc152.-7e0a</con2:id>
+                      <con3:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/EnrutadorConveniosIn"/>
+                          <con2:param name="ParametersIn">
+                            <con2:path>$parametersIn</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:requestTransform>
+                  <con3:responseTransform>
+                    <con3:assign varName="parametersOut">
+                      <con2:id>_ActionId-6472708763538456745-122b32c7.14a886dc152.-7d81</con2:id>
+                      <con3:expr>
+                        <con2:xqueryText>fn-bea:inlinedXML($RSPEnrututador/responseData)</con2:xqueryText>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:responseTransform>
+                </con3:wsCallout>
+              </con3:actions>
+            </con3:case>
+            <con3:default>
+              <con3:Error>
+                <con2:id>_ActionId-4177277513795904611-7f1e7c96.14a066cc028.-593f</con2:id>
+                <con3:errCode>OSB-000005</con3:errCode>
+                <con3:message>UNRECOGNIZED REMITTANCE STRUCTURE</con3:message>
+              </con3:Error>
+            </con3:default>
+          </con3:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="response" name="ID_response">
+      <con1:stage name="ID_proxyResponse">
+        <con1:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasTypes" prefix="con"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con1:context>
+        <con1:actions>
+          <con3:ifThenElse>
+            <con2:comment>Condición para determinar a que remesadora pertenece la remesa. Las opciones son:
+* BTS
+* Ficohsa Remesas
+* Moneygram
+* Pacific
+* Remesas Locales
+* Uniteller</con2:comment>
+            <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7f84</con2:id>
+            <con3:case>
+              <con3:condition>
+                <con2:xqueryText>$remittSource = "REMESALOCAL"</con2:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:ifThenElse>
+                  <con2:comment>Condición para determinar adonde buscar una remesa local. Las opciones son:
+* T24
+* Tablas FLink</con2:comment>
+                  <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7d93</con2:id>
+                  <con3:case>
+                    <con3:condition>
+                      <con2:xqueryText>$localRemitSource = "T24"</con2:xqueryText>
+                    </con3:condition>
+                    <con3:actions>
+                      <con3:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7d7e</con2:id>
+                        <con3:expr>
+                          <con2:xqueryTransform>
+                            <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemesasHeaderOut"/>
+                            <con2:param name="consultaderemesaResponse">
+                              <con2:path>$RSPConsultaRemT24</con2:path>
+                            </con2:param>
+                          </con2:xqueryTransform>
+                        </con3:expr>
+                      </con3:replace>
+                      <con3:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7d5c</con2:id>
+                        <con3:expr>
+                          <con2:xqueryTransform>
+                            <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemesasOut"/>
+                            <con2:param name="consultaderemesaResponse">
+                              <con2:path>$RSPConsultaRemT24</con2:path>
+                            </con2:param>
+                          </con2:xqueryTransform>
+                        </con3:expr>
+                      </con3:replace>
+                    </con3:actions>
+                  </con3:case>
+                  <con3:default>
+                    <con3:replace varName="header" contents-only="true">
+                      <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7c90</con2:id>
+                      <con3:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemLocalIdHeaderOut"/>
+                          <con2:param name="outputParameters1">
+                            <con2:path>$RSPConsRemLocalId</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con3:expr>
+                    </con3:replace>
+                    <con3:replace varName="body" contents-only="true">
+                      <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7c8e</con2:id>
+                      <con3:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemLocalIdOut"/>
+                          <con2:param name="outputParameters1">
+                            <con2:path>$RSPConsRemLocalId</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con3:expr>
+                    </con3:replace>
+                  </con3:default>
+                </con3:ifThenElse>
+              </con3:actions>
+            </con3:case>
+            <con3:case>
+              <con3:condition>
+                <con2:xqueryText>$remittSource = "FICOREMESA"</con2:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:replace varName="header" contents-only="true">
+                  <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7f5c</con2:id>
+                  <con3:expr>
+                    <con2:xqueryTransform>
+                      <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemFRemIdHeaderOut"/>
+                      <con2:param name="outputParameters1">
+                        <con2:path>$RSPConsRemFRemId</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+                <con3:replace varName="body" contents-only="true">
+                  <con2:id>_ActionId-1745556865586654472--241abcd4.14a3a8c8ba4.-7f47</con2:id>
+                  <con3:expr>
+                    <con2:xqueryTransform>
+                      <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/ConsultaRemFRemIdOut"/>
+                      <con2:param name="outputParameters1">
+                        <con2:path>$RSPConsRemFRemId</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+              </con3:actions>
+            </con3:case>
+            <con3:case>
+              <con3:condition>
+                <con2:xqueryText>$remittSource = ("BTS","MONEYGRAM","UNITELLER","PACIFIC")</con2:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:replace varName="header" contents-only="true">
+                  <con2:id>_ActionId-6472708763538456745-122b32c7.14a886dc152.-7dc0</con2:id>
+                  <con3:expr>
+                    <con2:xqueryTransform>
+                      <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/EnrutadorConveniosHeaderOut"/>
+                      <con2:param name="parametersOut">
+                        <con2:path>$parametersOut</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+                <con3:replace varName="body" contents-only="true">
+                  <con2:id>_ActionId-6472708763538456745-122b32c7.14a886dc152.-7dad</con2:id>
+                  <con3:expr>
+                    <con2:xqueryTransform>
+                      <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/EnrutadorConveniosOut"/>
+                      <con2:param name="parametersOut">
+                        <con2:path>$parametersOut</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+              </con3:actions>
+            </con3:case>
+            <con3:default/>
+          </con3:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="request" name="NAME_request">
+      <con1:stage name="NAME_proxyRequest">
+        <con1:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasTypes" prefix="con"/>
+        </con1:context>
+        <con1:actions>
+          <con3:wsCallout>
+            <con2:id>_ActionId-4177277513795904611-7f1e7c96.14a066cc028.-5a82</con2:id>
+            <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/remesas/Resoruces/consultarRemLocalNombre_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>consultarRemLocalNombre</con3:operation>
+            <con3:request>
+              <con3:body>$REQConsRemNombre</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>RSPConsRemNombre</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="REQConsRemNombre">
+                <con2:id>_ActionId-4177277513795904611-7f1e7c96.14a066cc028.-5a83</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemLocalNomIn"/>
+                    <con2:param name="consultaRemesas1">
+                      <con2:path>$body/con:consultaRemesas</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+            </con3:requestTransform>
+            <con3:responseTransform/>
+          </con3:wsCallout>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="response" name="NAME_response">
+      <con1:stage name="NAME_proxyResponse">
+        <con1:context/>
+        <con1:actions>
+          <con3:replace varName="header" contents-only="true">
+            <con2:id>_ActionId-4177277513795904611-7f1e7c96.14a066cc028.-5a80</con2:id>
+            <con3:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemLocalNomHeaderOut"/>
+                <con2:param name="outputParameters1">
+                  <con2:path>$RSPConsRemNombre</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con3:expr>
+          </con3:replace>
+          <con3:replace varName="body" contents-only="true">
+            <con2:id>_ActionId-4177277513795904611-7f1e7c96.14a066cc028.-5a7e</con2:id>
+            <con3:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/Business_Resources/remesas/ConsultaRemesas/consultaRemLocalNomOut"/>
+                <con2:param name="outputParameters1">
+                  <con2:path>$RSPConsRemNombre</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con3:expr>
+          </con3:replace>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="request" name="ERROR_request">
+      <con1:stage name="ERROR_proxyRequest">
+        <con1:context/>
+        <con1:actions>
+          <con3:Error>
+            <con2:id>_ActionId-4177277513795904611-7f1e7c96.14a066cc028.-5a78</con2:id>
+            <con3:errCode>BEA-382505</con3:errCode>
+            <con3:message>REQUIRED FIELDS NOT SUPPLIED</con3:message>
+          </con3:Error>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="response" name="ERROR_response"/>
+    <con1:flow>
+      <con1:pipeline-node name="VALIDATION">
+        <con1:request>VALIDATION_request</con1:request>
+        <con1:response>VALIDATION_response</con1:response>
+      </con1:pipeline-node>
+      <con1:branch-node type="condition" name="TypeOfQuery">
+        <con1:comment>Condición para determinar que tipo de consulta se hará. Las opciones son:
+* Consulta por Clave de remesa
+* Consulta por Nombre (Remitente y Beneficiario)</con1:comment>
+        <con1:context/>
+        <con1:branch-table variable="queryType">
+          <con1:branch name="ID_BASED">
+            <con1:operator>equals</con1:operator>
+            <con1:value>"ID_BASED"</con1:value>
+            <con1:flow>
+              <con1:pipeline-node name="ID">
+                <con1:request>ID_request</con1:request>
+                <con1:response>ID_response</con1:response>
+              </con1:pipeline-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="NAME_BASED">
+            <con1:operator>equals</con1:operator>
+            <con1:value>"NAME_BASED"</con1:value>
+            <con1:flow>
+              <con1:pipeline-node name="NAME">
+                <con1:request>NAME_request</con1:request>
+                <con1:response>NAME_response</con1:response>
+              </con1:pipeline-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:default-branch>
+            <con1:flow>
+              <con1:pipeline-node name="ERROR">
+                <con1:request>ERROR_request</con1:request>
+                <con1:response>ERROR_response</con1:response>
+              </con1:pipeline-node>
+            </con1:flow>
+          </con1:default-branch>
+        </con1:branch-table>
+      </con1:branch-node>
+    </con1:flow>
+  </ser:router>
+</xml-fragment>

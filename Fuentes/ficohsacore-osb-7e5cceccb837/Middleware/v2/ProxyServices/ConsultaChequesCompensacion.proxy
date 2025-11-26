@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:security>
+      <con:custom-token-authentication>
+        <con:username-password>
+          <con:username-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/UserName/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:username-selector>
+          <con:password-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/Password/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:password-selector>
+        </con:username-password>
+      </con:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/ConsultaChequesCompensacion/wsdl/consultaChequesCompensacionPS"/>
+      <con:port>
+        <con:name>consultaChequesCompensacionPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaChequesCompensacionPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/OperationsAndExecution/Payments/ConsultaChequesCompensacion</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties>
+        <http:use-https>true</http:use-https>
+      </http:inbound-properties>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-1245663765389347676-47c0fe84.16b7559cdfc.-7ee3">
+    <con1:pipeline type="error" name="_onErrorHandler-1245663765389347676-47c0fe84.16b7559cdfc.-7ee3">
+      <con1:stage name="ManejoError">
+        <con1:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaChequesCompensacionTypes" prefix="con"/>
+        </con1:context>
+        <con1:actions>
+          <con3:assign varName="errorCode">
+            <con2:id>_ActionId-1245663765389347676-47c0fe84.16b7559cdfc.-7ed2</con2:id>
+            <con3:expr>
+              <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:assign varName="errorMessage">
+            <con2:id>_ActionId-1245663765389347676-47c0fe84.16b7559cdfc.-7eb3</con2:id>
+            <con3:expr>
+              <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:wsCallout>
+            <con2:id>_ActionId-1245663765389347676-47c0fe84.16b7559cdfc.-7e94</con2:id>
+            <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>mapeoErrores</con3:operation>
+            <con3:request>
+              <con3:body>$REQmapeoErrores</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>RSPmapeoErrores</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="REQmapeoErrores">
+                <con2:id>_ActionId-1245663765389347676-47c0fe84.16b7559cdfc.-7e72</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con2:param name="CODIGO_ERROR">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                    <con2:param name="MENSAJE_ERROR">
+                      <con2:path>fn:concat("FICBCO0336", "$#$", $errorMessage)</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+            </con3:requestTransform>
+            <con3:responseTransform>
+              <con3:replace varName="header" contents-only="true">
+                <con2:id>_ActionId-1245663765389347676-47c0fe84.16b7559cdfc.-7e4b</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con2:param name="mapeoErroresResponse1">
+                      <con2:path>$RSPmapeoErrores</con2:path>
+                    </con2:param>
+                    <con2:param name="successIndicator">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:replace>
+            </con3:responseTransform>
+          </con3:wsCallout>
+          <con3:replace varName="body" contents-only="true">
+            <con2:id>_ActionId-1245663765389347676-47c0fe84.16b7559cdfc.-7e34</con2:id>
+            <con3:expr>
+              <con2:xqueryText>if ($operation = "consultaChequeDetalle") then (
+	&lt;con:consultaChequeDetalleResponse/>
+) else if ($operation = "consultaChequeTotal") then (
+	&lt;con:consultaChequeTotalResponse/>
+) else if($operation = "consultaDocumento") then(
+	&lt;con:consultaDocumentoResponse/>
+)else ()</con2:xqueryText>
+            </con3:expr>
+          </con3:replace>
+          <con2:reply>
+            <con2:id>_ActionId-1245663765389347676-47c0fe84.16b7559cdfc.-7e1a</con2:id>
+          </con2:reply>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:flow>
+      <con1:branch-node type="operation" name="Operaciones">
+        <con1:context/>
+        <con1:branch-table>
+          <con1:branch name="consultaChequeDetalle">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="consultaChequeDetalle">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-1245663765389347676-47c0fe84.16b7559cdfc.-7fda</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConsultaChequeDetalle" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>consultaChequeDetalle</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="consultaChequeTotal">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="consultaChequeTotal">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-331388249151460871--58c5ca96.16b7b095428.-7ee0</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConsultaChequeTotal" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>consultaChequeTotal</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="consultaDocumento">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="consultaDocumento">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-3037429011550320410--23d207c8.1715a9beebe.-7f66</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConsultaDocumento" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>consultaDocumento</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:default-branch>
+            <con1:flow/>
+          </con1:default-branch>
+        </con1:branch-table>
+      </con1:branch-node>
+    </con1:flow>
+  </ser:router>
+</xml-fragment>

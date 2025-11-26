@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con1:SoapBindingType" xmlns:con1="http://www.bea.com/wli/sb/services/bindings/config">
+      <con1:wsdl ref="Middleware/v2/Resources/ConsultaLoteDeudores/wsdl/consultaLoteDeudoresPS"/>
+      <con1:port>
+        <con1:name>consultaLoteDeudoresPSSOAP</con1:name>
+        <con1:namespace>http://www.ficohsa.com.hn/middleware.services/consultaLoteDeudoresPS/</con1:namespace>
+      </con1:port>
+      <con1:selector type="SOAP action"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-440014616324087193-f4bdf95.15c59b1153f.-35de">
+    <con:pipeline type="error" name="_onErrorHandler-440014616324087193-f4bdf95.15c59b1153f.-35de">
+      <con:stage name="ManejoError">
+        <con:context xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/cobranzasElectronicasTypes" prefix="cob"/>
+        </con:context>
+        <con:actions xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+          <con2:assign varName="errorCode">
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-35c1</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="errorMessage">
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-35c0</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-35bd</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>mapeoErrores</con2:operation>
+            <con2:request>
+              <con2:body>$reqMapeoErrores</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>respMapeoErrores</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="reqMapeoErrores">
+                <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-35bf</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con1:param name="CODIGO_ERROR">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                    <con1:param name="MENSAJE_ERROR">
+                      <con1:path>fn:concat("FICBCO0235", "$#$", $errorMessage)</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-35be</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con1:param name="mapeoErroresResponse1">
+                      <con1:path>$respMapeoErrores</con1:path>
+                    </con1:param>
+                    <con1:param name="successIndicator">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con2:responseTransform>
+          </con2:wsCallout>
+          <con2:replace varName="body" contents-only="true">
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-35bc</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;cob:consultaLoteDeudoresResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-35bb</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ValidacionesGenerales_request">
+      <con:stage name="ValidacionXSD" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/cobranzasElectronicasTypes" prefix="cob"/>
+        </con:context>
+        <con:actions>
+          <con2:validate>
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3588</con1:id>
+            <con2:schema ref="Middleware/v2/Resources/CobranzasElectronicas/xsd/cobranzasElectronicasTypes"/>
+            <con2:schemaElement xmlns:cob="http://www.ficohsa.com.hn/middleware.services/cobranzasElectronicasTypes">cob:consultaLoteDeudores</con2:schemaElement>
+            <con2:varName>body</con2:varName>
+            <con2:location>
+              <con1:xpathText>./cob:consultaLoteDeudores</con1:xpathText>
+            </con2:location>
+          </con2:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionServicioRegional" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/cobranzasElectronicasTypes" prefix="cob"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3581</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>ValidaServicioRegional</con2:operation>
+            <con2:request>
+              <con2:body>$reqValidaServicioRegional</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>respValidaServicioRegional</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="reqValidaServicioRegional">
+                <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3587</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                    <con1:param name="requestHeader1">
+                      <con1:path>$header/aut:RequestHeader</con1:path>
+                    </con1:param>
+                    <con1:param name="serviceId">
+                      <con1:path>"FICBCO0235"</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:ifThenElse>
+                <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3586</con1:id>
+                <con2:case>
+                  <con2:condition>
+                    <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:replace contents-only="true" varName="header">
+                      <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3585</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                      <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3584</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>&lt;cob:consultaLoteDeudoresResponse/></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                      <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3583</con1:id>
+                    </con1:reply>
+                  </con2:actions>
+                </con2:case>
+                <con2:default>
+                  <con2:replace contents-only="true" varName="header">
+                    <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3582</con1:id>
+                    <con2:expr>
+                      <con1:xqueryTransform>
+                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                        <con1:param name="requestHeader">
+                          <con1:path>$header/aut:RequestHeader</con1:path>
+                        </con1:param>
+                      </con1:xqueryTransform>
+                    </con2:expr>
+                  </con2:replace>
+                </con2:default>
+              </con2:ifThenElse>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionesGenerales_response">
+      <con:stage name="MapeoError" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3580</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-357d</con1:id>
+                  <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>mapeoErrores</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQMapeoErrores</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPMapeoErrores</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQMapeoErrores">
+                      <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-357f</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                          <con1:param name="MENSAJE_ERROR">
+                            <con1:path>fn:concat("FICBCO0235","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                          </con1:param>
+                          <con1:param name="CODIGO_ERROR">
+                            <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-357e</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                          <con1:param name="mapeoErroresResponse1">
+                            <con1:path>$RSPMapeoErrores</con1:path>
+                          </con1:param>
+                          <con1:param name="successIndicator">
+                            <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="Default_ConsultaLoteDedudores_request">
+      <con:stage name="FlujoEntrada">
+        <con:context/>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="Default_ConsultaLoteDedudores_response">
+      <con:stage name="FlujoSalida">
+        <con:context/>
+        <con:actions>
+          <con1:Error xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-440014616324087193-f4bdf95.15c59b1153f.-355c</con2:id>
+            <con1:errCode>MW-0008</con1:errCode>
+            <con1:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con1:message>
+          </con1:Error>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ValidacionPaginacion_request">
+      <con:stage name="ValidacionPaginacion">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/cobranzasElectronicasTypes" prefix="cob"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="validaPaginacion">
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-2f58</con1:id>
+            <con2:expr>
+              <con1:xqueryTransform>
+                <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaPaginacion"/>
+                <con1:param name="pagingInfo">
+                  <con1:path>$body/cob:consultaLoteDeudores/PAGING_INFO</con1:path>
+                </con1:param>
+              </con1:xqueryTransform>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-2f57</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>xs:boolean($validaPaginacion)</con1:xqueryText>
+              </con2:condition>
+              <con2:actions/>
+            </con2:case>
+            <con2:default>
+              <con2:Error>
+                <con1:id>_ActionId-440014616324087193-f4bdf95.15c59b1153f.-2f56</con1:id>
+                <con2:errCode>BEA-382505</con2:errCode>
+                <con2:message>REQUIRED FIELDS NOT SUPPLIED</con2:message>
+              </con2:Error>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionPaginacion_response"/>
+    <con:flow>
+      <con:pipeline-node name="ValidacionesGenerales">
+        <con:request>ValidacionesGenerales_request</con:request>
+        <con:response>ValidacionesGenerales_response</con:response>
+      </con:pipeline-node>
+      <con:pipeline-node name="ValidacionPaginacion">
+        <con:request>ValidacionPaginacion_request</con:request>
+        <con:response>ValidacionPaginacion_response</con:response>
+      </con:pipeline-node>
+      <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:branch-table variable="header">
+          <con:xpath>
+            <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+          </con:xpath>
+          <con:branch name="HNBanco">
+            <con:operator>equals</con:operator>
+            <con:value>'HN01'</con:value>
+            <con:flow>
+              <con:route-node name="HNBanco_ConsultaLoteDeudores_routing">
+                <con:context>
+                  <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/cobranzasElectronicasTypes" prefix="cob"/>
+                  <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultarLoteDeudores" prefix="con"/>
+                  <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                  <con1:route xmlns:con1="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3540</con2:id>
+                    <con1:service ref="Middleware/v2/BusinessServices/ABK/consultarLoteDeudores/biz/consultarLoteDeudores_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con1:operation>consultarLoteDeudores</con1:operation>
+                    <con1:outboundTransform>
+                      <con2:replace varName="body" contents-only="true">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3521</con3:id>
+                        <con2:expr>
+                          <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                            <con3:resource ref="Middleware/v2/Resources/ConsultaLoteDeudores/xq/consultaLoteDeudoresIn"/>
+                            <con3:param name="consultaLoteDeudores">
+                              <con3:path>$body/cob:consultaLoteDeudores</con3:path>
+                            </con3:param>
+                          </con3:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                    </con1:outboundTransform>
+                    <con1:responseTransform>
+                      <con2:replace varName="header" contents-only="true">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-440014616324087193-f4bdf95.15c59b1153f.-34e7</con3:id>
+                        <con2:expr>
+                          <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                            <con3:resource ref="Middleware/v2/Resources/ConsultaLoteDeudores/xq/consultaLoteDeudoresHeaderOut"/>
+                            <con3:param name="outputParameters">
+                              <con3:path>$body/con:OutputParameters</con3:path>
+                            </con3:param>
+                          </con3:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-440014616324087193-f4bdf95.15c59b1153f.-34c7</con3:id>
+                        <con2:case>
+                          <con2:condition>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) = "SUCCESS"</con3:xqueryText>
+                          </con2:condition>
+                          <con2:actions>
+                            <con2:replace varName="body" contents-only="true">
+                              <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-440014616324087193-f4bdf95.15c59b1153f.-34a0</con3:id>
+                              <con2:expr>
+                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                  <con3:resource ref="Middleware/v2/Resources/ConsultaLoteDeudores/xq/consultaLoteDeudoresOut"/>
+                                  <con3:param name="outputParameters">
+                                    <con3:path>$body/con:OutputParameters</con3:path>
+                                  </con3:param>
+                                </con3:xqueryTransform>
+                              </con2:expr>
+                            </con2:replace>
+                          </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                          <con2:replace varName="body" contents-only="true">
+                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-440014616324087193-f4bdf95.15c59b1153f.-3482</con3:id>
+                            <con2:expr>
+                              <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;cob:consultaLoteDeudoresResponse/></con3:xqueryText>
+                            </con2:expr>
+                          </con2:replace>
+                        </con2:default>
+                      </con2:ifThenElse>
+                    </con1:responseTransform>
+                  </con1:route>
+                </con:actions>
+              </con:route-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow>
+              <con:pipeline-node name="Default_ConsultaLoteDedudores">
+                <con:request>Default_ConsultaLoteDedudores_request</con:request>
+                <con:response>Default_ConsultaLoteDedudores_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

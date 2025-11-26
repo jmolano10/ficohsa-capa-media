@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con1:SoapBindingType" xmlns:con1="http://www.bea.com/wli/sb/services/bindings/config">
+      <con1:wsdl ref="Middleware/v3/Resources/ValidacionOverlimit/wsdl/ValidacionOverlimitPS"/>
+      <con1:port>
+        <con1:name>ValidacionOverlimitSOAP</con1:name>
+        <con1:namespace>http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitPS/</con1:namespace>
+      </con1:port>
+      <con1:selector type="SOAP body"/>
+      <con1:WSI-compliant>false</con1:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-2637201477923639010-99fba2b.1799ea65474.-73e0">
+    <con:pipeline type="request" name="ValidacionOverlimitHN_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="ConsultaDatosTarjeta">
+        <con:comment>En esta etapa se realiza el llamado a la operacion conDatoTarjeta de MasterDataHN</con:comment>
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitTypes" prefix="val" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:assign varName="cardBank">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-5594</con2:id>
+            <con1:expr>
+              <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($body/val:validacionOverlimitRequest/CARD_BANK/text())</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="countryCode">
+            <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Variable encargada de obtener la conversion del codigo pais en formato ISO.</con2:comment>
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7991</con2:id>
+            <con1:expr>
+              <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                <con2:param name="codigoPais">
+                  <con2:path>$cardBank</con2:path>
+                </con2:param>
+                <con2:param name="sentidoConversion">
+                  <con2:path>"OSB-ISO3"</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con1:expr>
+          </con1:assign>
+          <con1:wsCallout>
+            <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Llamado a conDatoTarjeta, Operación encargada de consultar los datos de la tarjeta.</con2:comment>
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7974</con2:id>
+            <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoTarjeta/biz/conDatoTarjeta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con1:operation>conDatoTarjeta</con1:operation>
+            <con1:request>
+              <con1:body>$REQconDatoTarjeta</con1:body>
+            </con1:request>
+            <con1:response>
+              <con1:body>RSPconDatoTarjeta</con1:body>
+            </con1:response>
+            <con1:requestTransform>
+              <con1:assign varName="REQconDatoTarjeta">
+                <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Se realiza la transformación de los parametros entrada del servicio proxy con la operación conDatoTarjeta.</con2:comment>
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-793c</con2:id>
+                <con1:expr>
+                  <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                    <con2:resource ref="Middleware/v2/Resources/MasterDataHN/xq/conDatoTarjetaIn"/>
+                    <con2:param name="codigoPais">
+                      <con2:path>$countryCode</con2:path>
+                    </con2:param>
+                    <con2:param name="cardNumber">
+                      <con2:path>fn:string($body/val:validacionOverlimitRequest/CARD_NUMBER/text())</con2:path>
+                    </con2:param>
+                    <con2:param name="org">
+                      <con2:path>""</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+            </con1:requestTransform>
+            <con1:responseTransform>
+              <con1:assign varName="errorCode">
+                <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Codigo de error obtenido de la operación conDatoTarjeta</con2:comment>
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-78ce</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($RSPconDatoTarjeta/con:CodigoError/text())</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="validationMessage">
+                <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Mensaje de error obtenido de la operación conDatoTarjeta</con2:comment>
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-78b1</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode = "-1") then (
+	""
+) else(
+	fn:string($RSPconDatoTarjeta/con:MensajeError/text())
+)</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="clientId">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7165334984662051246-644d0f09.18d337115c7.24d5</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">let $column := $RSPconDatoTarjeta/con:RowSet/con:Row[1]/con:Column
+	return
+		fn:string($column[@name = "customer_id"]/text())</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="numIdentidad">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7165334984662051246-644d0f09.18d337115c7.24e9</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">let $column := $RSPconDatoTarjeta/con:RowSet/con:Row[1]/con:Column
+	return
+		fn:string($column[@name = "card_holder_id"]/text())</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+            </con1:responseTransform>
+          </con1:wsCallout>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ConsultaVisionPlus ">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.procesa.com/fdcs" prefix="fdcs" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitTypes" prefix="val" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:ifThenElse>
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7837</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ""</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:assign varName="paymentCurrency">
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7271</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($body/val:validacionOverlimitRequest/PAYMENT_CURRENCY/text())</con2:xqueryText>
+                  </con1:expr>
+                </con1:assign>
+                <con1:assign varName="accountNumber">
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7317</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">(: $RSPconDatoTarjeta/Rowset/Row[x]/Column[NumCuenta] - Donde x == Row con moneda del pago :)
+$RSPconDatoTarjeta/con:RowSet
+/con:Row[$RSPconDatoTarjeta/con:RowSet/con:Row/con:Column[upper-case(@name) = 'CODMONEDA']/text() = $paymentCurrency]
+/con:Column[upper-case(@name) = 'NUMCUENTA']/text()</con2:xqueryText>
+                  </con1:expr>
+                </con1:assign>
+                <con1:assign varName="org">
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7319</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">for $row in $RSPconDatoTarjeta/con:RowSet/con:Row
+        where $row/con:Column[upper-case(@name) = 'CODMONEDA' and  text() = $paymentCurrency]
+        return
+        	data($row/con:Column[upper-case(@name) = 'ORG'])</con2:xqueryText>
+                  </con1:expr>
+                </con1:assign>
+                <con1:wsCallout>
+                  <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Llamado a AccountInquiryVA Operación encargada de hacer la consulta en VisionPlus.</con2:comment>
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-77ff</con2:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlusHN/vmx/biz/vmx" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>AccountInquiryL8VL</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQAccountInquiryL8VL</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RSPAccountInquiryL8VL</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQAccountInquiryL8VL">
+                      <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Se realiza la transformación de los parametros entrada del servicio proxy con la operación AccountInquiryVA.</con2:comment>
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-77c7</con2:id>
+                      <con1:expr>
+                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                          <con2:resource ref="Middleware/v2/Resources/VisionPlusHN/xq/accountInquiryL8VLIn_StringParams"/>
+                          <con2:param name="accountNumber">
+                            <con2:path>$accountNumber</con2:path>
+                          </con2:param>
+                          <con2:param name="org">
+                            <con2:path>$org</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform>
+                    <con1:assign varName="errorCode">
+                      <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Codigo de error obtenido de la operación AccountInquiryVA</con2:comment>
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7757</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($RSPAccountInquiryL8VL/ServiceReturnCode/text())</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="validationMessage">
+                      <con2:comment xmlns:con2="http://www.bea.com/wli/sb/stages/config">Mensaje de error obtenido de la operación AccountInquiryVA</con2:comment>
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-773a</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if ($errorCode != "P") then(
+	fn-bea:trim(fn:string($RSPAccountInquiryL8VL/fdcs:ReturnCodes/RC/Desc[1]/text()))
+)else("")</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:responseTransform>
+                </con1:wsCallout>
+              </con1:actions>
+            </con1:case>
+            <con1:default/>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionOverlimit">
+        <con:context>
+          <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/validacionOverlimit" prefix="valdb" xmlns:con2="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://www.procesa.com/fdcs" prefix="fdcs" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitTypes" prefix="val" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidacionOverlimit" prefix="val1" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:ifThenElse>
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7702</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ""</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:assign varName="currentBalance">
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-76ca</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($RSPAccountInquiryL8VL/AZXAIO-CURR-BAL/text())</con2:xqueryText>
+                  </con1:expr>
+                </con1:assign>
+                <con1:wsCallout>
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7673</con2:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v3/BusinessServices/ValidacionOverlimitHN/biz/validacionOverlimit_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>validacionOverlimit</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQValidacionOverlimit</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RSPValidacionOverlimit</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQValidacionOverlimit">
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7165334984662051246-644d0f09.18d337115c7.273a</con2:id>
+                      <con1:expr>
+                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                          <con2:resource ref="Middleware/v3/BusinessServices/ValidacionOverlimitHN/xq/validacionOverlimitHN"/>
+                          <con2:param name="Identidad">
+                            <con2:path>$numIdentidad</con2:path>
+                          </con2:param>
+                          <con2:param name="Moneda">
+                            <con2:path>$paymentCurrency</con2:path>
+                          </con2:param>
+                          <con2:param name="Saldo">
+                            <con2:path>$currentBalance</con2:path>
+                          </con2:param>
+                          <con2:param name="Monto">
+                            <con2:path>fn:string($body/val:validacionOverlimitRequest/PAYMENT_AMOUNT/text())</con2:path>
+                          </con2:param>
+                          <con2:param name="Pais">
+                            <con2:path>$cardBank</con2:path>
+                          </con2:param>
+                          <con2:param name="Creditos">
+                            <con2:path>fn:string($RSPAccountInquiryL8VL/AZXAIO-AMT-MEMO-CR/text())</con2:path>
+                          </con2:param>
+                          <con2:param name="TasaCambio">
+                            <con2:path>$body/val:validacionOverlimitRequest/EXCHANGE_RATE/text()</con2:path>
+                          </con2:param>
+                          <con2:param name="Debitos">
+                            <con2:path>fn:string($RSPAccountInquiryL8VL/AZXAIO-AMT-MEMO-DB/text())</con2:path>
+                          </con2:param>
+                          <con2:param name="CodCliente">
+                            <con2:path>$clientId</con2:path>
+                          </con2:param>
+                          <con2:param name="CruceMoneda">
+                            <con2:path>$body/val:validacionOverlimitRequest/COINS_CROSSING/text()</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform>
+                    <con1:assign varName="errorCode">
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7536</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($RSPValidacionOverlimit/valdb:ERROR_CODE/text())</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="validationMessage">
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7519</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn-bea:trim(fn:string($RSPValidacionOverlimit/valdb:ERROR_MESSAGE/text()))</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="overLimit">
+                      <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7165334984662051246-644d0f09.18d337115c7.254b</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($RSPValidacionOverlimit/valdb:PV_OVER_LIMIT/text())</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:responseTransform>
+                </con1:wsCallout>
+              </con1:actions>
+            </con1:case>
+            <con1:default/>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionOverlimitHN_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitTypes" prefix="val" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:actions>
+          <con1:replace contents-only="true" varName="header">
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-74ab</con2:id>
+            <con1:expr>
+              <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	{
+		if($validationMessage = "") then (
+			<successIndicator>Success</successIndicator>
+		)else (
+			<successIndicator>{ $errorCode }</successIndicator>,
+			<messages>{ $validationMessage }</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con1:ifThenElse>
+            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-748e</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ""</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace contents-only="true" varName="body">
+                  <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-741b</con2:id>
+                  <con1:expr>
+                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                      <con2:resource ref="Middleware/v3/Resources/ValidacionOverlimit/xq/validacionOverlimitOut"/>
+                      <con2:param name="org">
+                        <con2:path>$org</con2:path>
+                      </con2:param>
+                      <con2:param name="numIdentidad">
+                        <con2:path>$numIdentidad</con2:path>
+                      </con2:param>
+                      <con2:param name="clientId">
+                        <con2:path>$clientId</con2:path>
+                      </con2:param>
+                      <con2:param name="currentBalance">
+                        <con2:path>$currentBalance</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:replace contents-only="true" varName="body">
+                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2637201477923639010-99fba2b.1799ea65474.-7454</con2:id>
+                <con1:expr>
+                  <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">&lt;val:validacionOverlimitResponse/></con2:xqueryText>
+                </con1:expr>
+              </con1:replace>
+            </con1:default>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con1:pipeline type="error" name="_onErrorHandler-2637201477923639010-99fba2b.1799ea65474.-73e0" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+      <con1:stage name="ManejoError">
+        <con1:context>
+          <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitTypes" prefix="val"/>
+        </con1:context>
+        <con1:actions>
+          <con2:replace contents-only="true" varName="header" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+            <con:id>_ActionId-2637201477923639010-99fba2b.1799ea65474.-7372</con:id>
+            <con2:expr>
+              <con:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+            <con:id>_ActionId-2637201477923639010-99fba2b.1799ea65474.-7355</con:id>
+            <con2:expr>
+              <con:xqueryText>&lt;val:validacionOverlimitResponse/></con:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con:reply>
+            <con:id>_ActionId-2637201477923639010-99fba2b.1799ea65474.-7338</con:id>
+          </con:reply>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:pipeline-node name="ValidacionOverlimitHN">
+        <con:request>ValidacionOverlimitHN_request</con:request>
+        <con:response>ValidacionOverlimitHN_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

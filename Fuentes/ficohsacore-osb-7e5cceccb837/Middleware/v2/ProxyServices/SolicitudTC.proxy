@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con3:SoapBindingType" xmlns:con3="http://www.bea.com/wli/sb/services/bindings/config">
+      <con3:wsdl ref="Middleware/v2/Resources/SolicitudTC/wsdl/solicitudTCPS"/>
+      <con3:port>
+        <con3:name>solicitudTCPSSOAP</con3:name>
+        <con3:namespace>http://www.ficohsa.com.hn/middleware.services/solicitudTCPS/</con3:namespace>
+      </con3:port>
+      <con3:selector type="SOAP action"/>
+      <con3:WSI-compliant>false</con3:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-4431925783392807007--4097ba94.1621aea95fd.-7f58">
+    <con:pipeline type="error" name="_onErrorHandler-4431925783392807007--4097ba94.1621aea95fd.-7f58">
+      <con:stage name="ManejoError">
+        <con:context xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+        </con:context>
+        <con:actions xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+          <con2:assign varName="errorCode">
+            <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7d92</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="errorMessage">
+            <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7d91</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7d8e</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>mapeoErrores</con2:operation>
+            <con2:request>
+              <con2:body>$reqMapeoErrores</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>respMapeoErrores</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="reqMapeoErrores">
+                <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7d90</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con1:param name="CODIGO_ERROR">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                    <con1:param name="MENSAJE_ERROR">
+                      <con1:path>fn:concat("FICBCO0262", "$#$", $errorMessage)</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7d8f</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con1:param name="mapeoErroresResponse1">
+                      <con1:path>$respMapeoErrores</con1:path>
+                    </con1:param>
+                    <con1:param name="successIndicator">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con2:responseTransform>
+          </con2:wsCallout>
+          <con2:replace varName="body" contents-only="true">
+            <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7d8d</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;ges:solicitudTCResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7d8c</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ValidacionesGenerales_request">
+      <con:stage name="ValidacionXSD">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+        </con:context>
+        <con:actions>
+          <con2:validate>
+            <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7f20</con1:id>
+            <con2:schema ref="Middleware/v2/Resources/GestionesTarjetas/xsd/gestionesTarjetasTypes"/>
+            <con2:schemaElement xmlns:ges="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes">ges:solicitudTC</con2:schemaElement>
+            <con2:varName>body</con2:varName>
+            <con2:location>
+              <con1:xpathText>./ges:solicitudTC</con1:xpathText>
+            </con2:location>
+          </con2:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionServicioRegional">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+            <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7ea2</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>ValidaServicioRegional</con2:operation>
+            <con2:request>
+              <con2:body>$reqValidaServicioRegional</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>respValidaServicioRegional</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="reqValidaServicioRegional">
+                <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7ea7</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                    <con1:param name="requestHeader1">
+                      <con1:path>$header/aut:RequestHeader</con1:path>
+                    </con1:param>
+                    <con1:param name="serviceId">
+                      <con1:path>"FICBCO0262"</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:ifThenElse>
+                <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7ea6</con1:id>
+                <con2:case>
+                  <con2:condition>
+                    <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:replace contents-only="true" varName="header">
+                      <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7ea5</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7e85</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>&lt;ges:solicitudTCResponse/></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                      <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7ea4</con1:id>
+                    </con1:reply>
+                  </con2:actions>
+                </con2:case>
+                <con2:default>
+                  <con2:replace contents-only="true" varName="header">
+                    <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7ea3</con1:id>
+                    <con2:expr>
+                      <con1:xqueryTransform>
+                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                        <con1:param name="requestHeader">
+                          <con1:path>$header/aut:RequestHeader</con1:path>
+                        </con1:param>
+                      </con1:xqueryTransform>
+                    </con2:expr>
+                  </con2:replace>
+                </con2:default>
+              </con2:ifThenElse>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionesGenerales_response">
+      <con:stage name="MapeoError">
+        <con:context xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+          <con2:ifThenElse>
+            <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7e10</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7e0d</con1:id>
+                  <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>mapeoErrores</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQMapeoErrores</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPMapeoErrores</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQMapeoErrores">
+                      <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7e0f</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                          <con1:param name="MENSAJE_ERROR">
+                            <con1:path>fn:concat("FICBCO0262","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                          </con1:param>
+                          <con1:param name="CODIGO_ERROR">
+                            <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7e0e</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                          <con1:param name="mapeoErroresResponse1">
+                            <con1:path>$RSPMapeoErrores</con1:path>
+                          </con1:param>
+                          <con1:param name="successIndicator">
+                            <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="Default_SolicitudTC_request">
+      <con:stage name="FlujoEntrada" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:context/>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="Default_SolicitudTC_response">
+      <con:stage name="FlujoSalida" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:Error>
+            <con1:id>_ActionId-4431925783392807007--4097ba94.1621aea95fd.-7cb1</con1:id>
+            <con2:errCode>MW-0008</con2:errCode>
+            <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+          </con2:Error>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="NI01_SolicitudTC_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.procesa.com/fdcs" prefix="fdcs"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta" prefix="con1"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-2045240971314368978--19f38e2f.1626386dc52.-58d1</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>fn:string($body/ges:solicitudTC/ORG/text()) = ""</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="codigoPais">
+                  <con1:id>_ActionId-4779522846899487589--21cb5f41.16317c7f7f6.-7f27</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                      <con1:param name="sentidoConversion">
+                        <con1:path>'OSB-ISO3'</con1:path>
+                      </con1:param>
+                      <con1:param name="codigoPais">
+                        <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:assign>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-2045240971314368978--19f38e2f.1626386dc52.-58b4</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterData/conDatoCuenta/biz/conDatoCuenta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>conDatoCuenta</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQconDatoCuenta</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPconDatoCuenta</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQconDatoCuenta">
+                      <con1:id>_ActionId-2045240971314368978--19f38e2f.1626386dc52.-5899</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MasterData/xq/conDatoCuentaIn"/>
+                          <con1:param name="accountNumber">
+                            <con1:path>string($body/ges:solicitudTC/ACCOUNT_NUMBER/text())</con1:path>
+                          </con1:param>
+                          <con1:param name="codigoPais">
+                            <con1:path>$codigoPais</con1:path>
+                          </con1:param>
+                          <con1:param name="org">
+                            <con1:path>string($body/ges:solicitudTC/ORG/text())</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:validate>
+                      <con1:id>_ActionId-908374796176349984-33f45d5a.162d026add8.-7eb7</con1:id>
+                      <con2:schema ref="Middleware/v2/BusinessServices/MasterData/conDatoCuenta/xsd/conDatoCuenta_sp"/>
+                      <con2:schemaElement xmlns:con3="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta" xmlns:con4="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta">con3:InputParameters</con2:schemaElement>
+                      <con2:varName>REQconDatoCuenta</con2:varName>
+                      <con2:location>
+                        <con1:xpathText>.</con1:xpathText>
+                      </con2:location>
+                    </con2:validate>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="errorCode">
+                      <con1:id>_ActionId-1967344263151171514--6b3be216.164ed67d716.-7f42</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>string($RSPconDatoCuenta/con1:CodigoError/text())</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="validationMessage">
+                      <con1:id>_ActionId-1967344263151171514--6b3be216.164ed67d716.-7f25</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>if($errorCode != '-1')then(
+	string($RSPconDatoCuenta/con1:MensajeError/text())
+)else(
+	''
+)</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="org">
+                      <con1:id>_ActionId-8226515848660967608--27881b8e.162685a23d0.-7e97</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>let $row := $RSPconDatoCuenta/con1:RowSet/con1:Row
+   where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+   data($row/con1:Column[upper-case(@name) = 'ORG'])</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:assign varName="org">
+                <con1:id>_ActionId-8226515848660967608--27881b8e.162685a23d0.-7e7a</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($body/ges:solicitudTC/ORG/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:default>
+          </con2:ifThenElse>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-8226515848660967608--27881b8e.162685a23d0.-7e3e</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$org != ""</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-8226515848660967608--27881b8e.162685a23d0.-7e38</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>EmbosserAddL8VB</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQEmbosserAddL8VB</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPEmbosserAddL8VB</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQEmbosserAddL8VB">
+                      <con1:id>_ActionId-6734578931473165396-6e7a3fa1.16c2ad0ae45.-7c52</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/SolicitudTC/xq/embosserAddL8VBIn"/>
+                          <con1:param name="solicitudTCRequest">
+                            <con1:path>$body/ges:solicitudTC</con1:path>
+                          </con1:param>
+                          <con1:param name="org">
+                            <con1:path>$org</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:validate>
+                      <con1:id>_ActionId-908374796176349984-33f45d5a.162d026add8.-7e9a</con1:id>
+                      <con2:schema ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/xsd/XMLSchema_769155616"/>
+                      <con2:schemaElement xmlns:fdcs="http://www.procesa.com/fdcs">fdcs:EmbosserAddL8VBRequest</con2:schemaElement>
+                      <con2:varName>REQEmbosserAddL8VB</con2:varName>
+                      <con2:location>
+                        <con1:xpathText>.</con1:xpathText>
+                      </con2:location>
+                    </con2:validate>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="errorCode">
+                      <con1:id>_ActionId-1253462461980476253-2919f609.16397f8b758.-7fc9</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>fn-bea:trim(xs:string($RSPEmbosserAddL8VB/fdcs:ReturnCodes/RC[1]/Code/text()))</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="validationMessage">
+                      <con1:id>_ActionId-8226515848660967608--27881b8e.162685a23d0.-7e39</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>let $svnReturn := $RSPEmbosserAddL8VB/SVC-RETURN/text()
+return
+if ($svnReturn != 'P') then(
+	fn-bea:trim(xs:string($RSPEmbosserAddL8VB/fdcs:ReturnCodes/RC[1]/Desc/text()))
+) else ("")</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="NI01_SolicitudTC_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-2045240971314368978--19f38e2f.1626386dc52.-57f6</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = ""</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-2045240971314368978--19f38e2f.1626386dc52.-57f4</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-2045240971314368978--19f38e2f.1626386dc52.-57f2</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/SolicitudTC/xq/solicitudTCOut"/>
+                      <con1:param name="embosserAddL8VBResponse">
+                        <con1:path>$RSPEmbosserAddL8VB</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace varName="header" contents-only="true">
+                <con1:id>_ActionId-2045240971314368978--19f38e2f.1626386dc52.-579e</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{$errorCode}</successIndicator>
+	<messages>{$validationMessage}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace varName="body" contents-only="true">
+                <con1:id>_ActionId-2045240971314368978--19f38e2f.1626386dc52.-5785</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;ges:solicitudTCResponse /></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="ValidacionesGenerales">
+        <con:request>ValidacionesGenerales_request</con:request>
+        <con:response>ValidacionesGenerales_response</con:response>
+      </con:pipeline-node>
+      <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:branch-table variable="header">
+          <con:xpath>
+            <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+          </con:xpath>
+          <con:branch name="NI01">
+            <con:operator>equals</con:operator>
+            <con:value>'NI01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="NI01_SolicitudTC">
+                <con:request>NI01_SolicitudTC_request</con:request>
+                <con:response>NI01_SolicitudTC_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="PA01">
+            <con:operator>equals</con:operator>
+            <con:value>'PA01'</con:value>
+            <con:flow>
+              <con:route-node name="PA01_SolicitudTC">
+                <con:context/>
+                <con:actions>
+                  <con3:route>
+                    <con1:id>_ActionId-6734578931473165396-6e7a3fa1.16c2ad0ae45.-78c3</con1:id>
+                    <con3:service ref="Middleware/v2/ProxyServices/SolicitudTCPA" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con3:operation>solicitudTC</con3:operation>
+                    <con3:outboundTransform/>
+                    <con3:responseTransform/>
+                  </con3:route>
+                </con:actions>
+              </con:route-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="GT01">
+            <con:operator>equals</con:operator>
+            <con:value>'GT01'</con:value>
+            <con:flow>
+              <con:route-node name="GT01_SolicitudTC">
+                <con:context/>
+                <con:actions>
+                  <con3:route>
+                    <con1:id>_ActionId-6734578931473165396-6e7a3fa1.16c2ad0ae45.-7469</con1:id>
+                    <con3:service ref="Middleware/v2/ProxyServices/SolicitudTCGT" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con3:operation>solicitudTC</con3:operation>
+                    <con3:outboundTransform/>
+                    <con3:responseTransform/>
+                  </con3:route>
+                </con:actions>
+              </con:route-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow>
+              <con:pipeline-node name="Default_SolicitudTC">
+                <con:request>Default_SolicitudTC_request</con:request>
+                <con:response>Default_SolicitudTC_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

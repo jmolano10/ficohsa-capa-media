@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isAutoPublish="false" isTracingEnabled="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="MiddlewareCaja/Resources/wsdls/RetiroEnMonedaLocal"/>
+      <con:port>
+        <con:name>T24WebServicesImplPort</con:name>
+        <con:namespace>T24WebServicesImpl</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/MiddlewareCaja/RetiroEnMonedaLocal</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-2384409316698514622--736b363.13cb5f6f6ac.-7275">
+    <con:pipeline type="request" name="Flujo Principal_request">
+      <con:stage name="EtapaPrincipalEntrada">
+        <con:comment>Se realiza el siguiente proceso:
+ 1. Retiro en efectivo en moneda local
+ 2. Consulta de detalle de la cuenta
+ 3. Consulta de usuario del sistema</con:comment>
+        <con:context>
+          <con2:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+        </con:context>
+        <con:actions>
+          <con1:wsCallout>
+            <con2:comment>Retiro en efectivo en moneda local.</con2:comment>
+            <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7cff</con2:id>
+            <con1:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/RetirosYPagos" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con1:operation>Retiroenmonedalocal</con1:operation>
+            <con1:request>
+              <con1:body>$REQUESTRetiroenmonedalocal</con1:body>
+            </con1:request>
+            <con1:response>
+              <con1:body>RESPONSERetiroenmonedalocal</con1:body>
+            </con1:response>
+            <con1:requestTransform>
+              <con1:assign varName="REQUESTRetiroenmonedalocal">
+                <con2:comment>Se asigna el request</con2:comment>
+                <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7c0a</con2:id>
+                <con1:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="MiddlewareCaja/Resources/xqueries/RetiroEnMonedaLocal/RetiroEnMonedaLocalIn"/>
+                    <con2:param name="retiroenmonedalocalRequest">
+                      <con2:path>$body/t24:Retiroenmonedalocal</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+            </con1:requestTransform>
+            <con1:responseTransform>
+              <con1:assign varName="successIndicatorRetiroenmonedalocal">
+                <con2:comment>se obtiene el estado "successIndicator" de la respuesta</con2:comment>
+                <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7bd2</con2:id>
+                <con1:expr>
+                  <con2:xqueryText>fn:string($RESPONSERetiroenmonedalocal/Status/successIndicator)</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+            </con1:responseTransform>
+          </con1:wsCallout>
+          <con1:ifThenElse>
+            <con2:comment>Si hubo error se termina el proceso. Si no hubo error se procede con el proceso</con2:comment>
+            <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7b9a</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText>$successIndicatorRetiroenmonedalocal = "Success"</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:wsCallout>
+                  <con2:comment>Consulta de detalle de la cuenta</con2:comment>
+                  <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7b62</con2:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/ConsultasCuenta" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>Consultadedetallesdelacuenta</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQUESTConsultadedetallesdelacuenta</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RESPONSEConsultadedetallesdelacuenta</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQUESTConsultadedetallesdelacuenta">
+                      <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7b29</con2:id>
+                      <con1:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="MiddlewareCaja/Resources/xqueries/RetiroEnMonedaLocal/ConsultaDeDetallesDeLaCuentaIn"/>
+                          <con2:param name="retiroenmonedalocalRequest">
+                            <con2:path>$body/t24:Retiroenmonedalocal</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform>
+                    <con1:assign varName="SHORTITLE">
+                      <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7af0</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText>fn:string($RESPONSEConsultadedetallesdelacuenta/WSACCOUNTLISTType/gWSACCOUNTLISTDetailType/mWSACCOUNTLISTDetailType/SHORTTITLE)</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="ALTACCTID">
+                      <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7ad3</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText>fn:string($RESPONSEConsultadedetallesdelacuenta/WSACCOUNTLISTType/gWSACCOUNTLISTDetailType/mWSACCOUNTLISTDetailType/ALTACCTID)</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:responseTransform>
+                </con1:wsCallout>
+                <con1:wsCallout>
+                  <con2:comment>Consulta de usuario del sistema</con2:comment>
+                  <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7a9b</con2:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/Core" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>Consultadeusuariosdelsistema</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQUESTConsultadeusuariosdelsistema</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RESPONSEConsultadeusuariosdelsistema</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQUESTConsultadeusuariosdelsistema">
+                      <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7a63</con2:id>
+                      <con1:expr>
+                        <con2:xqueryTransform>
+                          <con2:resource ref="MiddlewareCaja/Resources/xqueries/RetiroEnMonedaLocal/ConsultaDeUsuariosDelSistemaIn"/>
+                          <con2:param name="retiroenmonedalocalResponse">
+                            <con2:path>$RESPONSERetiroenmonedalocal</con2:path>
+                          </con2:param>
+                          <con2:param name="retiroenmonedalocalRequest">
+                            <con2:path>$REQUESTRetiroenmonedalocal</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform>
+                    <con1:assign varName="BRANCHNAME">
+                      <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-79f1</con2:id>
+                      <con1:expr>
+                        <con2:xqueryText>fn:string($RESPONSEConsultadeusuariosdelsistema/WSUSERType/gWSUSERDetailType/mWSUSERDetailType/BRANCHNAME)</con2:xqueryText>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:responseTransform>
+                </con1:wsCallout>
+              </con1:actions>
+            </con1:case>
+            <con1:default/>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="Flujo Principal_response">
+      <con:stage name="EtapaPrincipalSalida">
+        <con:context>
+          <con2:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+        </con:context>
+        <con:actions>
+          <con1:replace contents-only="true" varName="body">
+            <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-7967</con2:id>
+            <con1:expr>
+              <con2:xqueryText>$RESPONSERetiroenmonedalocal</con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con1:insert varName="body">
+            <con2:comment>Se inserta a la respuesta los campos adicionales</con2:comment>
+            <con2:id>_ActionId-2362650550315428768-15e3e915.13a743f3d73.-794a</con2:id>
+            <con1:location>
+              <con2:xpathText>./t24:RetiroenmonedalocalResponse/TELLERType</con2:xpathText>
+            </con1:location>
+            <con1:where>first-child</con1:where>
+            <con1:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="MiddlewareCaja/Resources/xqueries/RetiroEnMonedaLocal/RetiroEnMonedaLocalAddOut"/>
+                <con2:param name="ALTACCOUNTID">
+                  <con2:path>fn:string($ALTACCTID)</con2:path>
+                </con2:param>
+                <con2:param name="BRANCHNAME">
+                  <con2:path>fn:string($BRANCHNAME)</con2:path>
+                </con2:param>
+                <con2:param name="ACCOUNTNAME">
+                  <con2:path>fn:string($SHORTITLE)</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con1:expr>
+          </con1:insert>
+          <con1:ifThenElse>
+            <con2:id>_ActionId-1587027157399032175--191fdafc.13d11da92c2.-7eeb</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText>fn:string($ALTACCTID) != ""</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace contents-only="true" varName="body">
+                  <con2:id>_ActionId-1587027157399032175--191fdafc.13d11da92c2.-7eb3</con2:id>
+                  <con1:location>
+                    <con2:xpathText>./t24:RetiroenmonedalocalResponse/TELLERType/ACCOUNT2</con2:xpathText>
+                  </con1:location>
+                  <con1:expr>
+                    <con2:xqueryText>fn:string($ALTACCTID)</con2:xqueryText>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default/>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-2384409316698514622--736b363.13cb5f6f6ac.-7275">
+      <con:stage name="Etapa de Error">
+        <con:context>
+          <con2:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+        </con:context>
+        <con:actions>
+          <con1:replace varName="body" contents-only="true">
+            <con2:id>_ActionId-2384409316698514622--736b363.13cb5f6f6ac.-7204</con2:id>
+            <con1:expr>
+              <con2:xqueryText><![CDATA[<t24:RetiroenmonedalocalResponse>
+	<Status>
+		<successIndicator>TWSError</successIndicator>
+		<messages>{ concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) }</messages>
+	</Status>
+</t24:RetiroenmonedalocalResponse>]]></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con2:reply>
+            <con2:id>_ActionId-2384409316698514622--736b363.13cb5f6f6ac.-7203</con2:id>
+          </con2:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="Flujo Principal">
+        <con:request>Flujo Principal_request</con:request>
+        <con:response>Flujo Principal_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

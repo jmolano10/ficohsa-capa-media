@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/VerificaOTP/wsdl/verificaOTPPS"/>
+      <con:port>
+        <con:name>verificaOTPPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com/middleware.services/verificaOTPPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-1473810702047277080-2322cc71.17041e60ed0.-500c">
+    <con:pipeline type="request" name="VerificaHOTP_request">
+      <con:stage name="ParametrizacionMiddleware">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+          <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesCriptograficasTypes" prefix="oper"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/verificaOTPTypes" prefix="ver"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="idService">
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-52fb</con1:id>
+            <con2:expr>
+              <con1:xqueryText>'FICBCO0387'</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="hashAlgorithmParam">
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-52fd</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:concat($idService, '.HASH.ALGORITHM.OTP')</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-52d6</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>obtenerParametrizacion</con2:operation>
+            <con2:request>
+              <con2:body>$REQobtenerParametrizacion</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPobtenerParametrizacion</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQobtenerParametrizacion">
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-52b9</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                    <con1:param name="nombreParametros">
+                      <con1:path>$hashAlgorithmParam</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="errorCode">
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-5295</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:ERROR_CODE/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="validationMessage">
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-5273</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>if ($errorCode = 'SUCCESS') then (
+	''
+) else (
+	fn:string($RSPobtenerParametrizacion/osb:ERROR_MESSAGE/text())
+)</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+          <con2:assign varName="hashAlgorithm">
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-521d</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$hashAlgorithmParam]/osb:VALUE/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-5200</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/OperacionesCriptograficas" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>generarHash</con2:operation>
+            <con2:request>
+              <con2:body>$REQgenerarHash</con2:body>
+              <con2:header>$REQgenerarHashHeader</con2:header>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPgenerarHash</con2:body>
+              <con2:header>RSPgenerarHashHeader</con2:header>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQgenerarHashHeader">
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-513d</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>$header</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="REQgenerarHash">
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-5191</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/OperacionesCriptograficas/xq/generarHashIn"/>
+                    <con1:param name="algorithm">
+                      <con1:path>$hashAlgorithm</con1:path>
+                    </con1:param>
+                    <con1:param name="plainData">
+                      <con1:path>$body/ver:verificaHOTPRequest/ver:OTP_VALUE/text()</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="hashRepresentation">
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-5116</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>$RSPgenerarHash/oper:HASH_REPRESENTATION/text()</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+      <con:stage name="VerificaHOTP">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/verificaOTPTypes" prefix="ver"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-50e0</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$hashRepresentation != ''</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-50b7</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/PWS/verificaOTP/biz/verificaOTP_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>verificaOTP</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQverificaOTP</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPverificaOTP</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQverificaOTP">
+                      <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-4e7b</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/BusinessServices/PWS/verificaOTP/xq/verificaOTP"/>
+                          <con1:param name="otpType">
+                            <con1:path>'HOTP'</con1:path>
+                          </con1:param>
+                          <con1:param name="otpHash">
+                            <con1:path>$hashRepresentation</con1:path>
+                          </con1:param>
+                          <con1:param name="entityId">
+                            <con1:path>$body/ver:verificaHOTPRequest/ver:ENTITY_INFO/ver:ID/text()</con1:path>
+                          </con1:param>
+                          <con1:param name="otpUserChannel">
+                            <con1:path>$header/aut:RequestHeader/Authentication/UserName/text()</con1:path>
+                          </con1:param>
+                          <con1:param name="entityType">
+                            <con1:path>$body/ver:verificaHOTPRequest/ver:ENTITY_INFO/ver:TYPE/text()</con1:path>
+                          </con1:param>
+                          <con1:param name="otpCountry">
+                            <con1:path>$header/aut:RequestHeader/Region/SourceBank/text()</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform/>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:Error>
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-50c4</con1:id>
+                <con2:errCode>ERROR</con2:errCode>
+                <con2:message>Se produjo un error al obtener un hash del OTP.</con2:message>
+              </con2:Error>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="VerificaHOTP_response">
+      <con:stage name="ValidaVerificaOTP">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/verificaOTP" prefix="ver"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/verificaOTPTypes" prefix="ver1"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="returnCode">
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-5080</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($RSPverificaOTP/ver:P_RETURN_CODE/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-506e</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$returnCode != 'SUCCESS'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-505b</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;ver:verificaHOTPResponse/></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-503f</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/VerificaOTP/xq/verificaOTPOut"/>
+                    <con1:param name="status">
+                      <con1:path>fn:string($RSPverificaOTP/ver:P_STATUS/text())</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+          <con2:replace contents-only="true" varName="header">
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-500e</con1:id>
+            <con2:expr>
+              <con1:xqueryTransform>
+                <con1:resource ref="Middleware/v2/Resources/VerificaOTP/xq/verificaOTPHeaderOut"/>
+                <con1:param name="procVerificaOTPOutput">
+                  <con1:path>$RSPverificaOTP</con1:path>
+                </con1:param>
+              </con1:xqueryTransform>
+            </con2:expr>
+          </con2:replace>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-1473810702047277080-2322cc71.17041e60ed0.-500c">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/verificaOTPTypes" prefix="ver"/>
+        </con:context>
+        <con:actions>
+          <con5:assign varName="errorCode" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-4f2a</con2:id>
+            <con5:expr>
+              <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+            </con5:expr>
+          </con5:assign>
+          <con5:assign varName="errorMessage" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-4f2c</con2:id>
+            <con5:expr>
+              <con2:xqueryText>fn:substring(fn:string($fault/ctx:reason/text()), 1, 100)</con2:xqueryText>
+            </con5:expr>
+          </con5:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-4f14</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>mapeoErrores</con2:operation>
+            <con2:request>
+              <con2:body>$REQmapeoErrores</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPmapeoErrores</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQmapeoErrores">
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-4ef8</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con1:param name="CODIGO_ERROR">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                    <con1:param name="MENSAJE_ERROR">
+                      <con1:path>fn:concat('FICBCO0387', '$#$', $errorMessage)</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-4ed3</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con1:param name="mapeoErroresResponse1">
+                      <con1:path>$RSPmapeoErrores</con1:path>
+                    </con1:param>
+                    <con1:param name="successIndicator">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con2:responseTransform>
+          </con2:wsCallout>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-4eb2</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;ver:verificaHOTPResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-1473810702047277080-2322cc71.17041e60ed0.-4e9a</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="VerificaHOTP">
+        <con:request>VerificaHOTP_request</con:request>
+        <con:response>VerificaHOTP_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

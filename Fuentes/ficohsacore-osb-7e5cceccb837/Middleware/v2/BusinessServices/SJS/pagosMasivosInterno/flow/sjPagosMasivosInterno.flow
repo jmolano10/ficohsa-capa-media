@@ -1,0 +1,557 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpel:process name="sjPagosMasivosInterno"
+              targetNamespace="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/pagosMasivosInterno/flow/sjPagosMasivosInterno"
+              xmlns:tns="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/pagosMasivosInterno/flow/sjPagosMasivosInterno"
+              xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable"
+              xmlns:rescon="http://www.bea.com/alsb/flow/resources/config"
+              xmlns:bea="http://www.bea.com/bpel/ui/extensions"
+              xmlns:ext="http://www.bea.com/bpel/extensions"
+              xmlns:expr="http://www.bea.com/wli/sb/stages/config"
+              xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config"
+              bea:name="sjPagosMasivosInterno" xmlns:ns1="T24WebServicesImpl" xmlns:ns2="http://www.ficohsa.com.hn/middleware.services/sjPagosMasivosInternoPS" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ns0="http://xmlns.oracle.com/pcbpel/adapter/db/MiddlewareSOAApplication/ValidaEstructuraLote/validaEstructuraLote" xmlns:ns3="http://xmlns.oracle.com/pcbpel/adapter/db/MiddlewareSOAApplication/ProcesaLotePagoMasivo/procesaLotePagoMasivo" xmlns:ns4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:ns5="http://xmlns.oracle.com/pcbpel/adapter/db/sp/procesaLotePagoMasivo" xmlns:val="http://xmlns.oracle.com/pcbpel/adapter/db/sp/validaEstructuraLote" xmlns:ns6="http://www.ficohsa.com.hn/middleware.services/sjPagosMasivosInterno" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:ns7="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentaMasivosPS/">
+    <rescon:importInfo>
+    	<rescon:wsdl-import
+    		ref="Middleware/v2/Resources/ConsultaDetallesCuentaMasivos/wsdl/consultaDetallesCuentaMasivosPS">
+    	</rescon:wsdl-import></rescon:importInfo>
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjPagosMasivosInterno" partnerLinkType="tns:sjPagosMasivosInterno"
+                          myRole="sjPagosMasivosInterno">
+	       </bpel:partnerLink>
+	   
+	   <bpel:partnerLink name="validaEstructuraLote_db"
+		partnerLinkType="tns:validaEstructuraLote_db_plnkType"
+		partnerRole="validaEstructuraLote_db_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="consultaCuentasBS"
+	   	partnerLinkType="tns:consultaCuentasBS_plnkType"
+	   	partnerRole="consultaCuentasBS_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="procesaLotePagoMasivo_db"
+	   	partnerLinkType="tns:procesaLotePagoMasivo_db_plnkType"
+	   	partnerRole="procesaLotePagoMasivo_db_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="ConsultaDetallesCuentaMasivos"
+	   	partnerLinkType="tns:ConsultaDetallesCuentaMasivos_plnkType"
+	   	partnerRole="ConsultaDetallesCuentaMasivos_PartnerRole">
+	   </bpel:partnerLink></bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request" messageType="ns2:sjPagosMasivosInternoRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response" messageType="ns2:sjPagosMasivosInternoResponse">
+	       </bpel:variable>
+    
+    
+    
+    <bpel:variable name="totalBatches" type="xsd:integer"></bpel:variable>
+    <bpel:variable name="Batches" type="xsd:anyType"></bpel:variable></bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjPagosMasivosInterno" operation="PagosMasivosInterno" createInstance="yes" variable="request">
+	           <rescon:receiveInfo>
+                <rescon:wsdl ref="Middleware/v2/BusinessServices/SJS/pagosMasivosInterno/wsdl/sjPagosMasivosInterno" binding="ns2:sjPagosMasivosInternoPSSOAP"/>
+            </rescon:receiveInfo>
+        </bpel:receive>
+        
+        
+        
+        <bpel:assign>
+        	<bpel:extensionAssignOperation>
+        		<trf:assign varName="totalBatches">
+        			<trf:expr>
+        				<expr:xqueryText>count($request.inputParameters/BATCHES/BATCH)</expr:xqueryText></trf:expr></trf:assign>
+        	</bpel:extensionAssignOperation>
+        <bpel:extensionAssignOperation>
+		<trf:assign varName="response.outputParameters">
+			<trf:expr>
+				<expr:xqueryText>&lt;outputParameters&gt;
+	&lt;GLOBAL_ID&gt;{data($request.inputParameters/GLOBAL_ID)}&lt;/GLOBAL_ID&gt;
+	&lt;CUSTOMER_ID&gt;{data($request.inputParameters/CUSTOMER_ID)}&lt;/CUSTOMER_ID&gt;
+	&lt;BATCHES /&gt;
+&lt;/outputParameters&gt;</expr:xqueryText></trf:expr></trf:assign>
+        </bpel:extensionAssignOperation>
+	
+	
+	</bpel:assign>
+        <bpel:forEach parallel="yes" counterName="contador">
+        	<bpel:startCounterValue>1</bpel:startCounterValue>
+        	<bpel:finalCounterValue>count($request.inputParameters/BATCHES/BATCH)</bpel:finalCounterValue>
+        	<bpel:scope>
+        		<bpel:variables>
+        			<bpel:variable name="REQvalidaEstructuraLote"
+        				messageType="ns0:args_in_msg">
+        			</bpel:variable>
+        			<bpel:variable name="RSPvalidaEstructuraLote"
+        				messageType="ns0:args_out_msg">
+        			</bpel:variable>
+        			
+        			
+        			<bpel:variable
+        				name="REQconsultadedetallesdelacuenta"
+        				messageType="ns1:Consultadedetallesdelacuenta">
+        			</bpel:variable>
+        			<bpel:variable
+        				name="RSPconsultadedetalledelacuentaResponse"
+        				messageType="ns1:ConsultadedetallesdelacuentaResponse">
+        			</bpel:variable>
+        			
+        			<bpel:variable name="batchAgrupado"
+        				type="xsd:anyType">
+        			</bpel:variable>
+        			<bpel:variable name="REQprocesaLotePagoMasivo"
+        				messageType="ns3:args_in_msg">
+        			</bpel:variable>
+        			<bpel:variable name="RSPprocesaLotePagoMasivo"
+        				messageType="ns3:args_out_msg">
+        			</bpel:variable>
+        			<bpel:variable name="disponible"
+        				type="xsd:decimal">
+        			</bpel:variable>
+        			<bpel:variable name="validarSaldo"
+        				type="xsd:boolean">
+        			</bpel:variable>
+        			<bpel:variable name="validarEstado"
+        				type="xsd:boolean">
+        			</bpel:variable>
+        			<bpel:variable name="zeroRecords" type="xsd:boolean">
+        			</bpel:variable>
+        			<bpel:variable name="inactiveMarker" type="xsd:boolean">
+        			</bpel:variable>
+        			<bpel:variable name="restriccion" type="xsd:boolean">
+        			</bpel:variable>
+        			<bpel:variable name="totalAmount"
+        				type="xsd:decimal">
+        			</bpel:variable>
+        			<bpel:variable name="validaEstructura"
+        				type="xsd:boolean">
+        			</bpel:variable>
+        			<bpel:variable name="batch" type="xsd:anyType"></bpel:variable>
+        			<bpel:variable name="batchError" type="ns6:batchResponseType">
+        			</bpel:variable>
+        			<bpel:variable
+        				name="REQconsultaDetallesCuentaMasivos"
+        				messageType="ns7:consultaDetallesCuentaMasivosRequest">
+        			</bpel:variable>
+        			<bpel:variable
+        				name="RSPconsultaDetallesCuentaMasivos"
+        				messageType="ns7:consultaDetallesCuentaMasivosResponse">
+        			</bpel:variable></bpel:variables>
+        		
+        		<bpel:faultHandlers>
+        			<bpel:catch faultName="tns:saldoInsuficiente" ext:soapFaultVariable="soapFault">
+        				<bpel:sequence>
+        					<bpel:empty></bpel:empty>
+        				<bpel:assign>
+		
+	
+	
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./BATCHES</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>$batchError/BATCH</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        			</bpel:catch>
+        			<bpel:catch faultName="tns:estadoInvalido" ext:soapFaultVariable="soapFault">
+        				<bpel:sequence>
+        					<bpel:empty></bpel:empty>
+        				<bpel:assign>
+		
+	
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./BATCHES</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>$batchError/BATCH</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        			</bpel:catch>
+        			<bpel:catchAll ext:soapFaultVariable="soapFault">
+        				<bpel:sequence>
+        					<bpel:empty></bpel:empty>
+        				
+	<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<bpel:documentation></bpel:documentation>
+			<trf:replace contents-only="true" varName="batchError">
+				<trf:expr>
+					<expr:xqueryText>&lt;BATCH&gt;
+	&lt;ID_POSITION&gt;{$contador}&lt;/ID_POSITION&gt;
+	&lt;CUSTOMER_BATCH_ID&gt;{fn:string($request.inputParameters/BATCHES/BATCH[xs:int($contador)]/CUSTOMER_BATCH_ID/text())}&lt;/CUSTOMER_BATCH_ID&gt;
+	&lt;STATUS&gt;ERROR&lt;/STATUS&gt;
+	&lt;ERROR_CODE&gt;ERROR&lt;/ERROR_CODE&gt;
+	&lt;ERROR_MESSAGE&gt;Error inesperado&lt;/ERROR_MESSAGE&gt;
+&lt;/BATCH&gt;</expr:xqueryText></trf:expr></trf:replace></bpel:extensionAssignOperation>
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./BATCHES</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>$batchError/BATCH</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        			</bpel:catchAll></bpel:faultHandlers>
+        		<bpel:sequence>
+        			<bpel:assign>
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="REQvalidaEstructuraLote.InputParameters">
+        						<trf:expr>
+        							<expr:xqueryTransform>
+        								<expr:resource ref="Middleware/v2/BusinessServices/SJS/pagosMasivosInterno/xq/validaEstructuraLoteIn"></expr:resource>
+        								
+        								
+        								<expr:param name="numerobatch">
+        									<expr:path>$contador</expr:path></expr:param>
+        								<expr:param name="sjPagosMasivosInterno1">
+        									<expr:path>$request.inputParameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        			<bpel:extensionAssignOperation>
+		<trf:assign varName="batchError">
+			<trf:expr>
+				<expr:xqueryText>&lt;NONE&gt;&lt;/NONE&gt;</expr:xqueryText></trf:expr></trf:assign>
+        			</bpel:extensionAssignOperation>
+        			<bpel:extensionAssignOperation>
+        				<trf:assign varName="batch">
+        					<trf:expr>
+        						<expr:xqueryText>&lt;NONE&gt;&lt;/NONE&gt;</expr:xqueryText></trf:expr></trf:assign>
+        			</bpel:extensionAssignOperation></bpel:assign>
+        			<bpel:invoke operation="validaEstructuraLote" partnerLink="validaEstructuraLote_db" outputVariable="RSPvalidaEstructuraLote" inputVariable="REQvalidaEstructuraLote">
+        				<rescon:invokeInfo>
+        					<rescon:service isProxy="false" ref="Middleware/v2/BusinessServices/PMSV/validaEstructuraLote/biz/validaEstructuraLote_db"></rescon:service></rescon:invokeInfo></bpel:invoke>
+        			
+        			<bpel:assign>
+        				
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="validaEstructura">
+        						<trf:expr>
+        							<expr:xqueryText>fn:string($RSPvalidaEstructuraLote.OutputParameters/val:ERROR_CODE/text()) = &quot;SUCCESS&quot;</expr:xqueryText></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        			</bpel:assign>
+        			<bpel:if>
+        				<bpel:condition>$validaEstructura</bpel:condition>
+        				<bpel:sequence>
+        					<bpel:empty></bpel:empty>
+        				<bpel:assign>
+		
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="validarSaldo">
+				<trf:expr>
+					<expr:xqueryText>fn:string($request.inputParameters/BATCHES/BATCH[xs:int($contador)]/DATA_STRUCTURE/VALIDATIONS/DEBIT_ACCT_BALANCE/text()) = &quot;YES&quot;</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="validarEstado">
+				<trf:expr>
+					<expr:xqueryText>fn:string($request.inputParameters/BATCHES/BATCH[xs:int($contador)]/DATA_STRUCTURE/VALIDATIONS/DEBIT_ACCT_STATUS/text()) = &quot;YES&quot;</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        				<bpel:if>
+        					<bpel:condition>$validarSaldo or $validarEstado</bpel:condition>
+        					<bpel:sequence>
+        						<bpel:empty></bpel:empty>
+        					<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<bpel:documentation></bpel:documentation>
+			<trf:assign varName="batchAgrupado">
+				<trf:expr>
+					<expr:xqueryTransform>
+						<expr:resource
+							ref="Middleware/v2/Resources/PagosMasivosInterno/xq/agrupaTxnLoteXCuenta"></expr:resource>
+						<expr:param name="batch">
+							<expr:path>$request.inputParameters/BATCHES/BATCH[xs:int($contador)]</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        					<bpel:else>
+        						<bpel:sequence>
+        							<bpel:empty></bpel:empty>
+        						</bpel:sequence>
+        					</bpel:else>
+        				</bpel:if>
+        				<bpel:if>
+        					<bpel:condition>$validarSaldo or $validarEstado</bpel:condition>
+        					<bpel:sequence>
+        						<bpel:empty></bpel:empty>
+        					
+        					<bpel:forEach parallel="no"
+        						counterName="contadorCuentas">
+        						<bpel:startCounterValue>1</bpel:startCounterValue>
+        						<bpel:finalCounterValue>count($batchAgrupado/ACCOUNT)</bpel:finalCounterValue>
+        						<bpel:scope>
+        							<bpel:sequence>
+        								<bpel:if>
+        									<bpel:condition>$validarSaldo</bpel:condition>
+        									<bpel:sequence>
+        										<bpel:empty></bpel:empty>
+        									<bpel:scope>
+		<bpel:sequence>
+			<bpel:assign>
+				<bpel:extensionAssignOperation>
+					<bpel:documentation></bpel:documentation>
+					<trf:assign
+						varName="REQconsultaDetallesCuentaMasivos.parameters">
+						<trf:expr>
+							<expr:xqueryTransform>
+								<expr:resource
+									ref="Middleware/v2/BusinessServices/SJS/pagosMasivosInterno/xq/consultaDetallesCuentaMasivosIn"></expr:resource>
+								
+								<expr:param name="accountNumber">
+									<expr:path>data($batchAgrupado/ACCOUNT[xs:int($contadorCuentas)]/ACCOUNT_NUMBER)</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+			<bpel:invoke
+				partnerLink="ConsultaDetallesCuentaMasivos" operation="consultaDetallesCuentaMasivos" inputVariable="REQconsultaDetallesCuentaMasivos" outputVariable="RSPconsultaDetallesCuentaMasivos">
+				<rescon:invokeInfo>
+					<rescon:service
+						ref="Middleware/v2/ProxyServices/ConsultaDetallesCuentaMasivos"
+						isProxy="true"></rescon:service></rescon:invokeInfo></bpel:invoke>
+			<bpel:assign>
+				<bpel:extensionAssignOperation>
+					<trf:assign varName="disponible">
+						<trf:expr>
+							<expr:xqueryText>let $saldoDisp := fn:string($RSPconsultaDetallesCuentaMasivos.result/CURRENT_BALANCE/text())
+return
+	if($saldoDisp = &quot;&quot;) then (
+		0
+	) else (
+		xs:decimal($saldoDisp)
+	)</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+				<bpel:extensionAssignOperation>
+					<trf:assign varName="totalAmount">
+						<trf:expr>
+							<expr:xqueryText>data($batchAgrupado/ACCOUNT[xs:int($contadorCuentas)]/TOTAL_AMOUNT)</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+			<bpel:if>
+				<bpel:condition>$disponible &lt; $totalAmount</bpel:condition>
+				<bpel:sequence>
+					<bpel:empty></bpel:empty>
+					<bpel:assign>
+						<bpel:extensionAssignOperation>
+							<bpel:documentation></bpel:documentation>
+							<trf:replace varName="batchError"
+								contents-only="true">
+								<trf:expr>
+									<expr:xqueryText>&lt;BATCH&gt;
+	&lt;ID_POSITION&gt;{$contador}&lt;/ID_POSITION&gt;
+	&lt;CUSTOMER_BATCH_ID&gt;{fn:string($request.inputParameters/BATCHES/BATCH[xs:int($contador)]/CUSTOMER_BATCH_ID/text())}&lt;/CUSTOMER_BATCH_ID&gt;
+	&lt;STATUS&gt;ERROR&lt;/STATUS&gt;
+	&lt;ERROR_CODE&gt;ERROR&lt;/ERROR_CODE&gt;
+	&lt;ERROR_MESSAGE&gt;{fn:concat(&quot;La cuenta &quot;,data($batchAgrupado/ACCOUNT[xs:int($contadorCuentas)]/ACCOUNT_NUMBER), &quot; no tiene saldo suficiente&quot;)}&lt;/ERROR_MESSAGE&gt;
+&lt;/BATCH&gt;</expr:xqueryText></trf:expr></trf:replace></bpel:extensionAssignOperation></bpel:assign>
+					<bpel:throw faultName="tns:saldoInsuficiente"
+						bea:name="Saldo Insuficiente"></bpel:throw></bpel:sequence>
+				<bpel:else>
+					<bpel:sequence>
+						<bpel:empty></bpel:empty></bpel:sequence></bpel:else></bpel:if></bpel:sequence>
+        									</bpel:scope></bpel:sequence>
+        									<bpel:else>
+        										<bpel:sequence>
+        											<bpel:empty></bpel:empty>
+        										</bpel:sequence>
+        									</bpel:else>
+        								</bpel:if>
+        								
+        								
+        								
+        								
+        								<bpel:if>
+        									<bpel:condition>$validarEstado</bpel:condition>
+        									<bpel:sequence>
+        										<bpel:empty></bpel:empty>
+        										<bpel:assign>
+        											<bpel:extensionAssignOperation>
+        												<bpel:documentation></bpel:documentation>
+        												<trf:assign
+        													varName="REQconsultadedetallesdelacuenta.parameters">
+        													<trf:expr>
+        														<expr:xqueryTransform>
+        															<expr:resource
+        																ref="Middleware/v2/BusinessServices/SJS/pagosMasivosInterno/xq/consultaDetalleDeCuentaIn"></expr:resource>
+        															
+        															<expr:param name="accountNumber">
+        																<expr:path>data($batchAgrupado/ACCOUNT[xs:int($contadorCuentas)]/ACCOUNT_NUMBER)</expr:path></expr:param>
+        															<expr:param name="sjPagosMasivosInterno">
+        																<expr:path>$request.inputParameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        										<bpel:invoke
+        											outputVariable="RSPconsultadedetalledelacuentaResponse"
+        											partnerLink="consultaCuentasBS"
+        											operation="Consultadedetallesdelacuenta"
+        											inputVariable="REQconsultadedetallesdelacuenta">
+        											<rescon:invokeInfo>
+        												<rescon:service
+        													ref="Middleware/Business_Resources/ConsultasCuenta/Resources/consultaCuentasBS"
+        													isProxy="false"></rescon:service></rescon:invokeInfo></bpel:invoke>
+        										<bpel:assign>
+        											<bpel:extensionAssignOperation>
+        												<trf:assign
+        													varName="zeroRecords">
+        													<trf:expr>
+        														<expr:xqueryText>fn:string($RSPconsultadedetalledelacuentaResponse.parameters/Status/successIndicator/text()) = &quot;Success&quot; and
+fn:string($RSPconsultadedetalledelacuentaResponse.parameters/WSACCOUNTLISTType[1]/ZERORECORDS/text()) = &quot;&quot;</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        										<bpel:if>
+        											<bpel:condition>$zeroRecords</bpel:condition>
+        											<bpel:sequence>
+        												<bpel:empty></bpel:empty>
+        												<bpel:assign>
+        													<bpel:extensionAssignOperation>
+        														<trf:assign
+        															varName="inactiveMarker">
+        															<trf:expr>
+        																<expr:xqueryText>fn:string($RSPconsultadedetalledelacuentaResponse.parameters/WSACCOUNTLISTType[1]/gWSACCOUNTLISTDetailType/mWSACCOUNTLISTDetailType/INACTIVEMARKER/text())=&quot;Y&quot;</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        													<bpel:extensionAssignOperation>
+        														<trf:assign
+        															varName="restriccion">
+        															<trf:expr>
+        																<expr:xqueryText>fn:string($RSPconsultadedetalledelacuentaResponse.parameters/WSACCOUNTLISTType[1]/gWSACCOUNTLISTDetailType/mWSACCOUNTLISTDetailType/POSTINGRESTRICT/text()) = &quot;DEBIT&quot;
+or
+fn:string($RSPconsultadedetalledelacuentaResponse.parameters/WSACCOUNTLISTType[1]/gWSACCOUNTLISTDetailType/mWSACCOUNTLISTDetailType/POSTINGRESTRICT/text()) = &quot;ALL&quot;</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        												<bpel:if>
+        													<bpel:condition>$inactiveMarker 
+or 
+$restriccion</bpel:condition>
+        													<bpel:sequence>
+        														<bpel:empty></bpel:empty>
+        														<bpel:assign>
+        															<bpel:extensionAssignOperation>
+        																<trf:replace
+        																	varName="batchError" contents-only="true">
+        																	<trf:expr>
+        																		<expr:xqueryText>&lt;BATCH&gt;
+	&lt;ID_POSITION&gt;{$contador}&lt;/ID_POSITION&gt;
+	&lt;CUSTOMER_BATCH_ID&gt;{fn:string($request.inputParameters/BATCHES/BATCH[xs:int($contador)]/CUSTOMER_BATCH_ID/text())}&lt;/CUSTOMER_BATCH_ID&gt;
+	&lt;STATUS&gt;ERROR&lt;/STATUS&gt;
+	&lt;ERROR_CODE&gt;ERROR&lt;/ERROR_CODE&gt;
+	&lt;ERROR_MESSAGE&gt;{fn:concat(&quot;La cuenta &quot;,data($batchAgrupado/ACCOUNT[xs:int($contadorCuentas)]/ACCOUNT_NUMBER), &quot; se encuentra inactiva o con restricciones&quot;)}&lt;/ERROR_MESSAGE&gt;
+&lt;/BATCH&gt;</expr:xqueryText></trf:expr></trf:replace></bpel:extensionAssignOperation></bpel:assign>
+        														<bpel:throw
+        															faultName="tns:estadoInvalido"
+        															bea:name="Estado Invalido"></bpel:throw></bpel:sequence>
+        													<bpel:else>
+        														<bpel:sequence>
+        															<bpel:empty></bpel:empty></bpel:sequence></bpel:else></bpel:if></bpel:sequence>
+        											<bpel:else>
+        												<bpel:sequence>
+        													<bpel:empty></bpel:empty>
+        													<bpel:assign>
+        														<bpel:extensionAssignOperation>
+        															<bpel:documentation></bpel:documentation>
+        															<trf:replace
+        																varName="batchError" contents-only="true">
+        																<trf:expr>
+        																	<expr:xqueryText>&lt;BATCH&gt;
+	&lt;ID_POSITION&gt;{$contador}&lt;/ID_POSITION&gt;
+	&lt;CUSTOMER_BATCH_ID&gt;{fn:string($request.inputParameters/BATCHES/BATCH[xs:int($contador)]/CUSTOMER_BATCH_ID/text())}&lt;/CUSTOMER_BATCH_ID&gt;
+	&lt;STATUS&gt;ERROR&lt;/STATUS&gt;
+	{
+		let $successIndicator := fn:string($RSPconsultadedetalledelacuentaResponse.parameters/Status/successIndicator/text()) 
+		return
+		if ( $successIndicator = &quot;Success&quot;) then (
+			if (fn:string($RSPconsultadedetalledelacuentaResponse.parameters/WSACCOUNTLISTType/ZERORECORDS/text()) != &quot;&quot;) then (
+				&lt;ERROR_CODE&gt;NO RECORDS&lt;/ERROR_CODE&gt;,
+				&lt;ERROR_MESSAGE&gt;{ fn:string($RSPconsultadedetalledelacuentaResponse.parameters/WSACCOUNTLISTType[1]/ZERORECORDS/text()) }&lt;/ERROR_MESSAGE&gt;
+			) else()
+		) else (
+			&lt;ERROR_CODE&gt;{ $successIndicator }&lt;/ERROR_CODE&gt;,
+			for $messages in $RSPconsultadedetalledelacuentaResponse.parameters/Status/messages
+			return
+			&lt;ERROR_MESSAGE&gt;{ data($messages) }&lt;/ERROR_MESSAGE&gt;
+		)
+     }
+&lt;/BATCH&gt;</expr:xqueryText></trf:expr></trf:replace></bpel:extensionAssignOperation></bpel:assign>
+        													<bpel:throw
+        														faultName="tns:estadoInvalido"
+        														bea:name="Estado Inválido"></bpel:throw></bpel:sequence></bpel:else></bpel:if>
+        										
+        										</bpel:sequence>
+        									<bpel:else>
+        										<bpel:sequence>
+        											<bpel:empty></bpel:empty></bpel:sequence></bpel:else></bpel:if></bpel:sequence></bpel:scope></bpel:forEach></bpel:sequence>
+        					<bpel:else>
+        						<bpel:sequence>
+        							<bpel:empty></bpel:empty>
+        						</bpel:sequence>
+        					</bpel:else>
+        				</bpel:if>
+        				
+        				<bpel:assign>
+        					<bpel:extensionAssignOperation>
+        						<trf:assign
+        							varName="REQprocesaLotePagoMasivo.InputParameters">
+        							<trf:expr>
+        								<expr:xqueryTransform>
+        									<expr:resource
+        										ref="Middleware/v2/BusinessServices/SJS/pagosMasivosInterno/xq/procesaLotePagoMasivoIn"></expr:resource>
+        									
+        									
+        									
+        									
+        									
+        									
+        									
+        									
+        									<expr:param name="numerobatch">
+        										<expr:path>$contador</expr:path></expr:param>
+        									<expr:param name="sjPagosMasivosInterno">
+        										<expr:path>$request.inputParameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        				<bpel:invoke operation="procesaLotePagoMasivo"
+        					partnerLink="procesaLotePagoMasivo_db"
+        					outputVariable="RSPprocesaLotePagoMasivo"
+        					inputVariable="REQprocesaLotePagoMasivo">
+        					<rescon:invokeInfo>
+        						<rescon:service
+        							ref="Middleware/v2/BusinessServices/PMSV/procesaLotePagoMasivo/biz/procesaLotePagoMasivo_db"
+        							isProxy="false"></rescon:service></rescon:invokeInfo></bpel:invoke>
+        				<bpel:assign>
+        					<bpel:extensionAssignOperation>
+        						<trf:replace contents-only="true" varName="batch">
+        							<trf:expr>
+        								<expr:xqueryTransform>
+        									<expr:resource ref="Middleware/v2/BusinessServices/SJS/pagosMasivosInterno/xq/sjPagosMasivosInternoBacthOut"></expr:resource>
+        									
+        									<expr:param name="outputParameters">
+        										<expr:path>$RSPprocesaLotePagoMasivo.OutputParameters</expr:path></expr:param>
+        									<expr:param name="contador">
+        										<expr:path>$contador</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:replace>
+        					</bpel:extensionAssignOperation>
+        					
+        				<bpel:extensionAssignOperation>
+		<trf:insert varName="response.outputParameters">
+			<trf:location>
+				<expr:xpathText>./BATCHES</expr:xpathText></trf:location>
+			<trf:where>last-child</trf:where>
+		<trf:expr>
+			<expr:xqueryText>$batch/BATCH</expr:xqueryText></trf:expr></trf:insert>
+        				</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        				<bpel:else>
+        					<bpel:sequence>
+        						<bpel:empty></bpel:empty>
+        					<bpel:assign>
+		<bpel:extensionAssignOperation>
+		<trf:replace contents-only="true" varName="batchError">
+			<trf:expr>
+				<expr:xqueryText>&lt;BATCH&gt;
+	&lt;ID_POSITION&gt;{$contador}&lt;/ID_POSITION&gt;
+	&lt;CUSTOMER_BATCH_ID&gt;{fn:string($request.inputParameters/BATCHES/BATCH[xs:int($contador)]/CUSTOMER_BATCH_ID/text())}&lt;/CUSTOMER_BATCH_ID&gt;
+	&lt;STATUS&gt;ERROR&lt;/STATUS&gt;
+	&lt;ERROR_CODE&gt;ERROR&lt;/ERROR_CODE&gt;
+	&lt;ERROR_MESSAGE&gt;{fn:string($RSPvalidaEstructuraLote.OutputParameters/val:ERROR_MESSAGE/text())}&lt;/ERROR_MESSAGE&gt;
+&lt;/BATCH&gt;</expr:xqueryText></trf:expr></trf:replace>
+		</bpel:extensionAssignOperation>
+	
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./BATCHES</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>$batchError/BATCH</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        				</bpel:else>
+        			</bpel:if>
+        			
+        			
+        			
+        			
+        			
+        			
+        			
+        			
+        			
+        			
+        			
+        			</bpel:sequence>
+        	</bpel:scope>
+        </bpel:forEach>
+        
+        <bpel:reply partnerLink="sjPagosMasivosInterno" operation="PagosMasivosInterno" variable="response"></bpel:reply>
+    </bpel:sequence>
+</bpel:process>

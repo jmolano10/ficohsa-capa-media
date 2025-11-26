@@ -1,0 +1,848 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false" isAutoPublish="false">
+    <ser:binding type="SOAP" isSoap12="true" xsi:type="con2:SoapBindingType" xmlns:con2="http://www.bea.com/wli/sb/services/bindings/config">
+      <con2:wsdl ref="MiddlewareCaja/Resources/wsdls/Alcance"/>
+      <con2:port>
+        <con2:name>WSDLSoap12</con2:name>
+        <con2:namespace>http://tempuri.org/</con2:namespace>
+      </con2:port>
+      <con2:selector type="SOAP action"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+    <ser:throttling enabled="false">
+      <ser:capacity>0</ser:capacity>
+      <ser:maxQueueLength>0</ser:maxQueueLength>
+      <ser:timeToLive>0</ser:timeToLive>
+    </ser:throttling>
+    <ser:messageTracing enabled="false">
+      <ser:detailsLevel>Terse</ser:detailsLevel>
+      <ser:maxSize>8192</ser:maxSize>
+    </ser:messageTracing>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/MiddlewareCaja/TarjetaCreditoT24</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router>
+    <con2:pipeline type="request" name="pago_request">
+      <con2:stage name="FlujoEntrada">
+        <con2:context>
+          <con:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+          <con2:varNsDecl namespace="http://tempuri.org/" prefix="tem" xmlns:con2="http://www.bea.com/wli/sb/stages/config"/>
+        </con2:context>
+        <con2:actions>
+          <con4:wsCallout xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7eb0</con1:id>
+            <con4:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>obtenerParametrizacion</con4:operation>
+            <con4:request>
+              <con4:body>$REQObtenerParams</con4:body>
+            </con4:request>
+            <con4:response>
+              <con4:body>RSPObtenerParams</con4:body>
+            </con4:response>
+            <con4:requestTransform>
+              <con4:assign varName="REQObtenerParams">
+                <con1:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7eb2</con1:id>
+                <con4:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                    <con1:param name="nombreParametros">
+                      <con1:path>"ALCC001.HNLCONTRACTID||ALCC001.USDCONTRACTID||ALCC001.CITIBINS"</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con4:expr>
+              </con4:assign>
+            </con4:requestTransform>
+            <con4:responseTransform>
+              <con4:assign varName="statusParametrizacion">
+                <con1:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7eb1</con1:id>
+                <con4:expr>
+                  <con1:xqueryText>fn:string($RSPObtenerParams/osb:ERROR_CODE/text())</con1:xqueryText>
+                </con4:expr>
+              </con4:assign>
+            </con4:responseTransform>
+          </con4:wsCallout>
+          <con1:assign varName="citiBins">
+            <con:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7e78</con:id>
+            <con1:expr>
+              <con:xqueryText>fn:string($RSPObtenerParams/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="ALCC001.CITIBINS"]/osb:VALUE/text())</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="CARD_NUMBER">
+            <con:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7fc6</con:id>
+            <con1:expr>
+              <con:xqueryText>fn:string($body/tem:registrarPago/tem:noTarjetaCredito/text())</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="citiCardFlag">
+            <con:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7fa9</con:id>
+            <con1:expr>
+              <con:xqueryText>fn:index-of(fn:tokenize($citiBins,"\|\|"),fn:substring($CARD_NUMBER,1,8))</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:ifThenElse>
+            <con:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7f8c</con:id>
+            <con1:case>
+              <con1:condition>
+                <con:xqueryText>fn:empty($citiCardFlag)</con:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:wsCallout>
+                  <con:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7f88</con:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/AplicaTCT24_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>aplicaTCT24</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQUEST</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RESPONSE</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQUEST">
+                      <con:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7f89</con:id>
+                      <con1:expr>
+                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                          <con2:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/RegistrarPagoIn"/>
+                          <con2:param name="registrarPago">
+                            <con2:path>$body/tem:registrarPago</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform/>
+                </con1:wsCallout>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:assign varName="balanceCurrency">
+                <con:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7f4e</con:id>
+                <con1:expr>
+                  <con:xqueryText>fn:string($body/tem:registrarPago/tem:monedaPago/text())</con:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="contractId">
+                <con:id>_ActionId-5040233411200842428--297ec517.1481463dad9.-7f31</con:id>
+                <con1:expr>
+                  <con:xqueryText>if ($balanceCurrency = "340") then (
+	fn:string($RSPObtenerParams/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="ALCC001.HNLCONTRACTID"]/osb:VALUE/text())
+) elseif ($balanceCurrency = "840") then (
+	fn:string($RSPObtenerParams/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="ALCC001.USDCONTRACTID"]/osb:VALUE/text())
+) else ()</con:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="parameterIn">
+                <con:id>_ActionId-3076271579328178478-57410117.1481ede4b61.-7fe3</con:id>
+                <con1:expr>
+                  <con:xqueryTransform>
+                    <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/RegistrarPagoParametersIn"/>
+                    <con:param name="registrarPago1">
+                      <con:path>$body/tem:registrarPago</con:path>
+                    </con:param>
+                    <con:param name="contractId">
+                      <con:path>$contractId</con:path>
+                    </con:param>
+                  </con:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="canalPago">
+                <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7da6</con:id>
+                <con1:expr>
+                  <con:xqueryText>data($body/tem:registrarPago/tem:canalPago)</con:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:ifThenElse>
+                <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7fae</con:id>
+                <con1:case>
+                  <con1:condition>
+                    <con:xqueryText>(fn:contains($canalPago, "INPUTTER"))</con:xqueryText>
+                  </con1:condition>
+                  <con1:actions>
+                    <con4:wsCallout xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                      <con1:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7faa</con1:id>
+                      <con4:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/EnrutadorConvenios" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                      <con4:operation>invoke</con4:operation>
+                      <con4:request>
+                        <con4:param>
+                          <con4:name>serviceRequest</con4:name>
+                          <con4:variable>$RequestDataREQ</con4:variable>
+                        </con4:param>
+                      </con4:request>
+                      <con4:response>
+                        <con4:param>
+                          <con4:name>serviceResponse</con4:name>
+                          <con4:variable>ServiceResponseREQ</con4:variable>
+                        </con4:param>
+                      </con4:response>
+                      <con4:requestTransform>
+                        <con4:assign varName="RequestDataREQ">
+                          <con1:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7fab</con1:id>
+                          <con4:expr>
+                            <con1:xqueryTransform>
+                              <con1:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/PagoRecaudoEnrutadorIn"/>
+                              <con1:param name="ParametersIn">
+                                <con1:path>$parameterIn</con1:path>
+                              </con1:param>
+                            </con1:xqueryTransform>
+                          </con4:expr>
+                        </con4:assign>
+                      </con4:requestTransform>
+                      <con4:responseTransform/>
+                    </con4:wsCallout>
+                    <con4:assign varName="responseData" xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                      <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7f53</con:id>
+                      <con4:expr>
+                        <con:xqueryText>fn-bea:inlinedXML($ServiceResponseREQ/responseData)</con:xqueryText>
+                      </con4:expr>
+                    </con4:assign>
+                  </con1:actions>
+                </con1:case>
+                <con1:default/>
+              </con1:ifThenElse>
+            </con1:default>
+          </con1:ifThenElse>
+        </con2:actions>
+      </con2:stage>
+    </con2:pipeline>
+    <con2:pipeline type="response" name="pago_response">
+      <con2:stage name="FlujoSalida">
+        <con2:context/>
+        <con2:actions>
+          <con1:ifThenElse>
+            <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7cc6</con:id>
+            <con1:case>
+              <con1:condition>
+                <con:xqueryText>fn:empty($citiCardFlag)</con:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace contents-only="true" varName="body">
+                  <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7cc5</con:id>
+                  <con1:expr>
+                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                      <con2:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/RegistrarPagoOut"/>
+                      <con2:param name="outputParameters">
+                        <con2:path>$RESPONSE</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:ifThenElse>
+                <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7cc1</con:id>
+                <con1:case>
+                  <con1:condition>
+                    <con:xqueryText>(fn:contains($canalPago, "INPUTTER"))</con:xqueryText>
+                  </con1:condition>
+                  <con1:actions>
+                    <con1:replace contents-only="true" varName="body">
+                      <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7cbe</con:id>
+                      <con1:expr>
+                        <con:xqueryTransform>
+                          <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/RegistrarPagoCitiOut"/>
+                          <con:param name="responseParameters">
+                            <con:path>$responseData</con:path>
+                          </con:param>
+                        </con:xqueryTransform>
+                      </con1:expr>
+                    </con1:replace>
+                  </con1:actions>
+                </con1:case>
+                <con1:default>
+                  <con1:replace varName="body" contents-only="true">
+                    <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7cc0</con:id>
+                    <con1:expr>
+                      <con:xqueryTransform>
+                        <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/RegistrarPagoInvalidUserNameOut"/>
+                        <con:param name="mensajeConfirmacion">
+                          <con:path>'BINES FICOHSA CB NO PERMITIDOS EN ESTA OPCION'</con:path>
+                        </con:param>
+                        <con:param name="estatusConfirmacion">
+                          <con:path>'99'</con:path>
+                        </con:param>
+                      </con:xqueryTransform>
+                    </con1:expr>
+                  </con1:replace>
+                </con1:default>
+              </con1:ifThenElse>
+            </con1:default>
+          </con1:ifThenElse>
+        </con2:actions>
+      </con2:stage>
+    </con2:pipeline>
+    <con2:pipeline type="request" name="pagoReversion_request">
+      <con2:stage name="FlujoEntrada">
+        <con2:context>
+          <con:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+          <con2:varNsDecl namespace="http://tempuri.org/" prefix="tem" xmlns:con2="http://www.bea.com/wli/sb/stages/config"/>
+        </con2:context>
+        <con2:actions>
+          <con4:wsCallout xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7b32</con1:id>
+            <con4:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>obtenerParametrizacion</con4:operation>
+            <con4:request>
+              <con4:body>$REQObtenerParams</con4:body>
+            </con4:request>
+            <con4:response>
+              <con4:body>RSPObtenerParams</con4:body>
+            </con4:response>
+            <con4:requestTransform>
+              <con4:assign varName="REQObtenerParams">
+                <con1:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7b34</con1:id>
+                <con4:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                    <con1:param name="nombreParametros">
+                      <con1:path>"ALCC001.HNLCONTRACTID||ALCC001.USDCONTRACTID||ALCC001.CITIBINS"</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con4:expr>
+              </con4:assign>
+            </con4:requestTransform>
+            <con4:responseTransform>
+              <con4:assign varName="statusParametrizacion">
+                <con1:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7b33</con1:id>
+                <con4:expr>
+                  <con1:xqueryText>fn:string($RSPObtenerParams/osb:ERROR_CODE/text())</con1:xqueryText>
+                </con4:expr>
+              </con4:assign>
+            </con4:responseTransform>
+          </con4:wsCallout>
+          <con1:assign varName="citiBins">
+            <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7af1</con:id>
+            <con1:expr>
+              <con:xqueryText>fn:string($RSPObtenerParams/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="ALCC001.CITIBINS"]/osb:VALUE/text())</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="CARD_NUMBER">
+            <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7aef</con:id>
+            <con1:expr>
+              <con:xqueryText>fn:string($body/tem:reversarPago/tem:noTarjetaCredito/text())</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="citiCardFlag">
+            <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7aed</con:id>
+            <con1:expr>
+              <con:xqueryText>fn:index-of(fn:tokenize($citiBins,"\|\|"),fn:substring($CARD_NUMBER,1,8))</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:ifThenElse>
+            <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7a4a</con:id>
+            <con1:case>
+              <con1:condition>
+                <con:xqueryText>fn:empty($citiCardFlag)</con:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:wsCallout>
+                  <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7a08</con:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/AplicaTCT24_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>aplicaTCT24</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQUEST</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RESPONSE</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQUEST">
+                      <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7a09</con:id>
+                      <con1:expr>
+                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                          <con2:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/ReversarPagoIn"/>
+                          <con2:param name="reversarPago">
+                            <con2:path>$body/tem:reversarPago</con2:path>
+                          </con2:param>
+                        </con2:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform/>
+                </con1:wsCallout>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:assign varName="balanceCurrency">
+                <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7a47</con:id>
+                <con1:expr>
+                  <con:xqueryText>fn:string($body/tem:reversarPago/tem:monedaPago/text())</con:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="contractId">
+                <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7a46</con:id>
+                <con1:expr>
+                  <con:xqueryText>if ($balanceCurrency = "340") then (
+	fn:string($RSPObtenerParams/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="ALCC001.HNLCONTRACTID"]/osb:VALUE/text())
+) elseif ($balanceCurrency = "840") then (
+	fn:string($RSPObtenerParams/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="ALCC001.USDCONTRACTID"]/osb:VALUE/text())
+) else ()</con:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="parameterIn">
+                <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7a45</con:id>
+                <con1:expr>
+                  <con:xqueryTransform>
+                    <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/ReversarPagoParametersIn"/>
+                    <con:param name="contractId">
+                      <con:path>$contractId</con:path>
+                    </con:param>
+                    <con:param name="reversarPago1">
+                      <con:path>$body/tem:reversarPago</con:path>
+                    </con:param>
+                  </con:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="canalPago">
+                <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7c83</con:id>
+                <con1:expr>
+                  <con:xqueryText>data($body/tem:reversarPago/tem:canalPago)</con:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:ifThenElse>
+                <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7c66</con:id>
+                <con1:case>
+                  <con1:condition>
+                    <con:xqueryText>(fn:contains($canalPago, "INPUTTER"))</con:xqueryText>
+                  </con1:condition>
+                  <con1:actions>
+                    <con4:wsCallout xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                      <con1:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7c62</con1:id>
+                      <con4:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/EnrutadorConvenios" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                      <con4:operation>invoke</con4:operation>
+                      <con4:request>
+                        <con4:param>
+                          <con4:name>serviceRequest</con4:name>
+                          <con4:variable>$RequestDataREQ</con4:variable>
+                        </con4:param>
+                      </con4:request>
+                      <con4:response>
+                        <con4:param>
+                          <con4:name>serviceResponse</con4:name>
+                          <con4:variable>ServiceResponseREQ</con4:variable>
+                        </con4:param>
+                      </con4:response>
+                      <con4:requestTransform>
+                        <con4:assign varName="RequestDataREQ">
+                          <con1:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7c63</con1:id>
+                          <con4:expr>
+                            <con1:xqueryTransform>
+                              <con1:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/PagoRecaudoEnrutadorIn"/>
+                              <con1:param name="ParametersIn">
+                                <con1:path>$parameterIn</con1:path>
+                              </con1:param>
+                            </con1:xqueryTransform>
+                          </con4:expr>
+                        </con4:assign>
+                      </con4:requestTransform>
+                      <con4:responseTransform/>
+                    </con4:wsCallout>
+                    <con4:assign varName="responseData" xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                      <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7b84</con:id>
+                      <con4:expr>
+                        <con:xqueryText>fn-bea:inlinedXML($ServiceResponseREQ/responseData)</con:xqueryText>
+                      </con4:expr>
+                    </con4:assign>
+                  </con1:actions>
+                </con1:case>
+                <con1:default/>
+              </con1:ifThenElse>
+            </con1:default>
+          </con1:ifThenElse>
+        </con2:actions>
+      </con2:stage>
+    </con2:pipeline>
+    <con2:pipeline type="response" name="pagoReversion_response">
+      <con2:stage name="FlujoSalida">
+        <con2:context/>
+        <con2:actions>
+          <con1:ifThenElse>
+            <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-7976</con:id>
+            <con1:case>
+              <con1:condition>
+                <con:xqueryText>fn:empty($citiCardFlag)</con:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace contents-only="true" varName="body">
+                  <con:id>_ActionId-3704889803105055415-47db2c4d.1497c9827ca.-793c</con:id>
+                  <con1:expr>
+                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                      <con2:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/ReversarPagoOut"/>
+                      <con2:param name="outputParameters">
+                        <con2:path>$RESPONSE</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:ifThenElse>
+                <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7c2a</con:id>
+                <con1:case>
+                  <con1:condition>
+                    <con:xqueryText>(fn:contains($canalPago, "INPUTTER"))</con:xqueryText>
+                  </con1:condition>
+                  <con1:actions>
+                    <con1:replace varName="body" contents-only="true">
+                      <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7c26</con:id>
+                      <con1:expr>
+                        <con:xqueryTransform>
+                          <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/ReversarPagoCitiOut"/>
+                          <con:param name="ResponseParameters">
+                            <con:path>$responseData</con:path>
+                          </con:param>
+                        </con:xqueryTransform>
+                      </con1:expr>
+                    </con1:replace>
+                  </con1:actions>
+                </con1:case>
+                <con1:default>
+                  <con1:replace varName="body" contents-only="true">
+                    <con:id>_ActionId-9215339147823850600-664dfc8b.149bf85f21e.-7bed</con:id>
+                    <con1:expr>
+                      <con:xqueryTransform>
+                        <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/ReversarPagoInvalidadUsernameOut"/>
+                        <con:param name="mensajeConfirmacion">
+                          <con:path>'BINES FICOHSA CB NO PERMITIDOS EN ESTA OPCION'</con:path>
+                        </con:param>
+                        <con:param name="estatusConfirmacion">
+                          <con:path>'99'</con:path>
+                        </con:param>
+                      </con:xqueryTransform>
+                    </con1:expr>
+                  </con1:replace>
+                </con1:default>
+              </con1:ifThenElse>
+            </con1:default>
+          </con1:ifThenElse>
+        </con2:actions>
+      </con2:stage>
+    </con2:pipeline>
+    <con2:pipeline type="request" name="consultarSaldos_request">
+      <con2:stage name="FlujoEntrada">
+        <con2:context>
+          <con:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+          <con:varNsDecl namespace="http://tempuri.org/" prefix="tem"/>
+        </con2:context>
+        <con2:actions>
+          <con4:wsCallout xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7fb8</con1:id>
+            <con4:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>obtenerParametrizacion</con4:operation>
+            <con4:request>
+              <con4:body>$REQObtenerParams</con4:body>
+            </con4:request>
+            <con4:response>
+              <con4:body>RSPObtenerParams</con4:body>
+            </con4:response>
+            <con4:requestTransform>
+              <con4:assign varName="REQObtenerParams">
+                <con1:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7fba</con1:id>
+                <con4:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                    <con1:param name="nombreParametros">
+                      <con1:path>"ALCC001.HNLCONTRACTID||ALCC001.USDCONTRACTID||ALCC001.CITIBINS"</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con4:expr>
+              </con4:assign>
+            </con4:requestTransform>
+            <con4:responseTransform>
+              <con4:assign varName="statusParametrizacion">
+                <con1:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7fb9</con1:id>
+                <con4:expr>
+                  <con1:xqueryText>fn:string($RSPObtenerParams/osb:ERROR_CODE/text())</con1:xqueryText>
+                </con4:expr>
+              </con4:assign>
+            </con4:responseTransform>
+          </con4:wsCallout>
+          <con1:assign varName="citiBins">
+            <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7fb7</con:id>
+            <con1:expr>
+              <con:xqueryText>fn:string($RSPObtenerParams/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="ALCC001.CITIBINS"]/osb:VALUE/text())</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="CARD_NUMBER">
+            <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7fb6</con:id>
+            <con1:expr>
+              <con:xqueryText>fn:string($body/tem:consultarSaldos/tem:noTarjetaCredito/text())</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="citiCardFlag">
+            <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7fb5</con:id>
+            <con1:expr>
+              <con:xqueryText>fn:index-of(fn:tokenize($citiBins,"\|\|"),fn:substring($CARD_NUMBER,1,8))</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:ifThenElse>
+            <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7f35</con:id>
+            <con1:case>
+              <con1:condition>
+                <con:xqueryText>fn:empty($citiCardFlag)</con:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:wsCallout>
+                  <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7ef3</con:id>
+                  <con1:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/ConsultarSaldoTCAbanks_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con1:operation>consultarSaldoTCAbanks</con1:operation>
+                  <con1:request>
+                    <con1:body>$REQUEST</con1:body>
+                  </con1:request>
+                  <con1:response>
+                    <con1:body>RESPONSE</con1:body>
+                  </con1:response>
+                  <con1:requestTransform>
+                    <con1:assign varName="REQUEST">
+                      <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7ef4</con:id>
+                      <con1:expr>
+                        <con:xqueryTransform>
+                          <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/ConsultarSaldosIn"/>
+                          <con:param name="consultarSaldos">
+                            <con:path>$body/tem:consultarSaldos</con:path>
+                          </con:param>
+                        </con:xqueryTransform>
+                      </con1:expr>
+                    </con1:assign>
+                  </con1:requestTransform>
+                  <con1:responseTransform/>
+                </con1:wsCallout>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:assign varName="contractId">
+                <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7e3d</con:id>
+                <con1:expr>
+                  <con:xqueryText>fn:string($RSPObtenerParams/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="ALCC001.HNLCONTRACTID"]/osb:VALUE/text())</con:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="parameterIn">
+                <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7e04</con:id>
+                <con1:expr>
+                  <con:xqueryTransform>
+                    <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/ConsultarSaldosParametersIn"/>
+                    <con:param name="consultarSaldos1">
+                      <con:path>$body/tem:consultarSaldos</con:path>
+                    </con:param>
+                    <con:param name="contractId">
+                      <con:path>$contractId</con:path>
+                    </con:param>
+                  </con:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+              <con4:wsCallout xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                <con1:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7f2e</con1:id>
+                <con4:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/EnrutadorConvenios" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                <con4:operation>invoke</con4:operation>
+                <con4:request>
+                  <con4:param>
+                    <con4:name>serviceRequest</con4:name>
+                    <con4:variable>$RequestDataREQ</con4:variable>
+                  </con4:param>
+                </con4:request>
+                <con4:response>
+                  <con4:param>
+                    <con4:name>serviceResponse</con4:name>
+                    <con4:variable>ServiceResponseREQ</con4:variable>
+                  </con4:param>
+                </con4:response>
+                <con4:requestTransform>
+                  <con4:assign varName="RequestDataREQ">
+                    <con1:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7f2f</con1:id>
+                    <con4:expr>
+                      <con1:xqueryTransform>
+                        <con1:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/PagoRecaudoEnrutadorIn"/>
+                        <con1:param name="ParametersIn">
+                          <con1:path>$parameterIn</con1:path>
+                        </con1:param>
+                      </con1:xqueryTransform>
+                    </con4:expr>
+                  </con4:assign>
+                </con4:requestTransform>
+                <con4:responseTransform/>
+              </con4:wsCallout>
+              <con1:assign varName="responseData">
+                <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7f2d</con:id>
+                <con1:expr>
+                  <con:xqueryText>fn-bea:inlinedXML($ServiceResponseREQ/responseData)</con:xqueryText>
+                </con1:expr>
+              </con1:assign>
+            </con1:default>
+          </con1:ifThenElse>
+        </con2:actions>
+      </con2:stage>
+    </con2:pipeline>
+    <con2:pipeline type="response" name="consultarSaldos_response">
+      <con2:stage name="FlujoSalida">
+        <con2:context/>
+        <con2:actions>
+          <con1:ifThenElse>
+            <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7d22</con:id>
+            <con1:case>
+              <con1:condition>
+                <con:xqueryText>fn:empty($citiCardFlag)</con:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace contents-only="true" varName="body">
+                  <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7d03</con:id>
+                  <con1:expr>
+                    <con:xqueryTransform>
+                      <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/ConsultarSaldosOut"/>
+                      <con:param name="outputParameters">
+                        <con:path>$RESPONSE</con:path>
+                      </con:param>
+                    </con:xqueryTransform>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:replace contents-only="true" varName="body">
+                <con:id>_ActionId-2870933077336961496-34c3c3de.1483bf56465.-7d20</con:id>
+                <con1:expr>
+                  <con:xqueryTransform>
+                    <con:resource ref="MiddlewareCaja/Resources/xqueries/TarjetaCreditoT24/ConsultarSaldosCitiOut"/>
+                    <con:param name="responseParameters">
+                      <con:path>$responseData</con:path>
+                    </con:param>
+                  </con:xqueryTransform>
+                </con1:expr>
+              </con1:replace>
+            </con1:default>
+          </con1:ifThenElse>
+        </con2:actions>
+      </con2:stage>
+    </con2:pipeline>
+    <con2:pipeline type="request" name="Flujo de Modo de Proceso_request">
+      <con2:stage name="Etapa de Modo de Proceso">
+        <con2:context/>
+        <con2:actions>
+          <con1:assign varName="modoProceso">
+            <con:id>_ActionId-7852092778761883761-65d4af11.14374bcb1cf.-7d7c</con:id>
+            <con1:expr>
+              <con:xqueryText>(:: Posibles valores:
+"ABANKS": Realiza el retiro, reversión del retiro y Consulta de Saldos en ABANKS, el resto de las operaciones en Alcance
+"ONLINE" o (Cualquier otro valor distinto a "ABANKS"): Realiza todas las operaciones en Alcance
+:)
+"ABANKS"</con:xqueryText>
+            </con1:expr>
+          </con1:assign>
+        </con2:actions>
+      </con2:stage>
+    </con2:pipeline>
+    <con2:pipeline type="response" name="Flujo de Modo de Proceso_response"/>
+    <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+      <con:pipeline-node name="Flujo de Modo de Proceso">
+        <con:request>Flujo de Modo de Proceso_request</con:request>
+        <con:response>Flujo de Modo de Proceso_response</con:response>
+      </con:pipeline-node>
+      <con:branch-node type="condition" name="Modo Proceso">
+        <con:context>
+          <con3:varNsDecl namespace="http://tempuri.org/" prefix="tem" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+        </con:context>
+        <con:branch-table variable="modoProceso">
+          <con:branch name="ABANKS">
+            <con:operator>equals</con:operator>
+            <con:value>'ABANKS'</con:value>
+            <con:flow>
+              <con:branch-node type="operation" name="Flujo de Respaldo">
+                <con:context/>
+                <con:branch-table>
+                  <con:branch name="registrarPago">
+                    <con:operator>equals</con:operator>
+                    <con:value/>
+                    <con:flow>
+                      <con:pipeline-node name="pago">
+                        <con:request>pago_request</con:request>
+                        <con:response>pago_response</con:response>
+                      </con:pipeline-node>
+                    </con:flow>
+                  </con:branch>
+                  <con:branch name="reversarPago">
+                    <con:operator>equals</con:operator>
+                    <con:value/>
+                    <con:flow>
+                      <con:pipeline-node name="pagoReversion">
+                        <con:request>pagoReversion_request</con:request>
+                        <con:response>pagoReversion_response</con:response>
+                      </con:pipeline-node>
+                    </con:flow>
+                  </con:branch>
+                  <con:branch name="consultarSaldos">
+                    <con:operator>equals</con:operator>
+                    <con:value/>
+                    <con:flow>
+                      <con:pipeline-node name="consultarSaldos">
+                        <con:request>consultarSaldos_request</con:request>
+                        <con:response>consultarSaldos_response</con:response>
+                      </con:pipeline-node>
+                    </con:flow>
+                  </con:branch>
+                  <con:default-branch>
+                    <con:flow>
+                      <con:route-node name="OperacionesAlcance">
+                        <con:context/>
+                        <con:actions>
+                          <con1:route xmlns:con1="http://www.bea.com/wli/sb/stages/routing/config">
+                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5025198095348332765--50b058b8.14920135ca9.-7e95</con3:id>
+                            <con1:service ref="MiddlewareCaja/BussinessServices/Alcance" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                            <con1:operation passThrough="true"/>
+                            <con1:outboundTransform/>
+                            <con1:responseTransform/>
+                          </con1:route>
+                        </con:actions>
+                      </con:route-node>
+                    </con:flow>
+                  </con:default-branch>
+                </con:branch-table>
+              </con:branch-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow>
+              <con:route-node name="Directo Alcance">
+                <con:context/>
+                <con:actions>
+                  <con1:route xmlns:con1="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5060486286434664410--732b3687.1436d7d5962.-7e83</con3:id>
+                    <con1:service ref="MiddlewareCaja/BussinessServices/Alcance" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con1:operation passThrough="true"/>
+                    <con1:outboundTransform/>
+                    <con1:responseTransform/>
+                  </con1:route>
+                </con:actions>
+              </con:route-node>
+            </con:flow>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

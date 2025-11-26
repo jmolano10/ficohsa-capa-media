@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:security>
+      <con:custom-token-authentication>
+        <con:username-password>
+          <con:username-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/UserName/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:username-selector>
+          <con:password-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/Password/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:password-selector>
+        </con:username-password>
+      </con:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con5:SoapBindingType" xmlns:con5="http://www.bea.com/wli/sb/services/bindings/config">
+      <con5:wsdl ref="Middleware/v2/Resources/AlertasProductos/wsdl/alertasProductosPS"/>
+      <con5:port>
+        <con5:name>alertasProductosPSSOAP</con5:name>
+        <con5:namespace>http://www.ficohsa.com.hn/middleware.services/alertasProductosPS/</con5:namespace>
+      </con5:port>
+      <con5:selector type="SOAP body"/>
+      <con5:WSI-compliant>false</con5:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/SalesAndService/CrossChannel/AlertasProductos</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties>
+        <http:use-https>true</http:use-https>
+      </http:inbound-properties>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-9050182004495727527-22fafe66.171e05a4a28.5b61">
+    <con1:pipeline type="error" name="_onErrorHandler-9050182004495727527-22fafe66.171e05a4a28.5b61">
+      <con1:stage name="ManejoError">
+        <con1:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con1:context>
+        <con1:actions>
+          <con3:assign varName="errorCode">
+            <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5b6e</con2:id>
+            <con3:expr>
+              <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:assign varName="errorMessage">
+            <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5b7e</con2:id>
+            <con3:expr>
+              <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:wsCallout>
+            <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5b90</con2:id>
+            <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>mapeoErrores</con3:operation>
+            <con3:request>
+              <con3:body>$reqMapeoErrores</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>respMapeoErrores</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="reqMapeoErrores">
+                <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5ba5</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con2:param name="CODIGO_ERROR">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                    <con2:param name="MENSAJE_ERROR">
+                      <con2:path>fn:concat("FICBCO0377", "$#$", $errorMessage)</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+            </con3:requestTransform>
+            <con3:responseTransform>
+              <con3:replace varName="header" contents-only="true">
+                <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5bb2</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con2:param name="mapeoErroresResponse1">
+                      <con2:path>$respMapeoErrores</con2:path>
+                    </con2:param>
+                    <con2:param name="successIndicator">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:replace>
+            </con3:responseTransform>
+          </con3:wsCallout>
+          <con3:replace contents-only="true" varName="body">
+            <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5bbd</con2:id>
+            <con3:expr>
+              <con2:xqueryText>if ($operation = "subscribeProducto") then (
+	&lt;aler:subscribeProductoResponse/>
+) 
+else if ($operation = "consultaSaldoCuentasBatch") then (
+	&lt;aler:consultaSaldoCuentasBatchResponse/>
+)
+else if ($operation = "consultaSaldoTCBatch") then (
+	&lt;aler:consultaSaldoTCBatchResponse/>
+) 
+else if ($operation = "consultaControlSistema") then (
+	&lt;aler:consultaControlSistemaResponse/>
+) 
+else ()</con2:xqueryText>
+            </con3:expr>
+          </con3:replace>
+          <con2:reply>
+            <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5bc9</con2:id>
+          </con2:reply>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:flow>
+      <con1:branch-node type="operation" name="Operaciones">
+        <con1:context/>
+        <con1:branch-table>
+          <con1:branch name="subscribeProducto">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="SubscribeProducto">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5b60</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/SubscribeProducto" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>subscribeProducto</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="consultaSaldoCuentasBatch">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="ConsultaSaldoCuentasBatch">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5c54</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConsultaSaldoCuentasBatch" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>consultaSaldoCuentasBatch</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="consultaSaldoTCBatch">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="ConsultaSaldoTCBatch">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-9050182004495727527-22fafe66.171e05a4a28.5d4f</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConsultaSaldoTCBatch" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>consultaSaldoTCBatch</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="consultaControlSistema">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="ConsultaControlSistema">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7ff0</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConsultaControlSistema" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>consultaControlSistema</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:default-branch>
+            <con1:flow/>
+          </con1:default-branch>
+        </con1:branch-table>
+      </con1:branch-node>
+    </con1:flow>
+  </ser:router>
+</xml-fragment>

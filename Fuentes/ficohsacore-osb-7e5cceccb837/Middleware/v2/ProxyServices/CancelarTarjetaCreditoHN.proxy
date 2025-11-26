@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con3:SoapBindingType" xmlns:con3="http://www.bea.com/wli/sb/services/bindings/config">
+      <con3:wsdl ref="Middleware/v2/Resources/CancelarTarjetaCredito/wsdl/cancelarTarjetaCreditoPS"/>
+      <con3:port>
+        <con3:name>cancelarTarjetaCreditoPSSOAP</con3:name>
+        <con3:namespace>http://www.ficohsa.com.hn/middleware.services/cancelarTarjetaCreditoPS/</con3:namespace>
+      </con3:port>
+      <con3:selector type="SOAP body"/>
+      <con3:WSI-compliant>false</con3:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-1437156982166640563-4ac31080.1712b989d0d.-78c2">
+    <con:pipeline type="request" name="CancelarTarjetaCreditoHN_request">
+      <con:stage name="ParametrizacionMiddleware">
+        <con:context>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="sourceParameter">
+            <con1:id>_ActionId-8976343992473120149-3fe9e455.171560dc084.-7d22</con1:id>
+            <con2:expr>
+              <con1:xqueryText>'FICBCO0262.CANCEL.CREDITCARD.SOURCE'</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="reasonParameter">
+            <con1:id>_ActionId-8976343992473120149-3fe9e455.171560dc084.-7d20</con1:id>
+            <con2:expr>
+              <con1:xqueryText>'FICBCO0262.CANCEL.CREDITCARD.REASON'</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-8976343992473120149-3fe9e455.171560dc084.-7d1a</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>obtenerParametrizacion</con2:operation>
+            <con2:request>
+              <con2:body>$REQObtenerParametrizacion</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPObtenerParametrizacion</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQObtenerParametrizacion">
+                <con1:id>_ActionId-8976343992473120149-3fe9e455.171560dc084.-7d1c</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                    <con1:param name="nombreParametros">
+                      <con1:path>fn:concat(
+$sourceParameter, " || ",
+$reasonParameter)</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="errorCode">
+                <con1:id>_ActionId-8976343992473120149-3fe9e455.171560dc084.-7c38</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>string($RSPObtenerParametrizacion/osb:ERROR_CODE/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="validationMessage">
+                <con1:id>_ActionId-8976343992473120149-3fe9e455.171560dc084.-7c36</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>let $message := string($RSPObtenerParametrizacion/osb:ERROR_MESSAGE/text())
+	return
+	if($message != '')then(
+		concat('Middleware: ', $message)
+	)else('')</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ConsultaDatosCuenta">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d89</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="codigoPais">
+                  <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d87</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                      <con1:param name="sentidoConversion">
+                        <con1:path>"OSB-ISO3"</con1:path>
+                      </con1:param>
+                      <con1:param name="codigoPais">
+                        <con1:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:assign>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d7b</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoCuenta/biz/conDatoCuenta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>conDatoCuenta</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQconDatoCuenta</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPconDatoCuenta</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQconDatoCuenta">
+                      <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d80</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MasterDataHN/xq/conDatoCuentaHNIn"/>
+                          <con1:param name="accountNumber">
+                            <con1:path>fn:string($body/ges:cancelarTarjetaCredito/CREDIT_CARD_INFO/ACCOUNT_NUMBER/text())</con1:path>
+                          </con1:param>
+                          <con1:param name="countryCode">
+                            <con1:path>$codigoPais</con1:path>
+                          </con1:param>
+                          <con1:param name="org">
+                            <con1:path>"340"</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:validate>
+                      <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d7f</con1:id>
+                      <con2:schema ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoCuenta/xsd/conDatoCuenta_sp"/>
+                      <con2:schemaElement xmlns:con3="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta">con3:InputParameters</con2:schemaElement>
+                      <con2:varName>REQconDatoCuenta</con2:varName>
+                      <con2:location>
+                        <con1:xpathText>.</con1:xpathText>
+                      </con2:location>
+                    </con2:validate>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="errorCode">
+                      <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d7e</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>fn:string($RSPconDatoCuenta/con:CodigoError/text())</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="validationMessage">
+                      <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d7d</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>if( not($errorCode = ('-1', '-2') ) ) then (
+   string($RSPconDatoCuenta/con:MensajeError/text())
+) else ('')</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="clientId">
+                      <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d7c</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>let $CUSTNBR := string($RSPconDatoCuenta/con:RowSet[1]/con:Row[1]/con:Column[upper-case(@name) = 'CUST_NBR']/text())
+return
+	if( $CUSTNBR = '' )then(
+	''
+	) else ( xs:long ($CUSTNBR) )</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+      <con:stage name="GestionesGenericasCRM">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d5e</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d5a</con1:id>
+                  <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/GestionesGenericasCRM" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>gestionesGenericasCRM</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQgestionesGenericasCRM</con2:body>
+                    <con2:header>$REQHeadergestionesGenericasCRM</con2:header>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPgestionesGenericasCRM</con2:body>
+                    <con2:header>RSPHeadergestionesGenericasCRM</con2:header>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQHeadergestionesGenericasCRM">
+                      <con1:id>_ActionId-5388555380430367479-3feea09d.17e58cb55fb.-7d48</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>$header</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="REQgestionesGenericasCRM">
+                      <con1:id>_ActionId-4035002941723259923-a8f2a26.17e8e4f1127.-7fc9</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/CancelarTarjetaCredito/xq/gestionesGenericasCRMIn"/>
+                          <con1:param name="cancelarTarjetaCredito">
+                            <con1:path>$body/ges:cancelarTarjetaCredito</con1:path>
+                          </con1:param>
+                          <con1:param name="clientId">
+                            <con1:path>$clientId</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="errorCode">
+                      <con1:id>_ActionId-4035002941723259923-a8f2a26.17e8e4f1127.-7f5b</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>string($RSPHeadergestionesGenericasCRM/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="validationMessage">
+                      <con1:id>_ActionId-4035002941723259923-a8f2a26.17e8e4f1127.-7f3e</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>string($RSPHeadergestionesGenericasCRM/aut:ResponseHeader/messages/text())</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="CancelarTarjetaCreditoHN_response">
+      <con:stage name="FlujoDeSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-7380064031808295186-289b2e29.171373a7aab.-7fe3</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>upper-case($errorCode) = "SUCCESS"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-7380064031808295186-289b2e29.171373a7aab.-7fbc</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace varName="body" contents-only="true">
+                  <con1:id>_ActionId-7380064031808295186-289b2e29.171373a7aab.-7f88</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/CancelarTarjetaCredito/xq/cancelarTarjetaCreditoHNOut"/>
+                      <con1:param name="gestionesGenericasCRMResponse">
+                        <con1:path>$RSPgestionesGenericasCRM</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace varName="header" contents-only="true">
+                <con1:id>_ActionId-7380064031808295186-289b2e29.171373a7aab.-7fa5</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{$validationMessage}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace varName="body" contents-only="true">
+                <con1:id>_ActionId-7380064031808295186-289b2e29.171373a7aab.-7f6b</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;ges:cancelarTarjetaCreditoResponse/></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-1437156982166640563-4ac31080.1712b989d0d.-78c2">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+        </con:context>
+        <con:actions>
+          <con2:replace varName="header" contents-only="true">
+            <con1:id>_ActionId-1437156982166640563-4ac31080.1712b989d0d.-788a</con1:id>
+            <con2:expr>
+              <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-1437156982166640563-4ac31080.1712b989d0d.-786d</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;ges:cancelarTarjetaCreditoResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-1437156982166640563-4ac31080.1712b989d0d.-7850</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="CancelarTarjetaCreditoHN">
+        <con:request>CancelarTarjetaCreditoHN_request</con:request>
+        <con:response>CancelarTarjetaCreditoHN_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

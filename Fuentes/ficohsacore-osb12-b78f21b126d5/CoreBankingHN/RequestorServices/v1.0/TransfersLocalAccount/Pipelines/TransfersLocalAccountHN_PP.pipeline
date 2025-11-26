@@ -1,0 +1,2005 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/WSDL/TransfersLocalAccountHN_PS"/>
+            <con:binding>
+                <con:name>TransfersRouter_PS_ptt-binding</con:name>
+                <con:namespace>http://xmlns.oracle.com/DynamoMigrate/MWBanking/TransfersRouter_PS</con:namespace>
+            </con:binding>
+        </con:binding>
+        <con:xqConfiguration>
+            <con:snippetVersion>1.0</con:snippetVersion>
+        </con:xqConfiguration>
+    </con:coreEntry>
+    <con:router errorHandler="error-N3f57fef4.12146fa9.0.188777d81e7.N7da7">
+        <con:pipeline type="error" name="error-N3f57fef4.12146fa9.0.188777d81e7.N7da7">
+            <con:stage id="_StageId-N3f57fef4.12146fa9.0.188777d81e7.N7da6" name="GetErrors">
+                <con:context/>
+                <con:actions>
+                    <con1:assign varName="errorCode" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7d73</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:data($fault/ctx:errorCode)</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="errorDesciption" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7d3f</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:data($fault/ctx:reason)</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="getErrorReq" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7d0b</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_GetErrorBS"/>
+                                <con2:param name="codigoErrorSistema">
+                                    <con2:path>$errorCode</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoServicio">
+                                    <con2:path>$codigoServicio</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoSistema">
+                                    <con2:path>'1'</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoLenguaje">
+                                    <con2:path>if (fn:data($bodyInput/*:GeneralInfo/*:Language)!='')
+then
+fn:data($bodyInput/*:GeneralInfo/*:Language)
+else
+'es'</con2:path>
+                                </con2:param>
+                                <con2:param name="descripcionError">
+                                    <con2:path>$errorDesciption</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7cd5</con2:id>
+                        <con1:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/GetErrorMessages/v1.0/GetErrorMessages_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>GetErrorMessages_BS</con1:operation>
+                        <con1:request>
+                            <con1:body wrapped="false">getErrorReq</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body wrapped="false">getErrorRsp</con1:body>
+                        </con1:response>
+                        <con1:requestTransform/>
+                        <con1:responseTransform/>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-N3f57fef4.12146fa9.0.188777d81e7.N7c6c" name="TxErrorMessage">
+                <con:context/>
+                <con:actions>
+                    <con1:assign varName="errorResponse" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7c6b</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="CommonResources/XQ/Tx_ErrorMap_To_ErrorInfo"/>
+                                <con2:param name="systemId">
+                                    <con2:path>'1'</con2:path>
+                                </con2:param>
+                                <con2:param name="errorMapResponse">
+                                    <con2:path>$getErrorRsp</con2:path>
+                                </con2:param>
+                                <con2:param name="systemStatus">
+                                    <con2:path>'Error'</con2:path>
+                                </con2:param>
+                                <con2:param name="globalId">
+                                    <con2:path>$uuid</con2:path>
+                                </con2:param>
+                                <con2:param name="messageId">
+                                    <con2:path>'OSBError'</con2:path>
+                                </con2:param>
+                                <con2:param name="messages">
+                                    <con2:path>$errorDesciption</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="finalResponse" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7c6a</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/Tx_ErrorInfo_To_transfersLocalAccountResponse"/>
+                                <con2:param name="errorInfo">
+                                    <con2:path>$errorResponse</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-N3f57fef4.12146fa9.0.188777d81e7.N7bf9" name="LogErrorRequest">
+                <con:context>
+                    <con1:userNsDecl prefix="get" namespace="http://xmlns.oracle.com/MWBanking/GetAccountDetail_PS" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="varLogReq" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7bf8</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                <con2:param name="codigoAplicacion">
+                                    <con2:path>1</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoServicio">
+                                    <con2:path>$codigoServicio</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoError">
+                                    <con2:path>$errorCode</con2:path>
+                                </con2:param>
+                                <con2:param name="contenido">
+                                    <con2:path>fn-bea:serialize($fault)</con2:path>
+                                </con2:param>
+                                <con2:param name="estado">
+                                    <con2:path>'Error'</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoSistema">
+                                    <con2:path>1</con2:path>
+                                </con2:param>
+                                <con2:param name="nombreFlujoError">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="fechaHora">
+                                    <con2:path>fn:current-dateTime()</con2:path>
+                                </con2:param>
+                                <con2:param name="parametros">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="uuid">
+                                    <con2:path>$uuid</con2:path>
+                                </con2:param>
+                                <con2:param name="version">
+                                    <con2:path>'1'</con2:path>
+                                </con2:param>
+                                <con2:param name="operacionServicio">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="bancoDestino">
+                                    <con2:path>$destinationBank</con2:path>
+                                </con2:param>
+                                <con2:param name="endpoint">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="bancoOrigen">
+                                    <con2:path>$sourceBank</con2:path>
+                                </con2:param>
+                                <con2:param name="fechaTX">
+                                    <con2:path>fn:current-dateTime()</con2:path>
+                                </con2:param>
+                                <con2:param name="usuario">
+                                    <con2:path>$user</con2:path>
+                                </con2:param>
+                                <con2:param name="descripcionError">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="tipoMensaje">
+                                    <con2:path>'Request'</con2:path>
+                                </con2:param>
+                                <con2:param name="metodo">
+                                    <con2:path>'POST'</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:route xmlns:con1="http://www.bea.com/wli/sb/stages/publish/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7bf7</con2:id>
+                        <con1:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>SetLogInfoService_BS</con1:operation>
+                        <con1:outboundTransform>
+                            <con2:replace varName="body" contents-only="true" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7bf6</con3:id>
+                                <con2:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:routing-options xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7bf5</con3:id>
+                                <con2:mode>request</con2:mode>
+                                <con2:qualityOfService>best-effort</con2:qualityOfService>
+                            </con2:routing-options>
+                        </con1:outboundTransform>
+                    </con1:route>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-N3f57fef4.12146fa9.0.188777d81e7.N7b8c" name="Response">
+                <con:context/>
+                <con:actions>
+                    <con1:replace varName="body" contents-only="true" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7b8b</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$finalResponse</con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:reply xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+                        <con1:id>_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7b8a</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="request-N3f57fef4.12146fa9.0.188777d81e7.N7b89">
+            <con:stage id="_StageId-N3f57fef4.12146fa9.0.188777d81e7.N7b1a" name="Validate">
+                <con:context>
+                    <con1:userNsDecl prefix="cus" namespace="http://www.ficohsa.com.hn/middleware.services/customerTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="tran1" namespace="http://www.ficohsa.com.hn/middleware.services/transferLocalAccountTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="tran" namespace="http://www.ficohsa.com.hn/middleware.services/transferTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:validate xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-N3f57fef4.12146fa9.0.188777d81e7.N7b17</con2:id>
+                        <con1:schema ref="MWBanking/Transfers/RequestorServices/XSD/transferLocalAccountTypes"/>
+                        <con1:schemaElement xmlns:tran="http://www.ficohsa.com.hn/middleware.services/transferLocalAccountTypes">tran:transfersLocalAccountRequest</con1:schemaElement>
+                        <con1:varName>body</con1:varName>
+                        <con1:location>
+                            <con2:xpathText xmlns:con2="http://www.bea.com/wli/sb/stages/config">./tran1:transfersLocalAccountRequest</con2:xpathText>
+                        </con1:location>
+                    </con1:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-a51ea02.N6b44620e.0.188b673a522.N7f80" name="CommonParams">
+                <con:context>
+                    <con1:userNsDecl prefix="com" namespace="http://www.ficohsa.com.hn/middleware.services/commonTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="loan" namespace="http://www.ficohsa.com.hn/middleware.services/loansTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="get" namespace="http://xmlns.oracle.com/MigrationDynamo/MWBanking/GetAccountDetail_PS" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="mes" namespace="http://www.ficohsa.com.hn/middleware.services/messagingTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="get1" namespace="http://xmlns.oracle.com/Dynamo/MWBanking/GetCustomerLists_PS" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="get2" namespace="http://xmlns.oracle.com/Dynamo/MWBanking/GetLoanDetails_PS" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="tran" namespace="http://www.ficohsa.com.hn/middleware.services/transferLocalAccountTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="codigoServicio" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f7f</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">'19'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="bodyInput" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f7e</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$body/tran:transfersLocalAccountRequest</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="uuid" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f7d</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn-bea:uuid()</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="sourceBank" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f7c</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:data($body/tran:transfersLocalAccountRequest/tran:GeneralInfo/com:SourceBank)</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="destinationBank" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f7b</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:data($body/tran:transfersLocalAccountRequest/tran:GeneralInfo/com:DestinationBank)</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="authToken" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f7a</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$inbound/ctx:transport/ctx:request/tp:headers/tp:user-header[@name='Authorization']/@value</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="credentialsAuth" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f79</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="CommonResources/XQ/XqueryDecryptAuth"/>
+                                <con2:param name="entrada">
+                                    <con2:path>fn:substring-after($authToken, 'Basic ')</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="user" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f78</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:substring-before($credentialsAuth, ':')</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="applicationId" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f77</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">let $applicationId := fn:string($body/tran:transfersLocalAccountRequest/tran:GeneralInfo/com:ApplicationId/text())
+return
+  if ($applicationId = "") then '1'
+  else $applicationId</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="password" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f76</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:substring-after($credentialsAuth, ':')</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-a51ea02.N6b44620e.0.188b673a522.N7f05" name="LogRequestInicial">
+                <con:context>
+                    <con1:userNsDecl prefix="get" namespace="http://xmlns.oracle.com/MWBanking/GetAccountDetail_PS" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="varLogReq" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f04</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                <con2:param name="codigoAplicacion">
+                                    <con2:path>1</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoServicio">
+                                    <con2:path>$codigoServicio</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoError">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="contenido">
+                                    <con2:path>fn-bea:serialize($bodyInput)</con2:path>
+                                </con2:param>
+                                <con2:param name="estado">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoSistema">
+                                    <con2:path>1</con2:path>
+                                </con2:param>
+                                <con2:param name="nombreFlujoError">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="fechaHora">
+                                    <con2:path>fn:current-dateTime()</con2:path>
+                                </con2:param>
+                                <con2:param name="parametros">
+                                    <con2:path>fn-bea:serialize($bodyInput)</con2:path>
+                                </con2:param>
+                                <con2:param name="uuid">
+                                    <con2:path>$uuid</con2:path>
+                                </con2:param>
+                                <con2:param name="version">
+                                    <con2:path>'1'</con2:path>
+                                </con2:param>
+                                <con2:param name="operacionServicio">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="bancoDestino">
+                                    <con2:path>$destinationBank</con2:path>
+                                </con2:param>
+                                <con2:param name="endpoint">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="bancoOrigen">
+                                    <con2:path>$sourceBank</con2:path>
+                                </con2:param>
+                                <con2:param name="fechaTX">
+                                    <con2:path>fn:current-dateTime()</con2:path>
+                                </con2:param>
+                                <con2:param name="usuario">
+                                    <con2:path>$user</con2:path>
+                                </con2:param>
+                                <con2:param name="descripcionError">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="tipoMensaje">
+                                    <con2:path>'Request'</con2:path>
+                                </con2:param>
+                                <con2:param name="metodo">
+                                    <con2:path>'POST'</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:route xmlns:con1="http://www.bea.com/wli/sb/stages/publish/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f03</con2:id>
+                        <con1:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>SetLogInfoService_BS</con1:operation>
+                        <con1:outboundTransform>
+                            <con2:replace varName="body" contents-only="true" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f02</con3:id>
+                                <con2:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:routing-options xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7f01</con3:id>
+                                <con2:mode>request</con2:mode>
+                                <con2:qualityOfService>best-effort</con2:qualityOfService>
+                            </con2:routing-options>
+                        </con1:outboundTransform>
+                    </con1:route>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-N3f57fef4.12146fa9.0.188777d81e7.N7a20" name="Parametrization">
+                <con:context>
+                    <con1:userNsDecl prefix="tran" namespace="http://www.ficohsa.com.hn/middleware.services/transferLocalAccountTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="key" namespace="http://www.ficohsa.com.hn/middleware.services/keyValueTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="validationMessage" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7efe</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/TransfersAccountValidateHN"/>
+                                <con2:param name="transfersLocalAccountRequest">
+                                    <con2:path>$bodyInput</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="debitCredit" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7efb</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($bodyInput/tran:DebitCredit/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7ef4</con2:id>
+                        <con1:case id="_BranchId-a51ea02.N6b44620e.0.188b673a522.N7ef3">
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage != ""</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con2:skip xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                    <con2:id>_ActionId-a51ea02.N6b44620e.0.188b673a522.N7eee</con2:id>
+                                </con2:skip>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:assign varName="typeTransactionParameter">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7eeb</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/TransfersAccountGetParamTypeNameHN"/>
+                                        <con2:param name="transfersAccountRequest">
+                                            <con2:path>$bodyInput</con2:path>
+                                        </con2:param>
+                                        <con2:param name="user">
+                                            <con2:path>$user</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="authParameter">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7ee8</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">'0'</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="transactionType">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7ed9</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">dvm:lookup('CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/DVM/TransfersLocalAccountParameters', 'Name', $typeTransactionParameter, 'Value', 'Not Found')</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:ifThenElse>
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N6b44620e.0.188b673a522.N7edd</con2:id>
+                                <con1:case id="_BranchId-a51ea02.N6b44620e.0.188b673a522.N7edc">
+                                    <con1:condition>
+                                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$transactionType = 'Not Found'</con2:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:Error>
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7ebc</con2:id>
+                                            <con1:errCode>478</con1:errCode>
+                                            <con1:message>No se encontró la parametrización para TransactionType</con1:message>
+                                        </con1:Error>
+                                    </con1:actions>
+                                </con1:case>
+                            </con1:ifThenElse>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-a51ea04.N5883caca.0.188bb6d6354.N7a12" name="LocalTransfers">
+                <con:context>
+                    <con1:userNsDecl prefix="tran" namespace="http://www.ficohsa.com.hn/middleware.services/transferLocalAccountTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="key" namespace="http://www.ficohsa.com.hn/middleware.services/keyValueTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a11</con2:id>
+                        <con1:case id="_BranchId-a51ea04.N5883caca.0.188bb6d6354.N7a10">
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($bodyInput/tran:AdditionalInfo/key:KV_PAIR[key:Key="OPERATION_TYPE"]/key:Value/text()) = 'DESEMBOLSO'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="reqDisbursmentLoanCreditAccount">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a0f</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/DisbursmentLoanAccountHNIn"/>
+                                            <con2:param name="password">
+                                                <con2:path>$password</con2:path>
+                                            </con2:param>
+                                            <con2:param name="transfersLocalAccountRequest">
+                                                <con2:path>$bodyInput</con2:path>
+                                            </con2:param>
+                                            <con2:param name="user">
+                                                <con2:path>$user</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:assign varName="varLogReq">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a0e</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                            <con2:param name="codigoAplicacion">
+                                                <con2:path>$aplicationId</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoServicio">
+                                                <con2:path>$codigoServicio</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="contenido">
+                                                <con2:path>fn-bea:serialize($reqDisbursmentLoanCreditAccount)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="estado">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoSistema">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="nombreFlujoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaHora">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="parametros">
+                                                <con2:path>fn-bea:serialize($reqDisbursmentLoanCreditAccount)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="uuid">
+                                                <con2:path>$uuid</con2:path>
+                                            </con2:param>
+                                            <con2:param name="version">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="operacionServicio">
+                                                <con2:path>' Desembolsoporcreditoacuenta'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoDestino">
+                                                <con2:path>$destinationBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="endpoint">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoOrigen">
+                                                <con2:path>$sourceBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaTX">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="usuario">
+                                                <con2:path>$user</con2:path>
+                                            </con2:param>
+                                            <con2:param name="descripcionError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoMensaje">
+                                                <con2:path>'Request'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="metodo">
+                                                <con2:path>'POST'</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a0d</con3:id>
+                                    <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>SetLogInfoService_BS</con2:operation>
+                                    <con2:outboundTransform>
+                                        <con1:replace contents-only="true" varName="body">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a0c</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:routing-options>
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a0b</con3:id>
+                                            <con1:mode>request-response</con1:mode>
+                                            <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                        </con1:routing-options>
+                                    </con2:outboundTransform>
+                                </con2:route>
+                                <con1:wsCallout>
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a0a</con2:id>
+                                    <con1:service ref="CoreBankingHN/ProviderServices/BusinessServices/DisbursmentLoanCreditAccount/DisbursmentLoanCreditAccount_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>Desembolsoporcreditoacuenta</con1:operation>
+                                    <con1:request>
+                                        <con1:body wrapped="false">reqDisbursmentLoanCreditAccount</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body wrapped="false">rspDisbursmentLoanCreditAccount</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform/>
+                                    <con1:responseTransform/>
+                                </con1:wsCallout>
+                                <con1:assign varName="varLogReq">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a09</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                            <con2:param name="codigoAplicacion">
+                                                <con2:path>$aplicationId</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoServicio">
+                                                <con2:path>$codigoServicio</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="contenido">
+                                                <con2:path>fn-bea:serialize($rspDisbursmentLoanCreditAccount)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="estado">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoSistema">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="nombreFlujoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaHora">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="parametros">
+                                                <con2:path>fn-bea:serialize($rspDisbursmentLoanCreditAccount)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="uuid">
+                                                <con2:path>$uuid</con2:path>
+                                            </con2:param>
+                                            <con2:param name="version">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="operacionServicio">
+                                                <con2:path>' Desembolsoporcreditoacuenta'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoDestino">
+                                                <con2:path>$destinationBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="endpoint">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoOrigen">
+                                                <con2:path>$sourceBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaTX">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="usuario">
+                                                <con2:path>$user</con2:path>
+                                            </con2:param>
+                                            <con2:param name="descripcionError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoMensaje">
+                                                <con2:path>'Response'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="metodo">
+                                                <con2:path>'POST'</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a08</con3:id>
+                                    <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>SetLogInfoService_BS</con2:operation>
+                                    <con2:outboundTransform>
+                                        <con1:replace contents-only="true" varName="body">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a07</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:routing-options>
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a06</con3:id>
+                                            <con1:mode>request-response</con1:mode>
+                                            <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                        </con1:routing-options>
+                                    </con2:outboundTransform>
+                                </con2:route>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:case id="_BranchId-a51ea04.N5883caca.0.188bb6d6354.N7a05">
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">(: element &lt;REGIONAL_DETAILS> exists :)
+$bodyInput/tran:RegionalDetails</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="reqIntergrupalTranfers">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a04</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/IntergrupalTransfersHNIn"/>
+                                            <con2:param name="transactionType">
+                                                <con2:path>$transactionType</con2:path>
+                                            </con2:param>
+                                            <con2:param name="password">
+                                                <con2:path>$password</con2:path>
+                                            </con2:param>
+                                            <con2:param name="transfersLocalAccountRequest">
+                                                <con2:path>$bodyInput</con2:path>
+                                            </con2:param>
+                                            <con2:param name="auth">
+                                                <con2:path>$authParameter</con2:path>
+                                            </con2:param>
+                                            <con2:param name="uuid">
+                                                <con2:path>$uuid</con2:path>
+                                            </con2:param>
+                                            <con2:param name="user">
+                                                <con2:path>$user</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:assign varName="varLogReq">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a03</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                            <con2:param name="codigoAplicacion">
+                                                <con2:path>$aplicationId</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoServicio">
+                                                <con2:path>$codigoServicio</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="contenido">
+                                                <con2:path>fn-bea:serialize($reqIntergrupalTransfers)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="estado">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoSistema">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="nombreFlujoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaHora">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="parametros">
+                                                <con2:path>fn-bea:serialize($reqIntergrupalTransfers)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="uuid">
+                                                <con2:path>$uuid</con2:path>
+                                            </con2:param>
+                                            <con2:param name="version">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="operacionServicio">
+                                                <con2:path>'TransferenciaIntergrupalInsert'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoDestino">
+                                                <con2:path>$destinationBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="endpoint">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoOrigen">
+                                                <con2:path>$sourceBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaTX">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="usuario">
+                                                <con2:path>$user</con2:path>
+                                            </con2:param>
+                                            <con2:param name="descripcionError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoMensaje">
+                                                <con2:path>'Request'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="metodo">
+                                                <con2:path>'POST'</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a02</con3:id>
+                                    <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>SetLogInfoService_BS</con2:operation>
+                                    <con2:outboundTransform>
+                                        <con1:replace contents-only="true" varName="body">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a01</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:routing-options>
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7a00</con3:id>
+                                            <con1:mode>request-response</con1:mode>
+                                            <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                        </con1:routing-options>
+                                    </con2:outboundTransform>
+                                </con2:route>
+                                <con1:wsCallout>
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79ff</con2:id>
+                                    <con1:service ref="CoreBankingHN/ProviderServices/BusinessServices/IntergrupalTransfers/IntergrupalTransfers_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>TransferenciaIntergrupalInsert</con1:operation>
+                                    <con1:request>
+                                        <con1:body wrapped="false">reqIntergrupalTranfers</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body wrapped="false">rspIntergrupalTranfers</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform/>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N5221105a.0.188c5b8ad1b.N7e8c</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($rspIntergrupalTranfers/Status/successIndicator/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N5221105a.0.188c5b8ad1b.N7e89</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode != 'Success')then(
+  fn:string($rspIntergrupalTranfers/Status/messages/text())
+)else('')</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                                <con1:assign varName="varLogReq">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79fe</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                            <con2:param name="codigoAplicacion">
+                                                <con2:path>$aplicationId</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoServicio">
+                                                <con2:path>$codigoServicio</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="contenido">
+                                                <con2:path>fn-bea:serialize($rspIntergrupalTransfers)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="estado">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoSistema">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="nombreFlujoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaHora">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="parametros">
+                                                <con2:path>fn-bea:serialize($rspIntergrupalTransfers)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="uuid">
+                                                <con2:path>$uuid</con2:path>
+                                            </con2:param>
+                                            <con2:param name="version">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="operacionServicio">
+                                                <con2:path>'TransferenciaIntergrupalInsert'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoDestino">
+                                                <con2:path>$destinationBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="endpoint">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoOrigen">
+                                                <con2:path>$sourceBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaTX">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="usuario">
+                                                <con2:path>$user</con2:path>
+                                            </con2:param>
+                                            <con2:param name="descripcionError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoMensaje">
+                                                <con2:path>'Response'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="metodo">
+                                                <con2:path>'POST'</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79fd</con3:id>
+                                    <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>SetLogInfoService_BS</con2:operation>
+                                    <con2:outboundTransform>
+                                        <con1:replace contents-only="true" varName="body">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79fc</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:routing-options>
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79fb</con3:id>
+                                            <con1:mode>request-response</con1:mode>
+                                            <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                        </con1:routing-options>
+                                    </con2:outboundTransform>
+                                </con2:route>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:case id="_BranchId-a51ea04.N5883caca.0.188bb6d6354.N79fa">
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">(: CREDIT &amp;&amp; !SRV-ITPEUS :)
+$debitCredit = "CREDIT" and not(upper-case($user) = ("SRV-ITPEUS"))</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="reqLocalTransferBS">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f9</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/TransfersLocalAccountCreditAuthHNIn"/>
+                                            <con2:param name="transactionType">
+                                                <con2:path>$transactionType</con2:path>
+                                            </con2:param>
+                                            <con2:param name="password">
+                                                <con2:path>$password</con2:path>
+                                            </con2:param>
+                                            <con2:param name="transfersLocalAccountRequest">
+                                                <con2:path>$bodyInput</con2:path>
+                                            </con2:param>
+                                            <con2:param name="auth">
+                                                <con2:path>$authParameter</con2:path>
+                                            </con2:param>
+                                            <con2:param name="uuid">
+                                                <con2:path>$uuid</con2:path>
+                                            </con2:param>
+                                            <con2:param name="user">
+                                                <con2:path>$user</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:assign varName="varLogReq">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f8</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                            <con2:param name="codigoAplicacion">
+                                                <con2:path>$aplicationId</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoServicio">
+                                                <con2:path>$codigoServicio</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="contenido">
+                                                <con2:path>fn-bea:serialize($reqLocalTransferBS)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="estado">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoSistema">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="nombreFlujoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaHora">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="parametros">
+                                                <con2:path>fn-bea:serialize($reqLocalTransferBS)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="uuid">
+                                                <con2:path>$uuid</con2:path>
+                                            </con2:param>
+                                            <con2:param name="version">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="operacionServicio">
+                                                <con2:path>'TransferenciaIntergrupalInsert'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoDestino">
+                                                <con2:path>$destinationBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="endpoint">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoOrigen">
+                                                <con2:path>$sourceBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaTX">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="usuario">
+                                                <con2:path>$user</con2:path>
+                                            </con2:param>
+                                            <con2:param name="descripcionError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoMensaje">
+                                                <con2:path>'Request'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="metodo">
+                                                <con2:path>'POST'</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f7</con3:id>
+                                    <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>SetLogInfoService_BS</con2:operation>
+                                    <con2:outboundTransform>
+                                        <con1:replace contents-only="true" varName="body">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f6</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:routing-options>
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f5</con3:id>
+                                            <con1:mode>request-response</con1:mode>
+                                            <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                        </con1:routing-options>
+                                    </con2:outboundTransform>
+                                </con2:route>
+                                <con1:wsCallout>
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f4</con2:id>
+                                    <con1:service ref="CoreBankingHN/ProviderServices/BusinessServices/LocalTransfer/LocalTransfer_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>Transfentrecuentasinstrcredito</con1:operation>
+                                    <con1:request>
+                                        <con1:body wrapped="false">reqLocalTransferBS</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body wrapped="false">rspLocalTransferBS</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform/>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N5221105a.0.188c5b8ad1b.N7e95</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($rspLocalTransferBS/Status/successIndicator/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N5221105a.0.188c5b8ad1b.N7e92</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode != 'Success')then(
+  fn:string($rspLocalTransferBS/Status/messages/text())
+)else('')</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                                <con1:assign varName="varLogReq">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f3</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                            <con2:param name="codigoAplicacion">
+                                                <con2:path>$aplicationId</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoServicio">
+                                                <con2:path>$codigoServicio</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="contenido">
+                                                <con2:path>fn-bea:serialize($rspLocalTransferBS)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="estado">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoSistema">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="nombreFlujoError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaHora">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="parametros">
+                                                <con2:path>fn-bea:serialize($rspLocalTransferBS)</con2:path>
+                                            </con2:param>
+                                            <con2:param name="uuid">
+                                                <con2:path>$uuid</con2:path>
+                                            </con2:param>
+                                            <con2:param name="version">
+                                                <con2:path>'1'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="operacionServicio">
+                                                <con2:path>'TransferenciaIntergrupalInsert'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoDestino">
+                                                <con2:path>$destinationBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="endpoint">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bancoOrigen">
+                                                <con2:path>$sourceBank</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaTX">
+                                                <con2:path>fn:current-dateTime()</con2:path>
+                                            </con2:param>
+                                            <con2:param name="usuario">
+                                                <con2:path>$user</con2:path>
+                                            </con2:param>
+                                            <con2:param name="descripcionError">
+                                                <con2:path>''</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoMensaje">
+                                                <con2:path>'Response'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="metodo">
+                                                <con2:path>'POST'</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f2</con3:id>
+                                    <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>SetLogInfoService_BS</con2:operation>
+                                    <con2:outboundTransform>
+                                        <con1:replace contents-only="true" varName="body">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f1</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:routing-options>
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79f0</con3:id>
+                                            <con1:mode>request-response</con1:mode>
+                                            <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                        </con1:routing-options>
+                                    </con2:outboundTransform>
+                                </con2:route>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:assign varName="intAccountUsers">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79ef</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">dvm:lookup('CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/DVM/TransfersLocalAccountParameters', 'Name', fn:concat('T24T057.', 'INTACCOUNT' ,'.USERS'), 'Value', 'Not Found')</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:ifThenElse>
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79ee</con2:id>
+                                <con1:case id="_BranchId-a51ea04.N5883caca.0.188bb6d6354.N79ed">
+                                    <con1:condition>
+                                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$intAccountUsers = 'Not Found'</con2:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:Error>
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79ec</con2:id>
+                                            <con1:errCode>479</con1:errCode>
+                                            <con1:message>No se encontró la parametrización para intAccountUser</con1:message>
+                                        </con1:Error>
+                                    </con1:actions>
+                                </con1:case>
+                            </con1:ifThenElse>
+                            <con1:assign varName="intAcctUserFlag">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79eb</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:index-of(fn:tokenize($intAccountUsers,"\|\|"),upper-case(fn:string($user)))</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:ifThenElse>
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79ea</con2:id>
+                                <con1:case id="_BranchId-a51ea04.N5883caca.0.188bb6d6354.N79e9">
+                                    <con1:condition>
+                                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:exists($intAcctUserFlag)</con2:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:assign varName="reqLocalTransferBS">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79e8</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                    <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/TransfersAccountPensionaryAuthHNIn"/>
+                                                    <con2:param name="transactionType">
+                                                        <con2:path>$transactionType</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="password">
+                                                        <con2:path>$password</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="transfersLocalAccountRequest">
+                                                        <con2:path>$bodyInput</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="auth">
+                                                        <con2:path>$authParameter</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="uuid">
+                                                        <con2:path>$uuid</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="user">
+                                                        <con2:path>$user</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="varLogReq">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79e7</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                    <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                                    <con2:param name="codigoAplicacion">
+                                                        <con2:path>$aplicationId</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="codigoServicio">
+                                                        <con2:path>$codigoServicio</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="codigoError">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="contenido">
+                                                        <con2:path>fn-bea:serialize($reqLocalTransferBS)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="estado">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="codigoSistema">
+                                                        <con2:path>'1'</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="nombreFlujoError">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="fechaHora">
+                                                        <con2:path>fn:current-dateTime()</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="parametros">
+                                                        <con2:path>fn-bea:serialize($reqLocalTransferBS)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="uuid">
+                                                        <con2:path>$uuid</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="version">
+                                                        <con2:path>'1'</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="operacionServicio">
+                                                        <con2:path>'Transfmodelbankentrecuentas'</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="bancoDestino">
+                                                        <con2:path>$destinationBank</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="endpoint">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="bancoOrigen">
+                                                        <con2:path>$sourceBank</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="fechaTX">
+                                                        <con2:path>fn:current-dateTime()</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="usuario">
+                                                        <con2:path>$user</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="descripcionError">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="tipoMensaje">
+                                                        <con2:path>'Request'</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="metodo">
+                                                        <con2:path>'POST'</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79e6</con3:id>
+                                            <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                            <con2:operation>SetLogInfoService_BS</con2:operation>
+                                            <con2:outboundTransform>
+                                                <con1:replace contents-only="true" varName="body">
+                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79e5</con3:id>
+                                                    <con1:expr>
+                                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                                    </con1:expr>
+                                                </con1:replace>
+                                                <con1:routing-options>
+                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79e4</con3:id>
+                                                    <con1:mode>request-response</con1:mode>
+                                                    <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                                </con1:routing-options>
+                                            </con2:outboundTransform>
+                                        </con2:route>
+                                        <con1:wsCallout>
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79e3</con2:id>
+                                            <con1:service ref="CoreBankingHN/ProviderServices/BusinessServices/LocalTransfer/LocalTransfer_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                            <con1:operation>Transfmodelbankentrecuentas</con1:operation>
+                                            <con1:request>
+                                                <con1:body wrapped="false">reqLocalTransferBS</con1:body>
+                                            </con1:request>
+                                            <con1:response>
+                                                <con1:body wrapped="false">rspLocalTransferBS</con1:body>
+                                            </con1:response>
+                                            <con1:requestTransform/>
+                                            <con1:responseTransform>
+                                                <con1:assign varName="errorCode">
+                                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N5221105a.0.188c5b8ad1b.N7f5f</con2:id>
+                                                    <con1:expr>
+                                                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($rspLocalTransferBS/Status/successIndicator/text())</con2:xqueryText>
+                                                    </con1:expr>
+                                                </con1:assign>
+                                                <con1:assign varName="validationMessage">
+                                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea02.N5221105a.0.188c5b8ad1b.N7f62</con2:id>
+                                                    <con1:expr>
+                                                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode != 'Success')then(
+  fn:string($rspLocalTransferBS/Status/messages/text())
+)else('')</con2:xqueryText>
+                                                    </con1:expr>
+                                                </con1:assign>
+                                            </con1:responseTransform>
+                                        </con1:wsCallout>
+                                        <con1:assign varName="varLogReq">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79e2</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                    <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                                    <con2:param name="codigoAplicacion">
+                                                        <con2:path>$aplicationId</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="codigoServicio">
+                                                        <con2:path>$codigoServicio</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="codigoError">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="contenido">
+                                                        <con2:path>fn-bea:serialize($rspLocalTransferBS)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="estado">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="codigoSistema">
+                                                        <con2:path>'1'</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="nombreFlujoError">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="fechaHora">
+                                                        <con2:path>fn:current-dateTime()</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="parametros">
+                                                        <con2:path>fn-bea:serialize($rspLocalTransferBS)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="uuid">
+                                                        <con2:path>$uuid</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="version">
+                                                        <con2:path>'1'</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="operacionServicio">
+                                                        <con2:path>'Transfmodelbankentrecuentas'</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="bancoDestino">
+                                                        <con2:path>$destinationBank</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="endpoint">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="bancoOrigen">
+                                                        <con2:path>$sourceBank</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="fechaTX">
+                                                        <con2:path>fn:current-dateTime()</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="usuario">
+                                                        <con2:path>$user</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="descripcionError">
+                                                        <con2:path>''</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="tipoMensaje">
+                                                        <con2:path>'Response'</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="metodo">
+                                                        <con2:path>'POST'</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79e1</con3:id>
+                                            <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                            <con2:operation>SetLogInfoService_BS</con2:operation>
+                                            <con2:outboundTransform>
+                                                <con1:replace contents-only="true" varName="body">
+                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79e0</con3:id>
+                                                    <con1:expr>
+                                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                                    </con1:expr>
+                                                </con1:replace>
+                                                <con1:routing-options>
+                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79df</con3:id>
+                                                    <con1:mode>request-response</con1:mode>
+                                                    <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                                </con1:routing-options>
+                                            </con2:outboundTransform>
+                                        </con2:route>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:assign varName="reqLocalTransferBS">
+                                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79de</con2:id>
+                                        <con1:expr>
+                                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/TransfersAccountAuthHNIn"/>
+                                                <con2:param name="transactionType">
+                                                    <con2:path>$transactionType</con2:path>
+                                                </con2:param>
+                                                <con2:param name="password">
+                                                    <con2:path>$password</con2:path>
+                                                </con2:param>
+                                                <con2:param name="auth">
+                                                    <con2:path>$authParameter</con2:path>
+                                                </con2:param>
+                                                <con2:param name="tranfersLocalAccountRequest">
+                                                    <con2:path>$bodyInput</con2:path>
+                                                </con2:param>
+                                                <con2:param name="uuid">
+                                                    <con2:path>$uuid</con2:path>
+                                                </con2:param>
+                                                <con2:param name="user">
+                                                    <con2:path>$user</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con1:expr>
+                                    </con1:assign>
+                                    <con1:assign varName="varLogReq">
+                                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79dd</con2:id>
+                                        <con1:expr>
+                                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                                <con2:param name="codigoAplicacion">
+                                                    <con2:path>$aplicationId</con2:path>
+                                                </con2:param>
+                                                <con2:param name="codigoServicio">
+                                                    <con2:path>$codigoServicio</con2:path>
+                                                </con2:param>
+                                                <con2:param name="codigoError">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="contenido">
+                                                    <con2:path>fn-bea:serialize($reqLocalTransferBS)</con2:path>
+                                                </con2:param>
+                                                <con2:param name="estado">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="codigoSistema">
+                                                    <con2:path>'1'</con2:path>
+                                                </con2:param>
+                                                <con2:param name="nombreFlujoError">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="fechaHora">
+                                                    <con2:path>fn:current-dateTime()</con2:path>
+                                                </con2:param>
+                                                <con2:param name="parametros">
+                                                    <con2:path>fn-bea:serialize($reqLocalTransferBS)</con2:path>
+                                                </con2:param>
+                                                <con2:param name="uuid">
+                                                    <con2:path>$uuid</con2:path>
+                                                </con2:param>
+                                                <con2:param name="version">
+                                                    <con2:path>'1'</con2:path>
+                                                </con2:param>
+                                                <con2:param name="operacionServicio">
+                                                    <con2:path>'Transferenciaentrecuentas'</con2:path>
+                                                </con2:param>
+                                                <con2:param name="bancoDestino">
+                                                    <con2:path>$destinationBank</con2:path>
+                                                </con2:param>
+                                                <con2:param name="endpoint">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="bancoOrigen">
+                                                    <con2:path>$sourceBank</con2:path>
+                                                </con2:param>
+                                                <con2:param name="fechaTX">
+                                                    <con2:path>fn:current-dateTime()</con2:path>
+                                                </con2:param>
+                                                <con2:param name="usuario">
+                                                    <con2:path>$user</con2:path>
+                                                </con2:param>
+                                                <con2:param name="descripcionError">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="tipoMensaje">
+                                                    <con2:path>'Request'</con2:path>
+                                                </con2:param>
+                                                <con2:param name="metodo">
+                                                    <con2:path>'POST'</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con1:expr>
+                                    </con1:assign>
+                                    <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79dc</con3:id>
+                                        <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con2:operation>SetLogInfoService_BS</con2:operation>
+                                        <con2:outboundTransform>
+                                            <con1:replace contents-only="true" varName="body">
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79db</con3:id>
+                                                <con1:expr>
+                                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                                </con1:expr>
+                                            </con1:replace>
+                                            <con1:routing-options>
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79da</con3:id>
+                                                <con1:mode>request-response</con1:mode>
+                                                <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                            </con1:routing-options>
+                                        </con2:outboundTransform>
+                                    </con2:route>
+                                    <con1:wsCallout>
+                                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79d9</con2:id>
+                                        <con1:service ref="CoreBankingHN/ProviderServices/BusinessServices/LocalTransfer/LocalTransfer_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con1:operation>Transferenciaentrecuentas</con1:operation>
+                                        <con1:request>
+                                            <con1:body wrapped="false">reqLocalTransferBS</con1:body>
+                                        </con1:request>
+                                        <con1:response>
+                                            <con1:body wrapped="false">rspLocalTransferBS</con1:body>
+                                        </con1:response>
+                                        <con1:requestTransform/>
+                                        <con1:responseTransform>
+                                            <con1:assign varName="errorCode">
+                                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea05.628ffd0a.0.188c06c1900.N7f34</con2:id>
+                                                <con1:expr>
+                                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($rspLocalTransferBS/Status/successIndicator/text())</con2:xqueryText>
+                                                </con1:expr>
+                                            </con1:assign>
+                                            <con1:assign varName="validationMessage">
+                                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea05.628ffd0a.0.188c06c1900.N7f30</con2:id>
+                                                <con1:expr>
+                                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode != 'Success')then(
+  fn:string($rspLocalTransferBS/Status/messages/text())
+)else('')</con2:xqueryText>
+                                                </con1:expr>
+                                            </con1:assign>
+                                        </con1:responseTransform>
+                                    </con1:wsCallout>
+                                    <con1:assign varName="varLogReq">
+                                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79d8</con2:id>
+                                        <con1:expr>
+                                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                                <con2:param name="codigoAplicacion">
+                                                    <con2:path>$aplicationId</con2:path>
+                                                </con2:param>
+                                                <con2:param name="codigoServicio">
+                                                    <con2:path>$codigoServicio</con2:path>
+                                                </con2:param>
+                                                <con2:param name="codigoError">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="contenido">
+                                                    <con2:path>fn-bea:serialize($rspLocalTransferBS)</con2:path>
+                                                </con2:param>
+                                                <con2:param name="estado">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="codigoSistema">
+                                                    <con2:path>'1'</con2:path>
+                                                </con2:param>
+                                                <con2:param name="nombreFlujoError">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="fechaHora">
+                                                    <con2:path>fn:current-dateTime()</con2:path>
+                                                </con2:param>
+                                                <con2:param name="parametros">
+                                                    <con2:path>fn-bea:serialize($rspLocalTransferBS)</con2:path>
+                                                </con2:param>
+                                                <con2:param name="uuid">
+                                                    <con2:path>$uuid</con2:path>
+                                                </con2:param>
+                                                <con2:param name="version">
+                                                    <con2:path>'1'</con2:path>
+                                                </con2:param>
+                                                <con2:param name="operacionServicio">
+                                                    <con2:path>'Transferenciaentrecuentas'</con2:path>
+                                                </con2:param>
+                                                <con2:param name="bancoDestino">
+                                                    <con2:path>$destinationBank</con2:path>
+                                                </con2:param>
+                                                <con2:param name="endpoint">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="bancoOrigen">
+                                                    <con2:path>$sourceBank</con2:path>
+                                                </con2:param>
+                                                <con2:param name="fechaTX">
+                                                    <con2:path>fn:current-dateTime()</con2:path>
+                                                </con2:param>
+                                                <con2:param name="usuario">
+                                                    <con2:path>$user</con2:path>
+                                                </con2:param>
+                                                <con2:param name="descripcionError">
+                                                    <con2:path>''</con2:path>
+                                                </con2:param>
+                                                <con2:param name="tipoMensaje">
+                                                    <con2:path>'Response'</con2:path>
+                                                </con2:param>
+                                                <con2:param name="metodo">
+                                                    <con2:path>'POST'</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con1:expr>
+                                    </con1:assign>
+                                    <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79d7</con3:id>
+                                        <con2:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con2:operation>SetLogInfoService_BS</con2:operation>
+                                        <con2:outboundTransform>
+                                            <con1:replace contents-only="true" varName="body">
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79d6</con3:id>
+                                                <con1:expr>
+                                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                                </con1:expr>
+                                            </con1:replace>
+                                            <con1:routing-options>
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N79d5</con3:id>
+                                                <con1:mode>request-response</con1:mode>
+                                                <con1:qualityOfService>best-effort</con1:qualityOfService>
+                                            </con1:routing-options>
+                                        </con2:outboundTransform>
+                                    </con2:route>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="response-N3f57fef4.12146fa9.0.188777d81e7.N7b88">
+            <con:stage id="_StageId-N3f57fef4.12146fa9.0.188777d81e7.N7b86" name="Flujo Salida">
+                <con:context>
+                    <con1:userNsDecl prefix="tran" namespace="http://www.ficohsa.com.hn/middleware.services/transferLocalAccountTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:userNsDecl prefix="key" namespace="http://www.ficohsa.com.hn/middleware.services/keyValueTypes" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea05.628ffd0a.0.188c06c1900.N7e96</con2:id>
+                        <con1:case id="_BranchId-a51ea05.628ffd0a.0.188c06c1900.N7e95">
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:ifThenElse>
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7e47</con2:id>
+                                    <con1:case id="_BranchId-a51ea04.N5883caca.0.188bb6d6354.N7e46">
+                                        <con1:condition>
+                                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">string($bodyInput/tran:AdditionalInfo/key:KV_PAIR[key:Key="OPERATION_TYPE"]/key:Value/text()) = 'DESEMBOLSO'</con2:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:assign varName="finalResponse">
+                                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7e37</con2:id>
+                                                <con1:expr>
+                                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                        <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/DisbursmentLoanAccountHNOut"/>
+                                                        <con2:param name="disbursmentLoanCreditAccountResponse">
+                                                            <con2:path>$rspDisbursmentLoanCreditAccount</con2:path>
+                                                        </con2:param>
+                                                        <con2:param name="uuid">
+                                                            <con2:path>$uuid</con2:path>
+                                                        </con2:param>
+                                                    </con2:xqueryTransform>
+                                                </con1:expr>
+                                            </con1:assign>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:case id="_BranchId-a51ea04.N5883caca.0.188bb6d6354.N7e44">
+                                        <con1:condition>
+                                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">(: element &lt;REGIONAL_DETAILS> exists :)
+count($bodyInput/tran:RegionalDetails/key:SOURCE/key:KV_PAIR) > 0</con2:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:assign varName="finalResponse">
+                                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7e34</con2:id>
+                                                <con1:expr>
+                                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                        <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/IntergrupalTransfersHNOut"/>
+                                                        <con2:param name="intergrupalTransfersResponse">
+                                                            <con2:path>$rspIntergrupalTranfers</con2:path>
+                                                        </con2:param>
+                                                        <con2:param name="paymentDetails">
+                                                            <con2:path>fn:string($bodyInput/tran:TransferDetails/text())</con2:path>
+                                                        </con2:param>
+                                                        <con2:param name="uuid">
+                                                            <con2:path>$uuid</con2:path>
+                                                        </con2:param>
+                                                    </con2:xqueryTransform>
+                                                </con1:expr>
+                                            </con1:assign>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:case id="_BranchId-a51ea04.N5883caca.0.188bb6d6354.N7e42">
+                                        <con1:condition>
+                                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$debitCredit = "CREDIT" and
+not(upper-case(fn:string($user)) = ("SRV-ITPEUS"))</con2:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:assign varName="finalResponse">
+                                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7e31</con2:id>
+                                                <con1:expr>
+                                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                        <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/TransfersLocalAccountCreditAuthHNOut"/>
+                                                        <con2:param name="LocalTransferResponse">
+                                                            <con2:path>$rspLocalTransferBS</con2:path>
+                                                        </con2:param>
+                                                        <con2:param name="paymentDetails">
+                                                            <con2:path>fn:string($bodyInput/tran:TransferDetails/text())</con2:path>
+                                                        </con2:param>
+                                                        <con2:param name="uuid">
+                                                            <con2:path>$uuid</con2:path>
+                                                        </con2:param>
+                                                    </con2:xqueryTransform>
+                                                </con1:expr>
+                                            </con1:assign>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:default>
+                                        <con1:ifThenElse>
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7e3b</con2:id>
+                                            <con1:case id="_BranchId-a51ea04.N5883caca.0.188bb6d6354.N7e3a">
+                                                <con1:condition>
+                                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:exists($intAcctUserFlag)</con2:xqueryText>
+                                                </con1:condition>
+                                                <con1:actions>
+                                                    <con1:assign varName="finalResponse">
+                                                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7e2e</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                                <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/TransfersAccountPensionaryAuthHNOut"/>
+                                                                <con2:param name="LocalTransfersResponse">
+                                                                    <con2:path>$rspLocalTransferBS</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="paymentDetails">
+                                                                    <con2:path>fn:string($bodyInput/tran:TransferDetails/text())</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="uuid">
+                                                                    <con2:path>$uuid</con2:path>
+                                                                </con2:param>
+                                                            </con2:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con1:actions>
+                                            </con1:case>
+                                            <con1:default>
+                                                <con1:assign varName="finalResponse">
+                                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7e2b</con2:id>
+                                                    <con1:expr>
+                                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                            <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/TransfersAccountAuthHNOut"/>
+                                                            <con2:param name="LocalTransferResponse">
+                                                                <con2:path>$rspLocalTransferBS</con2:path>
+                                                            </con2:param>
+                                                            <con2:param name="paymentDetails">
+                                                                <con2:path>fn:string($bodyInput/tran:TransferDetails/text())</con2:path>
+                                                            </con2:param>
+                                                            <con2:param name="uuid">
+                                                                <con2:path>$uuid</con2:path>
+                                                            </con2:param>
+                                                        </con2:xqueryTransform>
+                                                    </con1:expr>
+                                                </con1:assign>
+                                            </con1:default>
+                                        </con1:ifThenElse>
+                                    </con1:default>
+                                </con1:ifThenElse>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:assign varName="getErrorReq">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea05.628ffd0a.0.188c06c1900.N7e6e</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_GetErrorBS"/>
+                                        <con2:param name="codigoErrorSistema">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                        <con2:param name="codigoServicio">
+                                            <con2:path>$codigoServicio</con2:path>
+                                        </con2:param>
+                                        <con2:param name="codigoSistema">
+                                            <con2:path>'2'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="codigoLenguaje">
+                                            <con2:path>if (fn:data($bodyInput/*:Language)!='')
+then
+fn:data($bodyInput/*:Language)
+else
+'es'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="descripcionError">
+                                            <con2:path>$validationMessage</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:wsCallout>
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea05.628ffd0a.0.188c06c1900.N7e6b</con2:id>
+                                <con1:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/GetErrorMessages/v1.0/GetErrorMessages_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                <con1:operation>GetErrorMessages_BS</con1:operation>
+                                <con1:request>
+                                    <con1:body wrapped="false">getErrorReq</con1:body>
+                                </con1:request>
+                                <con1:response>
+                                    <con1:body wrapped="false">getErrorRsp</con1:body>
+                                </con1:response>
+                                <con1:requestTransform/>
+                                <con1:responseTransform/>
+                            </con1:wsCallout>
+                            <con1:assign varName="errorResponse">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea05.628ffd0a.0.188c06c1900.N7e68</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="CommonResources/XQ/Tx_ErrorMap_To_ErrorInfo"/>
+                                        <con2:param name="systemId">
+                                            <con2:path>'2'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="errorMapResponse">
+                                            <con2:path>$getErrorRsp</con2:path>
+                                        </con2:param>
+                                        <con2:param name="systemStatus">
+                                            <con2:path>'Error'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="globalId">
+                                            <con2:path>$uuid</con2:path>
+                                        </con2:param>
+                                        <con2:param name="messageId">
+                                            <con2:path>'T24Error'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="messages">
+                                            <con2:path>$validationMessage</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="finalResponse">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea05.628ffd0a.0.188c06c1900.N7e65</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="CoreBankingHN/RequestorServices/v1.0/TransfersLocalAccount/XQ/Tx_ErrorInfo_To_transfersLocalAccountResponse"/>
+                                        <con2:param name="errorInfo">
+                                            <con2:path>$errorResponse</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:default>
+                    </con1:ifThenElse>
+                    <con1:replace varName="body" contents-only="true" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7e28</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$finalResponse</con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-a51ea04.N5883caca.0.188bb6d6354.N7db7" name="TxLogResponse">
+                <con:context/>
+                <con:actions>
+                    <con1:assign varName="varLogReq" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7db6</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                <con2:param name="codigoAplicacion">
+                                    <con2:path>$applicationId</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoServicio">
+                                    <con2:path>$codigoServicio</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoError">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="contenido">
+                                    <con2:path>fn-bea:serialize($finalResponse)</con2:path>
+                                </con2:param>
+                                <con2:param name="estado">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoSistema">
+                                    <con2:path>2</con2:path>
+                                </con2:param>
+                                <con2:param name="nombreFlujoError">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="fechaHora">
+                                    <con2:path>fn:current-dateTime()</con2:path>
+                                </con2:param>
+                                <con2:param name="parametros">
+                                    <con2:path>fn-bea:serialize($finalResponse)</con2:path>
+                                </con2:param>
+                                <con2:param name="uuid">
+                                    <con2:path>$uuid</con2:path>
+                                </con2:param>
+                                <con2:param name="version">
+                                    <con2:path>'1'</con2:path>
+                                </con2:param>
+                                <con2:param name="operacionServicio">
+                                    <con2:path>'TransferLocalAccount'</con2:path>
+                                </con2:param>
+                                <con2:param name="bancoDestino">
+                                    <con2:path>$destinationBank</con2:path>
+                                </con2:param>
+                                <con2:param name="endpoint">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="bancoOrigen">
+                                    <con2:path>$sourceBank</con2:path>
+                                </con2:param>
+                                <con2:param name="fechaTX">
+                                    <con2:path>fn:current-dateTime()</con2:path>
+                                </con2:param>
+                                <con2:param name="usuario">
+                                    <con2:path>$user</con2:path>
+                                </con2:param>
+                                <con2:param name="descripcionError">
+                                    <con2:path>''</con2:path>
+                                </con2:param>
+                                <con2:param name="tipoMensaje">
+                                    <con2:path>'Response'</con2:path>
+                                </con2:param>
+                                <con2:param name="metodo">
+                                    <con2:path>'POST'</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:route xmlns:con1="http://www.bea.com/wli/sb/stages/publish/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7db5</con2:id>
+                        <con1:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>SetLogInfoService_BS</con1:operation>
+                        <con1:outboundTransform>
+                            <con2:replace varName="body" contents-only="true" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7db4</con3:id>
+                                <con2:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$varLogReq</con3:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:routing-options xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a51ea04.N5883caca.0.188bb6d6354.N7db3</con3:id>
+                                <con2:mode>request</con2:mode>
+                                <con2:qualityOfService>best-effort</con2:qualityOfService>
+                            </con2:routing-options>
+                        </con1:outboundTransform>
+                    </con1:route>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="TransfersLocalAccountPP">
+                <con:request>request-N3f57fef4.12146fa9.0.188777d81e7.N7b89</con:request>
+                <con:response>response-N3f57fef4.12146fa9.0.188777d81e7.N7b88</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

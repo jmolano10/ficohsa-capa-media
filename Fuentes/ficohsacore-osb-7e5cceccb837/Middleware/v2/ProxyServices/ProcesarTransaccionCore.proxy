@@ -1,0 +1,1176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con4:SoapBindingType" xmlns:con4="http://www.bea.com/wli/sb/services/bindings/config">
+      <con4:wsdl ref="Middleware/v2/Resources/ProcesarTransaccionCore/wsdl/procesarTransaccionCorePS"/>
+      <con4:port>
+        <con4:name>procesarTransaccionCorePSSOAP</con4:name>
+        <con4:namespace>http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCorePS/</con4:namespace>
+      </con4:port>
+      <con4:selector type="SOAP body"/>
+      <con4:WSI-compliant>false</con4:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/OperationsAndExecution/BankingPartner/procesarTransaccionCore</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-1094376394654231000--3141a81d.1870665e4e1.-786d">
+    <con1:pipeline type="request" name="FlujoDepositoACuenta_request">
+      <con1:stage name="ObtenerCredenciales">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="CredServiceAccount">
+            <con3:id>_ActionId-3786028214805868744--36bd60fb.1878c42eaa3.-7979</con3:id>
+            <con2:expr>
+              <con3:xqueryTransform>
+                <con3:resource ref="Middleware/v2/Resources/Generales/xq/obtenerCredencialesServiceAccount"/>
+                <con3:param name="usuario">
+                  <con3:path>$body/proc:procesarTransaccionCore/USER_CB/text()</con3:path>
+                </con3:param>
+              </con3:xqueryTransform>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="validationMessage">
+            <con3:id>_ActionId-3786028214805868744--36bd60fb.1878c42eaa3.-7949</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if(string($CredServiceAccount/UserName/text()) = '' or string($CredServiceAccount/Password/text()) = '') then(
+	'Error obteniendo las credenciales del canal'
+) else(
+	''
+)</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ProcesarDeposito">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse>
+            <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7dea</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText>$validationMessage =''</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="uuidtrx">
+                  <con3:id>_ActionId-3549493682639480152--d26d0ef.1889140b3ba.-7e93</con3:id>
+                  <con2:expr>
+                    <con3:xqueryText>$body/proc:procesarTransaccionCore/TRANSACTION_ID/text()</con3:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:wsCallout>
+                  <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7de0</con3:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/T24/svcRegistraTransaccionTengo/biz/svcRegistraTransaccionTengo" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>RetiroEfectivoTengo</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQAplicaDeposito</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPAplicaDeposito</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQAplicaDeposito">
+                      <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7de4</con3:id>
+                      <con2:expr>
+                        <con3:xqueryTransform>
+                          <con3:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/procesarDepositoCBIn"/>
+                          <con3:param name="procesarTransaccionCore">
+                            <con3:path>$body/proc:procesarTransaccionCore</con3:path>
+                          </con3:param>
+                        </con3:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="successIndicator">
+                      <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7de3</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:upper-case(fn:string($RSPAplicaDeposito/Status/successIndicator/text()))</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorCode">
+                      <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7de2</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:string($RSPAplicaDeposito/Status/messageId/text())</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="t24ref">
+                      <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7de1</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:string($RSPAplicaDeposito/Status/transactionId/text())</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="mensajeError">
+                      <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7e05</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:string($RSPAplicaDeposito/Status/messages[1]/text())</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:Error>
+                <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7dc8</con3:id>
+                <con2:errCode>MW-0001</con2:errCode>
+                <con2:message>No se pudieron obtener las credenciales del usuario</con2:message>
+              </con2:Error>
+            </con2:default>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ActualizarInformacionDB">
+        <con1:context/>
+        <con1:actions>
+          <con2:assign varName="mensaje1">
+            <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7fe6</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if($mensajeError != '') then (
+let $mensajeerror1 := fn:string(fn:tokenize($mensajeError,"@FM"))
+return ($mensajeerror1[1])
+)else('')</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="mensaje2">
+            <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7fc0</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if($mensajeError != '') then (
+let $mensajeerror2 := fn:string(fn:tokenize($mensajeError,"@FM"))
+return ($mensajeerror2[2])
+)else('')</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con3:id>_ActionId-2511195042934333210-3ccc07ae.18986ce95ab.-7f92</con3:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/TransaccionesAsincronas/DB/ActualizarTransaccionCore/biz/actualizaTrxCore_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>actualizaTrxCore</con2:operation>
+            <con2:request>
+              <con2:body>$REQActualizarTrxCore</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPActualizarTrxCore</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQActualizarTrxCore">
+                <con3:id>_ActionId-2511195042934333210-3ccc07ae.18986ce95ab.-7f73</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/actualizarTrxAsinc_db"/>
+                    <con3:param name="UUID">
+                      <con3:path>$uuidtrx</con3:path>
+                    </con3:param>
+                    <con3:param name="message">
+                      <con3:path>fn:string($mensaje1)</con3:path>
+                    </con3:param>
+                    <con3:param name="refT24">
+                      <con3:path>$t24ref</con3:path>
+                    </con3:param>
+                    <con3:param name="resEstatus">
+                      <con3:path>$successIndicator</con3:path>
+                    </con3:param>
+                    <con3:param name="tipoTrx">
+                      <con3:path>3</con3:path>
+                    </con3:param>
+                    <con3:param name="messagesFTTFS">
+                      <con3:path>fn:string($mensaje2)</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform/>
+          </con2:wsCallout>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="response" name="FlujoDepositoACuenta_response">
+      <con1:stage name="registrarErrorDB">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse>
+            <con3:id>_ActionId-2248992866317740924--162bfa52.188e3b950b3.-7f6b</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText>$successIndicator != 'SUCCESS'</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con3:route xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+                  <con1:id>_ActionId-2248992866317740924--162bfa52.188e3b950b3.-7f68</con1:id>
+                  <con3:service ref="Middleware/v2/BusinessServices/TransaccionesAsincronas/DB/RegistrarErrorCB/biz/registrarTransaccionError_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>registrarTransaccionError</con3:operation>
+                  <con3:outboundTransform>
+                    <con2:replace varName="body" contents-only="true" xmlns:con3="http://www.bea.com/wli/sb/stages/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+                      <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2248992866317740924--162bfa52.188e3b950b3.-7f67</con5:id>
+                      <con2:location>
+                        <con5:xpathText xmlns:con5="http://www.bea.com/wli/sb/stages/config">.</con5:xpathText>
+                      </con2:location>
+                      <con2:expr>
+                        <con5:xqueryTransform xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                          <con5:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/registrarErrorProTRX"/>
+                          <con5:param name="msrequest">
+                            <con5:path>fn:concat('Request OSB: ',fn-bea:serialize($body/proc:procesarTransaccionCore), 'Request T24: ',fn-bea:serialize($REQAplicaDeposito))</con5:path>
+                          </con5:param>
+                          <con5:param name="etapa">
+                            <con5:path>0</con5:path>
+                          </con5:param>
+                          <con5:param name="descripcionError">
+                            <con5:path>'ERROR AL APLICAR EL DEPOSITO EN EL CORE'</con5:path>
+                          </con5:param>
+                          <con5:param name="msresponse">
+                            <con5:path>fn:concat('Response OSB: ',fn-bea:serialize($body/proc:procesarTransaccionCoreResponse), 'Response T24: ',fn-bea:serialize($RSPAplicaDeposito))</con5:path>
+                          </con5:param>
+                          <con5:param name="uuid">
+                            <con5:path>fn:string($uuidtrx)</con5:path>
+                          </con5:param>
+                        </con5:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con3:outboundTransform>
+                </con3:route>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="RespuestaDeposito">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+            <con1:id>_ActionId-1094376394654231000--3141a81d.1870665e4e1.-77e8</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$successIndicator = 'SUCCESS'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="ResponseHeader">
+                  <con1:id>_ActionId-7516690616632981812-ac6e9e8.18738e5d073.-7df1</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+&lt;successIndicator>SUCCESS&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-7516690616632981812-ac6e9e8.18738e5d073.-7dd8</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>$ResponseHeader</con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-7516690616632981812-ac6e9e8.18738e5d073.-7dc6</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText><![CDATA[<proc:procesarTransaccionCoreResponse>
+<T24_REFERENCE> {$t24ref} </T24_REFERENCE>
+<TRANSACTION_ID>{$body/proc:procesarTransaccionCore/TRANSACTION_ID/text()}</TRANSACTION_ID>
+</proc:procesarTransaccionCoreResponse>]]></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-7516690616632981812-ac6e9e8.18738e5d073.-7db5</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+<transactionId>{$t24ref}</transactionId>
+<successIndicator>{$successIndicator}</successIndicator>
+<messages>{$mensajeError}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace varName="body" contents-only="true">
+                <con1:id>_ActionId-7516690616632981812-ac6e9e8.18738e5d073.-7da0</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;proc:procesarTransaccionCoreResponse/></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="request" name="FlujoPagoTC_request">
+      <con1:stage name="ObtenerCredenciales">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="CredServiceAccount">
+            <con3:id>_ActionId-849745544697385486-50d22483.187dd517e87.-7dc3</con3:id>
+            <con2:expr>
+              <con3:xqueryTransform>
+                <con3:resource ref="Middleware/v2/Resources/Generales/xq/obtenerCredencialesServiceAccount"/>
+                <con3:param name="usuario">
+                  <con3:path>$body/proc:procesarTransaccionCore/USER_CB/text()</con3:path>
+                </con3:param>
+              </con3:xqueryTransform>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="validationMessage">
+            <con3:id>_ActionId-3786028214805868744--36bd60fb.1878c42eaa3.-7910</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if(string($CredServiceAccount/UserName/text()) = '' or string($CredServiceAccount/Password/text()) = '') then(
+	'Error obteniendo las credenciales del canal'
+) else(
+	''
+)</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ProcesarPagoTC">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse>
+            <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7db6</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText>$validationMessage =''</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="uuidtrx">
+                  <con3:id>_ActionId-3549493682639480152--d26d0ef.1889140b3ba.-7de8</con3:id>
+                  <con2:expr>
+                    <con3:xqueryText>$body/proc:procesarTransaccionCore/TRANSACTION_ID/text()</con3:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:wsCallout>
+                  <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7dac</con3:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/T24/svcRegistraTransaccionTengo/biz/svcRegistraTransaccionTengo" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>PagoTarjetaCreditoTengo</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQAplicaPagoTC</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPAplicaPagoTC</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQAplicaPagoTC">
+                      <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7db0</con3:id>
+                      <con2:expr>
+                        <con3:xqueryTransform>
+                          <con3:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/procesarPagoTCCBIn"/>
+                          <con3:param name="procesarTransaccionCore">
+                            <con3:path>$body/proc:procesarTransaccionCore</con3:path>
+                          </con3:param>
+                        </con3:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="successIndicator">
+                      <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7daf</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:upper-case(fn:string($RSPAplicaPagoTC/Status/successIndicator/text()))</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorCode">
+                      <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7dae</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:string($RSPAplicaPagoTC/Status/messageId/text())</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="t24ref">
+                      <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7dad</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:string($RSPAplicaPagoTC/Status/transactionId/text())</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="mensajeError">
+                      <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7df0</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:string($RSPAplicaPagoTC/Status/messages[1]/text())</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:Error>
+                <con3:id>_ActionId-7185169312053193967--782805d8.187b4c31504.-7da9</con3:id>
+                <con2:errCode>MW-0001</con2:errCode>
+                <con2:message>No se pudieron obtener las credenciales del usuario</con2:message>
+              </con2:Error>
+            </con2:default>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ActualizarInformacionDB">
+        <con1:context>
+          <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/actualizaTrxCore" prefix="atc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="mensaje1">
+            <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7f3b</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if($mensajeError != '') then (
+let $mensajeerror1 := fn:string(fn:tokenize($mensajeError,"@FM"))
+return ($mensajeerror1[1])
+)else('')</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="mensaje2">
+            <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7f3a</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if($mensajeError != '') then (
+let $mensajeerror2 := fn:string(fn:tokenize($mensajeError,"@FM"))
+return ($mensajeerror2[2])
+)else('')</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7f38</con3:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/TransaccionesAsincronas/DB/ActualizarTransaccionCore/biz/actualizaTrxCore_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>actualizaTrxCore</con2:operation>
+            <con2:request>
+              <con2:body>$REQActualizarTrxCore</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPActualizarTrxCore</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQActualizarTrxCore">
+                <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7f39</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/actualizarTrxAsinc_db"/>
+                    <con3:param name="UUID">
+                      <con3:path>$uuidtrx</con3:path>
+                    </con3:param>
+                    <con3:param name="message">
+                      <con3:path>fn:string($mensaje1)</con3:path>
+                    </con3:param>
+                    <con3:param name="refT24">
+                      <con3:path>$t24ref</con3:path>
+                    </con3:param>
+                    <con3:param name="resEstatus">
+                      <con3:path>$successIndicator</con3:path>
+                    </con3:param>
+                    <con3:param name="tipoTrx">
+                      <con3:path>5</con3:path>
+                    </con3:param>
+                    <con3:param name="messagesFTTFS">
+                      <con3:path>fn:string($mensaje2)</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="errorCode">
+                <con3:id>_ActionId-3354664272973809944--375c4fef.1899d5788cc.-7fe7</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>fn:string($RSPActualizarTrxCore/atc:PV_ERRORCODE/text())</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="result">
+                <con3:id>_ActionId-3354664272973809944--375c4fef.1899d5788cc.-7fd2</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>fn:string($RSPActualizarTrxCore/atc:PV_RESULT/text())</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="TFS">
+                <con3:id>_ActionId-3354664272973809944--375c4fef.1899d5788cc.-7fc1</con3:id>
+                <con2:expr>
+                  <con3:xqueryText>fn:string($RSPActualizarTrxCore/atc:PV_TFS_RESPONSE/text())</con3:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ActualizarTransaccionTCDB">
+        <con1:context/>
+        <con1:actions>
+          <con2:ifThenElse>
+            <con3:id>_ActionId-3354664272973809944--375c4fef.1899d5788cc.-7f99</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText>$errorCode = 'SUCCESS' and $result = '1'</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con3:id>_ActionId-3354664272973809944--375c4fef.1899d5788cc.-7f97</con3:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/TransaccionesAsincronas/DB/ActualizarTFSPagoTCCB/biz/actualizarTFSPagoTCCB_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>actualizarTFSPagoTCCB</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQActualizarTFS</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPActualizarTFS</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQActualizarTFS">
+                      <con3:id>_ActionId-3354664272973809944--375c4fef.1899d5788cc.-7f86</con3:id>
+                      <con2:expr>
+                        <con3:xqueryTransform>
+                          <con3:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/actualizarTFSPagoTC"/>
+                          <con3:param name="uuid">
+                            <con3:path>$uuidtrx</con3:path>
+                          </con3:param>
+                          <con3:param name="TFS">
+                            <con3:path>$TFS</con3:path>
+                          </con3:param>
+                        </con3:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform/>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="response" name="FlujoPagoTC_response">
+      <con1:stage name="registrarErrorDB">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse>
+            <con3:id>_ActionId-2248992866317740924--162bfa52.188e3b950b3.-7eb6</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText>$successIndicator != 'SUCCESS'</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con3:route xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+                  <con1:id>_ActionId-2248992866317740924--162bfa52.188e3b950b3.-7eb3</con1:id>
+                  <con3:service ref="Middleware/v2/BusinessServices/TransaccionesAsincronas/DB/RegistrarErrorCB/biz/registrarTransaccionError_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>registrarTransaccionError</con3:operation>
+                  <con3:outboundTransform>
+                    <con2:replace varName="body" contents-only="true" xmlns:con3="http://www.bea.com/wli/sb/stages/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+                      <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2248992866317740924--162bfa52.188e3b950b3.-7eb2</con5:id>
+                      <con2:location>
+                        <con5:xpathText xmlns:con5="http://www.bea.com/wli/sb/stages/config">.</con5:xpathText>
+                      </con2:location>
+                      <con2:expr>
+                        <con5:xqueryTransform xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                          <con5:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/registrarErrorProTRX"/>
+                          <con5:param name="msrequest">
+                            <con5:path>fn:concat('Request OSB: ',fn-bea:serialize($body/proc:procesarTransaccionCore), 'Request T24: ',fn-bea:serialize($REQAplicaPagoTC))</con5:path>
+                          </con5:param>
+                          <con5:param name="etapa">
+                            <con5:path>0</con5:path>
+                          </con5:param>
+                          <con5:param name="descripcionError">
+                            <con5:path>'ERROR AL APLICAR EL PAGO TC EN EL CORE'</con5:path>
+                          </con5:param>
+                          <con5:param name="msresponse">
+                            <con5:path>fn:concat('Response OSB: ',fn-bea:serialize($body/proc:procesarTransaccionCoreResponse), 'Response T24: ',fn-bea:serialize($RSPAplicaPagoTC))</con5:path>
+                          </con5:param>
+                          <con5:param name="uuid">
+                            <con5:path>fn:string($uuidtrx)</con5:path>
+                          </con5:param>
+                        </con5:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con3:outboundTransform>
+                </con3:route>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="RespuestaPago">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+            <con1:id>_ActionId-7516690616632981812-ac6e9e8.18738e5d073.-7d1f</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$successIndicator = 'SUCCESS'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="ResponseHeader">
+                  <con1:id>_ActionId-7516690616632981812-ac6e9e8.18738e5d073.-7d1e</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+&lt;successIndicator>SUCCESS&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-7516690616632981812-ac6e9e8.18738e5d073.-7d1d</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>$ResponseHeader</con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-7516690616632981812-ac6e9e8.18738e5d073.-7d1c</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText><![CDATA[<proc:procesarTransaccionCoreResponse>
+<T24_REFERENCE> {$t24ref} </T24_REFERENCE>
+<TRANSACTION_ID>{$body/proc:procesarTransaccionCore/TRANSACTION_ID/text()}</TRANSACTION_ID>
+</proc:procesarTransaccionCoreResponse>]]></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-3549493682639480152--d26d0ef.1889140b3ba.-7dde</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+<transactionId>{$t24ref}</transactionId>
+<successIndicator>{$successIndicator}</successIndicator>
+<messages>{$mensajeError}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace varName="body" contents-only="true">
+                <con1:id>_ActionId-3549493682639480152--d26d0ef.1889140b3ba.-7ddc</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;proc:procesarTransaccionCoreResponse/></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="error" name="_onErrorHandler-1094376394654231000--3141a81d.1870665e4e1.-786d">
+      <con1:stage name="RegistrarErrorTransaccion">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="cterrorCode">
+            <con3:id>_ActionId-3786028214805868744--36bd60fb.1878c42eaa3.-77ad</con3:id>
+            <con2:expr>
+              <con3:xqueryText>$fault/ctx:errorCode/text()</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="ctreason">
+            <con3:id>_ActionId-3786028214805868744--36bd60fb.1878c42eaa3.-7793</con3:id>
+            <con2:expr>
+              <con3:xqueryText>$fault/ctx:reason/text()</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="ctdetails">
+            <con3:id>_ActionId-3786028214805868744--36bd60fb.1878c42eaa3.-7772</con3:id>
+            <con2:expr>
+              <con3:xqueryText>$fault/ctx:details/text()</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="uuidtrx">
+            <con3:id>_ActionId-3549493682639480152--d26d0ef.1889140b3ba.-7dc8</con3:id>
+            <con2:expr>
+              <con3:xqueryText>$body/proc:procesarTransaccionCore/TRANSACTION_ID/text()</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con4:route>
+            <con3:id>_ActionId-3786028214805868744--36bd60fb.1878c42eaa3.-77c1</con3:id>
+            <con4:service ref="Middleware/v2/BusinessServices/TransaccionesAsincronas/DB/RegistrarErrorCB/biz/registrarTransaccionError_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>registrarTransaccionError</con4:operation>
+            <con4:outboundTransform>
+              <con2:replace varName="body" contents-only="true">
+                <con3:id>_ActionId-3786028214805868744--36bd60fb.1878c42eaa3.-776a</con3:id>
+                <con2:location>
+                  <con3:xpathText>.</con3:xpathText>
+                </con2:location>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/registrarErrorProTRX"/>
+                    <con3:param name="msrequest">
+                      <con3:path>fn-bea:serialize($body/proc:procesarTransaccionCore)</con3:path>
+                    </con3:param>
+                    <con3:param name="etapa">
+                      <con3:path>0</con3:path>
+                    </con3:param>
+                    <con3:param name="descripcionError">
+                      <con3:path>fn:concat('ERROR GENERAL AL PROCESAR LA TRANSACCION: ', fn:string($cterrorCode), fn:string($ctreason), fn:string($ctdetails))</con3:path>
+                    </con3:param>
+                    <con3:param name="msresponse">
+                      <con3:path>fn-bea:serialize($body/proc:procesarTransaccionCoreResponse)</con3:path>
+                    </con3:param>
+                    <con3:param name="uuid">
+                      <con3:path>$uuidtrx</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con4:outboundTransform>
+          </con4:route>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ManejoError">
+        <con1:context xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaCuentaTDTypes" prefix="tran"/>
+        </con1:context>
+        <con1:actions xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+          <con4:assign varName="errorCode" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id>_ActionId-1094376394654231000--3141a81d.1870665e4e1.-771c</con2:id>
+            <con4:expr>
+              <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+            </con4:expr>
+          </con4:assign>
+          <con4:assign varName="errorMessage" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id>_ActionId-1094376394654231000--3141a81d.1870665e4e1.-771b</con2:id>
+            <con4:expr>
+              <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+            </con4:expr>
+          </con4:assign>
+          <con4:wsCallout xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id>_ActionId-1094376394654231000--3141a81d.1870665e4e1.-7718</con2:id>
+            <con4:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>mapeoErrores</con4:operation>
+            <con4:request>
+              <con4:body>$reqMapeoErrores</con4:body>
+            </con4:request>
+            <con4:response>
+              <con4:body>respMapeoErrores</con4:body>
+            </con4:response>
+            <con4:requestTransform>
+              <con4:assign varName="reqMapeoErrores">
+                <con2:id>_ActionId-1094376394654231000--3141a81d.1870665e4e1.-771a</con2:id>
+                <con4:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con2:param name="MENSAJE_ERROR">
+                      <con2:path>fn:concat("FICBCO0259", "$#$", $errorMessage)</con2:path>
+                    </con2:param>
+                    <con2:param name="CODIGO_ERROR">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con4:expr>
+              </con4:assign>
+            </con4:requestTransform>
+            <con4:responseTransform>
+              <con4:replace varName="header" contents-only="true">
+                <con2:id>_ActionId-1094376394654231000--3141a81d.1870665e4e1.-7719</con2:id>
+                <con4:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con2:param name="mapeoErroresResponse1">
+                      <con2:path>$respMapeoErrores</con2:path>
+                    </con2:param>
+                    <con2:param name="successIndicator">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con4:expr>
+              </con4:replace>
+            </con4:responseTransform>
+          </con4:wsCallout>
+          <con4:replace varName="body" contents-only="true" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id>_ActionId-1094376394654231000--3141a81d.1870665e4e1.-7717</con2:id>
+            <con4:expr>
+              <con2:xqueryText>&lt;tran:transferenciaCuentaTDResponse/></con2:xqueryText>
+            </con4:expr>
+          </con4:replace>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="request" name="PipelinePairNode1_request">
+      <con1:stage name="FlujoEntrada">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="OriginalBody" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+            <con1:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7e1d</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$body/proc:procesarTransaccionCore</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="response" name="PipelinePairNode1_response">
+      <con1:stage name="FlujoSalida">
+        <con1:context/>
+        <con1:actions>
+          <con2:Error xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+            <con1:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7e1a</con1:id>
+            <con2:errCode>MW-0008</con2:errCode>
+            <con2:message>TRANSACTION NOT IMPLEMENTED YET</con2:message>
+          </con2:Error>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="request" name="FlujoDepositoReferenciado_request">
+      <con1:stage name="ObtenerCredenciales">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:assign varName="CredServiceAccount">
+            <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d99</con3:id>
+            <con2:expr>
+              <con3:xqueryTransform>
+                <con3:resource ref="Middleware/v2/Resources/Generales/xq/obtenerCredencialesServiceAccount"/>
+                <con3:param name="usuario">
+                  <con3:path>$body/proc:procesarTransaccionCore/USER_CB/text()</con3:path>
+                </con3:param>
+              </con3:xqueryTransform>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="validationMessage">
+            <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d98</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if(string($CredServiceAccount/UserName/text()) = '' or string($CredServiceAccount/Password/text()) = '') then(
+	'Error obteniendo las credenciales del canal'
+) else(
+	''
+)</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ProcesarDepositoReferenciado">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse>
+            <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d97</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText>$validationMessage =''</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="uuidtrx">
+                  <con3:id>_ActionId-3549493682639480152--d26d0ef.1889140b3ba.-7e07</con3:id>
+                  <con2:expr>
+                    <con3:xqueryText>$body/proc:procesarTransaccionCore/TRANSACTION_ID/text()</con3:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:wsCallout>
+                  <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d91</con3:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/T24/svcRegistraTransaccionTengo/biz/svcRegistraTransaccionTengo" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>RetiroEfectivoTengo</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQAplicaDeposito</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPAplicaDeposito</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQAplicaDeposito">
+                      <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d96</con3:id>
+                      <con2:expr>
+                        <con3:xqueryTransform>
+                          <con3:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/procesarDepositoCBIn"/>
+                          <con3:param name="procesarTransaccionCore">
+                            <con3:path>$body/proc:procesarTransaccionCore</con3:path>
+                          </con3:param>
+                        </con3:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="successIndicator">
+                      <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d95</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:upper-case(fn:string($RSPAplicaDeposito/Status/successIndicator/text()))</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorCode">
+                      <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d94</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:string($RSPAplicaDeposito/Status/messageId/text())</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="t24ref">
+                      <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d93</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:string($RSPAplicaDeposito/Status/transactionId/text())</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="mensajeError">
+                      <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d92</con3:id>
+                      <con2:expr>
+                        <con3:xqueryText>fn:string($RSPAplicaDeposito/Status/messages[1]/text())</con3:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:Error>
+                <con3:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d90</con3:id>
+                <con2:errCode>MW-0001</con2:errCode>
+                <con2:message>No se pudieron obtener las credenciales del usuario</con2:message>
+              </con2:Error>
+            </con2:default>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ActualizarInformacionDB">
+        <con1:context/>
+        <con1:actions>
+          <con2:assign varName="mensaje1">
+            <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7f81</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if($mensajeError != '') then (
+let $mensajeerror1 := fn:string(fn:tokenize($mensajeError,"@FM"))
+return ($mensajeerror1[1])
+)else('')</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="mensaje2">
+            <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7f80</con3:id>
+            <con2:expr>
+              <con3:xqueryText>if($mensajeError != '') then (
+let $mensajeerror2 := fn:string(fn:tokenize($mensajeError,"@FM"))
+return ($mensajeerror2[2])
+)else('')</con3:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7f7e</con3:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/TransaccionesAsincronas/DB/ActualizarTransaccionCore/biz/actualizaTrxCore_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>actualizaTrxCore</con2:operation>
+            <con2:request>
+              <con2:body>$REQActualizarTrxCore</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPActualizarTrxCore</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQActualizarTrxCore">
+                <con3:id>_ActionId-1096776530058181840-2a0dcfa4.18998b07497.-7f7f</con3:id>
+                <con2:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/actualizarTrxAsinc_db"/>
+                    <con3:param name="UUID">
+                      <con3:path>$uuidtrx</con3:path>
+                    </con3:param>
+                    <con3:param name="message">
+                      <con3:path>fn:string($mensaje1)</con3:path>
+                    </con3:param>
+                    <con3:param name="refT24">
+                      <con3:path>$t24ref</con3:path>
+                    </con3:param>
+                    <con3:param name="resEstatus">
+                      <con3:path>$successIndicator</con3:path>
+                    </con3:param>
+                    <con3:param name="tipoTrx">
+                      <con3:path>2</con3:path>
+                    </con3:param>
+                    <con3:param name="messagesFTTFS">
+                      <con3:path>fn:string($mensaje2)</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform/>
+          </con2:wsCallout>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="response" name="FlujoDepositoReferenciado_response">
+      <con1:stage name="registrarErrorDB">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse>
+            <con3:id>_ActionId-2248992866317740924--162bfa52.188e3b950b3.-7f1e</con3:id>
+            <con2:case>
+              <con2:condition>
+                <con3:xqueryText>$successIndicator != 'SUCCESS'</con3:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con3:route xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+                  <con1:id>_ActionId-2248992866317740924--162bfa52.188e3b950b3.-7ee3</con1:id>
+                  <con3:service ref="Middleware/v2/BusinessServices/TransaccionesAsincronas/DB/RegistrarErrorCB/biz/registrarTransaccionError_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>registrarTransaccionError</con3:operation>
+                  <con3:outboundTransform>
+                    <con2:replace varName="body" contents-only="true" xmlns:con3="http://www.bea.com/wli/sb/stages/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+                      <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2248992866317740924--162bfa52.188e3b950b3.-7ee2</con5:id>
+                      <con2:location>
+                        <con5:xpathText xmlns:con5="http://www.bea.com/wli/sb/stages/config">.</con5:xpathText>
+                      </con2:location>
+                      <con2:expr>
+                        <con5:xqueryTransform xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                          <con5:resource ref="Middleware/v2/Resources/ProcesarTransaccionCore/xq/registrarErrorProTRX"/>
+                          <con5:param name="msrequest">
+                            <con5:path>fn:concat('Request OSB: ',fn-bea:serialize($body/proc:procesarTransaccionCore), 'Request T24: ',fn-bea:serialize($REQAplicaDeposito))</con5:path>
+                          </con5:param>
+                          <con5:param name="etapa">
+                            <con5:path>0</con5:path>
+                          </con5:param>
+                          <con5:param name="descripcionError">
+                            <con5:path>'ERROR AL APLICAR EL DEPOSITO EN EL CORE'</con5:path>
+                          </con5:param>
+                          <con5:param name="msresponse">
+                            <con5:path>fn:concat('Response OSB: ',fn-bea:serialize($body/proc:procesarTransaccionCoreResponse), 'Response T24: ',fn-bea:serialize($RSPAplicaDeposito))</con5:path>
+                          </con5:param>
+                          <con5:param name="uuid">
+                            <con5:path>fn:string($uuidtrx)</con5:path>
+                          </con5:param>
+                        </con5:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con3:outboundTransform>
+                </con3:route>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="RespuestaDeposito">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con1:context>
+        <con1:actions>
+          <con2:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+            <con1:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d8f</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$successIndicator = 'SUCCESS'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="ResponseHeader">
+                  <con1:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d8e</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+&lt;successIndicator>SUCCESS&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d8d</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>$ResponseHeader</con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-417228958105186196--5173633b.187c3d76ed2.-7d8c</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText><![CDATA[<proc:procesarTransaccionCoreResponse>
+<T24_REFERENCE> {$t24ref} </T24_REFERENCE>
+<TRANSACTION_ID>{$body/proc:procesarTransaccionCore/TRANSACTION_ID/text()}</TRANSACTION_ID>
+</proc:procesarTransaccionCoreResponse>]]></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-3549493682639480152--d26d0ef.1889140b3ba.-7dff</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+<transactionId>{$t24ref}</transactionId>
+<successIndicator>{$successIndicator}</successIndicator>
+<messages>{$mensajeError}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace varName="body" contents-only="true">
+                <con1:id>_ActionId-3549493682639480152--d26d0ef.1889140b3ba.-7dfd</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;proc:procesarTransaccionCoreResponse/></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:flow>
+      <con1:branch-node type="condition" name="ProcesarTransaccion">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesarTransaccionCoreTypes" prefix="proc"/>
+        </con1:context>
+        <con1:branch-table variable="body">
+          <con1:xpath>
+            <con3:xpathText>./proc:procesarTransaccionCore/TRANSACTION_TYPE</con3:xpathText>
+          </con1:xpath>
+          <con1:branch name="DepositoACuenta">
+            <con1:operator>equals</con1:operator>
+            <con1:value>'3'</con1:value>
+            <con1:flow>
+              <con1:pipeline-node name="FlujoDepositoACuenta">
+                <con1:request>FlujoDepositoACuenta_request</con1:request>
+                <con1:response>FlujoDepositoACuenta_response</con1:response>
+              </con1:pipeline-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="DepositoReferenciado">
+            <con1:operator>equals</con1:operator>
+            <con1:value>'2'</con1:value>
+            <con1:flow>
+              <con1:pipeline-node name="FlujoDepositoReferenciado">
+                <con1:request>FlujoDepositoReferenciado_request</con1:request>
+                <con1:response>FlujoDepositoReferenciado_response</con1:response>
+              </con1:pipeline-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="PagoTarjetaCredito">
+            <con1:operator>equals</con1:operator>
+            <con1:value>'5'</con1:value>
+            <con1:flow>
+              <con1:pipeline-node name="FlujoPagoTC">
+                <con1:request>FlujoPagoTC_request</con1:request>
+                <con1:response>FlujoPagoTC_response</con1:response>
+              </con1:pipeline-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:default-branch>
+            <con1:flow>
+              <con1:pipeline-node name="PipelinePairNode1">
+                <con1:request>PipelinePairNode1_request</con1:request>
+                <con1:response>PipelinePairNode1_response</con1:response>
+              </con1:pipeline-node>
+            </con1:flow>
+          </con1:default-branch>
+        </con1:branch-table>
+      </con1:branch-node>
+    </con1:flow>
+  </ser:router>
+</xml-fragment>

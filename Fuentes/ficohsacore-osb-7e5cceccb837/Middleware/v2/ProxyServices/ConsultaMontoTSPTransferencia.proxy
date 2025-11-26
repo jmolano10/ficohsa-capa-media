@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false" isAutoPublish="false">
+    <ser:security>
+      <con3:custom-token-authentication>
+        <con3:username-password>
+          <con3:username-selector>
+            <con3:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/UserName/text()</con3:xpath>
+            <con3:variable>header</con3:variable>
+          </con3:username-selector>
+          <con3:password-selector>
+            <con3:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/Password/text()</con3:xpath>
+            <con3:variable>header</con3:variable>
+          </con3:password-selector>
+        </con3:username-password>
+      </con3:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con3:SoapBindingType" xmlns:con3="http://www.bea.com/wli/sb/services/bindings/config">
+      <con3:wsdl ref="Middleware/v2/Resources/ConsultaMontoTSP/wsdl/consultaMontoTSPTransferenciaPS"/>
+      <con3:port>
+        <con3:name>consultaMontoTSPTransferenciaPSSOAP</con3:name>
+        <con3:namespace>http://www.ficohsa.com.hn/middleware.services/consultaMontoTSPTransferenciaPS/</con3:namespace>
+      </con3:port>
+      <con3:selector type="SOAP body"/>
+      <con3:WSI-compliant>false</con3:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="true">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/RiskAndCompliance/ComplianceChecks/ConsultaMontoTSP</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-1513403592250152821--293ac0ba.15071fe047f.-7db1">
+    <con:pipeline type="error" name="_onErrorHandler-1513403592250152821--293ac0ba.15071fe047f.-7db1">
+      <con:stage name="ManejodeErrores">
+        <con:context>
+          <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMontoTSPTransferenciaTypes" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con1:assign varName="errorCode">
+            <con2:id>_ActionId-2016688497259066171-2aea1b36.15081f8a091.-7ea8</con2:id>
+            <con1:expr>
+              <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="errorMessage">
+            <con2:id>_ActionId-2016688497259066171-2aea1b36.15081f8a091.-7ea6</con2:id>
+            <con1:expr>
+              <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:ifThenElse>
+            <con2:comment>Condicion para determinar si el error es producido por la validación del request</con2:comment>
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7dca</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText>$errorCode = "BEA-382505"</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace varName="header" contents-only="true">
+                  <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7da5</con2:id>
+                  <con1:expr>
+                    <con2:xqueryTransform>
+                      <con2:resource ref="Middleware/v2/Resources/Genericos/mapeoErrorValidate"/>
+                      <con2:param name="anyType1">
+                        <con2:path>$fault</con2:path>
+                      </con2:param>
+                    </con2:xqueryTransform>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con5:wsCallout xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+                <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7dc4</con2:id>
+                <con5:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                <con5:operation>mapeoErrores</con5:operation>
+                <con5:request>
+                  <con5:body>$reqMapeoErrores</con5:body>
+                </con5:request>
+                <con5:response>
+                  <con5:body>respMapeoErrores</con5:body>
+                </con5:response>
+                <con5:requestTransform>
+                  <con5:assign varName="reqMapeoErrores">
+                    <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7dc6</con2:id>
+                    <con5:expr>
+                      <con2:xqueryTransform>
+                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                        <con2:param name="MENSAJE_ERROR">
+                          <con2:path>$errorMessage</con2:path>
+                        </con2:param>
+                        <con2:param name="CODIGO_ERROR">
+                          <con2:path>$errorCode</con2:path>
+                        </con2:param>
+                      </con2:xqueryTransform>
+                    </con5:expr>
+                  </con5:assign>
+                </con5:requestTransform>
+                <con5:responseTransform>
+                  <con5:replace contents-only="true" varName="header">
+                    <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7dc5</con2:id>
+                    <con5:expr>
+                      <con2:xqueryTransform>
+                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                        <con2:param name="mapeoErroresResponse1">
+                          <con2:path>$respMapeoErrores</con2:path>
+                        </con2:param>
+                        <con2:param name="successIndicator">
+                          <con2:path>$errorCode</con2:path>
+                        </con2:param>
+                      </con2:xqueryTransform>
+                    </con5:expr>
+                  </con5:replace>
+                </con5:responseTransform>
+              </con5:wsCallout>
+            </con1:default>
+          </con1:ifThenElse>
+          <con1:ifThenElse>
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7e17</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText>$operation = "consultaMontoTSPBanco"</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace varName="body" contents-only="true">
+                  <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7dfb</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText>&lt;con:consultaMontoTSPBancoResponse/></con2:xqueryText>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:replace varName="body" contents-only="true">
+                <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7e15</con2:id>
+                <con1:expr>
+                  <con2:xqueryText>&lt;consultaMontoTSPTransferenciaResponse/></con2:xqueryText>
+                </con1:expr>
+              </con1:replace>
+            </con1:default>
+          </con1:ifThenElse>
+          <con2:reply>
+            <con2:id>_ActionId-2914218536222219488--12dc58d7.15136ca4455.-3f03</con2:id>
+          </con2:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ValidacionesGeneralesCliente_request">
+      <con:stage name="ValidacionXSD" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+        <con:context>
+          <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMontoTSPTransferenciaTypes" prefix="tsp"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con1:validate>
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fd8</con2:id>
+            <con1:schema ref="Middleware/v2/Resources/ConsultaMontoTSP/xsd/consultaMontoTSPTransferenciaTypes"/>
+            <con1:schemaElement xmlns:con5="http://www.ficohsa.com.hn/middleware.services/consultasType" xmlns:con6="http://www.ficohsa.com.hn/middleware.services/consultaMontoTSPTransferenciaTypes">con6:consultaMontoTSPCliente</con1:schemaElement>
+            <con1:varName>body</con1:varName>
+            <con1:location>
+              <con2:xpathText>./tsp:consultaMontoTSPCliente</con2:xpathText>
+            </con1:location>
+          </con1:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionServicioRegional" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con5:wsCallout xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fcf</con2:id>
+            <con5:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con5:operation>ValidaServicioRegional</con5:operation>
+            <con5:request>
+              <con5:body>$reqValidaServicioRegional</con5:body>
+            </con5:request>
+            <con5:response>
+              <con5:body>respValidaServicioRegional</con5:body>
+            </con5:response>
+            <con5:requestTransform>
+              <con5:assign varName="reqValidaServicioRegional">
+                <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fd7</con2:id>
+                <con5:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                    <con2:param name="requestHeader1">
+                      <con2:path>$header/aut:RequestHeader</con2:path>
+                    </con2:param>
+                    <con2:param name="serviceId">
+                      <con2:path>"FICBCO0189"</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con5:expr>
+              </con5:assign>
+            </con5:requestTransform>
+            <con5:responseTransform>
+              <con5:ifThenElse>
+                <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fd6</con2:id>
+                <con5:case>
+                  <con5:condition>
+                    <con2:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con2:xqueryText>
+                  </con5:condition>
+                  <con5:actions>
+                    <con5:wsCallout>
+                      <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fd3</con2:id>
+                      <con5:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                      <con5:operation>mapeoErrores</con5:operation>
+                      <con5:request>
+                        <con5:body>$reqMapeoErrores</con5:body>
+                      </con5:request>
+                      <con5:response>
+                        <con5:body>respMapeoErrores</con5:body>
+                      </con5:response>
+                      <con5:requestTransform>
+                        <con5:assign varName="reqMapeoErrores">
+                          <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fd5</con2:id>
+                          <con5:expr>
+                            <con2:xqueryTransform>
+                              <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                              <con2:param name="MENSAJE_ERROR">
+                                <con2:path>fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())</con2:path>
+                              </con2:param>
+                              <con2:param name="CODIGO_ERROR">
+                                <con2:path>'ERROR'</con2:path>
+                              </con2:param>
+                            </con2:xqueryTransform>
+                          </con5:expr>
+                        </con5:assign>
+                      </con5:requestTransform>
+                      <con5:responseTransform>
+                        <con5:replace contents-only="true" varName="header">
+                          <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fd4</con2:id>
+                          <con5:expr>
+                            <con2:xqueryTransform>
+                              <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                              <con2:param name="mapeoErroresResponse1">
+                                <con2:path>$respMapeoErrores</con2:path>
+                              </con2:param>
+                              <con2:param name="successIndicator">
+                                <con2:path>'ERROR'</con2:path>
+                              </con2:param>
+                            </con2:xqueryTransform>
+                          </con5:expr>
+                        </con5:replace>
+                      </con5:responseTransform>
+                    </con5:wsCallout>
+                    <con5:replace varName="body" contents-only="true">
+                      <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fd2</con2:id>
+                      <con5:expr>
+                        <con2:xqueryText>&lt;consultaMontoTSPTransferenciaResponse /></con2:xqueryText>
+                      </con5:expr>
+                    </con5:replace>
+                    <con2:reply>
+                      <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fd1</con2:id>
+                    </con2:reply>
+                  </con5:actions>
+                </con5:case>
+                <con5:default>
+                  <con5:replace contents-only="true" varName="header">
+                    <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fd0</con2:id>
+                    <con5:expr>
+                      <con2:xqueryTransform>
+                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                        <con2:param name="requestHeader">
+                          <con2:path>$header/aut:RequestHeader</con2:path>
+                        </con2:param>
+                      </con2:xqueryTransform>
+                    </con5:expr>
+                  </con5:replace>
+                </con5:default>
+              </con5:ifThenElse>
+            </con5:responseTransform>
+          </con5:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionesGeneralesCliente_response"/>
+    <con:pipeline type="request" name="HNBanco_ConsultaMontoTSPCliente_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.example.org/consultaMontoTSPProxy/" prefix="con"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMontoTSPTransferenciaTypes" prefix="con1"/>
+        </con:context>
+        <con:actions>
+          <con1:wsCallout>
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fc8</con2:id>
+            <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/TSP/consultaMontoTSPCliente/biz/consultaMontoTSPCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con1:operation>consultaMontoTSPTransferencia</con1:operation>
+            <con1:request>
+              <con1:body>$REQConsultaMontoTSPCliente</con1:body>
+            </con1:request>
+            <con1:response>
+              <con1:body>RSPConsultaMontoTSPCliente</con1:body>
+            </con1:response>
+            <con1:requestTransform>
+              <con1:assign varName="REQConsultaMontoTSPCliente">
+                <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fc9</con2:id>
+                <con1:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/ConsultaMontoTSP/xq/consultaMontoTSPClienteIn"/>
+                    <con2:param name="authentication1">
+                      <con2:path>$header/aut:RequestHeader/Authentication</con2:path>
+                    </con2:param>
+                    <con2:param name="consultaMontoTSPCliente1">
+                      <con2:path>$body/con1:consultaMontoTSPCliente</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+            </con1:requestTransform>
+            <con1:responseTransform/>
+          </con1:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="HNBanco_ConsultaMontoTSPCliente_response">
+      <con:stage name="FlujoSalida">
+        <con:context/>
+        <con:actions>
+          <con1:replace varName="body" contents-only="true">
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fc7</con2:id>
+            <con1:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/v2/Resources/ConsultaMontoTSP/xq/consultaMontoTSPClienteOut"/>
+                <con2:param name="outputParameters1">
+                  <con2:path>$RSPConsultaMontoTSPCliente</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con1:expr>
+          </con1:replace>
+          <con1:replace varName="header" contents-only="true">
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7fc6</con2:id>
+            <con1:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/v2/Resources/ConsultaMontoTSP/xq/consultaMontoTSPClienteHeaderOut"/>
+                <con2:param name="outputParameters1">
+                  <con2:path>$RSPConsultaMontoTSPCliente</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con1:expr>
+          </con1:replace>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="Default_ConsultaMontoTSPCliente_request">
+      <con:stage name="FlujoEntrada" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+        <con:context/>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="Default_ConsultaMontoTSPCliente_response">
+      <con:stage name="FlujoSalida" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con5:Error xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-2904212548225769464-377f73b5.15503376d40.-7fc5</con6:id>
+            <con5:errCode>MW-0008</con5:errCode>
+            <con5:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con5:message>
+          </con5:Error>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ValidacionesGeneralesBanco_request">
+      <con:stage name="ValidacionXSD" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+        <con:context>
+          <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMontoTSPTransferenciaTypes" prefix="tsp"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con1:validate>
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f44</con2:id>
+            <con1:schema ref="Middleware/v2/Resources/ConsultaMontoTSP/xsd/consultaMontoTSPTransferenciaTypes"/>
+            <con1:schemaElement xmlns:con5="http://www.ficohsa.com.hn/middleware.services/consultasType" xmlns:con6="http://www.ficohsa.com.hn/middleware.services/consultaMontoTSPTransferenciaTypes">con6:consultaMontoTSPBanco</con1:schemaElement>
+            <con1:varName>body</con1:varName>
+            <con1:location>
+              <con2:xpathText>./tsp:consultaMontoTSPBanco</con2:xpathText>
+            </con1:location>
+          </con1:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionServicioRegional" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con5:wsCallout xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f3b</con2:id>
+            <con5:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con5:operation>ValidaServicioRegional</con5:operation>
+            <con5:request>
+              <con5:body>$reqValidaServicioRegional</con5:body>
+            </con5:request>
+            <con5:response>
+              <con5:body>respValidaServicioRegional</con5:body>
+            </con5:response>
+            <con5:requestTransform>
+              <con5:assign varName="reqValidaServicioRegional">
+                <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f43</con2:id>
+                <con5:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                    <con2:param name="requestHeader1">
+                      <con2:path>$header/aut:RequestHeader</con2:path>
+                    </con2:param>
+                    <con2:param name="serviceId">
+                      <con2:path>"FICBCO0189"</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con5:expr>
+              </con5:assign>
+            </con5:requestTransform>
+            <con5:responseTransform>
+              <con5:ifThenElse>
+                <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f42</con2:id>
+                <con5:case>
+                  <con5:condition>
+                    <con2:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con2:xqueryText>
+                  </con5:condition>
+                  <con5:actions>
+                    <con5:wsCallout>
+                      <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f3f</con2:id>
+                      <con5:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                      <con5:operation>mapeoErrores</con5:operation>
+                      <con5:request>
+                        <con5:body>$reqMapeoErrores</con5:body>
+                      </con5:request>
+                      <con5:response>
+                        <con5:body>respMapeoErrores</con5:body>
+                      </con5:response>
+                      <con5:requestTransform>
+                        <con5:assign varName="reqMapeoErrores">
+                          <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f41</con2:id>
+                          <con5:expr>
+                            <con2:xqueryTransform>
+                              <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                              <con2:param name="MENSAJE_ERROR">
+                                <con2:path>fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())</con2:path>
+                              </con2:param>
+                              <con2:param name="CODIGO_ERROR">
+                                <con2:path>'ERROR'</con2:path>
+                              </con2:param>
+                            </con2:xqueryTransform>
+                          </con5:expr>
+                        </con5:assign>
+                      </con5:requestTransform>
+                      <con5:responseTransform>
+                        <con5:replace contents-only="true" varName="header">
+                          <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f40</con2:id>
+                          <con5:expr>
+                            <con2:xqueryTransform>
+                              <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                              <con2:param name="mapeoErroresResponse1">
+                                <con2:path>$respMapeoErrores</con2:path>
+                              </con2:param>
+                              <con2:param name="successIndicator">
+                                <con2:path>'ERROR'</con2:path>
+                              </con2:param>
+                            </con2:xqueryTransform>
+                          </con5:expr>
+                        </con5:replace>
+                      </con5:responseTransform>
+                    </con5:wsCallout>
+                    <con5:replace varName="body" contents-only="true">
+                      <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f3e</con2:id>
+                      <con5:expr>
+                        <con2:xqueryText>&lt;consultaMontoTSPTransferenciaResponse /></con2:xqueryText>
+                      </con5:expr>
+                    </con5:replace>
+                    <con2:reply>
+                      <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f3d</con2:id>
+                    </con2:reply>
+                  </con5:actions>
+                </con5:case>
+                <con5:default>
+                  <con5:replace contents-only="true" varName="header">
+                    <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7f3c</con2:id>
+                    <con5:expr>
+                      <con2:xqueryTransform>
+                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                        <con2:param name="requestHeader">
+                          <con2:path>$header/aut:RequestHeader</con2:path>
+                        </con2:param>
+                      </con2:xqueryTransform>
+                    </con5:expr>
+                  </con5:replace>
+                </con5:default>
+              </con5:ifThenElse>
+            </con5:responseTransform>
+          </con5:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionesGeneralesBanco_response"/>
+    <con:pipeline type="request" name="HN01_ConsultaMontoTSPBanco_request">
+      <con:stage name="HN01_proxyRequest">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMontoTSPTransferenciaTypes" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con1:wsCallout>
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7ec4</con2:id>
+            <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/TSP/consultaMontoTSPBanco/biz/consultaMontoTSPBanco_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con1:operation>consultaMontoTSPBanco</con1:operation>
+            <con1:request>
+              <con1:body>$REQConsMontoTSP</con1:body>
+            </con1:request>
+            <con1:response>
+              <con1:body>RSPConsMontoTSP</con1:body>
+            </con1:response>
+            <con1:requestTransform>
+              <con1:assign varName="REQConsMontoTSP">
+                <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7ea9</con2:id>
+                <con1:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/ConsultaMontoTSP/xq/consultaMontoTSPBancoIn"/>
+                    <con2:param name="consultaMontoTSPBanco1">
+                      <con2:path>$body/con:consultaMontoTSPBanco</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+            </con1:requestTransform>
+            <con1:responseTransform/>
+          </con1:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="HN01_ConsultaMontoTSPBanco_response">
+      <con:stage name="HN01_proxyResponse">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMontoTSPTransferenciaTypes" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con1:replace varName="header" contents-only="true">
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7e8c</con2:id>
+            <con1:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/v2/Resources/ConsultaMontoTSP/xq/consultaMontoTSPBancoHeaderOut"/>
+                <con2:param name="outputParameters1">
+                  <con2:path>$RSPConsMontoTSP</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con1:expr>
+          </con1:replace>
+          <con1:replace varName="body" contents-only="true">
+            <con2:id>_ActionId-2904212548225769464-377f73b5.15503376d40.-7e69</con2:id>
+            <con1:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/v2/Resources/ConsultaMontoTSP/xq/consultaMontoTSPBancoOut"/>
+                <con2:param name="outputParameters1">
+                  <con2:path>$RSPConsMontoTSP</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con1:expr>
+          </con1:replace>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:branch-node type="operation" name="OperationalBranch">
+        <con:context/>
+        <con:branch-table>
+          <con:branch name="consultaMontoTSPCliente">
+            <con:operator>equals</con:operator>
+            <con:value/>
+            <con:flow>
+              <con:pipeline-node name="ValidacionesGeneralesCliente">
+                <con:request>ValidacionesGeneralesCliente_request</con:request>
+                <con:response>ValidacionesGeneralesCliente_response</con:response>
+              </con:pipeline-node>
+              <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:comment/>
+                <con:context>
+                  <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                  <con:xpath>
+                    <con2:xpathText>./aut:RequestHeader/Region/SourceBank</con2:xpathText>
+                  </con:xpath>
+                  <con:branch name="HNBanco">
+                    <con:operator>equals</con:operator>
+                    <con:value>'HN01'</con:value>
+                    <con:flow>
+                      <con:pipeline-node name="HNBanco_ConsultaMontoTSPCliente">
+                        <con:request>HNBanco_ConsultaMontoTSPCliente_request</con:request>
+                        <con:response>HNBanco_ConsultaMontoTSPCliente_response</con:response>
+                      </con:pipeline-node>
+                    </con:flow>
+                  </con:branch>
+                  <con:default-branch>
+                    <con:flow>
+                      <con:pipeline-node name="Default_ConsultaMontoTSPCliente">
+                        <con:request>Default_ConsultaMontoTSPCliente_request</con:request>
+                        <con:response>Default_ConsultaMontoTSPCliente_response</con:response>
+                      </con:pipeline-node>
+                    </con:flow>
+                  </con:default-branch>
+                </con:branch-table>
+              </con:branch-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="consultaMontoTSPBanco">
+            <con:operator>equals</con:operator>
+            <con:value/>
+            <con:flow>
+              <con:pipeline-node name="ValidacionesGeneralesBanco">
+                <con:request>ValidacionesGeneralesBanco_request</con:request>
+                <con:response>ValidacionesGeneralesBanco_response</con:response>
+              </con:pipeline-node>
+              <con:branch-node type="condition" name="RegionalizacionPaisEmpresaBanco">
+                <con:context>
+                  <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                  <con:xpath>
+                    <con2:xpathText>./aut:RequestHeader/Region/SourceBank</con2:xpathText>
+                  </con:xpath>
+                  <con:branch name="HN01_ConsultaMontoTSPBanco">
+                    <con:operator>equals</con:operator>
+                    <con:value>'HN01'</con:value>
+                    <con:flow>
+                      <con:pipeline-node name="HN01_ConsultaMontoTSPBanco">
+                        <con:request>HN01_ConsultaMontoTSPBanco_request</con:request>
+                        <con:response>HN01_ConsultaMontoTSPBanco_response</con:response>
+                      </con:pipeline-node>
+                    </con:flow>
+                  </con:branch>
+                  <con:default-branch>
+                    <con:flow/>
+                  </con:default-branch>
+                </con:branch-table>
+              </con:branch-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow/>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

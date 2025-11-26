@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false" isAutoPublish="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con3:SoapBindingType" xmlns:con3="http://www.bea.com/wli/sb/services/bindings/config">
+      <con3:wsdl ref="MiddlewareCaja/Resources/wsdls/PagoRemesas"/>
+      <con3:port>
+        <con3:name>pagoRemesasPSSOAP</con3:name>
+        <con3:namespace>http://www.ficohsa.com.hn/middleware.services/pagoRemesas/</con3:namespace>
+      </con3:port>
+      <con3:selector type="SOAP body"/>
+      <con3:WSI-compliant>false</con3:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/MiddlewareCaja/PagoRemesas</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-7759223108206842949-7b0f5608.13e5c8bc24d.-7ff0">
+    <con:pipeline type="error" name="_onErrorHandler-7759223108206842949-7b0f5608.13e5c8bc24d.-7ff0">
+      <con:stage name="stage1">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasTypes" prefix="pag"/>
+        </con:context>
+        <con:actions>
+          <con2:replace contents-only="true" varName="header">
+            <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7f82</con1:id>
+            <con2:expr>
+              <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7f65</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;pag:pagoRemesasResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7f48</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="PipelinePairNode1_request">
+      <con:stage name="stage1">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasTypes" prefix="pag"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="validationMessage">
+            <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7e89</con1:id>
+            <con2:expr>
+              <con1:xqueryTransform>
+                <con1:resource ref="MiddlewareCaja/Resources/xqueries/PagoRemesas/PagoRemesasValidate"/>
+                <con1:param name="pagoRemesas">
+                  <con1:path>$body/pag:pagoRemesas</con1:path>
+                </con1:param>
+              </con1:xqueryTransform>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7e6c</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = ""</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7dfc</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/Remesas" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>Consultaderemesa</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQUESTConsultaderemesa</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RESPONSEConsultaderemesa</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQUESTConsultaderemesa">
+                      <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7d58</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="MiddlewareCaja/Resources/xqueries/PagoRemesas/ConsultaRemesaIn"/>
+                          <con1:param name="autenticacionRequestHeader">
+                            <con1:path>$header/aut:AutenticacionRequestHeader</con1:path>
+                          </con1:param>
+                          <con1:param name="pagoRemesas">
+                            <con1:path>$body/pag:pagoRemesas</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="validationMessage">
+                      <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7d20</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="MiddlewareCaja/Resources/xqueries/PagoRemesas/ConsultaRemesaValidate"/>
+                          <con1:param name="consultaderemesaResponse">
+                            <con1:path>$RESPONSEConsultaderemesa</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con1:skip>
+                <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7e34</con1:id>
+              </con1:skip>
+            </con2:default>
+          </con2:ifThenElse>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7ce8</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = ""</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7cb0</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/Remesas" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>Pagoderemesas</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQUEST</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RESPONSE</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQUEST">
+                      <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7c78</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="MiddlewareCaja/Resources/xqueries/PagoRemesas/PagoRemesasIn"/>
+                          <con1:param name="autenticacionRequestHeader">
+                            <con1:path>$header/aut:AutenticacionRequestHeader</con1:path>
+                          </con1:param>
+                          <con1:param name="consultaderemesaResponse">
+                            <con1:path>$RESPONSEConsultaderemesa</con1:path>
+                          </con1:param>
+                          <con1:param name="pagoRemesas">
+                            <con1:path>$body/pag:pagoRemesas</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="validationMessage">
+                      <con1:id>_ActionId-3363466156831411874-50f83497.13e6518e5ea.-7fc4</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>fn:string-join($RESPONSE/Status/messages," ")</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con1:skip>
+                <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7c0a</con1:id>
+              </con1:skip>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="PipelinePairNode1_response">
+      <con:stage name="stage1">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoRemesasTypes" prefix="pag"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7bd2</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = ""</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-3363466156831411874-50f83497.13e6518e5ea.-7f8c</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="MiddlewareCaja/BussinessServices/Core" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>Consultadeusuariosdelsistema</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQUESTConsultadeusuariosdelsistema</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RESPONSEConsultadeusuariosdelsistema</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQUESTConsultadeusuariosdelsistema">
+                      <con1:id>_ActionId-3363466156831411874-50f83497.13e6518e5ea.-7f54</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="MiddlewareCaja/Resources/xqueries/PagoRemesas/ConsultaUsuarioSistemaIn"/>
+                          <con1:param name="autenticacionRequestHeader">
+                            <con1:path>$header/aut:AutenticacionRequestHeader</con1:path>
+                          </con1:param>
+                          <con1:param name="pagoderemesasResponse">
+                            <con1:path>$RESPONSE</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform/>
+                </con2:wsCallout>
+                <con2:replace contents-only="true" varName="header">
+                  <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7b9a</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="MiddlewareCaja/Resources/xqueries/PagoRemesas/PagoRemesasHeaderOut"/>
+                      <con1:param name="pagoderemesasResponse">
+                        <con1:path>$RESPONSE</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7b7d</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="MiddlewareCaja/Resources/xqueries/PagoRemesas/PagoRemesasOut"/>
+                      <con1:param name="consultaderemesaResponse">
+                        <con1:path>$RESPONSEConsultaderemesa</con1:path>
+                      </con1:param>
+                      <con1:param name="pagoderemesasResponse">
+                        <con1:path>$RESPONSE</con1:path>
+                      </con1:param>
+                      <con1:param name="consultadeusuariosdelsistemaResponse">
+                        <con1:path>$RESPONSEConsultadeusuariosdelsistema</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7b42</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ fn:string($validationMessage) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-7759223108206842949-7b0f5608.13e5c8bc24d.-7b41</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;pag:pagoRemesasResponse/></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="PipelinePairNode1">
+        <con:request>PipelinePairNode1_request</con:request>
+        <con:response>PipelinePairNode1_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

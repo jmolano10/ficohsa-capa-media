@@ -1,0 +1,403 @@
+<bpel:process name="sjGetMultipleRemittances2" targetNamespace="http://xmlns.oracle.com/DynamoMigrate/CoreBankingHN/" bea:name="sjGetMultipleRemittances2" rescon:snippetVersion="1.0" xmlns:tns="http://xmlns.oracle.com/DynamoMigrate/CoreBankingHN/" xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable" xmlns:rescon="http://www.bea.com/alsb/flow/resources/config" xmlns:bea="http://www.bea.com/bpel/ui/extensions" xmlns:ext="http://www.bea.com/bpel/extensions" xmlns:expr="http://www.bea.com/wli/sb/stages/config" xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config" xmlns:bind="http://xmlns.oracle.com/DynamoMigrate/CoreBankingHN/sjGetMultipleRemittances" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ns1="http://xmlns.oracle.com/pcbpel/adapter/db/DynamoMigrate/CoreBankingHN/AssembleMessageCollection" xmlns:ns0="http://service.webserviceprovider.transporters.service.frametexx.com/" xmlns:ns2="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ass="http://xmlns.oracle.com/pcbpel/adapter/db/sp/AssembleMessageCollection" xmlns:sjg="http://www.ficohsa.com.hn/middleware.services/sjGgetMultipleRemittancesTypes" xmlns:ns3="http://xmlns.oracle.com/pcbpel/adapter/db/MigrationDynamo/CommonResources/SetLogInfoService_BS" xmlns:com="http://www.ficohsa.com.hn/middleware.services/commonTypes">
+    <rescon:importInfo>
+        <rescon:wsdl-import ref="CoreBankingHN/ProviderServices/WSDL/AssembleMessageCollection/AssembleMessageCollection"/>
+        <rescon:wsdl-import ref="CoreBankingHN/ProviderServices/WSDL/RouterConventions/RouterConventions"/>
+        <rescon:wsdl-import ref="CommonResources/MiddlewareDB/ProviderServices/WSDL/SetLogInfoService_BS"/>
+    </rescon:importInfo>
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjGetMultipleRemittances2" partnerLinkType="tns:sjGetMultipleRemittances2" myRole="sjGetMultipleRemittances2">
+	       </bpel:partnerLink>
+        <bpel:partnerLink name="AssembleMessageCollection" partnerLinkType="tns:AssembleMessageCollection" partnerRole="AssembleMessageCollection"/>
+        <bpel:partnerLink name="RouterConventions" partnerLinkType="tns:RouterConventions" partnerRole="RouterConventions"/>
+        <bpel:partnerLink name="SetLogInfoService_BS" partnerLinkType="tns:SetLogInfoService_BS"
+                          partnerRole="SetLogInfoService_BS"/>
+    </bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request" messageType="bind:sjGetMultipleRemittancesRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response" messageType="bind:sjGetMultipleRemittancesResponse">
+	       </bpel:variable>
+        <bpel:variable name="tiposRemesadoras" type="xsd:anyType"/>
+        <bpel:variable name="totalRemesadoras" type="xsd:int"/>
+        <bpel:variable name="REQAssembleMessageCollection" messageType="ns1:args_in_msg"/>
+        <bpel:variable name="RSPAssembleMessageCollection" messageType="ns1:args_out_msg"/>
+        <bpel:variable name="REQRouterConventions" messageType="ns0:invoke"/>
+        <bpel:variable name="RSPRouterConventions" messageType="ns0:invokeResponse"/>
+        <bpel:variable name="bodyReqLog" messageType="ns3:args_in_msg"/>
+        <bpel:variable name="bodyRspLog" messageType="ns3:args_out_msg"/>
+    </bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjGetMultipleRemittances2" operation="sjGetMultipleRemittances" variable="request" createInstance="yes">
+	           <rescon:receiveInfo>
+                <rescon:wsdl ref="CoreBankingHN/RequestorServices/v1.0/GetRemittances/WSDL/sjGetMultipleRemittances" binding="bind:sjGetMultipleRemittancesBinding"/>
+            </rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:scope bea:name="PrepararSalida">
+            <bpel:sequence>
+                <bpel:assign>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="response.outputParameters">
+                            <trf:expr>
+                                <expr:xqueryText>&lt;sjGetMultipleRemittancesResponse&gt;
+    &lt;sjg:SuccessIndicator&gt;SUCCESS&lt;/sjg:SuccessIndicator&gt;
+	&lt;sjg:ErrorMessage/&gt;
+	&lt;sjg:Remittance/&gt;
+&lt;/sjGetMultipleRemittancesResponse&gt;</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                </bpel:assign>
+            </bpel:sequence>
+        </bpel:scope>
+        <bpel:assign>
+            <bpel:extensionAssignOperation>
+                <trf:assign varName="tiposRemesadoras">
+                    <trf:expr>
+                        <expr:xqueryText>$request.inputParameters</expr:xqueryText>
+                    </trf:expr>
+                </trf:assign>
+            </bpel:extensionAssignOperation>
+            <bpel:extensionAssignOperation>
+                <trf:assign varName="totalRemesadoras">
+                    <trf:expr>
+                        <expr:xqueryText>count($tiposRemesadoras/sjg:TypesRemittance/sjg:TypesRemittanceItem)</expr:xqueryText>
+                    </trf:expr>
+                </trf:assign>
+            </bpel:extensionAssignOperation>
+        </bpel:assign>
+        <bpel:forEach parallel="no" counterName="remittancePosition">
+            <bpel:startCounterValue>1</bpel:startCounterValue>
+            <bpel:finalCounterValue>$totalRemesadoras</bpel:finalCounterValue>
+            <bpel:scope>
+                <bpel:variables>
+                    <bpel:variable name="successIndicator" type="xsd:string"/>
+                    <bpel:variable name="parametrosSalida" type="xsd:anyType"/>
+                    <bpel:variable name="successIndRouter" type="xsd:string"/>
+                    <bpel:variable name="remittanceInfo" type="xsd:anyType"/>
+                </bpel:variables>
+                <bpel:faultHandlers>
+                    <bpel:catchAll>
+                        <bpel:sequence>
+                            <bpel:empty/>
+                            <bpel:assign>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="response.outputParameters">
+                                        <trf:expr>
+                                            <expr:xqueryText><![CDATA[<sjGetMultipleRemittancesResponse>
+    <sjg:SuccessIndicator>447</sjg:SuccessIndicator>
+	<sjg:ErrorMessage>Error consultando remesa.</sjg:ErrorMessage>
+	<sjg:Remittance/>
+</sjGetMultipleRemittancesResponse>]]></expr:xqueryText>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                            </bpel:assign>
+                        </bpel:sequence>
+                    </bpel:catchAll>
+                </bpel:faultHandlers>
+                <bpel:sequence>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="REQAssembleMessageCollection.InputParameters">
+                                <trf:expr>
+                                    <expr:xqueryTransform>
+                                        <expr:resource ref="CoreBankingHN/RequestorServices/v1.0/GetRemittances/XQ/AssembleInfoParametersRemittances"/>
+                                        <expr:param name="sjGetMultipleRemittances">
+                                            <expr:path>$request.inputParameters</expr:path>
+                                        </expr:param>
+                                        <expr:param name="remittancePosition">
+                                            <expr:path>$remittancePosition</expr:path>
+                                        </expr:param>
+                                    </expr:xqueryTransform>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="bodyReqLog.InputParameters">
+                                <trf:expr>
+                                    <expr:xqueryTransform>
+                                        <expr:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                        <expr:param name="codigoAplicacion">
+                                            <expr:path>'1'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="codigoServicio">
+                                            <expr:path>'41'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="codigoError">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="contenido">
+                                            <expr:path>fn-bea:serialize($REQAssembleMessageCollection.InputParameters)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="estado">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="codigoSistema">
+                                            <expr:path>'18'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="nombreFlujoError">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="fechaHora">
+                                            <expr:path>fn:current-dateTime()</expr:path>
+                                        </expr:param>
+                                        <expr:param name="parametros">
+                                            <expr:path>fn-bea:serialize($REQAssembleMessageCollection.InputParameters)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="uuid">
+                                            <expr:path>fn:data($request.inputParameters/sjg:Uuid)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="version">
+                                            <expr:path>'1'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="operacionServicio">
+                                            <expr:path>'AssembleMessageCollection'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="bancoDestino">
+                                            <expr:path>fn:data($request.inputParameters/sjg:GeneralInfo/com:DestinationBank)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="endpoint">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="bancoOrigen">
+                                            <expr:path>fn:data($request.inputParameters/sjg:GeneralInfo/com:SourceBank)</expr:path>
+                                        </expr:param>
+                                        <expr:param name="fechaTX">
+                                            <expr:path>fn:current-dateTime()</expr:path>
+                                        </expr:param>
+                                        <expr:param name="usuario">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="descripcionError">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                        <expr:param name="tipoMensaje">
+                                            <expr:path>'Request'</expr:path>
+                                        </expr:param>
+                                        <expr:param name="metodo">
+                                            <expr:path>''</expr:path>
+                                        </expr:param>
+                                    </expr:xqueryTransform>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                    <bpel:invoke partnerLink="SetLogInfoService_BS" operation="SetLogInfoService_BS"
+                                 inputVariable="bodyReqLog" outputVariable="bodyRspLog">
+                        <rescon:invokeInfo>
+                            <rescon:service ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS"
+                                            xsi:type="ns2:BusinessServiceRef"/>
+                        </rescon:invokeInfo>
+                    </bpel:invoke>
+                    <bpel:invoke partnerLink="AssembleMessageCollection" operation="AssembleMessageCollection" inputVariable="REQAssembleMessageCollection" outputVariable="RSPAssembleMessageCollection">
+                        <rescon:invokeInfo>
+                            <rescon:service ref="CoreBankingHN/ProviderServices/BusinessServices/AssembleMessageCollection/AssembleMessageCollection" xsi:type="ns2:BusinessServiceRef"/>
+                        </rescon:invokeInfo>
+                    </bpel:invoke>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="successIndicator">
+                                <trf:expr>
+                                    <expr:xqueryText>fn:upper-case(fn:data($RSPAssembleMessageCollection.OutputParameters/ass:CODIGO_RESPUESTA))</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                    <bpel:if>
+                        <bpel:condition>$successIndicator = 'SUCCESS'</bpel:condition>
+                        <bpel:sequence>
+                            <bpel:empty/>
+                            <bpel:scope bea:name="EnrutadorConvenios">
+                                <bpel:faultHandlers>
+                                    <bpel:catchAll>
+                                        <bpel:sequence>
+                                            <bpel:empty/>
+                                            <bpel:assign>
+                                                <bpel:extensionAssignOperation>
+                                                    <trf:assign varName="response.outputParameters">
+                                                        <trf:expr>
+                                                            <expr:xqueryText><![CDATA[<sjGetMultipleRemittancesResponse>
+    <sjg:SuccessIndicator>447</sjg:SuccessIndicator>
+	<sjg:ErrorMessage>Error consultando remesa.</sjg:ErrorMessage>
+        <sjg:Remittance/>
+</sjGetMultipleRemittancesResponse>]]></expr:xqueryText>
+                                                        </trf:expr>
+                                                    </trf:assign>
+                                                </bpel:extensionAssignOperation>
+                                            </bpel:assign>
+                                        </bpel:sequence>
+                                    </bpel:catchAll>
+                                </bpel:faultHandlers>
+                                <bpel:sequence>
+                                    <bpel:assign>
+                                        <bpel:extensionAssignOperation>
+                                            <trf:assign varName="REQRouterConventions.serviceRequest">
+                                                <trf:expr>
+                                                    <expr:xqueryTransform>
+                                                        <expr:resource ref="CoreBankingHN/RequestorServices/v1.0/GetRemittances/XQ/RouterConventiosIn"/>
+                                                        <expr:param name="AssembleInfoParametersRemittancesRSP">
+                                                            <expr:path>$RSPAssembleMessageCollection.OutputParameters</expr:path>
+                                                        </expr:param>
+                                                    </expr:xqueryTransform>
+                                                </trf:expr>
+                                            </trf:assign>
+                                        </bpel:extensionAssignOperation>
+                                        <bpel:extensionAssignOperation>
+                                            <trf:assign varName="bodyReqLog.InputParameters">
+                                                <trf:expr>
+                                                    <expr:xqueryTransform>
+                                                        <expr:resource ref="CommonResources/MiddlewareDB/ProviderServices/XQ/Tx_Msg_To_SetLogInfo"/>
+                                                        <expr:param name="codigoAplicacion">
+                                                            <expr:path>'1'</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="codigoServicio">
+                                                            <expr:path>'41'</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="codigoError">
+                                                            <expr:path>''</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="contenido">
+                                                            <expr:path>fn-bea:serialize($REQRouterConventions.serviceRequest)</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="estado">
+                                                            <expr:path>''</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="codigoSistema">
+                                                            <expr:path>'18'</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="nombreFlujoError">
+                                                            <expr:path>''</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="fechaHora">
+                                                            <expr:path>fn:current-dateTime()</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="parametros">
+                                                            <expr:path>fn-bea:serialize($REQRouterConventions.serviceRequest)</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="uuid">
+                                                            <expr:path>fn:data($request.inputParameters/sjg:Uuid)</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="version">
+                                                            <expr:path>'1'</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="operacionServicio">
+                                                            <expr:path>'RouterConventions'</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="bancoDestino">
+                                                            <expr:path>fn:data($request.inputParameters/sjg:GeneralInfo/com:DestinationBank)</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="endpoint">
+                                                            <expr:path>''</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="bancoOrigen">
+                                                            <expr:path>fn:data($request.inputParameters/sjg:GeneralInfo/com:SourceBank)</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="fechaTX">
+                                                            <expr:path>fn:current-dateTime()</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="usuario">
+                                                            <expr:path>''</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="descripcionError">
+                                                            <expr:path>''</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="tipoMensaje">
+                                                            <expr:path>'Request'</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="metodo">
+                                                            <expr:path>''</expr:path>
+                                                        </expr:param>
+                                                    </expr:xqueryTransform>
+                                                </trf:expr>
+                                            </trf:assign>
+                                        </bpel:extensionAssignOperation>
+                                    </bpel:assign>
+                                    <bpel:invoke partnerLink="SetLogInfoService_BS" inputVariable="bodyReqLog"
+                                                 operation="SetLogInfoService_BS" outputVariable="bodyRspLog">
+                                        <rescon:invokeInfo>
+                                            <rescon:service xsi:type="ns2:BusinessServiceRef"
+                                                            ref="CommonResources/MiddlewareDB/ProviderServices/BusinessServices/SetLogInfoService/v1.0/SetLogInfoService_BS"/>
+                                        </rescon:invokeInfo>
+                                    </bpel:invoke>
+                                    <bpel:invoke partnerLink="RouterConventions" operation="invoke" inputVariable="REQRouterConventions" outputVariable="RSPRouterConventions">
+                                        <rescon:invokeInfo>
+                                            <rescon:service ref="CoreBankingHN/ProviderServices/BusinessServices/RouterConventions/RouterConventions" xsi:type="ns2:BusinessServiceRef"/>
+                                        </rescon:invokeInfo>
+                                    </bpel:invoke>
+                                    <bpel:assign>
+                                        <bpel:extensionAssignOperation>
+                                            <trf:assign varName="parametrosSalida">
+                                                <trf:expr>
+                                                    <expr:xqueryText>fn-bea:inlinedXML($RSPRouterConventions.serviceResponse/responseData)</expr:xqueryText>
+                                                </trf:expr>
+                                            </trf:assign>
+                                        </bpel:extensionAssignOperation>
+                                        <bpel:extensionAssignOperation>
+                                            <trf:assign varName="successIndRouter">
+                                                <trf:expr>
+                                                    <expr:xqueryText>$parametrosSalida/errorCode/text()</expr:xqueryText>
+                                                </trf:expr>
+                                            </trf:assign>
+                                        </bpel:extensionAssignOperation>
+                                    </bpel:assign>
+                                </bpel:sequence>
+                            </bpel:scope>
+                            <bpel:if>
+                                <bpel:condition>$successIndRouter = '0' or $successIndRouter = '2'</bpel:condition>
+                                <bpel:sequence>
+                                    <bpel:empty/>
+                                    <bpel:assign>
+                                        <bpel:extensionAssignOperation>
+                                            <trf:assign varName="remittanceInfo">
+                                                <trf:expr>
+                                                    <expr:xqueryTransform>
+                                                        <expr:resource ref="CoreBankingHN/RequestorServices/v1.0/GetRemittances/XQ/GetMultipleRemittancesOut"/>
+                                                        <expr:param name="serviceResponse">
+                                                            <expr:path>$RSPRouterConventions.serviceResponse</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="sjGetMultipleRemittances">
+                                                            <expr:path>$request.inputParameters</expr:path>
+                                                        </expr:param>
+                                                        <expr:param name="remittancePosition">
+                                                            <expr:path>$remittancePosition</expr:path>
+                                                        </expr:param>
+                                                    </expr:xqueryTransform>
+                                                </trf:expr>
+                                            </trf:assign>
+                                        </bpel:extensionAssignOperation>
+                                    </bpel:assign>
+                                    <bpel:assign>
+                                        <bpel:extensionAssignOperation>
+                                            <trf:insert varName="response.outputParameters">
+                                                <trf:location>
+                                                    <expr:xpathText>./sjg:Remittance</expr:xpathText>
+                                                </trf:location>
+                                                <trf:where>last-child</trf:where>
+                                                <trf:expr>
+                                                    <expr:xqueryText>$remittanceInfo/sjg:Remittance/sjg:RouterResponse</expr:xqueryText>
+                                                </trf:expr>
+                                            </trf:insert>
+                                        </bpel:extensionAssignOperation>
+                                    </bpel:assign>
+                                </bpel:sequence>
+                                <bpel:else>
+                                    <bpel:sequence>
+                                        <bpel:empty/>
+                                    </bpel:sequence>
+                                </bpel:else>
+                            </bpel:if>
+                        </bpel:sequence>
+                        <bpel:else>
+                            <bpel:sequence>
+                                <bpel:empty/>
+                            </bpel:sequence>
+                        </bpel:else>
+                    </bpel:if>
+                </bpel:sequence>
+            </bpel:scope>
+        </bpel:forEach>
+        <bpel:reply partnerLink="sjGetMultipleRemittances2" operation="sjGetMultipleRemittances" variable="response"/>
+    </bpel:sequence>
+</bpel:process>

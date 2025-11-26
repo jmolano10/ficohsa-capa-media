@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false">
+    <ser:security>
+      <con:custom-token-authentication>
+        <con:username-password>
+          <con:username-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/UserName/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:username-selector>
+          <con:password-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/Password/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:password-selector>
+        </con:username-password>
+      </con:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/GestionesSolicitudCredito/wsdl/gestionesSolicitudCreditoPS"/>
+      <con:port>
+        <con:name>gestionesSolicitudCreditoPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/gestionesSolicitudCreditoPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/OperationsAndExecution/Cards/GestionesSolicitudCredito</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties>
+        <http:use-https>true</http:use-https>
+      </http:inbound-properties>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-7633501481021411433--56284e0b.162f47a37ae.-7dab">
+    <con1:pipeline type="error" name="_onErrorHandler-7633501481021411433--56284e0b.162f47a37ae.-7dab">
+      <con1:stage name="ManejoError">
+        <con1:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesSolicitudCreditoTypes" prefix="ges"/>
+        </con1:context>
+        <con1:actions>
+          <con3:assign varName="errorCode">
+            <con2:id>_ActionId-7633501481021411433--56284e0b.162f47a37ae.-7d73</con2:id>
+            <con3:expr>
+              <con2:xqueryText>string($fault/ctx:errorCode/text())</con2:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:assign varName="errorMessage">
+            <con2:id>_ActionId-7633501481021411433--56284e0b.162f47a37ae.-7d39</con2:id>
+            <con3:expr>
+              <con2:xqueryText>string($fault/ctx:reason/text())</con2:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:wsCallout>
+            <con2:id>_ActionId-7633501481021411433--56284e0b.162f47a37ae.-7cfd</con2:id>
+            <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>mapeoErrores</con3:operation>
+            <con3:request>
+              <con3:body>$reqMapeoErrores</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>respMapeoErrores</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="reqMapeoErrores">
+                <con2:id>_ActionId-7633501481021411433--56284e0b.162f47a37ae.-7cc5</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con2:param name="CODIGO_ERROR">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                    <con2:param name="MENSAJE_ERROR">
+                      <con2:path>fn:concat("FICBCO0273", "$#$", $errorMessage)</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+            </con3:requestTransform>
+            <con3:responseTransform>
+              <con3:replace varName="header" contents-only="true">
+                <con2:id>_ActionId-7633501481021411433--56284e0b.162f47a37ae.-7c57</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con2:param name="mapeoErroresResponse1">
+                      <con2:path>$respMapeoErrores</con2:path>
+                    </con2:param>
+                    <con2:param name="successIndicator">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:replace>
+            </con3:responseTransform>
+          </con3:wsCallout>
+          <con3:replace varName="body" contents-only="true">
+            <con2:id>_ActionId-7633501481021411433--56284e0b.162f47a37ae.-7c19</con2:id>
+            <con3:expr>
+              <con2:xqueryText><![CDATA[if($operation = 'precalificacionCliente')then(
+
+	<ges:precalificacionClienteResponse/>
+	
+)else if($operation = 'confirmacionPrecalificacionCliente')then(
+
+	<ges:confirmacionPrecalificacionClienteResponse/>
+
+)else if($operation = 'evaluacionSolicitudTarjetaCredito')then(
+
+	<ges:evaluacionSolicitudTarjetaCreditoResponse/>
+
+)else if($operation = 'evaluacionSolicitudPrestamoTarjetaCredito')then (
+	
+	<ges:evaluacionSolicitudPrestamoTarjetaCreditoResponse/>
+	
+)else if($operation = 'confirmacionSolicitudTarjetaCredito') then(
+	
+	<ges:confirmacionSolicitudTarjetaCreditoResponse/>
+
+)else if($operation = 'confirmacionSolicitudPrestamoTarjetaCredito') then(
+	
+	<ges:confirmacionSolicitudPrestamoTarjetaCreditoResponse/>
+
+)else if($operation = 'actualizacionEstadoSolicitudCredito') then(
+	
+	<ges:actualizacionEstadoSolicitudCreditoResponse/>
+
+)else()]]></con2:xqueryText>
+            </con3:expr>
+          </con3:replace>
+          <con2:reply>
+            <con2:id>_ActionId-7633501481021411433--56284e0b.162f47a37ae.-7bd9</con2:id>
+          </con2:reply>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:flow>
+      <con1:branch-node type="operation" name="Operaciones">
+        <con1:context/>
+        <con1:branch-table>
+          <con1:branch name="precalificacionCliente">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="precalificacionCliente">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-7633501481021411433--56284e0b.162f47a37ae.-7e2a</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/PrecalificacionCliente" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation passThrough="true"/>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="confirmacionPrecalificacionCliente">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="confirmacionPrecalificacionCliente">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-7633501481021411433--56284e0b.162f47a37ae.-7b8d</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConfirmacionPrecalificacionCliente" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation passThrough="true"/>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="evaluacionSolicitudTarjetaCredito">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="evaluacionSolicitudTarjetaCredito">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-6254033731464820472-4620b487.1633fe81fa2.-7fab</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/EvaluacionSolicitudTarjetaCredito" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation passThrough="true"/>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="confirmacionSolicitudTarjetaCredito">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="confirmacionSolicitudTarjetaCredito">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-789945553043088433-13d0b8d5.1634aaafda4.-5655</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConfirmacionSolicitudTarjetaCredito" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation passThrough="true"/>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="evaluacionSolicitudPrestamoTarjetaCredito">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="evaluacionSolicitudPrestamoTarjetaCredito">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-5534147189781543442-37513f1e.163654b487a.-76ac</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/EvaluacionSolicitudPrestamoTarjetaCredito" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>evaluacionSolicitudPrestamoTarjetaCredito</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="confirmacionSolicitudPrestamoTarjetaCredito">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="confirmacionSolicitudPrestamoTarjetaCredito">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-7327254715613238370-47bf414d.163648c2b17.-716e</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConfirmacionSolicitudPrestamoTarjetaCredito" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation passThrough="true"/>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="actualizacionEstadoSolicitudCredito">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="actualizacionEstadoSolicitudCredito">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-2101583346155089324--d1eb4f3.16382f4341a.-7ff5</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ActualizacionEstadoSolicitudCredito" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>actualizacionEstadoSolicitudCredito</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="calificacionBlaze">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="calificacionBlaze">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-5000504095859697756-209a7cc2.16c0518b9b0.-7df6</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/CalificacionBlaze" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>calificacionBlaze</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="resultadoCalificacionBlaze">
+            <con1:operator>equals</con1:operator>
+            <con1:value/>
+            <con1:flow>
+              <con1:route-node name="resultadoCalificacionBlaze">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-5000504095859697756-209a7cc2.16c0518b9b0.-7d45</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ResultadoCalificacionBlaze" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>resultadoCalificacionBlaze</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:default-branch>
+            <con1:flow/>
+          </con1:default-branch>
+        </con1:branch-table>
+      </con1:branch-node>
+    </con1:flow>
+  </ser:router>
+</xml-fragment>

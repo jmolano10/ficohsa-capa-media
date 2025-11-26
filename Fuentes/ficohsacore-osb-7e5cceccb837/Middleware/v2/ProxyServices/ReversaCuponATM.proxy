@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/ReversaCuponATM/wsdl/reversaCuponATMPS"/>
+      <con:port>
+        <con:name>reversaCuponATMPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/reversaCuponATMPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-4728620077039186735--143f99c9.1824cc79c5c.-7dd7">
+    <con:pipeline type="request" name="ValidacionesGenerales_request">
+      <con:stage name="ValidacionXSD">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaCuponATMTypes" prefix="rev"/>
+        </con:context>
+        <con:actions>
+          <con2:validate>
+            <con1:id>_ActionId-696175079544198904--18b262a8.18240db30a1.-7a96</con1:id>
+            <con2:schema ref="Middleware/v2/Resources/ReversaCuponATM/xsd/reversaCuponATMTypes"/>
+            <con2:schemaElement xmlns:rev="http://www.ficohsa.com.hn/middleware.services/reversaCuponATMTypes">rev:reversaCuponATM</con2:schemaElement>
+            <con2:varName>body</con2:varName>
+            <con2:location>
+              <con1:xpathText>./rev:reversaCuponATM</con1:xpathText>
+            </con2:location>
+          </con2:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionServicioRegional">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaCuponATMTypes" prefix="rev"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-696175079544198904--18b262a8.18240db30a1.-7a28</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>ValidaServicioRegional</con2:operation>
+            <con2:request>
+              <con2:body>$reqValidaServicioRegional</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>respValidaServicioRegional</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="reqValidaServicioRegional">
+                <con1:id>_ActionId-696175079544198904--18b262a8.18240db30a1.-79f0</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                    <con1:param name="requestHeader1">
+                      <con1:path>$header/aut:RequestHeader</con1:path>
+                    </con1:param>
+                    <con1:param name="serviceId">
+                      <con1:path>"FICBCO0518"</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:ifThenElse>
+                <con1:id>_ActionId-696175079544198904--18b262a8.18240db30a1.-79b8</con1:id>
+                <con2:case>
+                  <con2:condition>
+                    <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-696175079544198904--18b262a8.18240db30a1.-7980</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-696175079544198904--18b262a8.18240db30a1.-7963</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>&lt;rev:reversaCuponATMResponse/></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                      <con1:id>_ActionId-696175079544198904--18b262a8.18240db30a1.-792b</con1:id>
+                    </con1:reply>
+                  </con2:actions>
+                </con2:case>
+                <con2:default>
+                  <con2:replace varName="header" contents-only="true">
+                    <con1:id>_ActionId-696175079544198904--18b262a8.18240db30a1.-78f3</con1:id>
+                    <con2:expr>
+                      <con1:xqueryTransform>
+                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                        <con1:param name="requestHeader">
+                          <con1:path>$header/aut:RequestHeader</con1:path>
+                        </con1:param>
+                      </con1:xqueryTransform>
+                    </con2:expr>
+                  </con2:replace>
+                </con2:default>
+              </con2:ifThenElse>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ObtenerDatosCupon">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaCuponTengoATM" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaCuponATMTypes" prefix="rev"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7d6a</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/TENGO/ConsultaDatosCuponATM/biz/consultaCuponTengoATM_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>consultaCuponTengoATM</con2:operation>
+            <con2:request>
+              <con2:body>$REQConsultarCupon</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPConsultarCupon</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQConsultarCupon">
+                <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7d44</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/ReversaCuponATM/xq/consultarCuponTengodbIn"/>
+                    <con1:param name="retrievalReference">
+                      <con1:path>$body/rev:reversaCuponATM/RETRIEVAL_REFERENCE/text()</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="terminalReference">
+                <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7d30</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPConsultarCupon/con:PV_TERMINAR_REFERENCE/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="atmdate">
+                <con1:id>_ActionId-443206607841417903-70cb9aa6.18854c0fa8f.-7fff</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPConsultarCupon/con:PV_ATM_DATE/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="terminalID">
+                <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7d0f</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPConsultarCupon/con:PV_TERMINAL_ID/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="tengoref">
+                <con1:id>_ActionId-443206607841417903-70cb9aa6.18854c0fa8f.-7e5f</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPConsultarCupon/con:PV_CBREF/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="validationMessage">
+                <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7cdb</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPConsultarCupon/con:PV_CODIGO_ERROR/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="errorCode">
+                <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7cc9</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>fn:string($RSPConsultarCupon/con:PV_MENSAJE_ERROR/text())</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="controlmessage">
+                <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7cb7</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>if ($tengoref != '') then
+('')
+else ('No se pudo encontrar la transaccion')</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ReversarCuponTengo">
+        <con:context>
+          <con1:userNsDecl namespace="urn:UMARKETSCWS" prefix="urn"/>
+          <con1:userNsDecl namespace="http://appATM/" prefix="ns2"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7b63</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$controlmessage =''</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7b5b</con1:id>
+                  <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/TENGO/umarketscReversiones/biz/umarketscReversiones" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>reversioncupon</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQReversarCuponTengo</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPReversarCuponTengo</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQReversarCuponTengo">
+                      <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7b5e</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/ReversaCuponATM/xq/reversaCuponTengoIn"/>
+                          <con1:param name="transactionId">
+                            <con1:path>$tengoref</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:assign varName="errorCode">
+                      <con1:id>_ActionId-443206607841417903-70cb9aa6.18854c0fa8f.-7cf6</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>string($RSPReversarCuponTengo/return/urn:result/text())</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessage">
+                      <con1:id>_ActionId-3549493682639480152--d26d0ef.1889140b3ba.-7fee</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>string($RSPReversarCuponTengo/return/urn:result_namespace/text())</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="validationMessage">
+                      <con1:id>_ActionId-1219607682798253767--22b8d63e.188252263a8.-7b5d</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>if($errorCode = '0') then(
+		''
+	) else(
+		concat('151000-TENGO-', upper-case($errorMessage), '-', $errorCode)
+	)</con1:xqueryText>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ReversarTransaccionT24">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaCuponATMTypes" prefix="rev"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-443206607841417903-70cb9aa6.18854c0fa8f.-7d37</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$controlmessage =''</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con3:route>
+                  <con1:id>_ActionId-443206607841417903-70cb9aa6.18854c0fa8f.-7d30</con1:id>
+                  <con3:service ref="Middleware/v2/BusinessServices/TENGO/svcReversarCuponCB/biz/svcReversarBilleteraCB" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>ReversarTransaccionesATMTengo</con3:operation>
+                  <con3:outboundTransform>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-443206607841417903-70cb9aa6.18854c0fa8f.-7d2f</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/ReversaCuponATM/xq/reversarTransaccionCuponT24In"/>
+                          <con1:param name="usuario">
+                            <con1:path>$header/aut:RequestHeader/Authentication/UserName/text()</con1:path>
+                          </con1:param>
+                          <con1:param name="terminalref11">
+                            <con1:path>$terminalReference</con1:path>
+                          </con1:param>
+                          <con1:param name="fecha">
+                            <con1:path>let $fechaSistema := fn:current-date()
+    let $year := fn-bea:pad-left(fn:string(year-from-date($fechaSistema)), 4, "0")
+    let $mes := fn-bea:pad-left(fn:string(month-from-date($fechaSistema)) , 2, "0")
+    let $dia := fn-bea:pad-left(fn:string(day-from-date($fechaSistema)), 2, "0")
+return(
+	fn:concat($year,$mes,$dia)
+)</con1:path>
+                          </con1:param>
+                          <con1:param name="terminalid41">
+                            <con1:path>$terminalID</con1:path>
+                          </con1:param>
+                          <con1:param name="referenciacb">
+                            <con1:path>$tengoref</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con3:outboundTransform>
+                </con3:route>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionesGenerales_response">
+      <con:stage name="FlujodeSalida">
+        <con:context>
+          <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroATMConCuponTypes" prefix="ret"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaCuponATMTypes" prefix="rev"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-1537878027399584096--7c2f8f9.188017aa555.-7e88</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace contents-only="true" varName="header">
+                  <con1:id>_ActionId-1537878027399584096--7c2f8f9.188017aa555.-7e87</con1:id>
+                  <con2:location>
+                    <con1:xpathText>.</con1:xpathText>
+                  </con2:location>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-1537878027399584096--7c2f8f9.188017aa555.-7e86</con1:id>
+                  <con2:location>
+                    <con1:xpathText>.</con1:xpathText>
+                  </con2:location>
+                  <con2:expr>
+                    <con1:xqueryText><![CDATA[<rev:reversaCuponATMResponse>
+<TRANSACTION_DATE>{ fn:current-date() }</TRANSACTION_DATE>
+<AUTORIZATION_NUMBER>{ $terminalReference }</AUTORIZATION_NUMBER>
+</rev:reversaCuponATMResponse>]]></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-1537878027399584096--7c2f8f9.188017aa555.-7e85</con1:id>
+                <con2:location>
+                  <con1:xpathText>.</con1:xpathText>
+                </con2:location>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>
+      {
+      	if(string($errorCode) != '0') then(
+      		'ERROR'
+      	) else (
+      		$errorCode
+      	)
+      }
+      </successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-1537878027399584096--7c2f8f9.188017aa555.-7e84</con1:id>
+                <con2:location>
+                  <con1:xpathText>.</con1:xpathText>
+                </con2:location>
+                <con2:expr>
+                  <con1:xqueryText>&lt;rev:reversaCuponATMResponse/></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="error" name="_onErrorHandler-4728620077039186735--143f99c9.1824cc79c5c.-7dd7">
+      <con:stage name="ManejoError">
+        <con4:context xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroATMConCuponTypes" prefix="ret"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaBilleteraATMTypes" prefix="rev"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaCuponATMTypes" prefix="rev1"/>
+        </con4:context>
+        <con4:actions xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+          <con4:assign varName="errorCode" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-4728620077039186735--143f99c9.1824cc79c5c.-7dc1</con5:id>
+            <con4:expr>
+              <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($fault/ctx:errorCode/text())</con5:xqueryText>
+            </con4:expr>
+          </con4:assign>
+          <con4:assign varName="errorMessage" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-4728620077039186735--143f99c9.1824cc79c5c.-7dc0</con5:id>
+            <con4:expr>
+              <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($fault/ctx:reason/text())</con5:xqueryText>
+            </con4:expr>
+          </con4:assign>
+          <con5:wsCallout xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+            <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-4728620077039186735--143f99c9.1824cc79c5c.-7dbd</con6:id>
+            <con5:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con5:operation>mapeoErrores</con5:operation>
+            <con5:request>
+              <con5:body>$reqMapeoErrores</con5:body>
+            </con5:request>
+            <con5:response>
+              <con5:body>respMapeoErrores</con5:body>
+            </con5:response>
+            <con5:requestTransform>
+              <con5:assign varName="reqMapeoErrores">
+                <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-4728620077039186735--143f99c9.1824cc79c5c.-7dbf</con6:id>
+                <con5:expr>
+                  <con6:xqueryTransform xmlns:con6="http://www.bea.com/wli/sb/stages/config">
+                    <con6:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con6:param name="MENSAJE_ERROR">
+                      <con6:path>fn:concat("FICBCO0259", "$#$", $errorMessage)</con6:path>
+                    </con6:param>
+                    <con6:param name="CODIGO_ERROR">
+                      <con6:path>$errorCode</con6:path>
+                    </con6:param>
+                  </con6:xqueryTransform>
+                </con5:expr>
+              </con5:assign>
+            </con5:requestTransform>
+            <con5:responseTransform>
+              <con5:replace contents-only="true" varName="header">
+                <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-4728620077039186735--143f99c9.1824cc79c5c.-7dbe</con6:id>
+                <con5:expr>
+                  <con6:xqueryTransform xmlns:con6="http://www.bea.com/wli/sb/stages/config">
+                    <con6:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con6:param name="mapeoErroresResponse1">
+                      <con6:path>$respMapeoErrores</con6:path>
+                    </con6:param>
+                    <con6:param name="successIndicator">
+                      <con6:path>$errorCode</con6:path>
+                    </con6:param>
+                  </con6:xqueryTransform>
+                </con5:expr>
+              </con5:replace>
+            </con5:responseTransform>
+          </con5:wsCallout>
+          <con3:replace contents-only="true" varName="body">
+            <con2:id>_ActionId-4728620077039186735--143f99c9.1824cc79c5c.-7dbc</con2:id>
+            <con3:expr>
+              <con2:xqueryText>&lt;rev:reversaCuponATMResponse/></con2:xqueryText>
+            </con3:expr>
+          </con3:replace>
+          <con2:reply>
+            <con2:id>_ActionId-4728620077039186735--143f99c9.1824cc79c5c.-7dbb</con2:id>
+          </con2:reply>
+        </con4:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="ValidacionesGenerales">
+        <con:request>ValidacionesGenerales_request</con:request>
+        <con:response>ValidacionesGenerales_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

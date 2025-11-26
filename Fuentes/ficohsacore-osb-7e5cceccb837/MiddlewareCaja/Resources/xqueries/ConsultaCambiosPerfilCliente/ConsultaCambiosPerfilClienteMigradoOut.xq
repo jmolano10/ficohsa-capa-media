@@ -1,0 +1,173 @@
+(:: pragma bea:global-element-parameter parameter="$consultaperfildeclienteResponse" element="ns0:ConsultaperfildeclienteResponse" location="../../xsds/PerfilCliente/XMLSchema_-994245660.xsd" ::)
+(:: pragma bea:global-element-return element="ns0:ConsultaperfildeclienteResponse" location="../../xsds/ConsultaCambiosPerfilCliente/ConsultaCambiosPerfilCliente.xsd" ::)
+
+declare namespace ns0 = "T24WebServicesImpl";
+declare namespace xf = "http://tempuri.org/MiddlewareCaja/Resources/xqueries/ConsultaCambiosPerfilCliente/ConsultaCambiosPerfilClienteMigradoOut/";
+
+declare function xf:ConsultaCambiosPerfilClienteMigradoOut($consultaperfildeclienteResponse as element(ns0:ConsultaperfildeclienteResponse))
+    as element(ns0:ConsultaperfildeclienteResponse) {
+        <ns0:ConsultaperfildeclienteResponse>
+            {
+                for $Status in $consultaperfildeclienteResponse/Status
+                return
+                    <Status>{ $Status/@* , $Status/node() }</Status>
+            }
+		    <WSCUSTOMERFULLType>
+		        <gWSCUSTOMERFULLDetailType>
+		            <mWSCUSTOMERFULLDetailType>
+		                <CUSTOMER>{ fn:string($consultaperfildeclienteResponse/WSCUSTOMERFULLType[1]/gWSCUSTOMERFULLDetailType/mWSCUSTOMERFULLDetailType[1]/CUSTOMER/text()) }</CUSTOMER>
+		                <MNEMONIC></MNEMONIC>
+		                <GIVENNAMES></GIVENNAMES>
+		                <FAMILYNAMES></FAMILYNAMES>
+		                <NAMEOFBUSINESS></NAMEOFBUSINESS>
+		                <COMMERCIALNAME></COMMERCIALNAME>
+		                <SHORTNAME></SHORTNAME>
+		                <ADDRESSLINE1></ADDRESSLINE1>
+		                <ADDRESSLINE2></ADDRESSLINE2>
+		                <SECTOR></SECTOR>
+		                <SECTORNAME></SECTORNAME>
+		                <INDUSTRY></INDUSTRY>
+		                <INDUSTRYNAME></INDUSTRYNAME>
+		                <TARGET></TARGET>
+		                <TARGETNAME></TARGETNAME>
+		                <NATIONALITY></NATIONALITY>
+		                <RESIDENCE></RESIDENCE>
+		                <CUSTOMERSTATUS></CUSTOMERSTATUS>
+		                <CUSTOMERTYPE></CUSTOMERTYPE>
+		                <LEGALID></LEGALID>
+		                <LEGALDOCNAME></LEGALDOCNAME>
+		                <LEGALHOLDERNAME></LEGALHOLDERNAME>
+		                <DATEOFBIRTH></DATEOFBIRTH>
+		                <MARITALSTATUS></MARITALSTATUS>
+		                <GENDER></GENDER>
+		                <EMAIL></EMAIL>
+		                <SMS></SMS>
+		                <PHONE></PHONE>
+		                <FAX></FAX>
+		                <ADDRESSTYPE></ADDRESSTYPE>
+		                <GENERATORTYPE></GENERATORTYPE>
+		                <LANGUAGE></LANGUAGE>
+		                <ACCOUNTOFFICER></ACCOUNTOFFICER>
+		                <BRANCHCODE></BRANCHCODE>
+		                <COUNTRYCODE></COUNTRYCODE>
+		                <STATECODE></STATECODE>
+		                <CITYCODE></CITYCODE>
+		                <OCCUPATION></OCCUPATION>
+		                <EMPLOYMENTSTATUS></EMPLOYMENTSTATUS>
+		                <EMPLOYERSNAME></EMPLOYERSNAME>
+		                <MARRIEDLASTNAME></MARRIEDLASTNAME>
+		                <LEGALREPNAME></LEGALREPNAME>
+		                <LEGALREPID></LEGALREPID>
+		                <TYPEOFCOMPANY></TYPEOFCOMPANY>
+		                <PROFESSIONORTRADE></PROFESSIONORTRADE>
+		                <NUMBEROFDEED></NUMBEROFDEED>
+		                <LEGALREPHOMEPHONE></LEGALREPHOMEPHONE>
+		                <INPUTTER></INPUTTER>
+		                <DATETIME></DATETIME>
+		                <TYPEOFPERSON></TYPEOFPERSON>
+		                <SECTORIZATIONTYPE></SECTORIZATIONTYPE>
+		                <SECTORIZATIONCODE></SECTORIZATIONCODE>
+		                <EDUCATIONLEVEL></EDUCATIONLEVEL>
+		                <SPOUSENAME></SPOUSENAME>
+		                <NOOFDEPENDANTS></NOOFDEPENDANTS>
+		                <INCOMERANGE></INCOMERANGE>
+		                <EMPLOYMENTSTART></EMPLOYMENTSTART>
+		                <MAINADDRESSYN></MAINADDRESSYN>
+		                <CUSTOMERSINCE></CUSTOMERSINCE>
+		                <ECONOMICGROUPID></ECONOMICGROUPID>
+		                <ECONOMICGROUPNAME></ECONOMICGROUPNAME>
+		                <NATIONALITYID></NATIONALITYID>
+		                <RESIDENCEID></RESIDENCEID>
+		                <LEGALISSDATE></LEGALISSDATE>
+		                <JOBTITLE></JOBTITLE>
+		                <CUSTOMERCURRENCY></CUSTOMERCURRENCY>
+		                <CITYOFBIRTH></CITYOFBIRTH>
+		                <SRCOFINCOME></SRCOFINCOME>
+		                <NAMEDEPENDANT></NAMEDEPENDANT>
+		                <RELATIONSHIP></RELATIONSHIP>
+		                <COLONYCODE></COLONYCODE>
+		                <AVENUE></AVENUE>
+		                <ADDSTREET></ADDSTREET>
+		                <BLOCK></BLOCK>
+		                <HOUSENUMBER></HOUSENUMBER>
+		                <REFERENCES></REFERENCES>
+		                <TYPEOFMERCHANT></TYPEOFMERCHANT>
+		                <INCOMECCY></INCOMECCY>
+		                <PROVIDERNAME></PROVIDERNAME>
+		                <PROVIDERLOCATION></PROVIDERLOCATION>
+		                <GEOPROVIDES></GEOPROVIDES>
+		                <PROVIDERTELNO></PROVIDERTELNO>
+		                <CLIENTNAME></CLIENTNAME>
+		                <CLIENTLOCATION></CLIENTLOCATION>
+		                <SRVPRODOFFER></SRVPRODOFFER>
+		                <CLIENTTELNO></CLIENTTELNO>
+		                <COMMREFNAME></COMMREFNAME>
+		                <COMMREFCON></COMMREFCON>
+		                <COMMREFTELNO></COMMREFTELNO>
+		                <OWNSVEHICLE></OWNSVEHICLE>
+		                <PERSREFFGNAME></PERSREFFGNAME>
+		                <PERSREFFLNAME></PERSREFFLNAME>
+		                <PERSREFSLNAME></PERSREFSLNAME>
+		                <PERSREFMDNNAME></PERSREFMDNNAME>
+		                <PERSREFTELNO></PERSREFTELNO>
+		                <PERSREFRELATION></PERSREFRELATION>
+		                <NOOFEMPLOYEES></NOOFEMPLOYEES>
+		                <NOOFPROVIDERS></NOOFPROVIDERS>
+		                <RECOLLOFVALUE></RECOLLOFVALUE>
+		                <LGLREPTYPEIDEN></LGLREPTYPEIDEN>
+		                <LGLREPMDNNAME></LGLREPMDNNAME>
+		                <LGLREPHSTLNO></LGLREPHSTLNO>
+		                <LGLREPCLTLNO></LGLREPCLTLNO>
+		                <LGLREPEMAIL></LGLREPEMAIL>
+		                <POWEROVRCOMP></POWEROVRCOMP>
+		                <POWERDESCRIPTION></POWERDESCRIPTION>
+		                <CONTACTFSTNAME></CONTACTFSTNAME>
+		                <CONTACTLSTNAME></CONTACTLSTNAME>
+		                <CONTACTMDNNAME></CONTACTMDNNAME>
+		                <CONTACTHSTLNO></CONTACTHSTLNO>
+		                <CONTACTCLTLNO></CONTACTCLTLNO>
+		                <CONTACTEMAIL></CONTACTEMAIL>
+		                <CONTACTCURPOSPER></CONTACTCURPOSPER>
+		                <SHARETYPE></SHARETYPE>
+		                <TYPEOFSALES></TYPEOFSALES>
+		                <SALESVOLUME></SALESVOLUME>
+		                <SHARECAPITAL></SHARECAPITAL>
+		                <REGISTERDATE></REGISTERDATE>
+		                <REGISTERNO></REGISTERNO>
+		                <VOLOFREGISTER></VOLOFREGISTER>
+		                <COMPANYPURPOSE></COMPANYPURPOSE>
+		                <AUDITSIGNATURE></AUDITSIGNATURE>
+		                <MGMTCOUNCIL></MGMTCOUNCIL>
+		                <MINUTEDATE></MINUTEDATE>
+		                <LGLREPFACULTIES></LGLREPFACULTIES>
+		                <SHRHLDIDTYPE></SHRHLDIDTYPE>
+		                <SHRHLDIDNO></SHRHLDIDNO>
+		                <SHRHLDFSTNAME></SHRHLDFSTNAME>
+		                <SHRHLDLSTNAME></SHRHLDLSTNAME>
+		                <SHRHLDMDNNAME></SHRHLDMDNNAME>
+		                <SHAREPERCENT></SHAREPERCENT>
+		                <REACHABLECLIENT></REACHABLECLIENT>
+		                <RELATEDPART></RELATEDPART>
+		                <TYPERELPART></TYPERELPART>
+		                <EXTENSION></EXTENSION>
+		                <LRMAINADELEC></LRMAINADELEC>
+		                <LEGALISEDID></LEGALISEDID>
+		                <LEGALISEDNAME></LEGALISEDNAME>
+		                <RTN></RTN>
+		                <NEIGHBORHOOD></NEIGHBORHOOD>
+		                <PHONEREFERENCE></PHONEREFERENCE>
+		                <SECTORIZATIONLEVEL></SECTORIZATIONLEVEL>
+		                <SECTORIZATIONNOTES></SECTORIZATIONNOTES>
+		                <SMENAME></SMENAME>
+		                <PROFESSIONDEP></PROFESSIONDEP>
+		                <SOCIETYTYPE></SOCIETYTYPE>
+		                <RESIDENCESTATUS></RESIDENCESTATUS>
+		            </mWSCUSTOMERFULLDetailType>
+		        </gWSCUSTOMERFULLDetailType>
+		    </WSCUSTOMERFULLType>            
+        </ns0:ConsultaperfildeclienteResponse>
+};
+
+declare variable $consultaperfildeclienteResponse as element(ns0:ConsultaperfildeclienteResponse) external;
+
+xf:ConsultaCambiosPerfilClienteMigradoOut($consultaperfildeclienteResponse)

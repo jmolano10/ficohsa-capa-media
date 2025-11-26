@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false">
+    <ser:security>
+      <con3:custom-token-authentication>
+        <con3:username-password>
+          <con3:username-selector>
+            <con3:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/UserName/text()</con3:xpath>
+            <con3:variable>header</con3:variable>
+          </con3:username-selector>
+          <con3:password-selector>
+            <con3:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/Password/text()</con3:xpath>
+            <con3:variable>header</con3:variable>
+          </con3:password-selector>
+        </con3:username-password>
+      </con3:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/TransaccionesACHRecibidas/wsdl/transaccionesACHRecibidasPS"/>
+      <con:binding>
+        <con:name>transaccionesACHRecibidasPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/transaccionesACHRecibidasPS/</con:namespace>
+      </con:binding>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/OperationsAndExecution/CustomerDeposits/TransaccionesACHRecibidas</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-8681816266708232033-35fc08eb.160e55a56cb.-7145">
+    <con:pipeline type="request" name="ValidacionesGenerales_request">
+      <con:stage name="ValidacionXSD">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transaccionesACHRecibidasTypes" prefix="tran"/>
+        </con:context>
+        <con:actions>
+          <con2:validate>
+            <con1:id>_ActionId-5457291939840025826-b5a2419.160e0b7ef30.-5a5e</con1:id>
+            <con2:schema ref="Middleware/v2/Resources/TransaccionesACHRecibidas/xsd/transaccionesACHRecibidasTypes"/>
+            <con2:schemaElement xmlns:tran1="http://www.ficohsa.com.hn/middleware.services/transaccionesACHRecibidasTypes">tran1:transaccionesACHRecibidas</con2:schemaElement>
+            <con2:varName>body</con2:varName>
+            <con2:location>
+              <con1:xpathText>./tran:transaccionesACHRecibidas</con1:xpathText>
+            </con2:location>
+          </con2:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionBloqueUnico">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transaccionesACHRecibidasTypes" prefix="tran"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-6511141408664271902--312f1c9c.160fa4caead.-7eb9</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>count($body/tran:transaccionesACHRecibidas/TRANSACTION_DETAILS/TRANSACTION_DETAIL) != 1</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-6511141408664271902--312f1c9c.160fa4caead.-7eb8</con1:id>
+                  <con2:errCode>ERROR</con2:errCode>
+                  <con2:message>MULTIPLE TRANSACTIONS NOT ALLOWED</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionesGenerales_response"/>
+    <con:pipeline type="request" name="EjecucionACHDebito_request">
+      <con:stage name="Servicio_ACHDebitos">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transaccionesACHRecibidasTypes" prefix="tran"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-8681816266708232033-35fc08eb.160e55a56cb.-774b</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/TransferenciasACHDebitos" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>transferenciasACHDebitos</con2:operation>
+            <con2:request>
+              <con2:body>$REQTransferACHDebitos</con2:body>
+              <con2:header>$header</con2:header>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPTransferACHDebitos</con2:body>
+              <con2:header>RSPHeaderTransferACHDebitos</con2:header>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQTransferACHDebitos">
+                <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-7bde</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/TransaccionesACHRecibidas/xq/transferenciasACHDebitosIn"/>
+                    <con1:param name="transaccionesACHRecibidas1">
+                      <con1:path>$body/tran:transaccionesACHRecibidas</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:ifThenElse>
+                <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-7ba6</con1:id>
+                <con2:case>
+                  <con2:condition>
+                    <con1:xqueryText>fn:string($RSPHeaderTransferACHDebitos/aut:ResponseHeader/successIndicator/text())="Success"</con1:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:replace contents-only="true" varName="body">
+                      <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-7afd</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/TransaccionesACHRecibidas/xq/transferenciasACHDebitosOut"/>
+                          <con1:param name="transferenciasACHDebitosResponse1">
+                            <con1:path>$RSPTransferACHDebitos</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:actions>
+                </con2:case>
+                <con2:default>
+                  <con2:replace contents-only="true" varName="body">
+                    <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-7b6e</con1:id>
+                    <con2:expr>
+                      <con1:xqueryText>&lt;tran:transaccionesACHRecibidasResponse/></con1:xqueryText>
+                    </con2:expr>
+                  </con2:replace>
+                </con2:default>
+              </con2:ifThenElse>
+              <con2:replace varName="header">
+                <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-7b36</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>$RSPHeaderTransferACHDebitos</con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="EjecucionACHDebito_response"/>
+    <con:pipeline type="error" name="_onErrorHandler-8681816266708232033-35fc08eb.160e55a56cb.-7145">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transaccionesACHRecibidasTypes" prefix="tran"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="errorCode">
+            <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-7901</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="errorMessage">
+            <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-78c9</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-78ac</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>mapeoErrores</con2:operation>
+            <con2:request>
+              <con2:body>$REQMapeoErrores</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPMapeoErrores</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQMapeoErrores">
+                <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-7874</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con1:param name="CODIGO_ERROR">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                    <con1:param name="MENSAJE_ERROR">
+                      <con1:path>fn:concat("FICBCO0191", "$#$", $errorMessage)</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-783c</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con1:param name="mapeoErroresResponse1">
+                      <con1:path>$RSPMapeoErrores</con1:path>
+                    </con1:param>
+                    <con1:param name="successIndicator">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con2:responseTransform>
+          </con2:wsCallout>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-7804</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;tran:transaccionesACHRecibidasResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-4666021585831732400-2dcba32a.160ea7c0de7.-77e7</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="EjecucionACHRecibida_request">
+      <con:stage name="Servicio_ACH_Recibidas">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transaccionesACHRecibidasTypes" prefix="tran"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-2604857859505615960-7b6fd90c.161478862fc.-7fa4</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/TransferenciasACHRecibidas" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>transferenciasACHRecibidas</con2:operation>
+            <con2:request>
+              <con2:body>$REQtransferenciasACHRecibidas</con2:body>
+              <con2:header>$header</con2:header>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPtransferenciasACHRecibidas</con2:body>
+              <con2:header>RSPHeadertransferenciasACHRecibidas</con2:header>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="REQtransferenciasACHRecibidas">
+                <con1:id>_ActionId-2604857859505615960-7b6fd90c.161478862fc.-7fa9</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/TransaccionesACHRecibidas/xq/transferenciasACHRecibidasIn"/>
+                    <con1:param name="transaccionesACHRecibidas1">
+                      <con1:path>$body/tran:transaccionesACHRecibidas</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+              <con2:transport-headers copy-all="true">
+                <con1:id>_ActionId-9104783294156470241--422f4520.16b7015d2d9.-7fe8</con1:id>
+                <con2:header-set>outbound-request</con2:header-set>
+              </con2:transport-headers>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:ifThenElse>
+                <con1:id>_ActionId-2604857859505615960-7b6fd90c.161478862fc.-7fa8</con1:id>
+                <con2:case>
+                  <con2:condition>
+                    <con1:xqueryText>fn:string($RSPHeadertransferenciasACHRecibidas/aut:ResponseHeader/successIndicator/text())="SUCCESS"</con1:xqueryText>
+                  </con2:condition>
+                  <con2:actions>
+                    <con2:replace contents-only="true" varName="body">
+                      <con1:id>_ActionId-2604857859505615960-7b6fd90c.161478862fc.-7fa7</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/TransaccionesACHRecibidas/xq/transferenciasACHRecibidasOut"/>
+                          <con1:param name="transferenciasACHRecibidasResponse1">
+                            <con1:path>$RSPtransferenciasACHRecibidas</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:actions>
+                </con2:case>
+                <con2:default>
+                  <con2:replace contents-only="true" varName="body">
+                    <con1:id>_ActionId-2604857859505615960-7b6fd90c.161478862fc.-7fa6</con1:id>
+                    <con2:expr>
+                      <con1:xqueryText>&lt;tran:transaccionesACHRecibidasResponse/></con1:xqueryText>
+                    </con2:expr>
+                  </con2:replace>
+                </con2:default>
+              </con2:ifThenElse>
+              <con2:replace varName="header">
+                <con1:id>_ActionId-2604857859505615960-7b6fd90c.161478862fc.-7fa5</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>$RSPHeadertransferenciasACHRecibidas</con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="EjecucionACHRecibida_response"/>
+    <con:flow>
+      <con:pipeline-node name="ValidacionesGenerales">
+        <con:request>ValidacionesGenerales_request</con:request>
+        <con:response>ValidacionesGenerales_response</con:response>
+      </con:pipeline-node>
+      <con:branch-node type="condition" name="CanalizacionServicios">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transaccionesACHRecibidasTypes" prefix="tran"/>
+        </con:context>
+        <con:branch-table variable="body">
+          <con:xpath>
+            <con1:xpathText>./tran:transaccionesACHRecibidas/TRANSACTION_DETAILS/TRANSACTION_DETAIL[1]/TRANSACTION_TYPE</con1:xpathText>
+          </con:xpath>
+          <con:branch name="ACH_Debito">
+            <con:operator>equals</con:operator>
+            <con:value>'ACCT_DEBIT'</con:value>
+            <con:flow>
+              <con:pipeline-node name="EjecucionACHDebito">
+                <con:request>EjecucionACHDebito_request</con:request>
+                <con:response>EjecucionACHDebito_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow>
+              <con:pipeline-node name="EjecucionACHRecibida">
+                <con:request>EjecucionACHRecibida_request</con:request>
+                <con:response>EjecucionACHRecibida_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

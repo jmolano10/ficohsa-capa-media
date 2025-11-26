@@ -1,0 +1,365 @@
+<bpel:process name="sjTransferenciaInternacionalH2H" targetNamespace="http://www.example.com/flow/MWHostToHost/v1/BusinessServices/SJS/TransferenciaInternacionalH2H/flow/sjTransferenciaInternacionalH2H" bea:name="sjTransferenciaInternacionalH2H" xmlns:tns="http://www.example.com/flow/MWHostToHost/v1/BusinessServices/SJS/TransferenciaInternacionalH2H/flow/sjTransferenciaInternacionalH2H" xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable" xmlns:rescon="http://www.bea.com/alsb/flow/resources/config" xmlns:bea="http://www.bea.com/bpel/ui/extensions" xmlns:ext="http://www.bea.com/bpel/extensions" xmlns:expr="http://www.bea.com/wli/sb/stages/config" xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config" xmlns:bind="http://www.ficohsa.com.hn/middleware.services/sjTransferenciaInternacionalH2HPS/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ns1="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalPS/" xmlns:aut="http://www.ficohsa.com.hn/middleware.services/autType" xmlns:ns0="http://xmlns.oracle.com/pcbpel/adapter/db/sp/CuentasPorCliente" xmlns:ns2="http://xmlns.oracle.com/pcbpel/adapter/db/CuentasPorCliente/CuentasPorCliente/CuentasPorCliente" xmlns:ns3="http://www.bea.com/wli/sb/stages/logging/config">
+    <rescon:importInfo>
+    	<rescon:schema-import ref="MWHostToHost/v1/BusinessServices/INTFC/consultaCuentasPorClienteH2H/xsd/CuentasPorCliente_sp">
+    	</rescon:schema-import></rescon:importInfo>
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjTransferenciaInternacionalH2H" partnerLinkType="tns:sjTransferenciaInternacionalH2H" myRole="sjTransferenciaInternacionalH2H">
+	       </bpel:partnerLink>
+	   <bpel:partnerLink name="TransferenciaInternacional_1" partnerLinkType="tns:TransferenciaInternacional_1_plnkType" partnerRole="TransferenciaInternacional_1_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="CuentasPorCliente_db" partnerLinkType="tns:CuentasPorCliente_db_plnkType" partnerRole="CuentasPorCliente_db_PartnerRole">
+	   </bpel:partnerLink></bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request" messageType="bind:sjTransferenciaInternacionalH2HRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response" messageType="bind:sjTransferenciaInternacionalH2HResponse">
+	       </bpel:variable>
+    <bpel:variable name="transferIntREQ" messageType="ns1:transferenciaInternacionalRequest">
+    </bpel:variable>
+    <bpel:variable name="transferIntRSP" messageType="ns1:transferenciaInternacionalResponse">
+    </bpel:variable>
+    
+    <bpel:variable name="consultaCuentaREQ" messageType="ns2:args_in_msg">
+    </bpel:variable>
+    <bpel:variable name="consultaCuentaRSP" messageType="ns2:args_out_msg">
+    </bpel:variable>
+    <bpel:variable name="tempRequest" type="xsd:anyType"/></bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjTransferenciaInternacionalH2H" operation="sjTransferencia" variable="request" createInstance="yes">
+	           <rescon:receiveInfo>
+                <rescon:wsdl ref="MWHostToHost/v1/BusinessServices/SJS/TransferenciaInternacionalH2H/wsdl/sjTransferenciaInternacionalH2H" binding="bind:sjTransferenciaInternacionalH2HPSSOAP"/>
+            </rescon:receiveInfo>
+        </bpel:receive>
+        
+        <bpel:scope bea:name="PrepararParametros">
+        	<bpel:sequence>
+        		<bpel:assign>
+        			<bpel:extensionAssignOperation bea:name="Salida">
+        				<trf:assign varName="response.outputParameters">
+        					<trf:expr>
+        						<expr:xqueryText>&lt;outputParameters>
+	&lt;SUCCESS_INDICATOR>SUCCESS&lt;/SUCCESS_INDICATOR>
+	&lt;TRANSFERS_INT/>
+&lt;/outputParameters></expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        			<bpel:extensionAssignOperation bea:name="Accounts">
+        				<bpel:documentation/>
+        				<trf:assign varName="tempRequest">
+        					<trf:expr>
+        						<expr:xqueryText>&lt;requestTemp>
+	&lt;TRANSFERS_INT/>
+&lt;/requestTemp></expr:xqueryText></trf:expr></trf:assign>
+        			</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        </bpel:scope>
+        
+        <bpel:scope bea:name="ConsultaCuenta">
+        	<bpel:variables>
+        		<bpel:variable name="consultaCuentaError" type="xsd:string">
+        		</bpel:variable>
+        		<bpel:variable name="trace" type="xsd:string"/>
+        		<bpel:variable name="bodyTransaction" type="xsd:anyType"/>
+        		<bpel:variable name="transfer" type="xsd:anyType"/></bpel:variables>
+        	<bpel:faultHandlers>
+        		<bpel:catchAll>
+        			<bpel:sequence>
+        				<bpel:empty/>
+        			<bpel:assign>
+		<bpel:extensionAssignOperation bea:name="Transfer">
+			<bpel:documentation/>
+			<trf:assign varName="transfer">
+				<trf:expr>
+					<expr:xqueryText><![CDATA[<NODE>
+	<TRANSFER_INT>
+		<SUCCESS_INDICATOR>Error</SUCCESS_INDICATOR>
+		<ERROR_MESSAGE>Ocurrio un error al consultar las cuentas.</ERROR_MESSAGE>
+	</TRANSFER_INT>
+</NODE>]]></expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+		<bpel:extensionAssignOperation bea:name="Transfer">
+			<bpel:documentation/>
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./TRANSFERS_INT</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>$transfer/*</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        		</bpel:catchAll></bpel:faultHandlers>
+        	<bpel:sequence>
+        		<bpel:forEach parallel="no" counterName="accountIndex">
+        			<bpel:startCounterValue>1</bpel:startCounterValue>
+        			<bpel:finalCounterValue>count($request.inputParameters/TRANSFERS_INT/TRANSFER_INT)</bpel:finalCounterValue>
+        			<bpel:scope>
+        				<bpel:sequence>
+        					
+        					
+        					<bpel:assign>
+        						<bpel:extensionAssignOperation bea:name="Request">
+        							<trf:assign varName="consultaCuentaREQ.InputParameters">
+        								<trf:expr>
+        									<expr:xqueryTransform>
+        										<expr:resource ref="MWHostToHost/v1/BusinessServices/SJS/TransferenciaInternacionalH2H/xq/sjConsultaCuentaIN"/>
+        										
+        										
+        										<expr:param name="sjTransferenciaInternacionalRequest1">
+        											<expr:path>$request.inputParameters</expr:path></expr:param>
+        										<expr:param name="tranferIndex">
+        											<expr:path>$accountIndex</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        						</bpel:assign>
+        					
+        					
+        					<bpel:invoke partnerLink="CuentasPorCliente_db" outputVariable="consultaCuentaRSP" inputVariable="consultaCuentaREQ" operation="CuentasPorCliente">
+        						<rescon:invokeInfo>
+        							<rescon:service ref="MWHostToHost/v1/BusinessServices/INTFC/consultaCuentasPorClienteH2H/biz/CuentasPorCliente_db" isProxy="false"/></rescon:invokeInfo></bpel:invoke>
+        					
+        					<bpel:assign>
+        						<bpel:extensionAssignOperation bea:name="ConsultaClienteError">
+        							<trf:assign varName="consultaCuentaError">
+        								<trf:expr>
+        									<expr:xqueryText>fn:upper-case(string($consultaCuentaRSP.OutputParameters/ns0:PV_CODIGOMENSAJE))</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        						<bpel:extensionAssignOperation bea:name="Trace">
+        							<bpel:documentation/>
+        							<trf:assign varName="trace">
+        								<trf:expr>
+        									<expr:xqueryText>string($request.inputParameters/TRANSFERS_INT/TRANSFER_INT[ xs:int($accountIndex) ]/TRACE/text())</expr:xqueryText></trf:expr></trf:assign>
+        						</bpel:extensionAssignOperation>
+        						</bpel:assign>
+        					
+        					<bpel:if>
+        						<bpel:condition>$consultaCuentaError = 'SUCCESS'</bpel:condition>
+        						<bpel:sequence>
+        							<bpel:empty/>
+        							<bpel:assign>
+        								<bpel:extensionAssignOperation bea:name="Transaction">
+        									<trf:assign varName="bodyTransaction">
+        										<trf:expr>
+        											<expr:xqueryText>&lt;NODE>
+	{$request.inputParameters/TRANSFERS_INT/TRANSFER_INT[ xs:int($accountIndex) ]}
+&lt;/NODE></expr:xqueryText></trf:expr></trf:assign>
+        								</bpel:extensionAssignOperation>
+        							<bpel:extensionAssignOperation bea:name="Transaction">
+		<bpel:documentation/>
+		<trf:insert varName="tempRequest">
+			<trf:location>
+				<expr:xpathText>./TRANSFERS_INT</expr:xpathText></trf:location>
+			<trf:where>last-child</trf:where>
+			<trf:expr>
+				<expr:xqueryText>$bodyTransaction/*</expr:xqueryText></trf:expr></trf:insert>
+        							</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        						<bpel:else>
+        							<bpel:sequence>
+        								<bpel:empty/>
+        								<bpel:assign>
+        									
+        									
+        									<bpel:extensionAssignOperation bea:name="Transfer">
+        										<trf:assign varName="transfer">
+        											<trf:expr>
+        												<expr:xqueryText><![CDATA[<NODE>
+	<TRANSFER_INT>
+		<SUCCESS_INDICATOR>{ string($consultaCuentaRSP.OutputParameters/ns0:PV_CODIGOMENSAJE) }</SUCCESS_INDICATOR>
+		<ERROR_MESSAGE>{ string($consultaCuentaRSP.OutputParameters/ns0:PV_DESCRIPCIONMENSAJE) }</ERROR_MESSAGE>
+		<TRACE>{ $trace}</TRACE>
+	</TRANSFER_INT>
+</NODE>]]></expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        									<bpel:extensionAssignOperation bea:name="Transfer">
+        										<bpel:documentation/>
+        										<trf:insert varName="response.outputParameters">
+        											<trf:location>
+        												<expr:xpathText>./TRANSFERS_INT</expr:xpathText></trf:location>
+        											<trf:where>last-child</trf:where>
+        											<trf:expr>
+        												<expr:xqueryText>$transfer/*</expr:xqueryText></trf:expr></trf:insert>
+        									</bpel:extensionAssignOperation></bpel:assign></bpel:sequence></bpel:else></bpel:if>
+        					</bpel:sequence>
+        			</bpel:scope>
+        		</bpel:forEach></bpel:sequence>
+        </bpel:scope>
+        <bpel:scope bea:name="Iterate">
+		<bpel:variables>
+        		<bpel:variable name="successIndicator" type="xsd:string">
+        		</bpel:variable>
+			<bpel:variable name="errorMessage" type="xsd:string">
+        		</bpel:variable>
+			<bpel:variable name="transactionId" type="xsd:string">
+        		</bpel:variable>
+        		<bpel:variable name="validationMessage" type="xsd:string">
+        		</bpel:variable>
+        		<bpel:variable name="orderingCustomer" type="xsd:string">
+        		</bpel:variable>
+        		<bpel:variable name="transfer" type="xsd:anyType">
+        		</bpel:variable>
+        		<bpel:variable name="trace" type="xsd:string"/>
+        		
+        		<bpel:variable name="countTransaction" type="xsd:integer">
+        		</bpel:variable>
+        		<bpel:variable name="valueDate" type="xsd:string"></bpel:variable></bpel:variables>
+        	<bpel:faultHandlers>
+        		<bpel:catchAll>
+        			<bpel:sequence>
+        				<bpel:empty/>
+        			<bpel:assign>
+		<bpel:extensionAssignOperation bea:name="Transfer">
+			<bpel:documentation/>
+			<trf:assign varName="transfer">
+				<trf:expr>
+					<expr:xqueryText><![CDATA[<NODE>
+	<TRANSFER_INT>
+		<SUCCESS_INDICATOR></SUCCESS_INDICATOR>
+		<ERROR_MESSAGE>Ocurrio un error al realizar la transferencia</ERROR_MESSAGE>
+	</TRANSFER_INT>
+</NODE>]]></expr:xqueryText></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+        			<bpel:extensionAssignOperation bea:name="Transfer">
+		<bpel:documentation/>
+		<trf:insert varName="response.outputParameters">
+			<trf:location>
+				<expr:xpathText>./TRANSFERS_INT</expr:xpathText></trf:location>
+			<trf:where>last-child</trf:where>
+			<trf:expr>
+				<expr:xqueryText>$transfer/*</expr:xqueryText></trf:expr></trf:insert>
+        			</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        		</bpel:catchAll></bpel:faultHandlers>
+	<bpel:sequence>
+        		<bpel:forEach parallel="yes" counterName="transferIndex">
+        			<bpel:startCounterValue>1</bpel:startCounterValue>
+        			<bpel:finalCounterValue>count($tempRequest/TRANSFERS_INT/TRANSFER_INT)</bpel:finalCounterValue>
+        			<bpel:scope>
+        				<bpel:sequence>
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					<bpel:assign>
+        						<bpel:extensionAssignOperation bea:name="RequestHeader">
+        							<trf:assign varName="transferIntREQ.RequestHeader">
+        								<trf:expr>
+        									<expr:xqueryText><![CDATA[<aut:RequestHeader>
+	<Authentication>
+		<UserName>{ upper-case(string($request.inputParameters/USER_NAME/text())) }</UserName>
+		<Password>{ string($request.inputParameters/PASSWORD/text()) }</Password>
+	</Authentication>
+	<Region>
+		<SourceBank>{ string($request.inputParameters/SOURCE_BANK/text()) }</SourceBank>
+		<DestinationBank></DestinationBank>
+	</Region>
+</aut:RequestHeader>]]></expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        						<bpel:extensionAssignOperation bea:name="Request">
+        							<trf:assign varName="transferIntREQ.parameters">
+        								<trf:expr>
+        									<expr:xqueryTransform>
+        										<expr:resource ref="MWHostToHost/v1/BusinessServices/SJS/TransferenciaInternacionalH2H/xq/sjTransferenciaInternacionalIN"/>
+        										
+        										
+        										
+        										<expr:param name="transferIndex">
+        											<expr:path>$transferIndex</expr:path></expr:param>
+        										<expr:param name="sjTransferenciaInternacionalRequest">
+        											<expr:path>$tempRequest</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        					
+        					<bpel:invoke partnerLink="TransferenciaInternacional_1" outputVariable="transferIntRSP" inputVariable="transferIntREQ" operation="transferenciaInternacional">
+        						<rescon:invokeInfo>
+        							<rescon:service ref="Middleware/v2/ProxyServices/TransferenciaInternacional" isProxy="true"/></rescon:invokeInfo></bpel:invoke>
+        					
+        					
+        					<bpel:assign>
+        						<bpel:extensionAssignOperation bea:name="Trace">
+        							<bpel:documentation/>
+        							<trf:assign varName="trace">
+        								<trf:expr>
+        									<expr:xqueryText>string($tempRequest/TRANSFERS_INT/TRANSFER_INT[ xs:int($transferIndex) ]/TRACE/text())</expr:xqueryText></trf:expr></trf:assign>
+        						</bpel:extensionAssignOperation>
+        						<bpel:extensionAssignOperation bea:name="SuccessIndicator">
+        							<trf:assign varName="successIndicator">
+        								<trf:expr>
+        									<expr:xqueryText>fn:upper-case(string($transferIntRSP.ResponseHeader/successIndicator))</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        						</bpel:assign>
+        					
+        					<bpel:if bea:name="Success">
+        						<bpel:condition>$successIndicator = 'SUCCESS'</bpel:condition>
+        						<bpel:sequence>
+        							<bpel:empty/>
+        							<bpel:assign>
+        								<bpel:extensionAssignOperation
+        									bea:name="valueDate">
+        									<bpel:documentation></bpel:documentation>
+        									<trf:assign
+        										varName="valueDate">
+        										<trf:expr>
+        											<expr:xqueryText>string($transferIntRSP.ResponseHeader/valueDate)</expr:xqueryText></trf:expr></trf:assign>
+        								</bpel:extensionAssignOperation>
+        								<bpel:extensionAssignOperation bea:name="OrderingCustomer">
+        									<bpel:documentation/>
+        									<trf:assign varName="orderingCustomer">
+        										<trf:expr>
+        											<expr:xqueryText>$transferIntRSP.result/*</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        								<bpel:extensionAssignOperation bea:name="TransactionId">
+        									<bpel:documentation/>
+        									<trf:assign varName="transactionId">
+        										<trf:expr>
+        											<expr:xqueryText>string($transferIntRSP.ResponseHeader/transactionId)</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        								<bpel:extensionAssignOperation bea:name="Transfer">
+        									<trf:assign varName="transfer">
+        										<trf:expr>
+        											<expr:xqueryText>&lt;NODE&gt;
+	&lt;TRANSFER_INT&gt;
+		&lt;SUCCESS_INDICATOR&gt;{ $successIndicator }&lt;/SUCCESS_INDICATOR&gt;
+		&lt;TRACE&gt;{ $trace}&lt;/TRACE&gt;
+		&lt;TRANSACTION_ID&gt;{ $transactionId } &lt;/TRANSACTION_ID&gt;
+		&lt;ORDERING_CUSTOMER&gt;{ $orderingCustomer }&lt;/ORDERING_CUSTOMER&gt;
+		&lt;VALUEDATE&gt;{ $valueDate}&lt;/VALUEDATE&gt;
+	&lt;/TRANSFER_INT&gt;
+&lt;/NODE&gt;</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        						<bpel:else>
+        							<bpel:sequence>
+        								<bpel:empty/>
+        								<bpel:assign>
+        									<bpel:extensionAssignOperation bea:name="ErrorMessage">
+        										<bpel:documentation/>
+        										<trf:assign varName="errorMessage">
+        											<trf:expr>
+        												<expr:xqueryText>string($transferIntRSP.ResponseHeader/messages)</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        									<bpel:extensionAssignOperation bea:name="Transfer">
+        										<trf:assign varName="transfer">
+        											<trf:expr>
+        												<expr:xqueryText><![CDATA[<NODE>
+	<TRANSFER_INT>
+		<SUCCESS_INDICATOR>{ $successIndicator }</SUCCESS_INDICATOR>
+		<ERROR_MESSAGE>{ $errorMessage }</ERROR_MESSAGE>
+		<TRACE>{ $trace}</TRACE>
+	</TRANSFER_INT>
+</NODE>]]></expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign></bpel:sequence></bpel:else></bpel:if>
+        					<bpel:assign>
+        						<bpel:extensionAssignOperation bea:name="Transfer">
+        							<bpel:documentation/>
+        							<trf:insert varName="response.outputParameters">
+        								<trf:location>
+        									<expr:xpathText>./TRANSFERS_INT</expr:xpathText></trf:location>
+        								<trf:where>last-child</trf:where>
+        								<trf:expr>
+        									<expr:xqueryText>$transfer/*</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign>
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					</bpel:sequence>
+        			</bpel:scope>
+        		</bpel:forEach></bpel:sequence>
+        </bpel:scope>
+        <bpel:reply partnerLink="sjTransferenciaInternacionalH2H" operation="sjTransferencia" variable="response"/>
+    </bpel:sequence>
+</bpel:process>

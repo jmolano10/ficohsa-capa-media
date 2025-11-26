@@ -1,0 +1,138 @@
+<bpel:process name="sjConsultaActivosCliente" targetNamespace="http://www.example.com/flow/Middleware/Business_Resources/consultasCliente/consultaActivosCliente/sjConsultaActivosCliente" bea:name="sjConsultaActivosCliente" xmlns:tns="http://www.example.com/flow/Middleware/Business_Resources/consultasCliente/consultaActivosCliente/sjConsultaActivosCliente" xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable" xmlns:rescon="http://www.bea.com/alsb/flow/resources/config" xmlns:bea="http://www.bea.com/bpel/ui/extensions" xmlns:ext="http://www.bea.com/bpel/extensions" xmlns:expr="http://www.bea.com/wli/sb/stages/config" xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config" xmlns:bind="http://www.ficohsa.com.hn/middleware.services/sjConsultaActivosClientePS" xmlns:ns1="T24WebServicesImpl" xmlns:ns0="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaFondoPensiones" xmlns:ns2="http://xmlns.oracle.com/pcbpel/adapter/db/MiddlewareSOAApplication/ConsultaFondoPensiones/consultaFondoPensiones" xmlns:ns3="https://www.ficohsa.com/regional/pension" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjConsultaActivosCliente" partnerLinkType="tns:sjConsultaActivosCliente" myRole="sjConsultaActivosCliente">
+	       </bpel:partnerLink>
+	   <bpel:partnerLink name="sjConsultaCuentasCliente" partnerLinkType="tns:sjConsultaCuentasCliente_plnkType" partnerRole="sjConsultaCuentasCliente_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="consultasClienteBS" partnerLinkType="tns:consultasClienteBS_plnkType" partnerRole="consultasClienteBS_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="consultaFondoPensiones12c"
+	   	partnerLinkType="tns:consultaFondoPensiones12c_plnkType"
+	   	partnerRole="consultaFondoPensiones12c_PartnerRole">
+	   </bpel:partnerLink></bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request" messageType="bind:sjConsultaActivosClienteRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response" messageType="bind:sjConsultaActivosClienteResponse">
+	       </bpel:variable>
+    <bpel:variable name="REQConsCuentas" messageType="bind:sjConsultaActivosClienteRequest">
+    </bpel:variable>
+    <bpel:variable name="RSPConsCuentas" messageType="bind:sjConsultaActivosClienteResponse">
+    </bpel:variable>
+    <bpel:variable name="REQConsDeposito" messageType="ns1:Consultadecertifdepporcliente">
+    </bpel:variable>
+    <bpel:variable name="RSPConsDeposito" messageType="ns1:ConsultadecertifdepporclienteResponse">
+    </bpel:variable>
+    
+    
+    <bpel:variable name="REQPensiones"
+    	messageType="ns3:requestMessage">
+    </bpel:variable>
+    <bpel:variable name="RSPPensiones" messageType="ns3:replyMessage"></bpel:variable></bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjConsultaActivosCliente" operation="consultaActivosCliente" variable="request" createInstance="yes">
+	           <rescon:receiveInfo>
+                <rescon:wsdl ref="Middleware/Business_Resources/consultasCliente/consultaActivosCliente/sjConsultaActivosCliente" binding="bind:sjConsultaActivosClientePSSOAP"/>
+            </rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:flow>
+        	<bpel:scope>
+        		<bpel:sequence>
+        			<bpel:assign>
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="REQConsCuentas.inputParameters">
+        						<trf:expr>
+        							<expr:xqueryText>$request.inputParameters</expr:xqueryText></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        			</bpel:assign>
+        			<bpel:invoke operation="consultaActivosCliente" partnerLink="sjConsultaCuentasCliente" inputVariable="REQConsCuentas" outputVariable="RSPConsCuentas">
+        				<rescon:invokeInfo>
+        					<rescon:flow ref="Middleware/v2/BusinessServices/SJS/consultaCuentasCliente/flow/sjConsultaCuentasCliente"/></rescon:invokeInfo></bpel:invoke></bpel:sequence>
+        	</bpel:scope>
+        	<bpel:scope>
+        		<bpel:sequence>
+        			<bpel:assign>
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="REQConsDeposito.parameters">
+        						<trf:expr>
+        							<expr:xqueryTransform>
+        								<expr:resource ref="Middleware/Business_Resources/consultasCliente/consultaActivosCliente/sjConsultaCertifDepositoIn"/>
+        								<expr:param name="sjConsultaActivosClienteRequest1">
+        									<expr:path>$request.inputParameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        			</bpel:assign>
+        			<bpel:invoke operation="Consultadecertifdepporcliente" partnerLink="consultasClienteBS" inputVariable="REQConsDeposito" outputVariable="RSPConsDeposito">
+        				<rescon:invokeInfo>
+        					<rescon:service isProxy="false" ref="Middleware/Business_Resources/consultasCliente/Resources/consultasClienteBS"/></rescon:invokeInfo></bpel:invoke></bpel:sequence>
+        	</bpel:scope>
+        <bpel:scope>
+		<bpel:sequence>
+			
+			
+			<bpel:assign>
+				<bpel:extensionAssignOperation>
+					<trf:assign varName="REQPensiones.InputParameters">
+						<trf:expr>
+							<expr:xqueryTransform>
+								<expr:resource
+									ref="Middleware/v2/BusinessServices/SJS/consultaActivosCliente/xq/sjGetAssetsCustomerIn"></expr:resource>
+								
+								
+								<expr:param name="sjConsultaActivosClienteRequest">
+									<expr:path>$request.inputParameters</expr:path></expr:param>
+								<expr:param name="sourceBank">
+									<expr:path>'HN01'</expr:path></expr:param>
+								<expr:param name="destinationBank">
+									<expr:path>'HN01'</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation>
+				<bpel:extensionAssignOperation>
+					<trf:assign varName="REQPensiones.RequestHeader">
+						<trf:expr>
+							<expr:xqueryTransform>
+								<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaActivosCliente/xq/sjGetAssetsCustomerHeaderIn"></expr:resource>
+								<expr:param name="serviceAccountName">
+									<expr:path>'OSB12AUTH'</expr:path></expr:param>
+								<expr:param name="sourceBank">
+									<expr:path>'HN01'</expr:path></expr:param>
+								<expr:param name="destinationBank">
+									<expr:path>'HN01'</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+				</bpel:extensionAssignOperation>
+				</bpel:assign>
+			<bpel:invoke operation="getAssetsCustomer"
+				partnerLink="consultaFondoPensiones12c" inputVariable="REQPensiones" outputVariable="RSPPensiones">
+				<rescon:invokeInfo>
+					<rescon:service
+						ref="Middleware/v2/BusinessServices/ConsultaFondoPensiones12c/biz/consultaFondoPensiones12c"
+						isProxy="false"></rescon:service></rescon:invokeInfo></bpel:invoke></bpel:sequence>
+        </bpel:scope></bpel:flow>
+        
+        <bpel:assign>
+        	<bpel:extensionAssignOperation>
+        		<trf:assign varName="response.outputParameters">
+        			<trf:expr>
+        				<expr:xqueryTransform>
+        					<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaActivosCliente/xq/sjConsultaActivosOut"/>
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					
+        					<expr:param name="sjConsultaActivosClienteResponse1">
+        						<expr:path>$RSPConsCuentas.outputParameters</expr:path></expr:param>
+        					<expr:param name="outputParameters">
+        						<expr:path>$RSPPensiones.OutputParameters</expr:path></expr:param>
+        					<expr:param name="consultadecertifdepporclienteResponse1">
+        						<expr:path>$RSPConsDeposito.parameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+        	</bpel:extensionAssignOperation>
+        </bpel:assign>
+        <bpel:reply partnerLink="sjConsultaActivosCliente" operation="consultaActivosCliente" variable="response"/>
+    </bpel:sequence>
+</bpel:process>

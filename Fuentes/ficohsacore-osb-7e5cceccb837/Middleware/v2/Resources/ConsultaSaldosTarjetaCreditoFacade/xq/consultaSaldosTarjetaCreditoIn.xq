@@ -1,0 +1,15 @@
+(:: pragma bea:global-element-return element="ns0:consultaSaldosTarjetaCredito" location="../../ConsultaSaldosTarjetaCredito/xsd/consultaSaldosTarjetaCreditoTypes.xsd" ::)
+
+declare namespace ns0 = "http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoTypes";
+declare namespace xf = "http://tempuri.org/Middleware/v2/Resources/ConsultaSaldosTarjetaCreditoFacade/xq/consultaSaldosTarjetaCreditoIn/";
+
+declare function xf:consultaSaldosTarjetaCreditoIn($cardNumber as xs:string)
+    as element(ns0:consultaSaldosTarjetaCredito) {
+        <ns0:consultaSaldosTarjetaCredito>
+            <CARD_NUMBER>{ $cardNumber }</CARD_NUMBER>
+        </ns0:consultaSaldosTarjetaCredito>
+};
+
+declare variable $cardNumber as xs:string external;
+
+xf:consultaSaldosTarjetaCreditoIn($cardNumber)

@@ -1,0 +1,216 @@
+<bpel:process name="sjConsultaMultipleRemesadoras" targetNamespace="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/consultaMultipleRemesadoras/flow/sjConsultaMultipleRemesadoras" bea:name="sjConsultaMultipleRemesadoras" xmlns:tns="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/consultaMultipleRemesadoras/flow/sjConsultaMultipleRemesadoras" xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable" xmlns:rescon="http://www.bea.com/alsb/flow/resources/config" xmlns:bea="http://www.bea.com/bpel/ui/extensions" xmlns:ext="http://www.bea.com/bpel/extensions" xmlns:expr="http://www.bea.com/wli/sb/stages/config" xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config" xmlns:ns1="http://xmlns.oracle.com/pcbpel/adapter/db/MiddlewareSOAApplication/ArmarMensajeRecaudo/armarMensajeRecaudo" xmlns:ns0="http://service.webserviceprovider.transporters.service.frametexx.com/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:osb="http://xmlns.oracle.com/pcbpel/adapter/db/FLINK/OSB_K_RECAUDOS_REF_ONLINE/OSB_ARMAR_MENSAJE/" xmlns:ns2="http://www.ficohsa.com.hn/middleware.services/sjConsultaMultipleRemesadorasPS" xmlns:sjc="http://www.ficohsa.com.hn/middleware.services/sjConsultaMultipleRemesadoras" xmlns:bind="http://www.ficohsa.com.hn/middleware.services/sjConsultaMultipleRemesadorasPS">
+    <rescon:importInfo>
+    	<rescon:wsdl-import ref="Middleware/v2/BusinessServices/armarMensajeRecaudo/wsdl/ArmarMensajeRecaudo">
+    	</rescon:wsdl-import>
+    	<rescon:wsdl-import ref="Middleware/v2/BusinessServices/enrutadorConvenios/wsdl/enrutadorConvenios">
+    	</rescon:wsdl-import></rescon:importInfo>
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjConsultaMultipleRemesadoras" partnerLinkType="tns:sjConsultaMultipleRemesadoras" myRole="sjConsultaMultipleRemesadoras">
+	       </bpel:partnerLink>
+	   <bpel:partnerLink name="armarMensajeRecaudo_db" partnerLinkType="tns:armarMensajeRecaudo_db_plnkType" partnerRole="armarMensajeRecaudo_db_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="enrutadorConvenios" partnerLinkType="tns:enrutadorConvenios_plnkType" partnerRole="enrutadorConvenios_PartnerRole">
+	   </bpel:partnerLink></bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request" messageType="ns2:sjConsultaMultipleRemesadorasRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response" messageType="ns2:sjConsultaMultipleRemesadorasResponse">
+	       </bpel:variable>
+    <bpel:variable name="REQarmarMensajeRecaudo" messageType="ns1:args_in_msg">
+    </bpel:variable>
+    <bpel:variable name="RSParmarMensajeRecaudo" messageType="ns1:args_out_msg">
+    </bpel:variable>
+    <bpel:variable name="REQenrutadorConvenios" messageType="ns0:invoke">
+    </bpel:variable>
+    <bpel:variable name="RSPenrutadorConvenios" messageType="ns0:invokeResponse">
+    </bpel:variable>
+    <bpel:variable name="totalRemesadoras" type="xsd:int"/>
+    <bpel:variable name="tiposRemesadoras" type="xsd:anyType"/>
+    
+    
+    </bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjConsultaMultipleRemesadoras" operation="consultaRemesadoras" createInstance="yes" variable="request">
+	           <rescon:receiveInfo>
+                <rescon:wsdl ref="Middleware/v2/BusinessServices/SJS/consultaMultipleRemesadoras/wsdl/sjConsultaMultipleRemesadoras" binding="ns2:sjConsultaMultipleRemesadorasPSSOAP"/>
+            </rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:scope bea:name="PrepararSalida">
+        	<bpel:sequence>
+        		<bpel:assign bea:name="Assign">
+        			<bpel:extensionAssignOperation>
+        				<bpel:documentation/>
+        				<trf:assign varName="response.outputParameters">
+        					<trf:expr>
+        						<expr:xqueryText><![CDATA[<outputParameters>
+    <sjc:SUCCESS_INDICATOR>SUCCESS</sjc:SUCCESS_INDICATOR>
+	<sjc:ERROR_MESSAGE/>
+	<sjc:REMITTANCE/>
+</outputParameters>]]></expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        			</bpel:assign></bpel:sequence>
+        </bpel:scope>
+        
+        <bpel:scope bea:name="InitVariables">
+        	<bpel:sequence>
+        		<bpel:assign>
+        			<bpel:extensionAssignOperation>
+        				<trf:assign varName="tiposRemesadoras">
+        					<trf:expr>
+        						<expr:xqueryText>$request.inputParameters</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        			<bpel:extensionAssignOperation>
+        				<trf:assign varName="totalRemesadoras">
+        					<trf:expr>
+        						<expr:xqueryText>count($tiposRemesadoras/sjc:TYPES_REMITTANCE/sjc:TYPES_REMITTANCE_ITEM)</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        </bpel:scope>
+        
+        
+        
+        <bpel:forEach counterName="remittancePosition" parallel="no">
+        	<bpel:startCounterValue>1</bpel:startCounterValue>
+        	<bpel:finalCounterValue>$totalRemesadoras</bpel:finalCounterValue>
+        	<bpel:scope bea:name="ConsultaRemesas">
+        		<bpel:variables>
+        			<bpel:variable type="xsd:string" name="successIndicator"/>
+        			<bpel:variable type="xsd:anyType" name="parametrosSalida"/>
+        			<bpel:variable type="xsd:string" name="successIndEnrutador"/>
+        			<bpel:variable type="xsd:anyType" name="remittanceInfo"/>
+        			
+        			
+        			
+        			
+        			</bpel:variables>
+        		<bpel:sequence>
+        			
+        			<bpel:scope bea:name="ArmarMensajeRecaudo">
+        				<bpel:faultHandlers>
+        					<bpel:catchAll>
+        						<bpel:sequence>
+        							<bpel:empty/>
+        							<bpel:assign>
+        								<bpel:extensionAssignOperation>
+        									<trf:assign varName="response.outputParameters">
+        										<trf:expr>
+        											<expr:xqueryText><![CDATA[<outputParameters>
+    <sjc:SUCCESS_INDICATOR>ERROR</sjc:SUCCESS_INDICATOR>
+	<sjc:ERROR_MESSAGE>Error consultando remesa</sjc:ERROR_MESSAGE>
+	<sjc:REMITTANCE/>
+</outputParameters>]]></expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign></bpel:sequence></bpel:catchAll></bpel:faultHandlers>
+        				<bpel:sequence>
+        					<bpel:assign>
+        						<bpel:extensionAssignOperation>
+        							<trf:assign varName="REQarmarMensajeRecaudo.InputParameters">
+        								<trf:expr>
+        									<expr:xqueryTransform>
+        										<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultipleRemesadoras/xq/armarInfoParametrosRemesas"/>
+        										<expr:param name="sjConsultaMultipleRemesadoras">
+        											<expr:path>$request.inputParameters</expr:path></expr:param>
+        										<expr:param name="remittancePosition">
+        											<expr:path>$remittancePosition</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        					<bpel:invoke outputVariable="RSParmarMensajeRecaudo" partnerLink="armarMensajeRecaudo_db" inputVariable="REQarmarMensajeRecaudo" operation="armarMensajeRecaudo">
+        						<rescon:invokeInfo>
+        							<rescon:service isProxy="false" ref="Middleware/v2/BusinessServices/armarMensajeRecaudo/biz/armarMensajeRecaudo_db"/></rescon:invokeInfo></bpel:invoke>
+        					<bpel:assign>
+        						<bpel:extensionAssignOperation>
+        							<bpel:documentation/>
+        							<trf:assign varName="successIndicator">
+        								<trf:expr>
+        									<expr:xqueryText>upper-case(data($RSParmarMensajeRecaudo.OutputParameters/osb:CODIGO_RESPUESTA))</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign></bpel:sequence></bpel:scope>
+        			<bpel:if>
+        				<bpel:condition>$successIndicator = 'SUCCESS'</bpel:condition>
+        				<bpel:sequence>
+        					<bpel:empty/>
+        					<bpel:scope bea:name="EnrutadorConvenios">
+        						<bpel:faultHandlers>
+        							<bpel:catchAll>
+        								<bpel:sequence>
+        									<bpel:empty/>
+        									<bpel:assign>
+        										<bpel:extensionAssignOperation>
+        											<trf:assign varName="response.outputParameters">
+        												<trf:expr>
+        													<expr:xqueryText><![CDATA[<outputParameters>
+    <sjc:SUCCESS_INDICATOR>ERROR</sjc:SUCCESS_INDICATOR>
+	<sjc:ERROR_MESSAGE>Error consultando remesa</sjc:ERROR_MESSAGE>
+	<sjc:REMITTANCE/>
+</outputParameters>]]></expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign></bpel:sequence></bpel:catchAll></bpel:faultHandlers>
+        						<bpel:sequence>
+        							<bpel:assign>
+        								<bpel:extensionAssignOperation>
+        									<trf:assign varName="REQenrutadorConvenios.serviceRequest">
+        										<trf:expr>
+        											<expr:xqueryTransform>
+        												<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultipleRemesadoras/xq/enrutadorConveniosIn"/>
+        												<expr:param name="outputParameters">
+        													<expr:path>$RSParmarMensajeRecaudo.OutputParameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        							<bpel:invoke outputVariable="RSPenrutadorConvenios" partnerLink="enrutadorConvenios" inputVariable="REQenrutadorConvenios" operation="invoke">
+        								<rescon:invokeInfo>
+        									<rescon:service ref="Middleware/v2/BusinessServices/enrutadorConvenios/biz/enrutadorConvenios" isProxy="false"/></rescon:invokeInfo></bpel:invoke>
+        							<bpel:assign>
+        								<bpel:extensionAssignOperation>
+        									<trf:assign varName="parametrosSalida">
+        										<trf:expr>
+        											<expr:xqueryText>fn-bea:inlinedXML($RSPenrutadorConvenios.serviceResponse/responseData)</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+        								<bpel:extensionAssignOperation>
+        									<trf:assign varName="successIndEnrutador">
+        										<trf:expr>
+        											<expr:xqueryText>$parametrosSalida/errorCode/text()</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        							<bpel:if>
+        								<bpel:condition>$successIndEnrutador = '0' or $successIndEnrutador = '2'</bpel:condition>
+        								<bpel:sequence>
+        									<bpel:empty/>
+        									<bpel:assign>
+        										<bpel:extensionAssignOperation>
+        											<trf:assign varName="remittanceInfo">
+        												<trf:expr>
+        													<expr:xqueryTransform>
+        														<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultipleRemesadoras/xq/sjConsultaMultipleRemesadoraOut"/>
+        														<expr:param name="sjConsultaMultipleRemesadoras">
+        															<expr:path>$request.inputParameters</expr:path></expr:param>
+        														<expr:param name="remittancePosition">
+        															<expr:path>$remittancePosition</expr:path></expr:param>
+        														<expr:param name="serviceResponse">
+        															<expr:path>$RSPenrutadorConvenios.serviceResponse</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+        									
+        									<bpel:assign>
+        										<bpel:extensionAssignOperation>
+        											<trf:insert varName="response.outputParameters">
+        												<trf:location>
+        													<expr:xpathText>./sjc:REMITTANCE</expr:xpathText></trf:location>
+        												<trf:where>last-child</trf:where>
+        												<trf:expr>
+        													<expr:xqueryText>$remittanceInfo/sjc:REMITTANCE/sjc:ROUTER_RESPONSE</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign>
+        									
+        									
+        									</bpel:sequence>
+        								<bpel:else>
+        									<bpel:sequence>
+        										<bpel:empty/></bpel:sequence></bpel:else></bpel:if>
+        							
+        							</bpel:sequence></bpel:scope></bpel:sequence>
+        				<bpel:else>
+        					<bpel:sequence>
+        						<bpel:empty/></bpel:sequence></bpel:else></bpel:if></bpel:sequence></bpel:scope></bpel:forEach>
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        <bpel:reply operation="consultaRemesadoras" partnerLink="sjConsultaMultipleRemesadoras" variable="response">
+        </bpel:reply>
+        <bpel:exit/>
+        
+        <bpel:reply partnerLink="sjConsultaMultipleRemesadoras" operation="consultaRemesadoras" variable="response"/>
+    </bpel:sequence>
+</bpel:process>

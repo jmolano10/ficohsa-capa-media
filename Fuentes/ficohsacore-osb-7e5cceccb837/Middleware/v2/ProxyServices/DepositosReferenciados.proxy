@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isAutoPublish="false" isTracingEnabled="false">
+    <ser:security>
+      <con:custom-token-authentication>
+        <con:username-password>
+          <con:username-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/UserName/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:username-selector>
+          <con:password-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/Password/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:password-selector>
+        </con:username-password>
+      </con:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/DepositosReferenciados/wsdl/depositosReferenciadosPS"/>
+      <con:port>
+        <con:name>depositosReferenciadosPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/depositosReferenciadosPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/OperationsAndExecution/Payments/DepositosReferenciados</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties/>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-3631205292627682280-56adafd5.15c6acbe3dc.-7f8d">
+    <con1:pipeline type="error" name="_onErrorHandler-3631205292627682280-56adafd5.15c6acbe3dc.-7f8d">
+      <con1:stage name="ManejoError">
+        <con1:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/depositosReferenciadosTypes" prefix="dep"/>
+        </con1:context>
+        <con1:actions>
+          <con3:assign varName="errorCode">
+            <con2:id>_ActionId-3631205292627682280-56adafd5.15c6acbe3dc.-7f7b</con2:id>
+            <con3:expr>
+              <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:assign varName="errorMessage">
+            <con2:id>_ActionId-3631205292627682280-56adafd5.15c6acbe3dc.-7f5c</con2:id>
+            <con3:expr>
+              <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:wsCallout>
+            <con2:id>_ActionId-3631205292627682280-56adafd5.15c6acbe3dc.-7f1f</con2:id>
+            <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>mapeoErrores</con3:operation>
+            <con3:request>
+              <con3:body>$reqMapeoErrores</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>respMapeoErrores</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="reqMapeoErrores">
+                <con2:id>_ActionId-3631205292627682280-56adafd5.15c6acbe3dc.-7f03</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con2:param name="CODIGO_ERROR">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                    <con2:param name="MENSAJE_ERROR">
+                      <con2:path>fn:concat("FICBCO0235", "$#$", $errorMessage)</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+            </con3:requestTransform>
+            <con3:responseTransform>
+              <con3:replace varName="header" contents-only="true">
+                <con2:id>_ActionId-3631205292627682280-56adafd5.15c6acbe3dc.-7ef3</con2:id>
+                <con3:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con2:param name="mapeoErroresResponse1">
+                      <con2:path>$respMapeoErrores</con2:path>
+                    </con2:param>
+                    <con2:param name="successIndicator">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con3:expr>
+              </con3:replace>
+            </con3:responseTransform>
+          </con3:wsCallout>
+          <con3:replace varName="body" contents-only="true">
+            <con2:id>_ActionId-3631205292627682280-56adafd5.15c6acbe3dc.-7ebb</con2:id>
+            <con3:expr>
+              <con2:xqueryText>if ($operation = "consultaLote") then (
+    &lt;dep:consultaLoteResponse />
+) else if ($operation = "consultaDeudores") then (
+    &lt;dep:consultaDeudoresResponse />
+) else if ($operation = "agregarDeudores") then (
+    &lt;dep:agregarDeudoresResponse />
+) else if ($operation = "eliminarDeudores") then (
+    &lt;dep:eliminarDeudoresResponse />
+) else if ($operation = "autorizacionLote") then (
+    &lt;dep:autorizacionLoteResponse />
+)
+else ()</con2:xqueryText>
+            </con3:expr>
+          </con3:replace>
+          <con2:reply>
+            <con2:id>_ActionId-3631205292627682280-56adafd5.15c6acbe3dc.-7ec5</con2:id>
+          </con2:reply>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:flow>
+      <con1:branch-node type="operation" name="BranchNode1">
+        <con1:context/>
+        <con1:branch-table>
+          <con1:branch name="consultaLote">
+            <con1:operator>equals</con1:operator>
+            <con1:value>consultaLote</con1:value>
+            <con1:flow>
+              <con1:route-node name="consultaLote">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-8312655069451225681-5a7f8534.15c883d7704.-7bee</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConsultaLoteDepRef" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>consultaLote</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="consultaDeudores">
+            <con1:operator>equals</con1:operator>
+            <con1:value>consultaDeudores</con1:value>
+            <con1:flow>
+              <con1:route-node name="consultarDeudores">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-875129725434694137--c6db8df.15c830e1556.-7fb8</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ConsultaDeudoresDepRef" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>consultaDeudoresDepRef</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="agregarDeudores">
+            <con1:operator>equals</con1:operator>
+            <con1:value>agregarDeudores</con1:value>
+            <con1:flow>
+              <con1:route-node name="agregarDeudores">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-8750282707477691911--4e0823e8.15c79c259f8.-7dcf</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/AfiliacionDeudoresDepRef" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="eliminarDeudores">
+            <con1:operator>equals</con1:operator>
+            <con1:value>eliminarDeudores</con1:value>
+            <con1:flow>
+              <con1:route-node name="eliminarDeudores">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-4184154867274667053-7df3d0ab.15ca2c145b3.-7d30</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/EliminarDeudoresDepRef" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>eliminarDeudores</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="autorizacionLote">
+            <con1:operator>equals</con1:operator>
+            <con1:value>autorizacionLote</con1:value>
+            <con1:flow>
+              <con1:route-node name="autorizacionLote">
+                <con1:context/>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-4566278033792620179-47f3dff3.15c9caf3756.-7ed4</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/AutorizarLoteDeudoresDepRef" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>autorizarloteDeudoresDepRef</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:branch name="validaDepositoReferenciado">
+            <con1:operator>equals</con1:operator>
+            <con1:value>validaDepositoReferenciado</con1:value>
+            <con1:flow>
+              <con1:route-node name="validaDepositoReferenciado">
+                <con1:comment/>
+                <con1:context>
+                  <con2:userNsDecl prefix="val" namespace="http://www.ficohsa.com.hn/middleware.services/ValidaDepositoReferenciadoTypes"/>
+                  <con2:varNsDecl prefix="dep" namespace="http://www.ficohsa.com.hn/middleware.services/depositosReferenciadosTypes"/>
+                  <con2:varNsDecl prefix="aut" namespace="http://www.ficohsa.com.hn/middleware.services/autType"/>
+                </con1:context>
+                <con1:actions>
+                  <con4:route>
+                    <con2:id>_ActionId-5933896112660964401--91722ad.1696d5f7d18.-7f0e</con2:id>
+                    <con4:service ref="Middleware/v2/ProxyServices/ValidaDepositoReferenciado" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con4:operation>ValidaDepositoReferenciado</con4:operation>
+                    <con4:outboundTransform/>
+                    <con4:responseTransform/>
+                  </con4:route>
+                </con1:actions>
+              </con1:route-node>
+            </con1:flow>
+          </con1:branch>
+          <con1:default-branch>
+            <con1:flow/>
+          </con1:default-branch>
+        </con1:branch-table>
+      </con1:branch-node>
+    </con1:flow>
+  </ser:router>
+</xml-fragment>

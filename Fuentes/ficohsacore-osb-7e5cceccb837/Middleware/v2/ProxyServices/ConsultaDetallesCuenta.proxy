@@ -1,0 +1,1025 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isAutoPublish="false" isTracingEnabled="false">
+    <ser:security>
+      <con4:custom-token-authentication>
+        <con4:username-password>
+          <con4:username-selector>
+            <con4:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/UserName/text()</con4:xpath>
+            <con4:variable>header</con4:variable>
+          </con4:username-selector>
+          <con4:password-selector>
+            <con4:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/Password/text()</con4:xpath>
+            <con4:variable>header</con4:variable>
+          </con4:password-selector>
+        </con4:username-password>
+      </con4:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con6:SoapBindingType" xmlns:con6="http://www.bea.com/wli/sb/services/bindings/config">
+      <con6:wsdl ref="Middleware/v2/Resources/ConsultaDetallesCuenta/wsdl/consultaDetallesCuentaPS"/>
+      <con6:port>
+        <con6:name>consultaDetallesCuentaPSSOAP</con6:name>
+        <con6:namespace>http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentaPS/</con6:namespace>
+      </con6:port>
+      <con6:selector type="SOAP body"/>
+      <con6:WSI-compliant>false</con6:WSI-compliant>
+    </ser:binding>
+    <ser:monitoring isEnabled="true">
+      <ser:aggregationInterval>720</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Action</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/SMiddleware/OperationsAndExecution/CustomerDeposits/ConsultaDetallesCuenta_v2</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific xsi:type="http:HttpEndPointConfiguration">
+      <http:inbound-properties>
+        <http:use-https>true</http:use-https>
+      </http:inbound-properties>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-8848777042473091319--23eafd38.13c2a05c9f3.-6ff9">
+    <con:pipeline type="error" name="_onErrorHandler-8848777042473091319--23eafd38.13c2a05c9f3.-6ff9">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaFICOPENTypes" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con1"/>
+        </con:context>
+        <con:actions>
+          <con3:ifThenElse>
+            <con1:comment>Condicion para determinar si el error es producido por la validación del request</con1:comment>
+            <con1:id>_ActionId-5133587267699506809-1c366e12.154ef070bd4.-7f6a</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:string($fault/ctx:errorCode/text()) = "BEA-382505"</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-5133587267699506809-1c366e12.154ef070bd4.-7f3e</con1:id>
+                  <con3:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/Genericos/mapeoErrorValidate"/>
+                      <con1:param name="anyType1">
+                        <con1:path>$fault</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+              </con3:actions>
+            </con3:case>
+            <con3:default>
+              <con3:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-5133587267699506809-1c366e12.154ef070bd4.-7f68</con1:id>
+                <con3:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con3:expr>
+              </con3:replace>
+            </con3:default>
+          </con3:ifThenElse>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-5250462254477236415-4ac5896b.1571f8ac842.-7f51</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:wsCallout>
+                  <con1:id>_ActionId-5250462254477236415-4ac5896b.1571f8ac842.-7f26</con1:id>
+                  <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>mapeoErrores</con3:operation>
+                  <con3:request>
+                    <con3:body>$REQMapeoErrores</con3:body>
+                  </con3:request>
+                  <con3:response>
+                    <con3:body>RSPMapeoErrores</con3:body>
+                  </con3:response>
+                  <con3:requestTransform>
+                    <con3:assign varName="REQMapeoErrores">
+                      <con1:id>_ActionId-5250462254477236415-4ac5896b.1571f8ac842.-7f16</con1:id>
+                      <con3:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                          <con1:param name="MENSAJE_ERROR">
+                            <con1:path>fn:concat("FICBCO0033","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                          </con1:param>
+                          <con1:param name="CODIGO_ERROR">
+                            <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:requestTransform>
+                  <con3:responseTransform>
+                    <con3:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-5250462254477236415-4ac5896b.1571f8ac842.-7ef8</con1:id>
+                      <con3:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                          <con1:param name="mapeoErroresResponse1">
+                            <con1:path>$RSPMapeoErrores</con1:path>
+                          </con1:param>
+                          <con1:param name="successIndicator">
+                            <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con3:expr>
+                    </con3:replace>
+                  </con3:responseTransform>
+                </con3:wsCallout>
+              </con3:actions>
+            </con3:case>
+            <con3:default/>
+          </con3:ifThenElse>
+          <con3:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-8848777042473091319--23eafd38.13c2a05c9f3.-6f88</con1:id>
+            <con3:expr>
+              <con1:xqueryText>&lt;con1:consultaDetallesCuentaResponse/></con1:xqueryText>
+            </con3:expr>
+          </con3:replace>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-6916</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:string($fault/ctx:errorCode/text()) != "MW-0001"</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con5:route>
+                  <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-6902</con1:id>
+                  <con5:service ref="Middleware/Business_Resources/general/Resources/RegistrarUsoServicio/registrarUsoServicio_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con5:operation>registrarUsoServicio</con5:operation>
+                  <con5:outboundTransform>
+                    <con3:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-68e2</con1:id>
+                      <con3:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/Business_Resources/general/UsoServicio/registroUsoServicioIn"/>
+                          <con1:param name="idServicio">
+                            <con1:path>"FICBCO0033"</con1:path>
+                          </con1:param>
+                          <con1:param name="bancoOrigen">
+                            <con1:path>$sourceBank</con1:path>
+                          </con1:param>
+                          <con1:param name="operacion">
+                            <con1:path>"2"</con1:path>
+                          </con1:param>
+                          <con1:param name="idUsuario">
+                            <con1:path>$username</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con3:expr>
+                    </con3:replace>
+                  </con5:outboundTransform>
+                </con5:route>
+              </con3:actions>
+            </con3:case>
+            <con3:default/>
+          </con3:ifThenElse>
+          <con1:reply>
+            <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-6397</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ValidacionesGenerales_request">
+      <con:stage name="ValidacionXSD">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentasTypes" prefix="con1"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentaTypes" prefix="con2"/>
+        </con:context>
+        <con:actions>
+          <con3:validate>
+            <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-7ac6</con1:id>
+            <con3:schema ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xsd/consultaDetallesCuentaTypes"/>
+            <con3:schemaElement xmlns:con5="http://www.ficohsa.com.hn/middleware.services/consultasType" xmlns:con6="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentasTypes" xmlns:con7="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentaTypes">con5:consultaDetallesCuenta</con3:schemaElement>
+            <con3:varName>body</con3:varName>
+            <con3:location>
+              <con1:xpathText>./con:consultaDetallesCuenta</con1:xpathText>
+            </con3:location>
+          </con3:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionServicioRegional">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+          <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentasTypes" prefix="con1"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentaTypes" prefix="con2"/>
+        </con:context>
+        <con:actions>
+          <con3:wsCallout>
+            <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-7a8e</con1:id>
+            <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>ValidaServicioRegional</con3:operation>
+            <con3:request>
+              <con3:body>$reqValidaServicioRegional</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>respValidaServicioRegional</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="reqValidaServicioRegional">
+                <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-7a20</con1:id>
+                <con3:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                    <con1:param name="requestHeader1">
+                      <con1:path>$header/aut:RequestHeader</con1:path>
+                    </con1:param>
+                    <con1:param name="serviceId">
+                      <con1:path>"FICBCO0033"</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+            </con3:requestTransform>
+            <con3:responseTransform>
+              <con3:ifThenElse>
+                <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-79e8</con1:id>
+                <con3:case>
+                  <con3:condition>
+                    <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                  </con3:condition>
+                  <con3:actions>
+                    <con3:replace contents-only="true" varName="header">
+                      <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-79b0</con1:id>
+                      <con3:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con3:expr>
+                    </con3:replace>
+                    <con3:replace contents-only="true" varName="body">
+                      <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-7993</con1:id>
+                      <con3:expr>
+                        <con1:xqueryText>&lt;con2:consultaDetallesCuentaResponse/></con1:xqueryText>
+                      </con3:expr>
+                    </con3:replace>
+                    <con1:reply>
+                      <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-7976</con1:id>
+                    </con1:reply>
+                  </con3:actions>
+                </con3:case>
+                <con3:default>
+                  <con3:replace contents-only="true" varName="header">
+                    <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-793e</con1:id>
+                    <con3:expr>
+                      <con1:xqueryTransform>
+                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                        <con1:param name="requestHeader">
+                          <con1:path>$header/aut:RequestHeader</con1:path>
+                        </con1:param>
+                      </con1:xqueryTransform>
+                    </con3:expr>
+                  </con3:replace>
+                </con3:default>
+              </con3:ifThenElse>
+            </con3:responseTransform>
+          </con3:wsCallout>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ValidacionUsoServicio">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/registrarUsoServicio" prefix="osb2"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con3:assign varName="username">
+            <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-698c</con1:id>
+            <con3:expr>
+              <con1:xqueryText>fn:string($header/aut:RequestHeader/Authentication/UserName/text())</con1:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:assign varName="sourceBank">
+            <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-6971</con1:id>
+            <con3:expr>
+              <con1:xqueryText>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:wsCallout>
+            <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-6b46</con1:id>
+            <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/RegistrarUsoServicio/registrarUsoServicio_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>registrarUsoServicio</con3:operation>
+            <con3:request>
+              <con3:body>$REQRegUsoSvc</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>RSPRegUsoSvc</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="REQRegUsoSvc">
+                <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-6b09</con1:id>
+                <con3:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/Business_Resources/general/UsoServicio/registroUsoServicioIn"/>
+                    <con1:param name="idServicio">
+                      <con1:path>"FICBCO0033"</con1:path>
+                    </con1:param>
+                    <con1:param name="bancoOrigen">
+                      <con1:path>$sourceBank</con1:path>
+                    </con1:param>
+                    <con1:param name="operacion">
+                      <con1:path>"1"</con1:path>
+                    </con1:param>
+                    <con1:param name="idUsuario">
+                      <con1:path>$username</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+            </con3:requestTransform>
+            <con3:responseTransform>
+              <con3:assign varName="statusUsoServicio">
+                <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-6aed</con1:id>
+                <con3:expr>
+                  <con1:xqueryText>fn:string($RSPRegUsoSvc/osb2:PN_CODIGO_ERROR/text())</con1:xqueryText>
+                </con3:expr>
+              </con3:assign>
+            </con3:responseTransform>
+          </con3:wsCallout>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-6ad8</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>$statusUsoServicio != "0"</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:Error>
+                  <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-6ab9</con1:id>
+                  <con3:errCode>MW-0001</con3:errCode>
+                  <con3:message>SERVICE QUOTA EXCEEDED</con3:message>
+                </con3:Error>
+              </con3:actions>
+            </con3:case>
+            <con3:default/>
+          </con3:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionesGenerales_response">
+      <con:stage name="ValidacionUsoServicioResponse">
+        <con:context/>
+        <con:actions>
+          <con5:route>
+            <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-69a6</con1:id>
+            <con5:service ref="Middleware/Business_Resources/general/Resources/RegistrarUsoServicio/registrarUsoServicio_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con5:operation>registrarUsoServicio</con5:operation>
+            <con5:outboundTransform>
+              <con3:replace varName="body" contents-only="true">
+                <con1:id>_ActionId-5163449686257933030--5ee5ed49.1545dc1c856.-69a5</con1:id>
+                <con3:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/Business_Resources/general/UsoServicio/registroUsoServicioIn"/>
+                    <con1:param name="idServicio">
+                      <con1:path>"FICBCO0033"</con1:path>
+                    </con1:param>
+                    <con1:param name="bancoOrigen">
+                      <con1:path>$sourceBank</con1:path>
+                    </con1:param>
+                    <con1:param name="operacion">
+                      <con1:path>"2"</con1:path>
+                    </con1:param>
+                    <con1:param name="idUsuario">
+                      <con1:path>$username</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con3:expr>
+              </con3:replace>
+            </con5:outboundTransform>
+          </con5:route>
+        </con:actions>
+      </con:stage>
+      <con:stage name="MapeoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-4276957870857690337-251d11e3.1582f5883d0.-7f8c</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:wsCallout>
+                  <con1:id>_ActionId-4276957870857690337-251d11e3.1582f5883d0.-7f89</con1:id>
+                  <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>mapeoErrores</con3:operation>
+                  <con3:request>
+                    <con3:body>$REQMapeoErrores</con3:body>
+                  </con3:request>
+                  <con3:response>
+                    <con3:body>RSPMapeoErrores</con3:body>
+                  </con3:response>
+                  <con3:requestTransform>
+                    <con3:assign varName="REQMapeoErrores">
+                      <con1:id>_ActionId-4276957870857690337-251d11e3.1582f5883d0.-7f8b</con1:id>
+                      <con3:expr>
+                        <con:xqueryTransform xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/services/security/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+                          <con:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                          <con:param name="CODIGO_ERROR">
+                            <con:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con:path>
+                          </con:param>
+                          <con:param name="MENSAJE_ERROR">
+                            <con:path>fn:concat("FICBCO0033","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con:path>
+                          </con:param>
+                        </con:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:requestTransform>
+                  <con3:responseTransform>
+                    <con3:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-4276957870857690337-251d11e3.1582f5883d0.-7f8a</con1:id>
+                      <con3:expr>
+                        <con:xqueryTransform xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/services/security/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+                          <con:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                          <con:param name="mapeoErroresResponse1">
+                            <con:path>$RSPMapeoErrores</con:path>
+                          </con:param>
+                          <con:param name="successIndicator">
+                            <con:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con:path>
+                          </con:param>
+                        </con:xqueryTransform>
+                      </con3:expr>
+                    </con3:replace>
+                  </con3:responseTransform>
+                </con3:wsCallout>
+              </con3:actions>
+            </con3:case>
+            <con3:default/>
+          </con3:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="HN01_ConsultaDetallesCuenta_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentasTypes" prefix="con1"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentaTypes" prefix="con2"/>
+        </con:context>
+        <con:actions>
+          <con3:wsCallout>
+            <con1:id>_ActionId-5133587267699506809-1c366e12.154ef070bd4.-7ff9</con1:id>
+            <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ConsultasCuenta/Resources/consultaCuentasBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con3:operation>Consultadedetallesdelacuenta</con3:operation>
+            <con3:request>
+              <con3:body>$REQConsCuenta</con3:body>
+            </con3:request>
+            <con3:response>
+              <con3:body>RSPConsCuenta</con3:body>
+            </con3:response>
+            <con3:requestTransform>
+              <con3:assign varName="REQConsCuenta">
+                <con1:id>_ActionId-5133587267699506809-1c366e12.154ef070bd4.-7ffa</con1:id>
+                <con3:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetallesCuentaIn"/>
+                    <con1:param name="requestHeader">
+                      <con1:path>$header/aut:RequestHeader</con1:path>
+                    </con1:param>
+                    <con1:param name="consultaDetallesCuenta">
+                      <con1:path>$body/con:consultaDetallesCuenta</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con3:expr>
+              </con3:assign>
+            </con3:requestTransform>
+            <con3:responseTransform/>
+          </con3:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="HN01_ConsultaDetallesCuenta_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con3:assign varName="zero">
+            <con1:id>_ActionId-5133587267699506809-1c366e12.154ef070bd4.-7fc1</con1:id>
+            <con3:expr>
+              <con1:xqueryText>$consultaCuentaRp/WSACCOUNTLISTType/ZERORECORDS</con1:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:replace contents-only="true" varName="header">
+            <con1:id>_ActionId-5133587267699506809-1c366e12.154ef070bd4.-7f35</con1:id>
+            <con3:expr>
+              <con1:xqueryTransform>
+                <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetallesCuentaHeaderOut"/>
+                <con1:param name="consultadedetallesdelacuentaResponse1">
+                  <con1:path>$RSPConsCuenta</con1:path>
+                </con1:param>
+              </con1:xqueryTransform>
+            </con3:expr>
+          </con3:replace>
+          <con3:replace varName="body" contents-only="true">
+            <con1:id>_ActionId-5133587267699506809-1c366e12.154ef070bd4.-7f33</con1:id>
+            <con3:expr>
+              <con1:xqueryTransform>
+                <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetallesCuentaOut"/>
+                <con1:param name="consultadedetallesdelacuentaResponse1">
+                  <con1:path>$RSPConsCuenta</con1:path>
+                </con1:param>
+              </con1:xqueryTransform>
+            </con3:expr>
+          </con3:replace>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="Default_ConsultaDetallesCuenta_request">
+      <con:stage name="FlujoEntrada">
+        <con:context/>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="Default_ConsultaDetallesCuenta_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con5:Error xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-2681369310853666711--5bcd27aa.14daf0d55d0.-795b</con1:id>
+            <con5:errCode>MW-0008</con5:errCode>
+            <con5:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con5:message>
+          </con5:Error>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="GT01_ConsultaDetallesCuenta_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentaTypes" prefix="con1"/>
+        </con:context>
+        <con:actions>
+          <con3:assign varName="acc">
+            <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c9e</con1:id>
+            <con3:expr>
+              <con1:xqueryText>$body/con:consultaDetallesCuenta/ACCOUNT_NUMBER/text()</con1:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c9d</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:string($acc)!=""</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:wsCallout>
+                  <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c9b</con1:id>
+                  <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKGT/consultaDetallesCuenta/biz/consultaDetallesCuenta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>ConsultaDetallesCuenta</con3:operation>
+                  <con3:request>
+                    <con3:body>$REQConsultaDetallesCuenta</con3:body>
+                  </con3:request>
+                  <con3:response>
+                    <con3:body>RSPConsultaDetallesCuenta</con3:body>
+                  </con3:response>
+                  <con3:requestTransform>
+                    <con3:assign varName="REQConsultaDetallesCuenta">
+                      <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c9c</con1:id>
+                      <con3:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetCuentaGTIn"/>
+                          <con1:param name="consultaDetallesCuenta">
+                            <con1:path>$body/con:consultaDetallesCuenta</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:requestTransform>
+                  <con3:responseTransform/>
+                </con3:wsCallout>
+              </con3:actions>
+            </con3:case>
+            <con3:default/>
+          </con3:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="GT01_ConsultaDetallesCuenta_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ConsultaDetallesCuenta" prefix="con1"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c9a</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:string($acc)!=""</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:replace contents-only="true" varName="header">
+                  <con1:id>_ActionId-4276957870857690337-251d11e3.1582f5883d0.-7f35</con1:id>
+                  <con3:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetCuentaGTHeaderOut"/>
+                      <con1:param name="outputParameters1">
+                        <con1:path>$RSPConsultaDetallesCuenta</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+                <con3:ifThenElse>
+                  <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c98</con1:id>
+                  <con3:case>
+                    <con3:condition>
+                      <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))="SUCCESS"</con1:xqueryText>
+                    </con3:condition>
+                    <con3:actions>
+                      <con3:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c96</con1:id>
+                        <con3:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetCuentaGTOut"/>
+                            <con1:param name="outputParameters1">
+                              <con1:path>$RSPConsultaDetallesCuenta</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con3:expr>
+                      </con3:replace>
+                    </con3:actions>
+                  </con3:case>
+                  <con3:default>
+                    <con3:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c94</con1:id>
+                      <con3:expr>
+                        <con1:xqueryText>&lt;con:consultaDetallesCuentaResponse/></con1:xqueryText>
+                      </con3:expr>
+                    </con3:replace>
+                  </con3:default>
+                </con3:ifThenElse>
+              </con3:actions>
+            </con3:case>
+            <con3:default>
+              <con3:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c93</con1:id>
+                <con3:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>REQUIRED FIELDS NOT SUPPLIED</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con3:expr>
+              </con3:replace>
+              <con3:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c92</con1:id>
+                <con3:expr>
+                  <con1:xqueryText>&lt;con:consultaDetallesCuentaResponse/></con1:xqueryText>
+                </con3:expr>
+              </con3:replace>
+            </con3:default>
+          </con3:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="PA01_ConsultaDetallesCuenta_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentaTypes" prefix="con1"/>
+        </con:context>
+        <con:actions>
+          <con3:assign varName="acc">
+            <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c13</con1:id>
+            <con3:expr>
+              <con1:xqueryText>$body/con:consultaDetallesCuenta/ACCOUNT_NUMBER/text()</con1:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c12</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:string($acc)!=""</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:wsCallout>
+                  <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c10</con1:id>
+                  <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/consultaDetallesCuenta/biz/consultaDetallesCuenta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>consultaDetallesCuenta</con3:operation>
+                  <con3:request>
+                    <con3:body>$REQconsultaDetallesCuenta</con3:body>
+                  </con3:request>
+                  <con3:response>
+                    <con3:body>RSPconsultaDetallesCuenta</con3:body>
+                  </con3:response>
+                  <con3:requestTransform>
+                    <con3:assign varName="REQconsultaDetallesCuenta">
+                      <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c11</con1:id>
+                      <con3:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetCuentaPAIn"/>
+                          <con1:param name="consultaDetallesCuenta">
+                            <con1:path>$body/con:consultaDetallesCuenta</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                  </con3:requestTransform>
+                  <con3:responseTransform/>
+                </con3:wsCallout>
+              </con3:actions>
+            </con3:case>
+            <con3:default/>
+          </con3:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="PA01_ConsultaDetallesCuenta_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaDetallesCuenta" prefix="con2"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c0f</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:string($acc)!=""</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:replace contents-only="true" varName="header">
+                  <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c0e</con1:id>
+                  <con3:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetCuentaPAHeaderOut"/>
+                      <con1:param name="outputParameters1">
+                        <con1:path>$RSPconsultaDetallesCuenta</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+                <con3:replace contents-only="true" varName="body">
+                  <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c0d</con1:id>
+                  <con3:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetCuentaPAOut"/>
+                      <con1:param name="outputParameters1">
+                        <con1:path>$RSPconsultaDetallesCuenta</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+              </con3:actions>
+            </con3:case>
+            <con3:default>
+              <con3:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c0c</con1:id>
+                <con3:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>REQUIRED FIELDS NOT SUPPLIED</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con3:expr>
+              </con3:replace>
+              <con3:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6c0b</con1:id>
+                <con3:expr>
+                  <con1:xqueryText>&lt;con:consultaDetallesCuentaResponse/></con1:xqueryText>
+                </con3:expr>
+              </con3:replace>
+            </con3:default>
+          </con3:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="NI01_ConsultaDetallesCuenta_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaDetallesCuentaTypes" prefix="con1"/>
+        </con:context>
+        <con:actions>
+          <con3:assign varName="acc">
+            <con1:id>_ActionId-8661104995623250878-7e510c97.158680024dc.-7f01</con1:id>
+            <con3:expr>
+              <con1:xqueryText>$body/con:consultaDetallesCuenta/ACCOUNT_NUMBER/text()</con1:xqueryText>
+            </con3:expr>
+          </con3:assign>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-8661104995623250878-7e510c97.158680024dc.-7f00</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:string($acc)!=""</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:wsCallout>
+                  <con1:id>_ActionId-8661104995623250878-7e510c97.158680024dc.-7efe</con1:id>
+                  <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/CTS/cuenta/biz/cuenta" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con3:operation>OpConsultaDetalleCuenta</con3:operation>
+                  <con3:request>
+                    <con3:body>$REQOpConsultaDetalleCuenta</con3:body>
+                  </con3:request>
+                  <con3:response>
+                    <con3:body>RSPOpConsultaDetalleCuenta</con3:body>
+                  </con3:response>
+                  <con3:requestTransform>
+                    <con3:assign varName="REQOpConsultaDetalleCuenta">
+                      <con1:id>_ActionId-8661104995623250878-7e510c97.158680024dc.-7eff</con1:id>
+                      <con3:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetCuentaNIIn"/>
+                          <con1:param name="consultaDetallesCuenta1">
+                            <con1:path>$body/con:consultaDetallesCuenta</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con3:expr>
+                    </con3:assign>
+                    <con3:validate>
+                      <con1:id>_ActionId-2112113176119020215-aa64e43.15d2d4f33d0.-7e5b</con1:id>
+                      <con3:schema ref="Middleware/v2/BusinessServices/CTS/cuenta/xsd/services"/>
+                      <con3:schemaElement xmlns:ser1="http://service.srvaplcobiscuenta.ecobis.cobiscorp">ser1:opConsultaDetalleCuentaSolicitud</con3:schemaElement>
+                      <con3:varName>REQOpConsultaDetalleCuenta</con3:varName>
+                      <con3:location>
+                        <con1:xpathText>.</con1:xpathText>
+                      </con3:location>
+                    </con3:validate>
+                  </con3:requestTransform>
+                  <con3:responseTransform/>
+                </con3:wsCallout>
+              </con3:actions>
+            </con3:case>
+            <con3:default/>
+          </con3:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="NI01_ConsultaDetallesCuenta_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaDetallesCuenta" prefix="con2"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+        </con:context>
+        <con:actions>
+          <con3:ifThenElse>
+            <con1:id>_ActionId-8661104995623250878-7e510c97.158680024dc.-7efd</con1:id>
+            <con3:case>
+              <con3:condition>
+                <con1:xqueryText>fn:string($acc)!=""</con1:xqueryText>
+              </con3:condition>
+              <con3:actions>
+                <con3:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-405103928748467962--2937b4fb.1588c7dada2.-7f78</con1:id>
+                  <con3:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetCuentaNIHeaderOut"/>
+                      <con1:param name="opConsultaDetalleCuentaRespuesta1">
+                        <con1:path>$RSPOpConsultaDetalleCuenta</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con3:expr>
+                </con3:replace>
+                <con3:ifThenElse>
+                  <con1:id>_ActionId-405103928748467962--2937b4fb.1588c7dada2.-7f25</con1:id>
+                  <con3:case>
+                    <con3:condition>
+                      <con1:xqueryText>fn:string($header/aut:ResponseHeader/successIndicator/text())!="Success"</con1:xqueryText>
+                    </con3:condition>
+                    <con3:actions>
+                      <con3:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-9061388050337847800-226855df.15c3ad4e86c.-7f8d</con1:id>
+                        <con3:expr>
+                          <con1:xqueryText>&lt;con:consultaDetallesCuentaResponse/></con1:xqueryText>
+                        </con3:expr>
+                      </con3:replace>
+                    </con3:actions>
+                  </con3:case>
+                  <con3:default>
+                    <con3:replace contents-only="true" varName="body">
+                      <con1:id>_ActionId-9061388050337847800-226855df.15c3ad4e86c.-7f8f</con1:id>
+                      <con3:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetCuentaNIOut"/>
+                          <con1:param name="opConsultaDetalleCuentaRespuesta1">
+                            <con1:path>$RSPOpConsultaDetalleCuenta</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con3:expr>
+                    </con3:replace>
+                  </con3:default>
+                </con3:ifThenElse>
+              </con3:actions>
+            </con3:case>
+            <con3:default>
+              <con3:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-8661104995623250878-7e510c97.158680024dc.-7efa</con1:id>
+                <con3:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>REQUIRED FIELDS NOT SUPPLIED</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con3:expr>
+              </con3:replace>
+              <con3:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-8661104995623250878-7e510c97.158680024dc.-7ef9</con1:id>
+                <con3:expr>
+                  <con1:xqueryText>&lt;con:consultaDetallesCuentaResponse/></con1:xqueryText>
+                </con3:expr>
+              </con3:replace>
+            </con3:default>
+          </con3:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="ValidacionesGenerales">
+        <con:request>ValidacionesGenerales_request</con:request>
+        <con:response>ValidacionesGenerales_response</con:response>
+      </con:pipeline-node>
+      <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:branch-table variable="header">
+          <con:xpath>
+            <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+          </con:xpath>
+          <con:branch name="HN01">
+            <con:operator>equals</con:operator>
+            <con:value>'HN01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="HN01_ConsultaDetallesCuenta">
+                <con:request>HN01_ConsultaDetallesCuenta_request</con:request>
+                <con:response>HN01_ConsultaDetallesCuenta_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="GT01">
+            <con:operator>equals</con:operator>
+            <con:value>'GT01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="GT01_ConsultaDetallesCuenta">
+                <con:request>GT01_ConsultaDetallesCuenta_request</con:request>
+                <con:response>GT01_ConsultaDetallesCuenta_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="PA01">
+            <con:operator>equals</con:operator>
+            <con:value>'PA01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="PA01_ConsultaDetallesCuenta">
+                <con:request>PA01_ConsultaDetallesCuenta_request</con:request>
+                <con:response>PA01_ConsultaDetallesCuenta_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="NI01">
+            <con:operator>equals</con:operator>
+            <con:value>'NI01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="NI01_ConsultaDetallesCuenta">
+                <con:request>NI01_ConsultaDetallesCuenta_request</con:request>
+                <con:response>NI01_ConsultaDetallesCuenta_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow>
+              <con:pipeline-node name="Default_ConsultaDetallesCuenta">
+                <con:request>Default_ConsultaDetallesCuenta_request</con:request>
+                <con:response>Default_ConsultaDetallesCuenta_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+  <ser:alertRules/>
+</xml-fragment>

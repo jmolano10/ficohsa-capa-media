@@ -1,0 +1,1330 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/ConsultaControlSistema/wsdl/consultaControlSistemaPS"/>
+      <con:port>
+        <con:name>consultaControlSistemaPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaControlSistemaPS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-703851691118873770--b8ec9fb.173495da482.-7feb">
+    <con:pipeline type="error" name="_onErrorHandler-703851691118873770--b8ec9fb.173495da482.-7feb">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="errorCode">
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7ec1</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="errorMessage">
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7ecf</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7ead</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>mapeoErrores</con2:operation>
+            <con2:request>
+              <con2:body>$reqMapeoErrores</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>respMapeoErrores</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="reqMapeoErrores">
+                <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7e97</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con1:param name="CODIGO_ERROR">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                    <con1:param name="MENSAJE_ERROR">
+                      <con1:path>fn:concat("FICBCO0377", "$#$", $errorMessage)</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:replace varName="header" contents-only="true">
+                <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7e80</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con1:param name="mapeoErroresResponse1">
+                      <con1:path>$respMapeoErrores</con1:path>
+                    </con1:param>
+                    <con1:param name="successIndicator">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con2:responseTransform>
+          </con2:wsCallout>
+          <con2:replace varName="body" contents-only="true">
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7e60</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;aler:consultaControlSistemaResponse/></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7e4d</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ValidacionesGenerales_request">
+      <con:stage name="ValidacionXSD">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:validate>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7fc0</con1:id>
+            <con2:schema ref="Middleware/v2/Resources/AlertasProductos/xsd/alertasProductosTypes"/>
+            <con2:schemaElement xmlns:aler="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes">aler:consultaControlSistema</con2:schemaElement>
+            <con2:varName>body</con2:varName>
+            <con2:location>
+              <con1:xpathText>./aler:consultaControlSistema</con1:xpathText>
+            </con2:location>
+          </con2:validate>
+        </con:actions>
+      </con:stage>
+      <con:stage name="ConsultaRutaRegional">
+        <con:context>
+          <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaRutaRegional" prefix="con1"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con5:wsCallout xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+            <con1:id>_ActionId-5942782237116675569-1fd4f963.181164c92da.-7424</con1:id>
+            <con5:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/consultaRutaRegional/biz/consultaRutaRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con5:operation>consultaRutaRegional</con5:operation>
+            <con5:request>
+              <con5:body>$REQConsultaRutaRegional</con5:body>
+            </con5:request>
+            <con5:response>
+              <con5:body>RSPConsultaRutaRegional</con5:body>
+            </con5:response>
+            <con5:requestTransform>
+              <con1:assign varName="REQConsultaRutaRegional" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-5942782237116675569-1fd4f963.181164c92da.-742a</con6:id>
+                <con1:expr>
+                  <con5:xqueryTransform xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                    <con5:resource ref="Middleware/v2/Resources/Generales/xq/consultaRutaRegionalIn"/>
+                    <con5:param name="idServicio">
+                      <con5:path>"FICBCO0377"</con5:path>
+                    </con5:param>
+                    <con5:param name="requestHeader">
+                      <con5:path>$header/aut:RequestHeader</con5:path>
+                    </con5:param>
+                    <con5:param name="operacion">
+                      <con5:path>$operation</con5:path>
+                    </con5:param>
+                    <con5:param name="version">
+                      <con5:path>"V2"</con5:path>
+                    </con5:param>
+                  </con5:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+            </con5:requestTransform>
+            <con5:responseTransform>
+              <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-5942782237116675569-1fd4f963.181164c92da.-7103</con6:id>
+                <con1:case>
+                  <con1:condition>
+                    <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">string($RSPConsultaRutaRegional/con1:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con5:xqueryText>
+                  </con1:condition>
+                  <con1:actions>
+                    <con1:replace contents-only="true" varName="header">
+                      <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-5942782237116675569-1fd4f963.181164c92da.-7102</con6:id>
+                      <con1:expr>
+                        <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($RSPConsultaRutaRegional/con1:PV_MENSAJE_ERROR/text()) }</messages>
+</aut:ResponseHeader>]]></con5:xqueryText>
+                      </con1:expr>
+                    </con1:replace>
+                    <con1:replace contents-only="true" varName="body">
+                      <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-5942782237116675569-1fd4f963.181164c92da.-7100</con6:id>
+                      <con1:expr>
+                        <con6:xqueryText xmlns:con6="http://www.bea.com/wli/sb/stages/config">&lt;aler:consultaControlSistemaResponse/></con6:xqueryText>
+                      </con1:expr>
+                    </con1:replace>
+                    <con5:reply xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                      <con5:id>_ActionId-5942782237116675569-1fd4f963.181164c92da.-70ff</con5:id>
+                    </con5:reply>
+                  </con1:actions>
+                </con1:case>
+                <con1:default>
+                  <con1:replace contents-only="true" varName="header">
+                    <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-5942782237116675569-1fd4f963.181164c92da.-70fe</con6:id>
+                    <con1:expr>
+                      <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                        <con2:param name="requestHeader">
+                          <con2:path>$header/aut:RequestHeader</con2:path>
+                        </con2:param>
+                      </con2:xqueryTransform>
+                    </con1:expr>
+                  </con1:replace>
+                </con1:default>
+              </con1:ifThenElse>
+            </con5:responseTransform>
+          </con5:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ValidacionesGenerales_response">
+      <con:stage name="MapeoErrores">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7f1a</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:wsCallout>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7f09</con1:id>
+                  <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                  <con2:operation>mapeoErrores</con2:operation>
+                  <con2:request>
+                    <con2:body>$REQMapeoErrores</con2:body>
+                  </con2:request>
+                  <con2:response>
+                    <con2:body>RSPMapeoErrores</con2:body>
+                  </con2:response>
+                  <con2:requestTransform>
+                    <con2:assign varName="REQMapeoErrores">
+                      <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7ef3</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                          <con1:param name="CODIGO_ERROR">
+                            <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                          </con1:param>
+                          <con1:param name="MENSAJE_ERROR">
+                            <con1:path>fn:concat("FICBCO0377","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:assign>
+                  </con2:requestTransform>
+                  <con2:responseTransform>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7ee0</con1:id>
+                      <con2:expr>
+                        <con1:xqueryTransform>
+                          <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                          <con1:param name="mapeoErroresResponse1">
+                            <con1:path>$RSPMapeoErrores</con1:path>
+                          </con1:param>
+                          <con1:param name="successIndicator">
+                            <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                          </con1:param>
+                        </con1:xqueryTransform>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:responseTransform>
+                </con2:wsCallout>
+              </con2:actions>
+            </con2:case>
+            <con2:default/>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="HN01_ConsultaControlSistema_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="application">
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-15bf</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$body/aler:consultaControlSistema/APPLICATION/text()</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-15d6</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CREDIT_CARD_PROCESSOR'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="region">
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-14f8</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>$body/aler:consultaControlSistema/APPLICATION_REGION/text()</con1:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:ifThenElse>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-154b</con1:id>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = ('ALL','PA01','NI01','GT01')</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:assign varName="pais">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-14ba</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                            <con1:param name="sentidoConversion">
+                              <con1:path>'OSB-ISO3'</con1:path>
+                            </con1:param>
+                            <con1:param name="codigoPais">
+                              <con1:path>$region</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:assign>
+                      <con2:wsCallout>
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-150b</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataREG/validaMasterData/biz/consultaValidaMasterData_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>consultaValidaMasterData</con2:operation>
+                        <con2:request>
+                          <con2:body>$REQConsultaMasterData</con2:body>
+                        </con2:request>
+                        <con2:response>
+                          <con2:body>RSPConsultaMasterData</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                          <con2:assign varName="REQConsultaMasterData">
+                            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-14db</con1:id>
+                            <con2:expr>
+                              <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaHNIn"/>
+                                <con1:param name="pais">
+                                  <con1:path>$pais</con1:path>
+                                </con1:param>
+                              </con1:xqueryTransform>
+                            </con2:expr>
+                          </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                      </con2:wsCallout>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:default/>
+                </con2:ifThenElse>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_BANKING'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions/>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_LOAN'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions/>
+            </con2:case>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="HN01_ConsultaControlSistema_response">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-15bc</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CREDIT_CARD_PROCESSOR'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:ifThenElse>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1536</con1:id>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = 'ALL'</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-12df</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-12c8</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaHNOut"/>
+                            <con1:param name="outputParameters">
+                              <con1:path>$RSPConsultaMasterData</con1:path>
+                            </con1:param>
+                            <con1:param name="flag">
+                              <con1:path>'1'</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = ('PA01','NI01','GT01')</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-13a3</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-12b5</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaHNOut"/>
+                            <con1:param name="outputParameters">
+                              <con1:path>$RSPConsultaMasterData</con1:path>
+                            </con1:param>
+                            <con1:param name="flag">
+                              <con1:path>'0'</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = 'HN01'</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-19b8</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-19b6</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText><![CDATA[<aler:consultaControlSistemaResponse>
+	<APPLICATIONS>
+		<APPLICATION>
+			<REGION>HN01</REGION>
+			<AVAILABLE_QUERY>YES</AVAILABLE_QUERY>
+		</APPLICATION>
+	</APPLICATIONS>
+</aler:consultaControlSistemaResponse>]]></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:default>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-19a6</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>Invalid application region request</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                      <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-1997</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>&lt;aler:consultaControlSistemaResponse /></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:default>
+                </con2:ifThenElse>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_BANKING'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1593</con1:id>
+                  <con2:errCode>ERROR</con2:errCode>
+                  <con2:message>APPLICATION NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_LOAN'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1580</con1:id>
+                  <con2:errCode>ERROR</con2:errCode>
+                  <con2:message>APPLICATION NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="PA01_ConsultaControlSistema_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="application">
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-15aa</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$body/aler:consultaControlSistema/APPLICATION/text()</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-15b5</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CREDIT_CARD_PROCESSOR'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="region">
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-11f4</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>$body/aler:consultaControlSistema/APPLICATION_REGION/text()</con1:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:ifThenElse>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1122</con1:id>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = ('ALL','PA01','NI01','GT01')</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:assign varName="pais">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-ffe</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                            <con1:param name="sentidoConversion">
+                              <con1:path>'OSB-ISO3'</con1:path>
+                            </con1:param>
+                            <con1:param name="codigoPais">
+                              <con1:path>$region</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:assign>
+                      <con2:wsCallout>
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-f62</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataREG/validaMasterData/biz/consultaValidaMasterData_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>consultaValidaMasterData</con2:operation>
+                        <con2:request>
+                          <con2:body>$REQConsultaMasterData</con2:body>
+                        </con2:request>
+                        <con2:response>
+                          <con2:body>RSPConsultaMasterData</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                          <con2:assign varName="REQConsultaMasterData">
+                            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-f22</con1:id>
+                            <con2:expr>
+                              <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaPAIn"/>
+                                <con1:param name="pais">
+                                  <con1:path>$pais</con1:path>
+                                </con1:param>
+                              </con1:xqueryTransform>
+                            </con2:expr>
+                          </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                      </con2:wsCallout>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:default/>
+                </con2:ifThenElse>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_BANKING'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions/>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_LOAN'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions/>
+            </con2:case>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="PA01_ConsultaControlSistema_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1570</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CREDIT_CARD_PROCESSOR'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:ifThenElse>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-d0e</con1:id>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = 'ALL'</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-ad9</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-9dc</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaPAOut"/>
+                            <con1:param name="outputParameters">
+                              <con1:path>$RSPConsultaMasterData</con1:path>
+                            </con1:param>
+                            <con1:param name="flag">
+                              <con1:path>'1'</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = ('PA01','NI01','GT01')</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-abf</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-9c8</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaPAOut"/>
+                            <con1:param name="outputParameters">
+                              <con1:path>$RSPConsultaMasterData</con1:path>
+                            </con1:param>
+                            <con1:param name="flag">
+                              <con1:path>'0'</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = 'HN01'</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-1970</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-196e</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText><![CDATA[<aler:consultaControlSistemaResponse>
+	<APPLICATIONS>
+		<APPLICATION>
+			<REGION>HN01</REGION>
+			<AVAILABLE_QUERY>YES</AVAILABLE_QUERY>
+		</APPLICATION>
+	</APPLICATIONS>
+</aler:consultaControlSistemaResponse>]]></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:default>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-195d</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>Invalid application region request</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-193d</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>&lt;aler:consultaControlSistemaResponse /></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:default>
+                </con2:ifThenElse>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_BANKING'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-156f</con1:id>
+                  <con2:errCode>ERROR</con2:errCode>
+                  <con2:message>APPLICATION NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_LOAN'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-156e</con1:id>
+                  <con2:errCode>ERROR</con2:errCode>
+                  <con2:message>APPLICATION NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="GT01_ConsultaControlSistema_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="application">
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-15ac</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$body/aler:consultaControlSistema/APPLICATION/text()</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-15b9</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CREDIT_CARD_PROCESSOR'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="region">
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1222</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>$body/aler:consultaControlSistema/APPLICATION_REGION/text()</con1:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:ifThenElse>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-11b2</con1:id>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = ('ALL','PA01','NI01','GT01')</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:assign varName="pais">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1006</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                            <con1:param name="sentidoConversion">
+                              <con1:path>'OSB-ISO3'</con1:path>
+                            </con1:param>
+                            <con1:param name="codigoPais">
+                              <con1:path>$region</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:assign>
+                      <con2:wsCallout>
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-f72</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataREG/validaMasterData/biz/consultaValidaMasterData_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>consultaValidaMasterData</con2:operation>
+                        <con2:request>
+                          <con2:body>$REQConsultaMasterData</con2:body>
+                        </con2:request>
+                        <con2:response>
+                          <con2:body>RSPConsultaMasterData</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                          <con2:assign varName="REQConsultaMasterData">
+                            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-f41</con1:id>
+                            <con2:expr>
+                              <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaGTIn"/>
+                                <con1:param name="pais">
+                                  <con1:path>$pais</con1:path>
+                                </con1:param>
+                              </con1:xqueryTransform>
+                            </con2:expr>
+                          </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                      </con2:wsCallout>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:default/>
+                </con2:ifThenElse>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_BANKING'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions/>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_LOAN'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions/>
+            </con2:case>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="GT01_ConsultaControlSistema_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1576</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CREDIT_CARD_PROCESSOR'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:ifThenElse>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-e77</con1:id>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = 'ALL'</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-c45</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-9fc</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaGTOut"/>
+                            <con1:param name="outputParameters">
+                              <con1:path>$RSPConsultaMasterData</con1:path>
+                            </con1:param>
+                            <con1:param name="flag">
+                              <con1:path>'1'</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = ('PA01','NI01','GT01')</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-af9</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-a1e</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaGTOut"/>
+                            <con1:param name="outputParameters">
+                              <con1:path>$RSPConsultaMasterData</con1:path>
+                            </con1:param>
+                            <con1:param name="flag">
+                              <con1:path>'0'</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = 'HN01'</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-1995</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-1993</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText><![CDATA[<aler:consultaControlSistemaResponse>
+	<APPLICATIONS>
+		<APPLICATION>
+			<REGION>HN01</REGION>
+			<AVAILABLE_QUERY>YES</AVAILABLE_QUERY>
+		</APPLICATION>
+	</APPLICATIONS>
+</aler:consultaControlSistemaResponse>]]></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:default>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-1981</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>Invalid application region request</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-1972</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>&lt;aler:consultaControlSistemaResponse /></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:default>
+                </con2:ifThenElse>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_BANKING'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1575</con1:id>
+                  <con2:errCode>ERROR</con2:errCode>
+                  <con2:message>APPLICATION NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_LOAN'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1574</con1:id>
+                  <con2:errCode>ERROR</con2:errCode>
+                  <con2:message>APPLICATION NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="Default_request">
+      <con:stage name="FlujoEntrada">
+        <con:context/>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="Default_response">
+      <con:stage name="FlujoSalida">
+        <con:context/>
+        <con:actions>
+          <con2:Error>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-7fd6</con1:id>
+            <con2:errCode>MW-0008</con2:errCode>
+            <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+          </con2:Error>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="NI01_ConsultaControlSistema_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="application">
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-15a8</con1:id>
+            <con2:expr>
+              <con1:xqueryText>$body/aler:consultaControlSistema/APPLICATION/text()</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-15b1</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CREDIT_CARD_PROCESSOR'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:assign varName="region">
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-11cf</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>$body/aler:consultaControlSistema/APPLICATION_REGION/text()</con1:xqueryText>
+                  </con2:expr>
+                </con2:assign>
+                <con2:ifThenElse>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-110c</con1:id>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = ('ALL','PA01','NI01','GT01')</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:assign varName="pais">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-ffa</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                            <con1:param name="sentidoConversion">
+                              <con1:path>'OSB-ISO3'</con1:path>
+                            </con1:param>
+                            <con1:param name="codigoPais">
+                              <con1:path>$region</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:assign>
+                      <con2:wsCallout>
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-f4a</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataREG/validaMasterData/biz/consultaValidaMasterData_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>consultaValidaMasterData</con2:operation>
+                        <con2:request>
+                          <con2:body>$REQConsultaMasterData</con2:body>
+                        </con2:request>
+                        <con2:response>
+                          <con2:body>RSPConsultaMasterData</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                          <con2:assign varName="REQConsultaMasterData">
+                            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-f0d</con1:id>
+                            <con2:expr>
+                              <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaNIIn"/>
+                                <con1:param name="pais">
+                                  <con1:path>$pais</con1:path>
+                                </con1:param>
+                              </con1:xqueryTransform>
+                            </con2:expr>
+                          </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                      </con2:wsCallout>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:default/>
+                </con2:ifThenElse>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_BANKING'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions/>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_LOAN'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions/>
+            </con2:case>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="NI01_ConsultaControlSistema_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/alertasProductosTypes" prefix="aler"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-156a</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CREDIT_CARD_PROCESSOR'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:ifThenElse>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-cf1</con1:id>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = 'ALL'</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-a91</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-99f</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaNIOut"/>
+                            <con1:param name="outputParameters">
+                              <con1:path>$RSPConsultaMasterData</con1:path>
+                            </con1:param>
+                            <con1:param name="flag">
+                              <con1:path>'1'</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = ('PA01','NI01','GT01')</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-a6a</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-98f</con1:id>
+                        <con2:expr>
+                          <con1:xqueryTransform>
+                            <con1:resource ref="Middleware/v2/Resources/ConsultaControlSistema/xq/consultaControlSistemaNIOut"/>
+                            <con1:param name="outputParameters">
+                              <con1:path>$RSPConsultaMasterData</con1:path>
+                            </con1:param>
+                            <con1:param name="flag">
+                              <con1:path>'0'</con1:path>
+                            </con1:param>
+                          </con1:xqueryTransform>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:case>
+                    <con2:condition>
+                      <con1:xqueryText>$region = 'HN01'</con1:xqueryText>
+                    </con2:condition>
+                    <con2:actions>
+                      <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-193b</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                      <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-1939</con1:id>
+                        <con2:expr>
+                          <con1:xqueryText><![CDATA[<aler:consultaControlSistemaResponse>
+	<APPLICATIONS>
+		<APPLICATION>
+			<REGION>HN01</REGION>
+			<AVAILABLE_QUERY>YES</AVAILABLE_QUERY>
+		</APPLICATION>
+	</APPLICATIONS>
+</aler:consultaControlSistemaResponse>]]></con1:xqueryText>
+                        </con2:expr>
+                      </con2:replace>
+                    </con2:actions>
+                  </con2:case>
+                  <con2:default>
+                    <con2:replace varName="header" contents-only="true">
+                      <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-1926</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>Invalid application region request</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                      <con1:id>_ActionId-2003981089054451542--855987e.1735949b384.-1911</con1:id>
+                      <con2:expr>
+                        <con1:xqueryText>&lt;aler:consultaControlSistemaResponse /></con1:xqueryText>
+                      </con2:expr>
+                    </con2:replace>
+                  </con2:default>
+                </con2:ifThenElse>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_BANKING'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1569</con1:id>
+                  <con2:errCode>ERROR</con2:errCode>
+                  <con2:message>APPLICATION NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$application = 'CORE_LOAN'</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:Error>
+                  <con1:id>_ActionId-703851691118873770--b8ec9fb.173495da482.-1568</con1:id>
+                  <con2:errCode>ERROR</con2:errCode>
+                  <con2:message>APPLICATION NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                </con2:Error>
+              </con2:actions>
+            </con2:case>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="ValidacionesGenerales">
+        <con:request>ValidacionesGenerales_request</con:request>
+        <con:response>ValidacionesGenerales_response</con:response>
+      </con:pipeline-node>
+      <con:branch-node type="condition" name="Regionalizacion">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:branch-table variable="header">
+          <con:xpath>
+            <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+          </con:xpath>
+          <con:branch name="HN01">
+            <con:operator>equals</con:operator>
+            <con:value>'HN01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="HN01_ConsultaControlSistema">
+                <con:request>HN01_ConsultaControlSistema_request</con:request>
+                <con:response>HN01_ConsultaControlSistema_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="GT01">
+            <con:operator>equals</con:operator>
+            <con:value>'GT01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="GT01_ConsultaControlSistema">
+                <con:request>GT01_ConsultaControlSistema_request</con:request>
+                <con:response>GT01_ConsultaControlSistema_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="PA01">
+            <con:operator>equals</con:operator>
+            <con:value>'PA01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="PA01_ConsultaControlSistema">
+                <con:request>PA01_ConsultaControlSistema_request</con:request>
+                <con:response>PA01_ConsultaControlSistema_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="NI01">
+            <con:operator>equals</con:operator>
+            <con:value>'NI01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="NI01_ConsultaControlSistema">
+                <con:request>NI01_ConsultaControlSistema_request</con:request>
+                <con:response>NI01_ConsultaControlSistema_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow>
+              <con:pipeline-node name="Default">
+                <con:request>Default_request</con:request>
+                <con:response>Default_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

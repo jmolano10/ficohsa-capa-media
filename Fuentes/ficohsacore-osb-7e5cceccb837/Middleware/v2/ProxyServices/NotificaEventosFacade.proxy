@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:security>
+      <con:custom-token-authentication>
+        <con:username-password>
+          <con:username-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/UserName/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:username-selector>
+          <con:password-selector>
+            <con:xpath>declare namespace aut='http://www.ficohsa.com.hn/middleware.services/autType';
+./aut:RequestHeader/Authentication/Password/text()</con:xpath>
+            <con:variable>header</con:variable>
+          </con:password-selector>
+        </con:username-password>
+      </con:custom-token-authentication>
+    </ser:security>
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/NotificaEventosFacade/wsdl/notificaEventosFacadePS"/>
+      <con:port>
+        <con:name>notificaEventosFacadePSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/notificaEventosFacadePS/</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="true">
+      <ser:aggregationInterval>360</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Action</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>http</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:URI>
+      <env:value>/Middleware/OperationsAndExecution/Messaging/NotificaEventosFacade</env:value>
+    </tran:URI>
+    <tran:inbound-properties/>
+    <tran:all-headers>false</tran:all-headers>
+    <tran:provider-specific>
+      <http:inbound-properties>
+        <http:use-https>true</http:use-https>
+      </http:inbound-properties>
+    </tran:provider-specific>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-576694318351665919--1a931447.1750f25d463.-435f">
+    <con1:pipeline type="error" name="_onErrorHandler-576694318351665919--1a931447.1750f25d463.-435f">
+      <con1:stage name="ManejoError">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaEventosFacadeTypes" prefix="not"/>
+        </con1:context>
+        <con1:actions>
+          <con4:assign varName="errorCode">
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7e6d</con3:id>
+            <con4:expr>
+              <con3:xqueryText>fn:string($fault/ctx:errorCode/text())</con3:xqueryText>
+            </con4:expr>
+          </con4:assign>
+          <con4:assign varName="errorMessage">
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7e54</con3:id>
+            <con4:expr>
+              <con3:xqueryText>fn:string($fault/ctx:reason/text())</con3:xqueryText>
+            </con4:expr>
+          </con4:assign>
+          <con4:wsCallout>
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7e38</con3:id>
+            <con4:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>mapeoErrores</con4:operation>
+            <con4:request>
+              <con4:body>$reqMapeoErrores</con4:body>
+            </con4:request>
+            <con4:response>
+              <con4:body>respMapeoErrores</con4:body>
+            </con4:response>
+            <con4:requestTransform>
+              <con4:assign varName="reqMapeoErrores">
+                <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7e22</con3:id>
+                <con4:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con3:param name="CODIGO_ERROR">
+                      <con3:path>fn:concat("FICBCO0444", "$#$", $errorMessage)</con3:path>
+                    </con3:param>
+                    <con3:param name="MENSAJE_ERROR">
+                      <con3:path>$errorCode</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con4:expr>
+              </con4:assign>
+            </con4:requestTransform>
+            <con4:responseTransform>
+              <con4:replace varName="header" contents-only="true">
+                <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7e11</con3:id>
+                <con4:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con3:param name="mapeoErroresResponse1">
+                      <con3:path>$respMapeoErrores</con3:path>
+                    </con3:param>
+                    <con3:param name="successIndicator">
+                      <con3:path>$errorCode</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con4:expr>
+              </con4:replace>
+            </con4:responseTransform>
+          </con4:wsCallout>
+          <con4:replace contents-only="true" varName="body">
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7df6</con3:id>
+            <con4:expr>
+              <con3:xqueryText>&lt;not:notificaEventosFacadeResponse/></con3:xqueryText>
+            </con4:expr>
+          </con4:replace>
+          <con3:reply>
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7ddc</con3:id>
+          </con3:reply>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="request" name="PipelinePairNode1_request">
+      <con1:stage name="ValidacionXSD">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaEventosFacadeTypes" prefix="not"/>
+        </con1:context>
+        <con1:actions>
+          <con4:validate>
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7fe4</con3:id>
+            <con4:schema ref="Middleware/v2/Resources/NotificaEventosFacade/xsd/notificaEventosFacadeTypes"/>
+            <con4:schemaElement xmlns:not="http://www.ficohsa.com.hn/middleware.services/notificaEventosFacadeTypes">not:notificaEventosFacade</con4:schemaElement>
+            <con4:varName>body</con4:varName>
+            <con4:location>
+              <con3:xpathText>./not:notificaEventosFacade</con3:xpathText>
+            </con4:location>
+          </con4:validate>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="ValidaServicioRegional">
+        <con1:context>
+          <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaEventosFacadeTypes" prefix="not"/>
+        </con1:context>
+        <con1:actions>
+          <con4:wsCallout>
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7fc5</con3:id>
+            <con4:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>ValidaServicioRegional</con4:operation>
+            <con4:request>
+              <con4:body>$reqValidaServicioRegional</con4:body>
+            </con4:request>
+            <con4:response>
+              <con4:body>respValidaServicioRegional</con4:body>
+            </con4:response>
+            <con4:requestTransform>
+              <con4:assign varName="reqValidaServicioRegional">
+                <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7fac</con3:id>
+                <con4:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                    <con3:param name="requestHeader1">
+                      <con3:path>$header/aut:RequestHeader</con3:path>
+                    </con3:param>
+                    <con3:param name="serviceId">
+                      <con3:path>"FICBCO0444"</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con4:expr>
+              </con4:assign>
+            </con4:requestTransform>
+            <con4:responseTransform>
+              <con4:ifThenElse>
+                <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7f9b</con3:id>
+                <con4:case>
+                  <con4:condition>
+                    <con3:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con3:xqueryText>
+                  </con4:condition>
+                  <con4:actions>
+                    <con4:replace varName="header" contents-only="true">
+                      <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7f78</con3:id>
+                      <con4:expr>
+                        <con3:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                      </con4:expr>
+                    </con4:replace>
+                    <con4:replace varName="body" contents-only="true">
+                      <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7f41</con3:id>
+                      <con4:expr>
+                        <con3:xqueryText>&lt;not:notificaEventosFacadeResponse/></con3:xqueryText>
+                      </con4:expr>
+                    </con4:replace>
+                    <con3:reply>
+                      <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7f05</con3:id>
+                    </con3:reply>
+                  </con4:actions>
+                </con4:case>
+                <con4:default>
+                  <con4:replace varName="header" contents-only="true">
+                    <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7f5f</con3:id>
+                    <con4:expr>
+                      <con3:xqueryTransform>
+                        <con3:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                        <con3:param name="requestHeader">
+                          <con3:path>$header/aut:RequestHeader</con3:path>
+                        </con3:param>
+                      </con3:xqueryTransform>
+                    </con4:expr>
+                  </con4:replace>
+                </con4:default>
+              </con4:ifThenElse>
+            </con4:responseTransform>
+          </con4:wsCallout>
+        </con1:actions>
+      </con1:stage>
+      <con1:stage name="NotificaEventos">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaEventosFacadeTypes" prefix="not"/>
+        </con1:context>
+        <con1:actions>
+          <con4:wsCallout>
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7ef3</con3:id>
+            <con4:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/NotificaEventosT24" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con4:operation>notificaEventosT24</con4:operation>
+            <con4:request>
+              <con4:body>$REQNotificaEventos</con4:body>
+              <con4:header>$REQHNotificaEventos</con4:header>
+            </con4:request>
+            <con4:response>
+              <con4:body>RSPNotificaEventos</con4:body>
+              <con4:header>RSPHNotificaEventos</con4:header>
+            </con4:response>
+            <con4:requestTransform>
+              <con4:assign varName="REQHNotificaEventos">
+                <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7ed6</con3:id>
+                <con4:expr>
+                  <con3:xqueryText>$header</con3:xqueryText>
+                </con4:expr>
+              </con4:assign>
+              <con4:assign varName="REQNotificaEventos">
+                <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7eb3</con3:id>
+                <con4:expr>
+                  <con3:xqueryTransform>
+                    <con3:resource ref="Middleware/v2/Resources/NotificaEventosFacade/xq/notificaEventosIn"/>
+                    <con3:param name="notificaEventosFacade">
+                      <con3:path>$body/not:notificaEventosFacade</con3:path>
+                    </con3:param>
+                  </con3:xqueryTransform>
+                </con4:expr>
+              </con4:assign>
+            </con4:requestTransform>
+            <con4:responseTransform/>
+          </con4:wsCallout>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:pipeline type="response" name="PipelinePairNode1_response">
+      <con1:stage name="FlujoSalida">
+        <con1:context>
+          <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaEventosFacadeTypes" prefix="not"/>
+        </con1:context>
+        <con1:actions>
+          <con4:replace varName="header" contents-only="false">
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7e9d</con3:id>
+            <con4:expr>
+              <con3:xqueryText>$RSPHNotificaEventos</con3:xqueryText>
+            </con4:expr>
+          </con4:replace>
+          <con4:replace varName="body" contents-only="true">
+            <con3:id>_ActionId-4274088810188695122-70eb9cc4.1751d94bf29.-7e88</con3:id>
+            <con4:expr>
+              <con3:xqueryTransform>
+                <con3:resource ref="Middleware/v2/Resources/NotificaEventosFacade/xq/notificaEventosOut"/>
+                <con3:param name="notificaEventosT24Response">
+                  <con3:path>$RSPNotificaEventos</con3:path>
+                </con3:param>
+              </con3:xqueryTransform>
+            </con4:expr>
+          </con4:replace>
+        </con1:actions>
+      </con1:stage>
+    </con1:pipeline>
+    <con1:flow>
+      <con1:pipeline-node name="PipelinePairNode1">
+        <con1:request>PipelinePairNode1_request</con1:request>
+        <con1:response>PipelinePairNode1_response</con1:response>
+      </con1:pipeline-node>
+    </con1:flow>
+  </ser:router>
+</xml-fragment>
