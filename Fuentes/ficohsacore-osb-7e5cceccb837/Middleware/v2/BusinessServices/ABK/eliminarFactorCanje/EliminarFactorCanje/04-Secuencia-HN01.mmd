@@ -6,7 +6,7 @@ sequenceDiagram
     participant DBHN as Oracle Database HN<br/>(ConnectionProxyAbanksHN)
 
     Note over Cliente,DBHN: Región: Honduras (HN01)
-    Note over Cliente,DBHN: Service ID: FICBCO0275
+    Note over Cliente,DBHN: Esquema: (default schema)
 
     Cliente->>ProxyHN: SOAP Request
     Note right of Cliente: Header: UserName=ADMIN_USER<br/>Body: PROMO_ID=PROMO2024001<br/>Selector: SOAP body
@@ -34,69 +34,44 @@ sequenceDiagram
     Note right of BizHN: IN: PV_IDPROMOCION='PROMO2024001'<br/>IN: PV_USUARIO='ADMIN_USER'
 
     activate DBHN
-    Note over DBHN: Stored Procedure Execution<br/>Package: (default schema)<br/>Procedure: PL_P_ELIMINAR_FACTOR_CANJE
+    Note over DBHN: Stored Procedure Execution<br/>Schema: (default schema)<br/>Procedure: PL_P_ELIMINAR_FACTOR_CANJE
 
     alt Promoción Eliminada Exitosamente
         DBHN-->>BizHN: OutputParameters
         Note left of DBHN: OUT: PV_CODIGOMENSAJE='SUCCESS'<br/>OUT: PV_DESCRIPCIONMENSAJE='Promoción eliminada exitosamente'
-        deactivate DBHN
 
         BizHN-->>ProxyHN: Response XML
-        Note left of BizHN: $RSPeliminarFactorCanje
-        deactivate BizHN
 
-        Note over ProxyHN: Extracción de Variables:<br/>$errorCode = string(PV_CODIGOMENSAJE)<br/>$validationMessage = string(PV_DESCRIPCIONMENSAJE)
+        Note over ProxyHN: Extracción: $errorCode='SUCCESS'<br/>$validationMessage='Promoción eliminada exitosamente'
 
-        Note over ProxyHN: Pipeline: HN01_EliminarFactorCanje_response<br/>Stage: FujoSalida
-
-        Note over ProxyHN: Evaluación: $errorCode = 'SUCCESS'
-
-        Note over ProxyHN: Construcción de Response Header:<br/>successIndicator='Success'
-
-        Note over ProxyHN: Construcción de Response Body:<br/><eliminarFactorCanjeResponse/>
+        Note over ProxyHN: Pipeline: HN01_EliminarFactorCanje_response<br/>Stage: FlujoSalida<br/>Evaluación: $errorCode = 'SUCCESS'
 
         ProxyHN-->>Cliente: SOAP Response (Success)
         Note left of ProxyHN: Header: successIndicator=Success<br/>Body: <eliminarFactorCanjeResponse/>
 
-    else Promoción No Existe o Error de Negocio
+    else Error de Negocio
         DBHN-->>BizHN: OutputParameters
         Note left of DBHN: OUT: PV_CODIGOMENSAJE='ERROR'<br/>OUT: PV_DESCRIPCIONMENSAJE='La promoción no existe'
-        deactivate DBHN
 
         BizHN-->>ProxyHN: Response XML
-        deactivate BizHN
-
-        Note over ProxyHN: Extracción de Variables:<br/>$errorCode = 'ERROR'<br/>$validationMessage = 'La promoción no existe'
-
-        Note over ProxyHN: Pipeline: HN01_EliminarFactorCanje_response<br/>Stage: FujoSalida
 
         Note over ProxyHN: Evaluación: $errorCode != 'SUCCESS'
 
-        Note over ProxyHN: Construcción de Response Header:<br/>successIndicator=$errorCode<br/>messages=$validationMessage
-
         ProxyHN-->>Cliente: SOAP Response (Error)
-        Note left of ProxyHN: Header: successIndicator=ERROR<br/>messages='La promoción no existe'<br/>Body: <eliminarFactorCanjeResponse/>
+        Note left of ProxyHN: Header: successIndicator=ERROR<br/>messages='La promoción no existe'
 
-    else Error Técnico (Excepción)
+    else Error Técnico
         DBHN-->>BizHN: Exception
-        Note left of DBHN: ORA-12154: TNS error<br/>o Connection timeout<br/>o SP no encontrado
-        deactivate DBHN
-
         BizHN-->>ProxyHN: Fault
-        deactivate BizHN
 
-        Note over ProxyHN: Error Handler Activado<br/>Pipeline: _onErrorHandler<br/>Stage: ManejoError
-
-        Note over ProxyHN: Captura de Fault:<br/>$errorCode = $fault/ctx:errorCode<br/>$errorMessage = $fault/ctx:reason
-
-        Note over ProxyHN: Construcción de Response Header:<br/>messageId=-1<br/>successIndicator=ERROR<br/>messages=$errorMessage
+        Note over ProxyHN: Error Handler: _onErrorHandler<br/>Stage: ManejoError
 
         ProxyHN-->>Cliente: SOAP Response (Exception)
-        Note left of ProxyHN: Header: messageId=-1<br/>successIndicator=ERROR<br/>messages='ORA-12154: TNS...'<br/>Body: <eliminarFactorCanjeResponse/>
+        Note left of ProxyHN: Header: messageId=-1<br/>successIndicator=ERROR<br/>messages='[Technical Error]'
     end
 
+    deactivate DBHN
+    deactivate BizHN
     deactivate ProxyHN
 
-    Note over Cliente,DBHN: Configuración de Retry:<br/>Retry Count: 0 (sin reintentos)<br/>Retry Interval: 30 segundos<br/>Retry Application Errors: true
-
-    Note over Cliente,DBHN: Logging: debug<br/>Monitoring: disabled<br/>SLA Alerting: enabled (normal)<br/>Pipeline Alerting: enabled (normal)
+    Note over Cliente,DBHN: Diferencias con GT01:<br/>- Esquema: (default schema, no explícito)<br/>- Variable XQuery: $eliminarFactorCanje<br/>- Business Service: ABK

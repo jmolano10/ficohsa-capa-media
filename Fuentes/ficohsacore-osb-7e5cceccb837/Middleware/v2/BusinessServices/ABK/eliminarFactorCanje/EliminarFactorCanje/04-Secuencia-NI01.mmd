@@ -40,13 +40,11 @@ sequenceDiagram
 
     alt Promoción Eliminada Exitosamente
         DBNI-->>BizNI: OutputParameters
-        Note left of DBNI: OUT: PV_CODIGOMENSAJE='SUCCESS'<br/>OUT: PV_DESCRIPCIONMENSAJE='Eliminación exitosa'
-        deactivate DBNI
+        Note left of DBNI: OUT: PV_CODIGOMENSAJE='SUCCESS'<br/>OUT: PV_DESCRIPCIONMENSAJE='Factor de canje eliminado en Nicaragua'
 
         BizNI-->>ProxyNI: Response XML
-        deactivate BizNI
 
-        Note over ProxyNI: Extracción con fn:string:<br/>$errorCode=fn:string(PV_CODIGOMENSAJE)<br/>$validationMessage=fn:string(PV_DESCRIPCIONMENSAJE)
+        Note over ProxyNI: Extracción: $errorCode='SUCCESS'<br/>$validationMessage='Factor de canje eliminado en Nicaragua'
 
         Note over ProxyNI: Pipeline: NI01_EliminarFactorCanje_response<br/>Stage: FlujoSalida<br/>Evaluación: $errorCode = 'SUCCESS'
 
@@ -55,29 +53,27 @@ sequenceDiagram
 
     else Error de Negocio
         DBNI-->>BizNI: OutputParameters
-        Note left of DBNI: OUT: PV_CODIGOMENSAJE='ERROR'<br/>OUT: PV_DESCRIPCIONMENSAJE='Error en Nicaragua'
-        deactivate DBNI
+        Note left of DBNI: OUT: PV_CODIGOMENSAJE='ERROR'<br/>OUT: PV_DESCRIPCIONMENSAJE='Promoción no encontrada en Nicaragua'
 
         BizNI-->>ProxyNI: Response XML
-        deactivate BizNI
 
         Note over ProxyNI: Evaluación: $errorCode != 'SUCCESS'
 
         ProxyNI-->>Cliente: SOAP Response (Error)
-        Note left of ProxyNI: Header: successIndicator=ERROR<br/>messages='Error en Nicaragua'
+        Note left of ProxyNI: Header: successIndicator=ERROR<br/>messages='Promoción no encontrada en Nicaragua'
 
     else Error Técnico
         DBNI-->>BizNI: Exception
-        deactivate DBNI
         BizNI-->>ProxyNI: Fault
-        deactivate BizNI
 
         Note over ProxyNI: Error Handler: _onErrorHandler<br/>Stage: ManejoError
 
         ProxyNI-->>Cliente: SOAP Response (Exception)
-        Note left of ProxyNI: Header: messageId=-1<br/>successIndicator=ERROR
+        Note left of ProxyNI: Header: messageId=-1<br/>successIndicator=ERROR<br/>messages='[Technical Error]'
     end
 
+    deactivate DBNI
+    deactivate BizNI
     deactivate ProxyNI
 
-    Note over Cliente,DBNI: Diferencias CRÍTICAS con otras regiones:<br/>1. Provider: http (no local)<br/>2. URI explícito: /Middleware/v2/ProxyServices/EliminarFactorCanjeNI<br/>3. all-headers: false (pérdida de headers personalizados)<br/>4. Selector: SOAP action<br/>5. Business Service: PXYNIC (no ABKNI)<br/>6. XQuery: eliminarFactorCanjeIn.xq (sin sufijo NI)<br/>7. Uso de fn:string explícito<br/>8. Esquema: PROXYNICARAGUA
+    Note over Cliente,DBNI: Diferencias con GT01:<br/>- Provider: http (URI explícito, no local)<br/>- Selector: SOAP action (vs SOAP body)<br/>- Business Service: PXYNIC (vs ABKGT)<br/>- XQuery: eliminarFactorCanjeIn.xq (sin sufijo NI)<br/>- Esquema: PROXYNICARAGUA<br/>- Variable XQuery: $eliminarFactorCanje1<br/>- all-headers: false (pérdida headers personalizados)

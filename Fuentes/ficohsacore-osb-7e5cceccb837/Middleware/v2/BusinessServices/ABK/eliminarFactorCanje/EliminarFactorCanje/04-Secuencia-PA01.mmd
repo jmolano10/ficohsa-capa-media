@@ -39,13 +39,11 @@ sequenceDiagram
 
     alt Promoción Eliminada Exitosamente
         DBPA-->>BizPA: OutputParameters
-        Note left of DBPA: OUT: PV_CODIGOMENSAJE='SUCCESS'<br/>OUT: PV_DESCRIPCIONMENSAJE='Eliminación exitosa'
-        deactivate DBPA
+        Note left of DBPA: OUT: PV_CODIGOMENSAJE='SUCCESS'<br/>OUT: PV_DESCRIPCIONMENSAJE='Eliminación exitosa en Panamá'
 
         BizPA-->>ProxyPA: Response XML
-        deactivate BizPA
 
-        Note over ProxyPA: Extracción: $errorCode='SUCCESS'
+        Note over ProxyPA: Extracción: $errorCode='SUCCESS'<br/>$validationMessage='Eliminación exitosa en Panamá'
 
         Note over ProxyPA: Pipeline: PA01_EliminarFactorCanje_response<br/>Stage: FlujoSalida<br/>Evaluación: $errorCode = 'SUCCESS'
 
@@ -54,29 +52,27 @@ sequenceDiagram
 
     else Error de Negocio
         DBPA-->>BizPA: OutputParameters
-        Note left of DBPA: OUT: PV_CODIGOMENSAJE='ERROR'<br/>OUT: PV_DESCRIPCIONMENSAJE='Error en Panamá'
-        deactivate DBPA
+        Note left of DBPA: OUT: PV_CODIGOMENSAJE='ERROR'<br/>OUT: PV_DESCRIPCIONMENSAJE='Promoción no encontrada en Panamá'
 
         BizPA-->>ProxyPA: Response XML
-        deactivate BizPA
 
         Note over ProxyPA: Evaluación: $errorCode != 'SUCCESS'
 
         ProxyPA-->>Cliente: SOAP Response (Error)
-        Note left of ProxyPA: Header: successIndicator=ERROR<br/>messages='Error en Panamá'
+        Note left of ProxyPA: Header: successIndicator=ERROR<br/>messages='Promoción no encontrada en Panamá'
 
     else Error Técnico
         DBPA-->>BizPA: Exception
-        deactivate DBPA
         BizPA-->>ProxyPA: Fault
-        deactivate BizPA
 
         Note over ProxyPA: Error Handler: _onErrorHandler<br/>Stage: ManejoError
 
         ProxyPA-->>Cliente: SOAP Response (Exception)
-        Note left of ProxyPA: Header: messageId=-1<br/>successIndicator=ERROR
+        Note left of ProxyPA: Header: messageId=-1<br/>successIndicator=ERROR<br/>messages='[Technical Error]'
     end
 
+    deactivate DBPA
+    deactivate BizPA
     deactivate ProxyPA
 
-    Note over Cliente,DBPA: Diferencias con HN01/GT01:<br/>- Selector: SOAP action (requiere SOAPAction HTTP header)<br/>- Esquema: PROXYABANKSPA<br/>- Business Service: ABKPA<br/>- XQuery: eliminarFactorCanjePAIn.xq
+    Note over Cliente,DBPA: Diferencias con GT01:<br/>- Selector: SOAP action (vs SOAP body en GT01)<br/>- Esquema explícito: PROXYABANKSPA<br/>- Variable XQuery: $eliminarFactorCanje1<br/>- Business Service: ABKPA
