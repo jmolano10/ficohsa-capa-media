@@ -1,11 +1,21 @@
 openapi: 3.0.3
 info:
-  title: Reward Points Account Admin
-  description: API que permite Permite la eliminación de tasas de cambio de puntos configuradas previamente en los diferentes países.
-  version: 1.0.0
+  title: "Reward Points Account Admin - Product "
+  version: "1.0.0"
+  description: >
+    La API Reward Points Account Admin - Product permite ermitir la configuración de tasas de cambio de puntos 
+    por comercio, terminal o tipo de comercio en los diferentes países para los puntos de compensación. Ademas, permite Permite la eliminación de tasas de cambio de puntos configuradas previamente en los diferentes países.
+  x-classification: product
+  x-bian:
+    businessArea: "OperationsAndExecution"
+    businessDomain: "AccountManagement"
+    serviceDomain: "RewardPointsAccount"
+  x-segmentation:
+    name: "Reward Points Account Admin"
+    rationale: "Segment focused on read-only capabilities of the SD to keep cohesion and limit operations."
   contact:
-    name: FICOHSA API Team
-    email: api-support@ficohsa.com
+    name: "API Governance"
+    email: "apigov@ficohsa.com"
 servers:
   - url: https://{environment}.labs.integration.ficohsa.com
     description: "Non-production environments"
@@ -19,12 +29,124 @@ servers:
     x-mtls-required: true
 
 tags:
-  - name: Card Points
-    description: Endpoints related to calculate credit Points
+  - name: Reward Points
+    description: Operaciones relacionadas con la gestión de puntos de recompensa
+  - name: Reward Points Account
+    description: Operaciones de administración de cuentas de puntos de recompensa
 
 paths:
-  /crss-prdct-ops/reward-points-accnt-admin/v1/{reference}/delete:
+  /account-management/reward-points-account-admin/v1/record-reward-points:
     post:
+      operationId: recordRewardPoints
+      tags: ["Reward Points"]
+      summary: Permite agregar factor de canje para la gestión de puntos de tarjetas
+      description: Permitir la configuración de tasas de cambio de puntos por comercio, terminal o tipo de comercio en los diferentes países para los puntos de compensación
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: "Token de autenticación en formato Bearer <token> (normalmente JWT u otro mecanismo OAuth2)"
+          schema:
+            type: string
+        - name: Correlation-Id
+          in: header
+          required: false
+          description: "Identificador único de la transacción para trazabilidad extremo a extremo. Se propaga en toda la cadena de llamadas (Debe ser el mismo en la respuesta). Formato UUID.Este campo puede ir vacío, y en este caso, desde la API se debe generar para tener trazabilidad interna del flujo de la API a nivel de petición y respuesta"
+          schema:
+            type: string
+            format: uuid
+        - name: Source-Bank
+          in: header
+          required: true
+          description: "Código del banco origen de la petición. Podría validarse contra el token para evitar suplantaciones. Ejemplo: HN01, GT01"
+          schema:
+            type: string
+        - name: Destination-Bank
+          in: header
+          required: false
+          description: "Código del banco destino de la operación. Ejemplo: HN01, GT01"
+          schema:
+            type: string
+        - name: Application-Id
+          in: header
+          required: true
+          description: "Identificador de la Aplicación que consume la API. Podría derivarse del token."
+          schema:
+            type: string
+        - name: Application-User
+          in: header
+          required: false
+          description: "Usuario de la aplicación consumidora que está ejecutando el servicio"
+          schema:
+            type: string
+        - name: Caller-Service
+          in: header
+          required: false
+          description: "En caso de APIs de experiencia o composición se usaría, para identificar la API que compone a las APIs de Producto"
+          schema:
+            type: string
+        - name: Channel
+          in: header
+          required: false
+          description: "Canal de interacción de la petición. Ejemplo: web, mobile, partner, atm, branch, ivr, etc."
+          schema:
+            type: string
+        - name: Transaction-Date
+          in: header
+          required: false
+          description: "Fecha de la transacción. Formato DateTime. YYYY-MM-DDTHH:MI:SS."
+          schema:
+            type: string
+        - name: Accept-Language
+          in: header
+          required: false
+          description: "Idioma preferido para mensajes y errores, usando código ISO 639-1 (es para español, en para inglés)"
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/recordRewardPointsRequest'
+        required: true
+
+      security:
+        - oauth2: ["api.read"]
+      responses:
+        '200':
+          description: "Respuesta exitosa con datos válidos"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/recordRewardPointsResponse'
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "423":
+          $ref: "#/components/responses/Locked"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+  /account-management/reward-points-account-admin/v1/{reference}/remove-reward-points:
+    delete:
+      operationId: removeRewardPoints
       tags: ["Reward Points Account"]
       summary: Permite la eliminación de tasas de cambio de puntos configuradas previamente en los diferentes países.
       description: Implementar el servicio de eliminar factor de canje para gestión de puntos de tarjetas.
@@ -109,7 +231,18 @@ paths:
                   meta:
                     $ref: '#/components/schemas/meta'
                   data:
-                    type: object  
+                    type: object 
+                    properties:
+                      transactionDate:
+                        type: string
+                        format: date-time
+                        description: Fecha y Hora de la transaccion. YYYY-MM-DDTHH:MI:SS.
+                      reference:
+                        type: string
+                        description: Identificador de la promoción a eliminar
+                      userApplication:
+                        type: string
+                        description: Usuario de la aplicación consumidora que está ejecutando el servicio. 
                   
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -134,7 +267,7 @@ paths:
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
         "504":
-          $ref: "#/components/responses/GatewayTimeout"        
+          $ref: "#/components/responses/GatewayTimeout"
 
 components:
   securitySchemes:
@@ -145,7 +278,55 @@ components:
           tokenUrl: https://auth.ficohsa.com/oauth2/token
           scopes:
             api.read: "Read access to product APIs"
-  schemas:                                                    
+  schemas:
+    recordRewardPointsRequest:
+      type: object
+      properties:
+        data:
+          type: object
+          required:
+           - rewardProgramIdentifier
+           - classificationType
+           - effectiveDate
+           - expiryDate
+           - rewardPointsExchangeRate
+           - PromotionalCampaignReference
+          properties:
+            rewardProgramIdentifier:
+              type: integer
+              description: "Identificador del logo/marca"
+            classificationType:
+              type: string
+              description: "Tipo de clasificación del factor de canje"
+              enum:
+                - TERMINAL_ID
+                - MERCHANT_ID
+                - MERCHANT_TYPE
+            classificationValue:
+              type: string
+              description: "Valor de clasificación del canje"
+            effectiveDate:
+              type: string
+              format: date
+              description: "Fecha de inicio de vigencia del canje"
+            expiryDate:
+              type: string
+              format: date
+              description: "Fecha de fin de vigencia del canje"
+            rewardPointsExchangeRate:
+              type: number
+              format: double
+              description: "Tasa de cambio/factor de canje"
+            promotionalCampaignReference:
+              type: string
+              description: "Identificador de la promoción"
+    recordRewardPointsResponse:
+      type: object
+      properties:
+        meta:
+          $ref: '#/components/schemas/meta'
+        data:
+          type: object
     meta:
       type: object
       properties:
@@ -157,10 +338,10 @@ components:
               example: "OperationsAndExecution"
             businessDomain:
               type: string
-              example: "OperationalServices"
+              example: "AccountManagement"
             serviceDomain:
               type: string
-              example: "IssuedDeviceAdministration"
+              example: "RewardPointsAccount"
     Error:
       type: object
       properties:
@@ -202,7 +383,7 @@ components:
                 title: "Bad Request"
                 status: 400
                 detail: "Los parámetros o formato son inválidos"
-                instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                instance: "/v1/savings-accounts"
                 correlationId: "4f7b-abc123"
                 timestamp: "2025-08-14T20:15:00Z"
 
@@ -219,7 +400,7 @@ components:
                 title: "Unauthorized"
                 status: 401
                 detail: "Cliente no autenticado o credenciales inválidas"
-                instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                instance: "/v1/savings-accounts"
                 correlationId: "4f7b-abc123"
                 timestamp: "2025-08-14T20:15:00Z"
 
@@ -236,7 +417,7 @@ components:
                 title: "Forbidden"
                 status: 403
                 detail: "Cliente autenticado pero sin permisos"
-                instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                instance: "/v1/savings-accounts"
                 correlationId: "4f7b-abc123"
                 timestamp: "2025-08-14T20:15:00Z"
 
@@ -253,7 +434,7 @@ components:
                 title: "Not Found"
                 status: 404
                 detail: "Recurso solicitado no existe"
-                instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                instance: "/v1/savings-accounts/12345/balance"
                 correlationId: "4f7b-abc123"
                 timestamp: "2025-08-14T20:15:00Z"
 
@@ -270,7 +451,7 @@ components:
                 title: "Conflict"
                 status: 409
                 detail: "Conflicto de estado "
-                instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                instance: "/v1/savings-accounts/12345/balance"
                 correlationId: "4f7b-abc123"
                 timestamp: "2025-08-14T20:15:00Z"
 
@@ -287,7 +468,7 @@ components:
                 title: "Unprocessable Entity"
                 status: 422
                 detail: "Datos válidos en formato pero con errores de negocio"
-                instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                instance: "/v1/savings-accounts/12345/balance"
                 correlationId: "4f7b-abc123"
                 timestamp: "2025-08-14T20:15:00Z"
             
@@ -305,7 +486,7 @@ components:
                 title: "Locked"
                 status: 423
                 detail: "El recurso está temporalmente bloqueado"
-                instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                instance: "/v1/savings-accounts/12345/balance"
                 correlationId: "4f7b-abc123"
                 timestamp: "2025-08-14T20:15:00Z"
 
@@ -322,7 +503,7 @@ components:
                 title: "Too Many Requests"
                 status: 429
                 detail: "Cliente excedió límite de peticiones"
-                instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                instance: "/v1/savings-accounts/12345/balance"
                 correlationId: "4f7b-abc123"
                 timestamp: "2025-08-14T20:15:00Z"
 
@@ -339,7 +520,7 @@ components:
                   title: "Internal Server Error"
                   status: 500
                   detail: "Error inesperado en el servicio"
-                  instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                  instance: "/v1/savings-accounts/12345/balance"
                   correlationId: "4f7b-abc123"
                   timestamp: "2025-08-14T20:15:00Z"
 
@@ -356,7 +537,7 @@ components:
                   title: "Bad Gateway"
                   status: 502
                   detail: "Falla de un servicio intermedio/gateway"
-                  instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                  instance: "/v1/savings-accounts/12345/balance"
                   correlationId: "4f7b-abc123"
                   timestamp: "2025-08-14T20:15:00Z"
 
@@ -373,7 +554,7 @@ components:
                   title: "Service Unavailable"
                   status: 503
                   detail: "Servicio temporalmente no disponible"
-                  instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                  instance: "/v1/savings-accounts/12345/balance"
                   correlationId: "4f7b-abc123"
                   timestamp: "2025-08-14T20:15:00Z"
 
@@ -390,7 +571,8 @@ components:
                   title: "Gateway Timeout"
                   status: 504
                   detail: "Tiempo de espera excedido en servicio dependiente"
-                  instance: "/operational-services/issued-dev-admin-debit-card-retrieves/v1"
+                  instance: "/v1/savings-accounts/12345/balance"
                   correlationId: "4f7b-abc123"
                   timestamp: "2025-08-14T20:15:00Z"
-
+    
+  
