@@ -1,0 +1,182 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant T24 as T24 Core Banking
+    participant CB as Core Banking DB
+    participant Abanks as Sistema Abanks
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Honduras (HN01) - ReversarTransaccion
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: TRANSACTION_ID, TRANSACTION_TYPE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>TRANSACTION_ID no vacío
+
+    alt Validación Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0084<br/>Region: HN01
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    Validator->>OSB: Validación Exitosa
+
+    OSB->>OSB: Extraer Variables
+    Note right of OSB: trxId = TRANSACTION_ID<br/>tipoTrx = substring(trxId, 1, 2)<br/>transactionType = TRANSACTION_TYPE
+
+    alt Tipo: CHEQUE_PAYMENT
+        OSB->>T24: ReversiondePagodeCheques
+        Note right of T24: XQuery: ReversarTransaccionPagoChequeIn.xq<br/>Mapeo: OSB → T24
+        T24->>OSB: Response Reversión Cheque
+        OSB->>OSB: Transformar Response
+        Note right of OSB: XQuery: ReversarTransaccionPagoChequeHeaderOut.xq
+    
+    else Tipo: CREDIT_CARD_PAYMENT
+        OSB->>T24: ReversionpagoTC
+        Note right of T24: XQuery: ReversarTransaccionPagooRetiroTCIn.xq<br/>Mapeo: TRANSACTION_ID → TFS
+        T24->>OSB: Response Reversión TC
+        
+        alt Reversión TC Exitosa
+            OSB->>T24: AutorizareversapagooretiroTC
+            Note right of T24: XQuery: AutorizarReversionPagooRetiroTCIn.xq<br/>Autorización dual requerida
+            T24->>OSB: Response Autorización
+            OSB->>CB: registrarReversionTCCB
+            Note right of CB: SP: registrarReversionTCCB<br/>Registro en Core Banking
+            CB->>OSB: Response Registro
+        else Reversión TC Fallida
+            OSB->>OSB: Asignar Mensaje Error
+            Note right of OSB: messageReversion = Status/messages
+        end
+    
+    else Tipo: REF_COLLECTION o ABANKS_COLLECTION
+        OSB->>OSB: Determinar Tipo Transacción
+        Note right of OSB: Extraer tipoTrx (FT/TT)
+        
+        alt Tipo FT
+            OSB->>T24: ConsultadetransaccionFT
+            Note right of T24: XQuery: ConsultaTransaccionFT.xq<br/>Consultar detalles transacción
+            T24->>OSB: Response Consulta FT
+            OSB->>OSB: Extraer payMethod, valueDate, inputter
+        else Tipo TT
+            OSB->>T24: ConsultadetransaccionTT
+            Note right of T24: XQuery: ConsultaTransaccionTT.xq<br/>Consultar detalles transacción
+            T24->>OSB: Response Consulta TT
+            OSB->>OSB: Extraer payMethod, valueDate, inputter
+        end
+        
+        alt Validación Exitosa
+            alt payMethod = CASH
+                OSB->>T24: Reversionpagorecaudorefefec
+                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefEfectIn.xq
+            else payMethod = DEB.TO.ACCT
+                OSB->>T24: Reversionpagorecaudorefdbcta
+                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefDebCtaIn.xq
+            else payMethod = FICO.CHEQUE
+                OSB->>T24: Reversionpagorecaudorefficochq
+                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefFicoChqIn.xq
+            else payMethod = OB.CHEQUE
+                OSB->>T24: Reversionpagorecaudorefobchq
+                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefOBChqIn.xq
+            else payMethod = INTL.CHEQUE
+                OSB->>T24: Reversionpagorecaudorefchqtintl
+                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefIntChqIn.xq
+            end
+            
+            T24->>OSB: Response Reversión Recaudo
+            
+            alt ABANKS_COLLECTION y Reversión Exitosa
+                OSB->>Abanks: reversionRecaudoAbanks_v2
+                Note right of Abanks: XQuery: ReversarTransaccionAbanksIn.xq<br/>SP: reversionRecaudoAbanks_v2
+                Abanks->>OSB: Response Abanks
+                
+                alt Error en Abanks
+                    alt Tipo TT
+                        OSB->>T24: EliminacionpagorecaudorefTT
+                        Note right of T24: XQuery: EliminacionRevRecRefTTIn.xq<br/>Rollback transacción
+                    else Tipo FT
+                        OSB->>T24: EliminacionpagorecaudorefFT
+                        Note right of T24: XQuery: EliminacionRevRecRefFTIn.xq<br/>Rollback transacción
+                    end
+                    T24->>OSB: Response Eliminación
+                end
+            end
+        else Validación Fallida
+            OSB->>OSB: Skip Processing
+            Note right of OSB: validationMessage contiene error
+        end
+    
+    else Tipo: LOAN_PAYMENT (TFS)
+        OSB->>T24: Reversiondepositocombinado
+        Note right of T24: XQuery: ReversarTransaccionPagooPrestamoIn.xq<br/>Reversión depósito combinado
+        T24->>OSB: Response Reversión Depósito
+        
+        alt Reversión Exitosa
+            OSB->>T24: AuthReversionDepositosCombinados
+            Note right of T24: XQuery: AutorizarReversionDepositoCombinadoIn.xq<br/>Autorización depósito
+            T24->>OSB: Response Autorización Depósito
+        else Reversión Fallida
+            OSB->>OSB: Asignar Mensaje Error
+        end
+    
+    else Tipo: FT o TT (Genérico)
+        alt Tipo FT
+            OSB->>T24: ReversiondetransaccionFT
+            Note right of T24: XQuery: reversarTransaccionFTIn.xq<br/>Reversión FT genérica
+            T24->>OSB: Response Reversión FT
+            
+            alt Reversión FT Exitosa
+                OSB->>T24: AutorizacionreversionFT
+                Note right of T24: XQuery: AutorizarReversionFTIn.xq<br/>Autorización FT
+                T24->>OSB: Response Autorización FT
+            end
+        
+        else Tipo TT
+            OSB->>T24: ReversiondetransaccionTT
+            Note right of T24: XQuery: reversarTransaccionTTIn.xq<br/>Reversión TT genérica
+            T24->>OSB: Response Reversión TT
+            
+            alt Reversión TT Exitosa
+                OSB->>T24: AutorizacionreversionTT
+                Note right of T24: XQuery: AutorizarReversionTTIn.xq<br/>Autorización TT
+                T24->>OSB: Response Autorización TT
+            end
+        end
+    
+    else Tipo No Soportado
+        OSB->>OSB: Error Tipo No Soportado
+        Note right of OSB: "UNSUPPORTED TRANSACTION_TYPE"
+    end
+
+    OSB->>OSB: Procesar Response
+    Note right of OSB: Determinar successIndicator<br/>Construir response header
+
+    alt Proceso Exitoso
+        OSB->>Client: Response Exitoso
+        Note right of OSB: successIndicator: SUCCESS<br/>Body: reversarTransaccionResponse
+    else Error en Proceso
+        OSB->>Client: Response con Error
+        Note right of OSB: successIndicator: ERROR<br/>messages: Descripción del error
+    end
+
+    Note over Client, ErrorHandler: Manejo de Errores Global
+    
+    alt Error No Controlado
+        OSB->>ErrorHandler: Exception
+        ErrorHandler->>ErrorHandler: Procesar Error
+        Note right of ErrorHandler: Concatenar errorCode + reason<br/>Generar response de error
+        ErrorHandler->>Client: Response Error Global
+    end
+```

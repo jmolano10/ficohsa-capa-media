@@ -1,0 +1,95 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as ConsultaDisponibleVentaMonedaExtranjeraHN.proxy
+    participant LDAP as LDAP Security
+    participant T24 as T24 MercadoLibre Service
+    participant ErrorHandler as Error Handler
+
+    Note over Client, ErrorHandler: Flujo Honduras (HN01) - ConsultaDisponibleVentaMonedaExtranjera
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: CURRENCY=USD<br/>Transport: Local
+
+    OSB->>OSB: Iniciar Pipeline Request
+    Note right of OSB: ConsultaDisponibleVentaMonedaExtranjeraHN_request<br/>Stage: ConsultaMontoDisponibleVentaDolar
+
+    OSB->>OSB: Preparar Transformación Request
+    Note right of OSB: XQuery: consultaMontoDisponibleVentaDolarIn.xq<br/>Mapeo: CURRENCY → criteriaValue
+
+    OSB->>LDAP: Lookup Credenciales
+    Note right of LDAP: Path: Middleware/Security/{UPPER(USERNAME)}<br/>Function: fn-bea:lookupBasicCredentials()
+
+    alt LDAP Lookup Exitoso
+        LDAP->>OSB: Credenciales LDAP
+        Note right of OSB: Username/Password desde LDAP
+    else LDAP Lookup Falla
+        OSB->>OSB: Usar Credenciales Header
+        Note right of OSB: Failover: usar credenciales del request header
+    end
+
+    OSB->>OSB: Construir Request T24
+    Note right of OSB: WebRequestCommon con credenciales<br/>FICOESELLTABLEENTRIESFXWSType<br/>enquiryInputCollection: CURRENCY=USD, operand=EQ
+
+    OSB->>T24: consultamontodisponiblevtadolar
+    Note right of T24: Endpoint: http://172.23.13.19:7003/svcMercadoLibre/services<br/>Operation: consultamontodisponiblevtadolar<br/>Protocol: SOAP/HTTP
+
+    alt T24 Response Exitoso
+        T24->>OSB: Response con AvailableAmt
+        Note right of T24: Status/successIndicator: Success<br/>FICOESELLTABLEENTRIESFXWSType/AvailableAmt
+
+        OSB->>OSB: Evaluar Response T24
+        Note right of OSB: Condición: $validationMessage = ""<br/>Variable: $errorCode = Status/successIndicator
+
+        OSB->>OSB: Pipeline Response - Caso Exitoso
+        Note right of OSB: Stage: FlujoSalida<br/>Transformación: consultaDisponibleVentaMonedaExtranjeraOut.xq
+
+        OSB->>OSB: Construir Response Header
+        Note right of OSB: successIndicator: Success<br/>Sin mensajes de error
+
+        OSB->>OSB: Transformar Response Body
+        Note right of OSB: Mapeo: AvailableAmt → AMOUNT_AVAILABLE<br/>Selección: primer elemento del array
+
+        OSB->>Client: SOAP Response Exitoso
+        Note right of Client: Header: successIndicator=Success<br/>Body: AMOUNT_AVAILABLE con monto
+
+    else T24 Response con Error
+        T24->>OSB: Response con Error
+        Note right of T24: Status/successIndicator: ERROR<br/>Status/messages: mensaje de error
+
+        OSB->>OSB: Evaluar Response T24
+        Note right of OSB: Condición: $validationMessage != ""<br/>Variables: $errorCode, $validationMessage
+
+        OSB->>OSB: Pipeline Response - Caso Error
+        Note right of OSB: Stage: FlujoSalida - Default branch
+
+        OSB->>OSB: Construir Response Header Error
+        Note right of OSB: successIndicator: {$errorCode}<br/>messages: {$validationMessage}
+
+        OSB->>OSB: Construir Response Body Vacío
+        Note right of OSB: Body: consultaDisponibleVentaMonedaExtranjeraResponse vacío
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: Header: successIndicator=ERROR<br/>Body: Response vacío
+
+    end
+
+    alt Error de Pipeline/Sistema
+        OSB->>ErrorHandler: Pipeline Error
+        Note right of ErrorHandler: Pipeline: _onErrorHandler<br/>Stage: ManejoError
+
+        ErrorHandler->>ErrorHandler: Capturar Error Context
+        Note right of ErrorHandler: $fault/ctx:errorCode<br/>$fault/ctx:reason
+
+        ErrorHandler->>ErrorHandler: Construir Response Error
+        Note right of ErrorHandler: Header: successIndicator={errorCode}<br/>messages: {reason}<br/>Body: Response vacío
+
+        ErrorHandler->>Client: SOAP Fault Response
+        Note right of Client: Error de sistema/pipeline
+    end
+
+    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:
+    Note over Client, ErrorHandler: 1. Failover de credenciales LDAP → Header
+    Note over Client, ErrorHandler: 2. Validación mensaje vacío = éxito
+    Note over Client, ErrorHandler: 3. Selección primer resultado de array T24
+    Note over Client, ErrorHandler: 4. Mapeo directo CURRENCY → criteriaValue
+    Note over Client, ErrorHandler: 5. Construcción dinámica de headers de respuesta

@@ -1,0 +1,102 @@
+flowchart TD
+    A[Cliente/Aplicación] --> B{Región de Origen}
+    
+    B -->|SourceBank = HN01| C[ConsultaDisponibleVentaMonedaExtranjeraHN.proxy]
+    B -->|SourceBank = GT01/PA01/NI01| D[ConsultaDisponibleVentaMonedaExtranjera.proxy]
+    
+    %% Flujo Honduras (HN01)
+    C --> C1[Sin Validación XSD]
+    C1 --> C2[Lookup Credenciales LDAP]
+    C2 --> C3{LDAP Disponible?}
+    C3 -->|Sí| C4[Usar Credenciales LDAP]
+    C3 -->|No| C5[Usar Credenciales Header]
+    C4 --> C6[Transformar Request]
+    C5 --> C6
+    C6 --> C7[consultaMontoDisponibleVentaDolarIn.xq]
+    C7 --> C8[T24 MercadoLibre Service]
+    C8 --> C9{Response T24 OK?}
+    C9 -->|Sí| C10[Transformar Response]
+    C9 -->|No| C11[Error Response]
+    C10 --> C12[consultaDisponibleVentaMonedaExtranjeraOut.xq]
+    C12 --> C13[Response Exitoso HN01]
+    C11 --> C14[Response Error HN01]
+    
+    %% Flujo Otras Regiones
+    D --> D1[Custom Token Authentication]
+    D1 --> D2{Auth OK?}
+    D2 -->|No| D3[HTTP 401 Unauthorized]
+    D2 -->|Sí| D4[Validación XSD Obligatoria]
+    D4 --> D5{XSD Válido?}
+    D5 -->|No| D6[Error Handler]
+    D5 -->|Sí| D7[Consulta Ruta Regional]
+    D7 --> D8[consultaRutaRegionalIn.xq]
+    D8 --> D9[MW_P_CONSULTA_RUTA_REGIONAL]
+    D9 --> D10{Región Configurada?}
+    D10 -->|No| D11[Error Regional]
+    D10 -->|Sí| D12[Aplicar Valores por Defecto]
+    D12 --> D13[aplicarValoresPorDefectoRegion.xq]
+    D13 --> D14[Router Dinámico]
+    D14 --> D15{Proxy Destino}
+    
+    %% Proxies Regionales Dinámicos
+    D15 -->|GT01| E1[ConsultaDisponibleVentaMonedaExtranjeraGT.proxy]
+    D15 -->|PA01| E2[ConsultaDisponibleVentaMonedaExtranjeraPA.proxy]
+    D15 -->|NI01| E3[ConsultaDisponibleVentaMonedaExtranjeraNI.proxy]
+    
+    E1 --> E4[Procesamiento Regional GT]
+    E2 --> E5[Procesamiento Regional PA]
+    E3 --> E6[Procesamiento Regional NI]
+    
+    E4 --> F1[Response Regional GT]
+    E5 --> F2[Response Regional PA]
+    E6 --> F3[Response Regional NI]
+    
+    %% Manejo de Errores
+    D6 --> G1[MapeoErrores.proxy]
+    D11 --> G1
+    G1 --> G2[mapeoErroresUsageIn.xq]
+    G2 --> G3[Mapeo de Errores]
+    G3 --> G4[mapeoErroresUsageOut.xq]
+    G4 --> G5[Response Error Mapeado]
+    
+    %% Pipeline Response
+    F1 --> H1[Pipeline Response]
+    F2 --> H1
+    F3 --> H1
+    C13 --> H2[Response Final HN01]
+    C14 --> H2
+    G5 --> H3[Response Error Final]
+    
+    H1 --> H4{Success Indicator?}
+    H4 -->|SUCCESS| H5[Response Exitoso]
+    H4 -->|ERROR| H6[Invocar MapeoErrores]
+    H6 --> H7[Error Mapeado Final]
+    
+    %% Respuestas Finales
+    H2 --> I[Cliente Recibe Response]
+    H3 --> I
+    H5 --> I
+    H7 --> I
+    D3 --> I
+    
+    %% Estilos
+    classDef hnFlow fill:#e1f5fe
+    classDef otherFlow fill:#f3e5f5
+    classDef errorFlow fill:#ffebee
+    classDef dbFlow fill:#e8f5e8
+    classDef decision fill:#fff3e0
+    
+    class C,C1,C2,C4,C5,C6,C7,C8,C10,C12,C13,H2 hnFlow
+    class D,D1,D4,D7,D8,D12,D13,D14,E1,E2,E3,E4,E5,E6,F1,F2,F3,H1 otherFlow
+    class D6,D11,G1,G2,G3,G4,G5,H3,H6,H7,C11,C14 errorFlow
+    class D9 dbFlow
+    class B,C3,D2,D5,D10,D15,H4 decision
+    
+    %% Notas de Reglas de Negocio
+    C7 -.->|"Mapeo: CURRENCY → criteriaValue<br/>Credenciales: LDAP failover<br/>Operación: consultamontodisponiblevtadolar"| C8
+    C12 -.->|"Mapeo: AvailableAmt → AMOUNT_AVAILABLE<br/>Selección: primer elemento array<br/>Validación: mensaje vacío = éxito"| C13
+    
+    D8 -.->|"Servicio: FICBCO0434<br/>Origen/Destino: del header<br/>Usuario: UPPER(username)<br/>Versión: V2"| D9
+    D14 -.->|"Enrutamiento: PV_UBICACION<br/>Proxy dinámico: isProxy=true<br/>Service path del DB"| D15
+    
+    G2 -.->|"Prefijo: FICBCO0434$#$<br/>Código: del contexto error<br/>Mensaje: concatenado"| G3

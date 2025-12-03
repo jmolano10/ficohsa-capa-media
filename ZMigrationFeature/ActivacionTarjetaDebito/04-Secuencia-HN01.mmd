@@ -1,0 +1,130 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as ActivacionTarjetaDebito.proxy
+    participant Validator as ValidaServicioRegional_db
+    participant LDAP as LDAP Security
+    participant Bitacora as RegistrarBitacoraOSB_v2
+    participant T24Consulta as T24 ConsultaMaestraTarjetaDebito
+    participant T24Activacion as T24 Activaciondetarjetadedebito
+    participant ErrorHandler as Error Handler
+
+    Note over Client, ErrorHandler: Flujo Honduras (HN01) - ActivacionTarjetaDebito
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: DEBIT_CARD_NUMBER<br/>Transport: HTTPS
+
+    OSB->>OSB: Validación XSD
+    Note right of OSB: Schema: activacionTarjetaDebitoTypes<br/>Element: activacionTarjetaDebito
+
+    OSB->>Validator: ValidaServicioRegional
+    Note right of Validator: PV_SERVICIO: FICBCO0324<br/>PV_ORIGEN: HN01<br/>PV_USUARIO: username
+
+    alt Validación Regional Exitosa
+        Validator->>OSB: SUCCESS
+        Note right of OSB: Servicio habilitado para HN01
+
+        OSB->>OSB: Branch Condicional
+        Note right of OSB: SourceBank = 'HN01'<br/>Enruta a pipeline HN01
+
+        OSB->>OSB: Generar UUID Request
+        Note right of OSB: obtenerUUID() para bitácora
+
+        OSB->>Bitacora: Registrar Request
+        Note right of Bitacora: TipoMensaje: REQ<br/>Contenido: request completo<br/>IdServicio: FICBCO0324
+
+        OSB->>OSB: Validar Campo Obligatorio
+        Note right of OSB: $cardNumber != ""
+
+        alt Campo Válido
+            OSB->>LDAP: Lookup Credenciales
+            Note right of LDAP: Path: Middleware/Security/{UPPER(USERNAME)}
+
+            alt LDAP Exitoso
+                LDAP->>OSB: Credenciales LDAP
+            else LDAP Falla
+                OSB->>OSB: Usar Credenciales Header
+            end
+
+            OSB->>OSB: Construir Request Consulta
+            Note right of OSB: XQuery: consultaMaestraTDIn.xq<br/>Patrón: "...{CARD_NUMBER}"<br/>Operand: LK
+
+            OSB->>T24Consulta: ConsultaMaestraTarjetaDebito
+            Note right of T24Consulta: Buscar tarjeta por patrón<br/>Obtener PRODUCTTYPE
+
+            alt Tarjeta Encontrada
+                T24Consulta->>OSB: Response con PRODUCTTYPE
+                Note right of T24Consulta: PRODUCTTYPE válido encontrado
+
+                OSB->>OSB: Validar Tipo Producto
+                Note right of OSB: $productType != ""
+
+                alt Producto Válido
+                    OSB->>OSB: Construir Request Activación
+                    Note right of OSB: XQuery: activacionTarjetaDebitoIn.xq<br/>ID: {PRODUCTTYPE}.{CARD_NUMBER}
+
+                    OSB->>T24Activacion: Activaciondetarjetadedebito
+                    Note right of T24Activacion: LATAMCARDORDERACTIVETDWSType<br/>ID compuesto para activación
+
+                    T24Activacion->>OSB: Response Activación
+                    Note right of T24Activacion: Status: Success<br/>TransactionId generado
+
+                    OSB->>OSB: Construir Header Response
+                    Note right of OSB: XQuery: activacionTarjetaDebitoHeaderOut.xq<br/>successIndicator: Success
+
+                else Producto Inválido
+                    OSB->>OSB: Error Producto
+                    Note right of OSB: successIndicator: ERROR<br/>messages: del sistema T24
+                end
+
+            else Tarjeta No Encontrada
+                T24Consulta->>OSB: ZERORECORDS o Error
+                Note right of T24Consulta: No se encontró la tarjeta
+
+                OSB->>OSB: Error Tarjeta
+                Note right of OSB: successIndicator: ERROR<br/>messages: ZERORECORDS o Status/messages
+            end
+
+        else Campo Vacío
+            OSB->>OSB: Error Campo Obligatorio
+            Note right of OSB: successIndicator: ERROR<br/>messages: REQUIRED FIELDS NOT SUPPLIED
+        end
+
+        OSB->>OSB: Generar UUID Response
+        Note right of OSB: obtenerUUID() para bitácora response
+
+        OSB->>Bitacora: Registrar Response
+        Note right of Bitacora: TipoMensaje: RSP<br/>UuidReq: vinculado<br/>Resultado: Success/ERROR
+
+        OSB->>Client: SOAP Response
+        Note right of Client: Header: successIndicator<br/>Body: activacionTarjetaDebitoResponse vacío
+
+    else Validación Regional Falla
+        Validator->>OSB: ERROR
+        Note right of Validator: Servicio no habilitado para región
+
+        OSB->>OSB: Error Regional
+        Note right of OSB: successIndicator: ERROR<br/>messages: del validador regional
+
+        OSB->>Client: SOAP Response Error
+        Note right of Client: Error de validación regional
+    end
+
+    alt Error de Pipeline/Sistema
+        OSB->>ErrorHandler: Pipeline Error
+        Note right of ErrorHandler: Capturar error del contexto
+
+        ErrorHandler->>ErrorHandler: Mapear Error
+        Note right of ErrorHandler: MapeoErrores con FICBCO0324
+
+        ErrorHandler->>Client: SOAP Fault Response
+        Note right of Client: Error mapeado del sistema
+    end
+
+    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:
+    Note over Client, ErrorHandler: 1. Validación regional obligatoria (FICBCO0324)
+    Note over Client, ErrorHandler: 2. Campo DEBIT_CARD_NUMBER obligatorio
+    Note over Client, ErrorHandler: 3. Consulta previa para obtener PRODUCTTYPE
+    Note over Client, ErrorHandler: 4. ID compuesto: {PRODUCTTYPE}.{CARD_NUMBER}
+    Note over Client, ErrorHandler: 5. Bitácora completa request/response
+    Note over Client, ErrorHandler: 6. Failover credenciales LDAP → Header
+    Note over Client, ErrorHandler: 7. Patrón búsqueda: "...{número_tarjeta}"

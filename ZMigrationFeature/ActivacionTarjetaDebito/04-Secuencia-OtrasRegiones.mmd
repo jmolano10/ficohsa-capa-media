@@ -1,0 +1,99 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as ActivacionTarjetaDebito.proxy
+    participant Validator as ValidaServicioRegional_db
+    participant ErrorMapper as MapeoErrores.proxy
+    participant ErrorHandler as Error Handler
+
+    Note over Client, ErrorHandler: Flujo Otras Regiones (GT01/PA01/NI01) - ActivacionTarjetaDebito
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=GT01/PA01/NI01<br/>Body: DEBIT_CARD_NUMBER<br/>Transport: HTTPS
+
+    OSB->>OSB: Validación XSD
+    Note right of OSB: Schema: activacionTarjetaDebitoTypes<br/>Element: activacionTarjetaDebito<br/>Validación obligatoria
+
+    alt Validación XSD Exitosa
+        OSB->>Validator: ValidaServicioRegional
+        Note right of Validator: PV_SERVICIO: FICBCO0324<br/>PV_ORIGEN: GT01/PA01/NI01<br/>PV_DESTINO: GT01/PA01/NI01<br/>PV_USUARIO: username
+
+        alt Servicio No Disponible (Caso Normal)
+            Validator->>OSB: ERROR
+            Note right of Validator: PV_CODIGO_ERROR: ERROR<br/>PV_MENSAJE_ERROR: Servicio no disponible
+
+            OSB->>OSB: Construir Response Error Regional
+            Note right of OSB: successIndicator: ERROR<br/>messages: del validador<br/>Body: response vacío
+
+            OSB->>OSB: Reply Inmediato
+            Note right of OSB: Termina procesamiento<br/>No continúa a branch
+
+            OSB->>Client: SOAP Response Error Regional
+            Note right of Client: Error de validación regional
+
+        else Servicio Disponible (Caso Hipotético)
+            Validator->>OSB: SUCCESS
+            Note right of Validator: Servicio habilitado para región
+
+            OSB->>OSB: Branch Condicional
+            Note right of OSB: SourceBank != 'HN01'<br/>Enruta a default branch
+
+            OSB->>OSB: Default Pipeline
+            Note right of OSB: Default_ActivacionTarjetasDebito
+
+            OSB->>OSB: Error por Defecto
+            Note right of OSB: Error Code: MW-0008<br/>Message: SERVICE NOT IMPLEMENTED YET
+
+            OSB->>Client: SOAP Response Error Implementación
+            Note right of Client: Error de servicio no implementado
+        end
+
+    else Validación XSD Falla
+        OSB->>ErrorHandler: Error de Validación
+        Note right of ErrorHandler: Schema constraint violation
+
+        ErrorHandler->>ErrorHandler: Capturar Error Context
+        Note right of ErrorHandler: $fault/ctx:errorCode<br/>$fault/ctx:reason
+
+        ErrorHandler->>ErrorMapper: Mapear Error
+        Note right of ErrorMapper: Service: MapeoErrores.proxy<br/>Operation: mapeoErrores
+
+        ErrorHandler->>ErrorHandler: Construir Request MapeoErrores
+        Note right of ErrorHandler: CODIGO_ERROR: {errorCode}<br/>MENSAJE_ERROR: FICBCO0324$#${errorMessage}
+
+        ErrorMapper->>ErrorHandler: Response Mapeado
+        Note right of ErrorMapper: Error mapeado según configuración
+
+        ErrorHandler->>ErrorHandler: Actualizar Header
+        Note right of ErrorHandler: XQuery: mapeoErroresUsageOut.xq
+
+        ErrorHandler->>Client: SOAP Fault Response
+        Note right of Client: Error de validación mapeado
+    end
+
+    alt Response con Error (Pipeline Response)
+        OSB->>OSB: Stage: MapeoError
+        Note right of OSB: Condición: successIndicator != "SUCCESS"
+
+        OSB->>ErrorMapper: Invocar MapeoErrores
+        Note right of ErrorMapper: Service: MapeoErrores.proxy
+
+        OSB->>OSB: Construir Request MapeoErrores
+        Note right of OSB: CODIGO_ERROR: {successIndicator}<br/>MENSAJE_ERROR: FICBCO0324$#${messages}
+
+        ErrorMapper->>OSB: Response Mapeado
+        Note right of ErrorMapper: Error estandarizado
+
+        OSB->>OSB: Actualizar Header Response
+        Note right of OSB: Header actualizado con error mapeado
+
+        OSB->>Client: SOAP Response con Error Mapeado
+        Note right of Client: Error estandarizado del sistema
+    end
+
+    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:
+    Note over Client, ErrorHandler: 1. Validación XSD obligatoria antes de procesamiento
+    Note over Client, ErrorHandler: 2. Validación regional con servicio FICBCO0324
+    Note over Client, ErrorHandler: 3. Error estándar para regiones no implementadas
+    Note over Client, ErrorHandler: 4. Mapeo de errores con código de servicio
+    Note over Client, ErrorHandler: 5. Sin bitácora para regiones no funcionales
+    Note over Client, ErrorHandler: 6. Branch condicional basado en SourceBank

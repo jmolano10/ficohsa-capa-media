@@ -1,0 +1,182 @@
+```mermaid
+flowchart TD
+    A[Cliente/Aplicación] --> B{Determinar Proxy Service}
+    
+    B -->|Legacy Caja| C[MiddlewareCaja/ReversarTransaccion.proxy]
+    B -->|V2 Regional| D[Middleware/v2/ReversarTransaccion.proxy]
+    B -->|Por ID| E[Middleware/v2/ReversarTransaccionID.proxy]
+    
+    %% Flujo Legacy Caja
+    C --> C1[Validar XSD]
+    C1 --> C2[Extraer Variables]
+    C2 --> C3{Tipo Transacción}
+    
+    C3 -->|CHEQUE_PAYMENT| C4[ReversaTransaccion.ReversiondePagodeCheques]
+    C3 -->|CREDIT_CARD_PAYMENT| C5[ReversaTransaccion.ReversionpagoTC]
+    C3 -->|REF_COLLECTION| C6[Procesar Recaudos por payMethod]
+    C3 -->|LOAN_PAYMENT TFS| C7[ReversaTransaccion2.Reversiondepositocombinado]
+    C3 -->|FT/TT Genérico| C8[ReversaTransaccion.ReversiondetransaccionFT/TT]
+    
+    C4 --> C9[Response Legacy]
+    C5 --> C10{Reversión Exitosa?}
+    C10 -->|Sí| C11[AutorizareversapagooretiroTC]
+    C10 -->|No| C9
+    C11 --> C9
+    
+    C6 --> C12{payMethod}
+    C12 -->|CASH| C13[Reversionpagorecaudorefefec]
+    C12 -->|DEB.TO.ACCT| C14[Reversionpagorecaudorefdbcta]
+    C12 -->|FICO.CHEQUE| C15[Reversionpagorecaudorefficochq]
+    C12 -->|OB.CHEQUE| C16[Reversionpagorecaudorefobchq]
+    C12 -->|INTL.CHEQUE| C17[Reversionpagorecaudorefchqtintl]
+    
+    C13 --> C18{ABANKS_COLLECTION?}
+    C14 --> C18
+    C15 --> C18
+    C16 --> C18
+    C17 --> C18
+    
+    C18 -->|Sí y Exitoso| C19[reversionRecaudoAbanks_v2_db]
+    C18 -->|No| C9
+    C19 --> C20{Error Abanks?}
+    C20 -->|Sí| C21[Eliminar Transacción T24]
+    C20 -->|No| C9
+    C21 --> C9
+    
+    C7 --> C22{Reversión Exitosa?}
+    C22 -->|Sí| C23[AuthReversionDepositosCombinados]
+    C22 -->|No| C9
+    C23 --> C9
+    
+    C8 --> C24{Reversión Exitosa?}
+    C24 -->|Sí| C25[AutorizacionreversionFT/TT]
+    C24 -->|No| C9
+    C25 --> C9
+    
+    %% Flujo V2 Regional
+    D --> D1[ValidacionesGenerales]
+    D1 --> D2[Validar XSD]
+    D2 --> D3[ValidaServicioRegional FICBCO0084]
+    D3 --> D4{Región Válida?}
+    
+    D4 -->|No| D5[Error: Región No Válida]
+    D4 -->|Sí| D6[aplicarValoresPorDefectoRegion]
+    
+    D6 --> D7{RegionalizacionPaisEmpresa}
+    D7 -->|SourceBank = HN01| D8[HNBanco_ReversarTransaccion]
+    D7 -->|Otras Regiones| D9[Default_ReversarTransaccion]
+    
+    D9 --> D10[Error: MW-0008 SERVICE NOT IMPLEMENTED]
+    
+    D8 --> D11[Procesar Transacción HN01]
+    D11 --> D12{Tipo Transacción}
+    
+    D12 -->|CHEQUE_PAYMENT| D13[ReverseTransaccionBS.ReversiondePagodeCheques]
+    D12 -->|CREDIT_CARD_TFS| D14[ReversaTransaccion.ReversionpagoTC + registrarReversionTCCB]
+    D12 -->|CREDIT_CARD_PAYMENT| D15[ReverseTransaccionBS.ReversionpagooretiroTC]
+    D12 -->|REF_COLLECTION| D16[ReverseTransaccionBS.Reversionpagorecaudorefdbcta]
+    D12 -->|FT/TT Genérico| D17[ReverseTransaccionBS.ReversiondetransaccionFT/TT]
+    
+    D13 --> D18[Response HN01]
+    D14 --> D19{Reversión Exitosa?}
+    D19 -->|Sí| D20[AutorizareversapagooretiroTC + conReversarPagoTCRG]
+    D19 -->|No| D18
+    D20 --> D18
+    
+    D15 --> D21{Reversión Exitosa?}
+    D21 -->|Sí| D22[AutorizareversapagooretiroTC]
+    D21 -->|No| D18
+    D22 --> D18
+    
+    D16 --> D23{Reversión Exitosa?}
+    D23 -->|Sí| D24[Authrevpagorecaudorefdbcta]
+    D23 -->|No| D18
+    D24 --> D18
+    
+    D17 --> D25{Reversión Exitosa?}
+    D25 -->|Sí| D26[AutorizacionreversionFT/TT]
+    D25 -->|No| D18
+    D26 --> D18
+    
+    %% Flujo Por ID
+    E --> E1[ConsultaRutaRegional FICBCO0516]
+    E1 --> E2{Ruta Válida?}
+    E2 -->|No| E3[Error: Ruta No Válida]
+    E2 -->|Sí| E4[aplicarValoresPorDefectoRegion]
+    
+    E4 --> E5[obtenerTipoTrxGen]
+    E5 --> E6[Determinar tipoConsulta]
+    E6 --> E7[validarEstadoTransaccion]
+    E7 --> E8{Estado Válido?}
+    
+    E8 -->|No| E9[Error: Estado Incorrecto]
+    E8 -->|Sí| E10{dbmesage = TRUE?}
+    
+    E10 -->|No| E11[Error: Estado No Correcto]
+    E10 -->|Sí| E12{Tipo Transacción}
+    
+    E12 -->|PAGO_TC| E13[registrarReversionTCCB + svcReversarTransaccionCB.ReversionPagoTCTengo]
+    E12 -->|PAGO_EEH| E14[svcGestionesTrxSEEHTENGO.ReversarTransaccionTENGOEEH]
+    E12 -->|Otros| E15[svcReversarTransaccionCB.ReversionDepositoTengo]
+    
+    E13 --> E16{Reversión Exitosa?}
+    E16 -->|Sí| E17[conReversarPagoTCRG + actualizarEstadoTransaccionUUID]
+    E16 -->|No| E18[Response ID Error]
+    E17 --> E19[Response ID Exitoso]
+    
+    E14 --> E20[actualizarTransaccionGenCB]
+    E15 --> E21[actualizarEstadoTransaccionUUID]
+    E20 --> E19
+    E21 --> E19
+    
+    %% Manejo de Errores Global
+    C9 --> F[Response Final]
+    D5 --> F
+    D10 --> F
+    D18 --> F
+    E3 --> F
+    E9 --> F
+    E11 --> F
+    E18 --> F
+    E19 --> F
+    
+    F --> G[Cliente/Aplicación]
+    
+    %% Estilos
+    classDef proxyService fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef businessService fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef database fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef error fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef success fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    
+    class C,D,E proxyService
+    class C4,C5,C6,C7,C8,D13,D14,D15,D16,D17,E13,E14,E15 businessService
+    class C19,D20,D24,E5,E7,E17,E20,E21 database
+    class C9,D5,D10,E3,E9,E11,E18 error
+    class D18,E19,F success
+    
+    %% Notas
+    note1["`**Regiones Detectadas:**
+    - HN01: Honduras (Implementado)
+    - GT01: Guatemala (No implementado)
+    - PA01: Panamá (No implementado)
+    - NI01: Nicaragua (No implementado)`"]
+    
+    note2["`**Tipos de Transacción:**
+    - CHEQUE_PAYMENT
+    - CREDIT_CARD_PAYMENT
+    - CREDIT_CARD_TFS
+    - REF_COLLECTION
+    - PROPTAX_COLLECTION
+    - ONLINE_COLLECTION
+    - LOCAL_COLLECTION
+    - ABANKS_COLLECTION
+    - LOAN_PAYMENT
+    - PAGO_TC
+    - PAGO_EEH`"]
+    
+    note3["`**Endpoints:**
+    - /MiddlewareCaja/ReversarTransaccion
+    - /Middleware/OperationsAndExecution/CustomerDeposits/ReversarTransaccion_v2
+    - /Middleware/SalesAndServices/BankingPartner/reversarTransaccionID`"]
+```

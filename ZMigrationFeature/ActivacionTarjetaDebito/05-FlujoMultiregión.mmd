@@ -1,0 +1,94 @@
+flowchart TD
+    A[Cliente/Aplicación] --> B[ActivacionTarjetaDebito.proxy]
+    
+    B --> C[Validación XSD]
+    C --> D{XSD Válido?}
+    D -->|No| E[Error Handler]
+    D -->|Sí| F[ValidaServicioRegional]
+    
+    F --> G{Servicio Disponible?}
+    G -->|No| H[Error Regional]
+    G -->|Sí| I{Región de Origen}
+    
+    %% Branch Condicional por Región
+    I -->|SourceBank = HN01| J[Pipeline HN01]
+    I -->|SourceBank != HN01| K[Pipeline Default]
+    
+    %% Flujo Honduras (HN01)
+    J --> J1[Generar UUID Request]
+    J1 --> J2[Registrar Bitácora Request]
+    J2 --> J3[Validar Campo Obligatorio]
+    J3 --> J4{DEBIT_CARD_NUMBER válido?}
+    J4 -->|No| J5[Error Campo Obligatorio]
+    J4 -->|Sí| J6[Lookup Credenciales LDAP]
+    J6 --> J7{LDAP Disponible?}
+    J7 -->|Sí| J8[Usar Credenciales LDAP]
+    J7 -->|No| J9[Usar Credenciales Header]
+    J8 --> J10[Consulta Maestra T24]
+    J9 --> J10
+    J10 --> J11{Tarjeta Encontrada?}
+    J11 -->|No| J12[Error Tarjeta No Encontrada]
+    J11 -->|Sí| J13[Validar Tipo Producto]
+    J13 --> J14{PRODUCTTYPE válido?}
+    J14 -->|No| J15[Error Producto Inválido]
+    J14 -->|Sí| J16[Activación T24]
+    J16 --> J17[Construir Response Header]
+    J17 --> J18[Generar UUID Response]
+    J18 --> J19[Registrar Bitácora Response]
+    J19 --> J20[Response Exitoso HN01]
+    
+    %% Flujo Otras Regiones
+    K --> K1[Error por Defecto]
+    K1 --> K2[Response Error Default]
+    
+    %% Manejo de Errores
+    E --> L1[MapeoErrores.proxy]
+    H --> L1
+    J5 --> L1
+    J12 --> L1
+    J15 --> L1
+    L1 --> L2[Error Mapeado]
+    
+    %% Pipeline Response
+    J20 --> M1[Pipeline Response]
+    K2 --> M1
+    L2 --> M1
+    
+    M1 --> M2{Success Indicator?}
+    M2 -->|SUCCESS| M3[Response Final Exitoso]
+    M2 -->|ERROR| M4[Invocar MapeoErrores]
+    M4 --> M5[Error Final Mapeado]
+    
+    %% Respuestas Finales
+    M3 --> N[Cliente Recibe Response]
+    M5 --> N
+    
+    %% Estilos
+    classDef hnFlow fill:#e1f5fe
+    classDef otherFlow fill:#f3e5f5
+    classDef errorFlow fill:#ffebee
+    classDef dbFlow fill:#e8f5e8
+    classDef decision fill:#fff3e0
+    classDef validation fill:#f1f8e9
+    classDef bitacora fill:#e8eaf6
+    
+    class J,J1,J2,J3,J6,J8,J9,J10,J13,J16,J17,J18,J19,J20 hnFlow
+    class K,K1,K2 otherFlow
+    class E,H,J5,J12,J15,L1,L2,M4,M5 errorFlow
+    class F dbFlow
+    class D,G,I,J4,J7,J11,J14,M2 decision
+    class C validation
+    class J1,J2,J18,J19 bitacora
+    
+    %% Notas de Reglas de Negocio
+    J10 -.->|"Patrón búsqueda: '...{CARD_NUMBER}'<br/>Operación: ConsultaMaestraTarjetaDebito<br/>Operand: LK (LIKE)"| J11
+    
+    J16 -.->|"ID compuesto: {PRODUCTTYPE}.{CARD_NUMBER}<br/>Operación: Activaciondetarjetadedebito<br/>LATAMCARDORDERACTIVETDWSType"| J17
+    
+    J2 -.->|"Bitácora Request: UUID, contenido completo<br/>TipoMensaje: REQ<br/>IdServicio: FICBCO0324"| J3
+    
+    J19 -.->|"Bitácora Response: UUID vinculado<br/>TipoMensaje: RSP<br/>Resultado: Success/ERROR"| J20
+    
+    F -.->|"Validación: FICBCO0324<br/>Región: SourceBank<br/>Usuario: del header"| G
+    
+    K1 -.->|"Error Code: MW-0008<br/>Message: SERVICE NOT IMPLEMENTED YET<br/>FOR THIS COUNTRY/COMPANY"| K2

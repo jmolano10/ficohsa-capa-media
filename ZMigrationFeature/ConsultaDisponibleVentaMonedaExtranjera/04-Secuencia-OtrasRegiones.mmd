@@ -1,0 +1,142 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as ConsultaDisponibleVentaMonedaExtranjera.proxy
+    participant Auth as Custom Token Auth
+    participant Validator as XSD Validator
+    participant DB as consultaRutaRegional_db
+    participant RegionalProxy as Proxy Regional Dinámico
+    participant ErrorMapper as MapeoErrores.proxy
+    participant ErrorHandler as Error Handler
+
+    Note over Client, ErrorHandler: Flujo Otras Regiones (GT01/PA01/NI01) - ConsultaDisponibleVentaMonedaExtranjera
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=GT01<br/>Body: CURRENCY=USD<br/>Transport: HTTPS<br/>Endpoint: /Middleware/OperationsAndExecution/ConsumerService/ConsultaDisponibleVentaMonedaExtranjera
+
+    OSB->>Auth: Validar Autenticación
+    Note right of Auth: Custom Token Authentication<br/>Username XPath: ./aut:RequestHeader/Authentication/UserName<br/>Password XPath: ./aut:RequestHeader/Authentication/Password
+
+    alt Autenticación Exitosa
+        Auth->>OSB: Credenciales Válidas
+        
+        OSB->>OSB: Iniciar Pipeline Request
+        Note right of OSB: ValidacionesGenerales_request<br/>Stage: ValidacionXSD
+
+        OSB->>Validator: Validar Esquema XSD
+        Note right of Validator: Schema: consultaDisponibleVentaMonedaExtranjeraTypes<br/>Element: con:consultaDisponibleVentaMonedaExtranjera<br/>Location: ./con:consultaDisponibleVentaMonedaExtranjera
+
+        alt Validación XSD Exitosa
+            Validator->>OSB: Esquema Válido
+
+            OSB->>OSB: Stage: ConsultaRutaRegional
+            Note right of OSB: Preparar request para consultaRutaRegional<br/>XQuery: consultaRutaRegionalIn.xq
+
+            OSB->>OSB: Construir Request DB
+            Note right of OSB: PV_SERVICIO: FICBCO0434<br/>PV_ORIGEN: GT01 (del header)<br/>PV_DESTINO: GT01<br/>PV_OPERACION: consultaDisponibleVentaMonedaExtranjera<br/>PV_VERSION: V2<br/>PV_USUARIO: UPPER(username)
+
+            OSB->>DB: consultaRutaRegional
+            Note right of DB: JCA Connection: jca://eis/DB/ConnectionMiddleware<br/>Stored Procedure: MW_P_CONSULTA_RUTA_REGIONAL<br/>Adapter: DB Adapter
+
+            alt Consulta Regional Exitosa
+                DB->>OSB: Response con PV_UBICACION
+                Note right of DB: PV_CODIGO_ERROR: SUCCESS<br/>PV_MENSAJE_ERROR: (vacío)<br/>PV_UBICACION: Middleware/v2/ProxyServices/ConsultaDisponibleVentaMonedaExtranjeraGT
+
+                OSB->>OSB: Evaluar Response DB
+                Note right of OSB: Condición: PV_CODIGO_ERROR != 'SUCCESS'<br/>Resultado: FALSE (continúa)
+
+                OSB->>OSB: Aplicar Valores por Defecto
+                Note right of OSB: XQuery: aplicarValoresPorDefectoRegion.xq<br/>Actualizar header con configuración regional
+
+                OSB->>OSB: Router Dinámico
+                Note right of OSB: RouterDinamico route node<br/>Dynamic Route basado en PV_UBICACION
+
+                OSB->>RegionalProxy: Enrutamiento Dinámico
+                Note right of RegionalProxy: Service: {PV_UBICACION}<br/>isProxy: true<br/>Proxy específico de región
+
+                RegionalProxy->>OSB: Response Regional
+                Note right of RegionalProxy: Response del proxy regional<br/>Procesamiento específico por región
+
+                OSB->>OSB: Pipeline Response
+                Note right of OSB: ValidacionesGenerales_response<br/>Stage: MapeoError
+
+                OSB->>OSB: Evaluar Success Indicator
+                Note right of OSB: Condición: upper-case(successIndicator) != "SUCCESS"<br/>Resultado: FALSE (sin error)
+
+                OSB->>Client: SOAP Response Exitoso
+                Note right of Client: Header: successIndicator=SUCCESS<br/>Body: Response del proxy regional
+
+            else Consulta Regional con Error
+                DB->>OSB: Response con Error
+                Note right of DB: PV_CODIGO_ERROR: ERROR<br/>PV_MENSAJE_ERROR: Servicio no configurado<br/>PV_UBICACION: (vacío)
+
+                OSB->>OSB: Evaluar Response DB
+                Note right of OSB: Condición: PV_CODIGO_ERROR != 'SUCCESS'<br/>Resultado: TRUE (error)
+
+                OSB->>OSB: Construir Response Error
+                Note right of OSB: Header: successIndicator=ERROR<br/>messages: {PV_MENSAJE_ERROR}<br/>Body: Response vacío
+
+                OSB->>OSB: Reply Inmediato
+                Note right of OSB: Termina procesamiento<br/>No continúa a router dinámico
+
+                OSB->>Client: SOAP Response con Error
+                Note right of Client: Header: successIndicator=ERROR<br/>Body: Response vacío
+            end
+
+        else Validación XSD Falla
+            Validator->>ErrorHandler: Error de Validación
+            Note right of ErrorHandler: XSD validation failed<br/>Schema constraint violation
+
+            ErrorHandler->>ErrorHandler: Pipeline Error Handler
+            Note right of ErrorHandler: _onErrorHandler pipeline<br/>Stage: ManejoError
+
+            ErrorHandler->>ErrorHandler: Capturar Error
+            Note right of ErrorHandler: $fault/ctx:errorCode<br/>$fault/ctx:reason
+
+            ErrorHandler->>ErrorMapper: Mapear Error
+            Note right of ErrorMapper: Service: MapeoErrores.proxy<br/>Operation: mapeoErrores
+
+            ErrorHandler->>ErrorHandler: Construir Request MapeoErrores
+            Note right of ErrorHandler: CODIGO_ERROR: {errorCode}<br/>MENSAJE_ERROR: FICBCO0434$#${errorMessage}
+
+            ErrorMapper->>ErrorHandler: Response Mapeado
+            Note right of ErrorMapper: Error mapeado según configuración
+
+            ErrorHandler->>ErrorHandler: Actualizar Header
+            Note right of ErrorHandler: XQuery: mapeoErroresUsageOut.xq<br/>successIndicator: {errorCode}
+
+            ErrorHandler->>Client: SOAP Fault Response
+            Note right of Client: Error de validación mapeado
+        end
+
+    else Autenticación Falla
+        Auth->>Client: Authentication Failed
+        Note right of Client: HTTP 401 Unauthorized<br/>Invalid credentials
+    end
+
+    alt Response con Error (Pipeline Response)
+        OSB->>OSB: Stage: MapeoError
+        Note right of OSB: Condición: successIndicator != "SUCCESS"<br/>Resultado: TRUE
+
+        OSB->>ErrorMapper: Invocar MapeoErrores
+        Note right of ErrorMapper: Service: MapeoErrores.proxy<br/>Operation: mapeoErrores
+
+        OSB->>OSB: Construir Request MapeoErrores
+        Note right of OSB: CODIGO_ERROR: {successIndicator}<br/>MENSAJE_ERROR: FICBCO0434$#${messages}
+
+        ErrorMapper->>OSB: Response Mapeado
+        Note right of ErrorMapper: Error mapeado y estandarizado
+
+        OSB->>OSB: Actualizar Header Response
+        Note right of OSB: XQuery: mapeoErroresUsageOut.xq<br/>Header actualizado con error mapeado
+
+        OSB->>Client: SOAP Response con Error Mapeado
+        Note right of Client: Error estandarizado del sistema
+    end
+
+    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:
+    Note over Client, ErrorHandler: 1. Validación XSD obligatoria antes de procesamiento
+    Note over Client, ErrorHandler: 2. Consulta regional determina proxy destino
+    Note over Client, ErrorHandler: 3. Enrutamiento dinámico basado en PV_UBICACION
+    Note over Client, ErrorHandler: 4. Mapeo estándar de errores con código FICBCO0434
+    Note over Client, ErrorHandler: 5. Autenticación personalizada con tokens
+    Note over Client, ErrorHandler: 6. Aplicación de valores por defecto regionales

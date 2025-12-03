@@ -1,0 +1,112 @@
+flowchart TD
+    A[Cliente/Aplicación] --> B{Región de Origen}
+    
+    B -->|SourceBank = HN01| C[ActualizaDisponibleVentaMonedaExtranjeraHN.proxy]
+    B -->|SourceBank = GT01/PA01/NI01| D[ActualizaDisponibleVentaMonedaExtranjera.proxy]
+    
+    %% Flujo Honduras (HN01)
+    C --> C1[Sin Validación XSD]
+    C1 --> C2[Lookup Credenciales LDAP]
+    C2 --> C3{LDAP Disponible?}
+    C3 -->|Sí| C4[Usar Credenciales LDAP]
+    C3 -->|No| C5[Usar Credenciales Header]
+    C4 --> C6[Transformar Request - 8 Campos]
+    C5 --> C6
+    C6 --> C7[actualizaDisponibleMonedaFCYIn.xq]
+    C7 --> C8[Conversión Fecha Automática]
+    C8 --> C9[Mapeo Campos OSB → T24]
+    C9 --> C10[T24 MercadoLibre Service]
+    C10 --> C11{Response T24 OK?}
+    C11 -->|Sí| C12[Transformar Response]
+    C11 -->|No| C13[Error Response]
+    C12 --> C14[actualizaDisponibleVentaMonedaExtranjeraOut.xq]
+    C14 --> C15[Response Exitoso HN01]
+    C13 --> C16[Response Error HN01]
+    
+    %% Flujo Otras Regiones
+    D --> D1[Custom Token Authentication]
+    D1 --> D2{Auth OK?}
+    D2 -->|No| D3[HTTP 401 Unauthorized]
+    D2 -->|Sí| D4[Validación XSD Obligatoria - 8 Campos]
+    D4 --> D5{XSD Válido?}
+    D5 -->|No| D6[Error Handler]
+    D5 -->|Sí| D7[Consulta Ruta Regional]
+    D7 --> D8[consultaRutaRegionalIn.xq]
+    D8 --> D9[MW_P_CONSULTA_RUTA_REGIONAL]
+    D9 --> D10{Región Configurada?}
+    D10 -->|No| D11[Error Regional]
+    D10 -->|Sí| D12[Aplicar Valores por Defecto]
+    D12 --> D13[aplicarValoresPorDefectoRegion.xq]
+    D13 --> D14[Router Dinámico]
+    D14 --> D15{Proxy Destino}
+    
+    %% Proxies Regionales Dinámicos
+    D15 -->|GT01| E1[ActualizaDisponibleVentaMonedaExtranjeraGT.proxy]
+    D15 -->|PA01| E2[ActualizaDisponibleVentaMonedaExtranjeraPA.proxy]
+    D15 -->|NI01| E3[ActualizaDisponibleVentaMonedaExtranjeraNI.proxy]
+    
+    E1 --> E4[Procesamiento Regional GT]
+    E2 --> E5[Procesamiento Regional PA]
+    E3 --> E6[Procesamiento Regional NI]
+    
+    E4 --> F1[Response Regional GT]
+    E5 --> F2[Response Regional PA]
+    E6 --> F3[Response Regional NI]
+    
+    %% Manejo de Errores
+    D6 --> G1[MapeoErrores.proxy]
+    D11 --> G1
+    G1 --> G2[mapeoErroresUsageIn.xq]
+    G2 --> G3[Mapeo de Errores FICBCO0439]
+    G3 --> G4[mapeoErroresUsageOut.xq]
+    G4 --> G5[Response Error Mapeado]
+    
+    %% Pipeline Response
+    F1 --> H1[Pipeline Response]
+    F2 --> H1
+    F3 --> H1
+    C15 --> H2[Response Final HN01]
+    C16 --> H2
+    G5 --> H3[Response Error Final]
+    
+    H1 --> H4{Success Indicator?}
+    H4 -->|SUCCESS| H5[Response Exitoso]
+    H4 -->|ERROR| H6[Invocar MapeoErrores]
+    H6 --> H7[Error Mapeado Final]
+    
+    %% Respuestas Finales
+    H2 --> I[Cliente Recibe Response]
+    H3 --> I
+    H5 --> I
+    H7 --> I
+    D3 --> I
+    
+    %% Estilos
+    classDef hnFlow fill:#e1f5fe
+    classDef otherFlow fill:#f3e5f5
+    classDef errorFlow fill:#ffebee
+    classDef dbFlow fill:#e8f5e8
+    classDef decision fill:#fff3e0
+    classDef validation fill:#f1f8e9
+    
+    class C,C1,C2,C4,C5,C6,C7,C8,C9,C10,C12,C14,C15,H2 hnFlow
+    class D,D1,D4,D7,D8,D12,D13,D14,E1,E2,E3,E4,E5,E6,F1,F2,F3,H1 otherFlow
+    class D6,D11,G1,G2,G3,G4,G5,H3,H6,H7,C13,C16 errorFlow
+    class D9 dbFlow
+    class B,C3,D2,D5,D10,D15,H4 decision
+    class D4,C6 validation
+    
+    %% Notas de Reglas de Negocio
+    C7 -.->|"Mapeo 8 campos: PROFILE→Cliente, CURRENCY→Moneda<br/>AMOUNT→Monto, DEAL→@id, STATUS→Estado<br/>OPERATION_TYPE→TipodeOperacion<br/>END_DATE→FechaVencimiento, ACTION_TYPE→TipodeAccion<br/>Credenciales: LDAP failover<br/>Operación: ActualizaDisponibleMonedaFCY"| C10
+    
+    C8 -.->|"Fecha automática: current-date()→YYYYMMDD<br/>Función: date-to-string()<br/>Campo: Fecha (generado automáticamente)"| C9
+    
+    C14 -.->|"Mapeo: Status/successIndicator → SUCCESS_FLAG<br/>Iteración sobre successIndicator elements<br/>Validación: mensaje vacío = éxito"| C15
+    
+    D8 -.->|"Servicio: FICBCO0439 (actualización)<br/>Origen/Destino: del header<br/>Usuario: UPPER(username)<br/>Versión: V2<br/>Operación: actualizaDisponibleVentaMonedaExtranjera"| D9
+    
+    D4 -.->|"Validación XSD: 8 campos obligatorios<br/>PROFILE, CURRENCY, AMOUNT, DEAL<br/>STATUS, OPERATION_TYPE, END_DATE, ACTION_TYPE<br/>Schema: actualizaDisponibleVentaMonedaExtranjeraTypes"| D5
+    
+    D14 -.->|"Enrutamiento: PV_UBICACION<br/>Proxy dinámico: isProxy=true<br/>Service path del DB<br/>Específico para actualización"| D15
+    
+    G2 -.->|"Prefijo: FICBCO0439$#$ (actualización)<br/>Código: del contexto error<br/>Mensaje: concatenado con servicio"| G3
