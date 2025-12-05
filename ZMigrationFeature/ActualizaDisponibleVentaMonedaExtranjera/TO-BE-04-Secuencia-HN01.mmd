@@ -1,100 +1,52 @@
 sequenceDiagram
-    participant Client as Cliente/Aplicación
-    participant OSB as ActualizaDisponibleVentaMonedaExtranjeraHN.proxy
-    participant LDAP as LDAP Security
-    participant T24 as T24 MercadoLibre Service
-    participant ErrorHandler as Error Handler
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as ActualizaDisponibleVentaMonedaExtranjera - Product <br> Epica 2550: ActualizaDisponibleVentaMonedaExtranjera <br> HU 7285:  PUT /consumer-services/currency-exchange-admin/v1/available-amount/update
+    participant Wrapper T24 as Wrapper T24 <br> BS: svcMercadoLibre/services <br/>Operation: ActualizaDisponibleMonedaFCY
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
 
-    Note over Client, ErrorHandler: Flujo Honduras (HN01) - ActualizaDisponibleVentaMonedaExtranjera
-
-    Client->>OSB: SOAP Request
-    Note right of Client: Header: SourceBank=HN01<br/>Body: 8 campos obligatorios<br/>PROFILE, CURRENCY, AMOUNT, DEAL<br/>STATUS, OPERATION_TYPE, END_DATE, ACTION_TYPE<br/>Transport: Local
-
-    OSB->>OSB: Iniciar Pipeline Request
-    Note right of OSB: ActualizaDisponibleVentaMonedaExtranjeraHN_request<br/>Stage: ActualizaDisponibleMonedaFCY
-
-    OSB->>OSB: Preparar Transformación Request
-    Note right of OSB: XQuery: actualizaDisponibleMonedaFCYIn.xq<br/>Mapeo: 8 campos → T24 structure<br/>Conversión fecha automática
-
-    OSB->>LDAP: Lookup Credenciales
-    Note right of LDAP: Path: Middleware/Security/{UPPER(USERNAME)}<br/>Function: fn-bea:lookupBasicCredentials()
-
-    alt LDAP Lookup Exitoso
-        LDAP->>OSB: Credenciales LDAP
-        Note right of OSB: Username/Password desde LDAP
-    else LDAP Lookup Falla
-        OSB->>OSB: Usar Credenciales Header
-        Note right of OSB: Failover: usar credenciales del request header
-    end
-
-    OSB->>OSB: Construir Request T24
-    Note right of OSB: WebRequestCommon con credenciales<br/>OfsFunction con configuración estándar<br/>FICOFXDEALSTXNINPUTType con id={DEAL}<br/>Fecha automática: current-date() → YYYYMMDD
-
-    OSB->>OSB: Mapear Campos de Entrada
-    Note right of OSB: PROFILE → Cliente<br/>CURRENCY → Moneda<br/>AMOUNT → Monto<br/>DEAL → @id<br/>STATUS → Estado<br/>OPERATION_TYPE → TipodeOperacion<br/>END_DATE → FechaVencimiento<br/>ACTION_TYPE → TipodeAccion
-
-    OSB->>T24: ActualizaDisponibleMonedaFCY
-    Note right of T24: Endpoint: http://172.23.13.19:7003/svcMercadoLibre/services<br/>Operation: ActualizaDisponibleMonedaFCY<br/>Protocol: SOAP/HTTP<br/>Deal ID como identificador único
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - ActualizaDisponibleVentaMonedaExtranjera
 
     alt T24 Response Exitoso
-        T24->>OSB: Response con Status Success
-        Note right of T24: Status/successIndicator: Success<br/>Status/messages: vacío<br/>FICOFXDEALSTXNOUTPUTType con datos actualizados
+        Consumidor->>API: REST Request
+        Note right of Consumidor: Header: SourceBank=HN01<br/>Body: 8 campos obligatorios <br/> customerProfile: "CLIENTE001" <br/> currencyCode: "USD" <br/> transactionAmount: "50000.00" <br/> dealReference: "DEAL20241201001" <br/> transactionStatus: "ACTIVE" <br/> operationType: "SELL" <br/> endDate: "2025-08-14" <br/> availabilityAction: "UPDATE"
 
-        OSB->>OSB: Evaluar Response T24
-        Note right of OSB: Condición: $validationMessage = ""<br/>Variable: $errorCode = Status/successIndicator
+        API->>API: Validar Request
+        Note over API: Valida campos obligatorios según contrato OpenAPI <br/> customerProfile, currencyCode, transactionAmount, dealReference, transactionStatus, operationType, endDate, availabilityAction
 
-        OSB->>OSB: Pipeline Response - Caso Exitoso
-        Note right of OSB: Stage: FlujoSalida<br/>Transformación: actualizaDisponibleVentaMonedaExtranjeraOut.xq
+        API->>API: Validación Exitosa
 
-        OSB->>OSB: Construir Response Header
-        Note right of OSB: successIndicator: Success<br/>Sin mensajes de error
+        API->>API: Validar Servicio Regional
+        Note right of API: key de config: available-amount 
 
-        OSB->>OSB: Transformar Response Body
-        Note right of OSB: Mapeo: Status/successIndicator → SUCCESS_FLAG<br/>Iteración sobre successIndicator elements
+        API->>API: Validación Regional Exitosa
 
-        OSB->>Client: SOAP Response Exitoso
-        Note right of Client: Header: successIndicator=Success<br/>Body: SUCCESS_FLAG=Success
+        API->>API: Construir Request Wrapper T24
+        Note right of API: Mapeo de Campos <br/> customerProfile → Cliente <br/> currencyCode → Moneda <br/> transactionAmount → Monto <br/> dealReference → id <br/> transactionStatus → Estado <br/> operationType → TipodeOperacion <br/> endDate → FechaVencimiento <br/> availabilityAction → TipodeAccion <br> {date-to-string(current-date())} → Fecha (Enviar la fecha del sistema en formato YYYYMMDD)
 
-    else T24 Response con Error
-        T24->>OSB: Response con Error
-        Note right of T24: Status/successIndicator: ERROR<br/>Status/messages: mensaje de error específico<br/>Deal no encontrado o estado inválido
+        API->>Wrapper T24: CALL Wrapper T24
+        Note right of API: Operation: ActualizaDisponibleVentaMonedaFCY <br/> Endpoint: svcMercadoLibre/services
 
-        OSB->>OSB: Evaluar Response T24
-        Note right of OSB: Condición: $validationMessage != ""<br/>Variables: $errorCode, $validationMessage
+        Wrapper T24-->>API: Response con Status Success
+        Note right of API: Status/successIndicator: Success<br/>Status/messages: vacío<br/>FICOFXDEALSTXNOUTPUTType con datos actualizados
 
-        OSB->>OSB: Pipeline Response - Caso Error
-        Note right of OSB: Stage: FlujoSalida - Default branch
+        API->>API: Transformar Response Body
 
-        OSB->>OSB: Construir Response Header Error
-        Note right of OSB: successIndicator: ERROR<br/>messages: {$validationMessage}
-
-        OSB->>OSB: Construir Response Body Vacío
-        Note right of OSB: Body: actualizaDisponibleVentaMonedaExtranjeraResponse vacío
-
-        OSB->>Client: SOAP Response con Error
-        Note right of Client: Header: successIndicator=ERROR<br/>Body: Response vacío
-
+        API->>Consumidor: REST Response Exitoso
+        Note right of Consumidor: Body: statusIndicator.description = SUCCESS_FLAG <br> transactionDate.description = fecha actual YYYYMMDD <br/> availableAmountDetails = datos actualizados
     end
 
-    alt Error de Pipeline/Sistema
-        OSB->>ErrorHandler: Pipeline Error
-        Note right of ErrorHandler: Pipeline: _onErrorHandler<br/>Stage: ManejoError
-
-        ErrorHandler->>ErrorHandler: Capturar Error Context
-        Note right of ErrorHandler: $fault/ctx:errorCode<br/>$fault/ctx:reason
-
-        ErrorHandler->>ErrorHandler: Construir Response Error
-        Note right of ErrorHandler: Header: successIndicator={errorCode}<br/>messages: {reason}<br/>Body: Response vacío
-
-        ErrorHandler->>Client: SOAP Fault Response
-        Note right of Client: Error de sistema/pipeline
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
     end
-
-    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:
-    Note over Client, ErrorHandler: 1. Failover de credenciales LDAP → Header
-    Note over Client, ErrorHandler: 2. Conversión automática fecha actual → YYYYMMDD
-    Note over Client, ErrorHandler: 3. Deal ID como identificador único en T24
-    Note over Client, ErrorHandler: 4. Mapeo directo de 8 campos OSB → T24
-    Note over Client, ErrorHandler: 5. Validación mensaje vacío = éxito
-    Note over Client, ErrorHandler: 6. Configuración OFS estándar para T24
-    Note over Client, ErrorHandler: 7. Construcción dinámica headers respuesta
+    deactivate API
+    Note over Consumidor, Errors: Reglas de Negocio Aplicadas: <br/> 1. Conversión automática fecha actual → YYYYMMDD <br/> 2. Deal ID como identificador único en Wrapper T24 <br/>3. Mapeo directo de 8 campos API → Wrapper T24
