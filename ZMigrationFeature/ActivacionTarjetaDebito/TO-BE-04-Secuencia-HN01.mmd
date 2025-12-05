@@ -1,0 +1,88 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as IssuedDevAdminDebitCard-Product<br/>Epica 2403: ActivacionTarjetaDebito <br> HU 6539:  POST /operational-services/issued-dev-admin-debit-card/v1/activate-debit-card
+    participant LibraryPipeline as Library Pipeline <br> IssuedDevAdminDebitCard-Product
+    participant WrapperT24Details as svcTarjetaDebito/services <br/>Operation: ConsultaMaestraTarjetaDebito
+    participant WrapperT24 as <br> BS: svcTarjetaDebito/services <br/>Operation: Activaciondetarjetadedebito
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - ActivacionTarjetaDebito
+
+    alt T24 Response Exitoso
+        Consumidor->>API: REST Request
+        Note right of Consumidor: Header: SourceBank=HN01<br/>Body: <br> debitCardNumber 
+
+        API->>API: Validar Request
+        Note right of API: Valida campos obligatorios según contrato OpenAPI <br> debitCardNumber 
+
+        API->>API: ValidaServicioRegional
+        Note right of API: key de config: IssuedDevAdminDebitCard
+
+        API->>API: Validación Regional Exitosa
+        Note right of API: Servicio habilitado para HN01
+
+        API->>LibraryPipeline: Consulta Constantes de Pipeline
+        LibraryPipeline-->>API: Retorna Constantes de Pipeline
+        Note right of API: Constantes que retorna <br> columnName = @ID<br/>operand = LK 
+
+        API->>API: Construir Request Consulta Debit Card Details
+        Note right of API: columnName = @ID <br> criteriaValue = "debitCardNumber"<br> Operand: LK
+
+        API->>WrapperT24Details: CALL Wrapper T24 - ConsultaMaestraTarjetaDebito
+        Note right of API: Buscar tarjeta por Patrón: "...{debitCardNumber}" <br/> Obtener PRODUCTTYPE
+
+        alt Tarjeta Encontrada
+            WrapperT24Details-->>API: Response con PRODUCTTYPE
+            Note right of WrapperT24Details: PRODUCTTYPE válido encontrado
+
+            API->>API: Validar Tipo Producto
+            Note right of API: $productType != ""
+
+            alt Producto Válido
+                API->>API: Construir Request Activación
+                Note right of API: LATAMCARDORDERACTIVETDWSType = "PRODUCTTYPE.debitCardNumber" <br> Ej: "DEBITO.CLASICA.1234567890123456"
+
+                API->>WrapperT24: Activaciondetarjetadedebito
+                Note right of API: LATAMCARDORDERACTIVETDWSType<br/>ID compuesto para activación
+
+                WrapperT24-->>API: Response Activación
+                Note left of WrapperT24: successIndicator: Success<br/>TransactionId generado
+
+                API->>Consumidor: REST Response Activación Exitosa
+                Note left of API: transactionDate
+
+            else Producto Inválido
+                API->>Consumidor: REST Response Tipo de Producto Inválido
+                Note left of API: status: 422<br/>detail: Tarjeta no válida para activación
+            end
+
+            else Tarjeta No Encontrada
+                WrapperT24Details-->>API: ZERORECORDS o Error
+                Note left of WrapperT24Details: successIndicator = "ERROR" <br> messages = "NO RECORDS FOUND FOR THE SPECIFIED CARD NUMBER"
+
+                API->>Consumidor: REST Response Tarejta No Encontrada
+                Note left of API: status: 404<br/>detail: Tarjeta no encontrada.
+            end
+        end 
+    
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
+
+    Note over Consumidor, Errors: Reglas de Negocio Aplicadas:
+    Note over Consumidor, Errors: 1. Validación regional obligatoria (FICBCO0324)
+    Note over Consumidor, Errors: 2. Campo debitCardNumber obligatorio
+    Note over Consumidor, Errors: 3. Consulta previa para obtener PRODUCTTYPE
+    Note over Consumidor, Errors: 4. ID compuesto: {PRODUCTTYPE}.{debitCardNumber}
+    Note over Consumidor, Errors: 5. Patrón búsqueda: "...{debitCardNumber}"
