@@ -1,0 +1,77 @@
+sequenceDiagram
+    participant Cliente as Cliente/Aplicación
+    participant ProxyHN as EliminarFactorCanjeHN<br/>(Proxy Service)
+    participant XQueryHN as eliminarFactorCanjeHNIn.xq<br/>(Transformación)
+    participant BizHN as eliminarFactorCanje_db<br/>(Business Service ABK)
+    participant DBHN as Oracle Database HN<br/>(ConnectionProxyAbanksHN)
+
+    Note over Cliente,DBHN: Región: Honduras (HN01)
+    Note over Cliente,DBHN: Esquema: (default schema)
+
+    Cliente->>ProxyHN: SOAP Request
+    Note right of Cliente: Header: UserName=ADMIN_USER<br/>Body: PROMO_ID=PROMO2024001<br/>Selector: SOAP body
+
+    activate ProxyHN
+    Note over ProxyHN: Pipeline: HN01_EliminarFactorCanje_request<br/>Stage: FlujoEntrada
+
+    ProxyHN->>XQueryHN: Transformar Request
+    Note right of ProxyHN: Parámetros:<br/>$eliminarFactorCanje<br/>$userName
+
+    activate XQueryHN
+    Note over XQueryHN: Mapeo de Campos:<br/>PROMO_ID → PV_IDPROMOCION<br/>upper-case(UserName) → PV_USUARIO
+
+    XQueryHN-->>ProxyHN: InputParameters XML
+    Note left of XQueryHN: PV_IDPROMOCION=PROMO2024001<br/>PV_USUARIO=ADMIN_USER
+    deactivate XQueryHN
+
+    ProxyHN->>BizHN: wsCallout (eliminarFactorCanje)
+    Note right of ProxyHN: Request: $REQeliminarFactorCanje
+
+    activate BizHN
+    Note over BizHN: JCA Adapter<br/>Connection: ConnectionProxyAbanksHN<br/>Schema: (default)<br/>Operation: eliminarFactorCanje
+
+    BizHN->>DBHN: CALL PL_P_ELIMINAR_FACTOR_CANJE
+    Note right of BizHN: IN: PV_IDPROMOCION='PROMO2024001'<br/>IN: PV_USUARIO='ADMIN_USER'
+
+    activate DBHN
+    Note over DBHN: Stored Procedure Execution<br/>Schema: (default schema)<br/>Procedure: PL_P_ELIMINAR_FACTOR_CANJE
+
+    alt Promoción Eliminada Exitosamente
+        DBHN-->>BizHN: OutputParameters
+        Note left of DBHN: OUT: PV_CODIGOMENSAJE='SUCCESS'<br/>OUT: PV_DESCRIPCIONMENSAJE='Promoción eliminada exitosamente'
+
+        BizHN-->>ProxyHN: Response XML
+
+        Note over ProxyHN: Extracción: $errorCode='SUCCESS'<br/>$validationMessage='Promoción eliminada exitosamente'
+
+        Note over ProxyHN: Pipeline: HN01_EliminarFactorCanje_response<br/>Stage: FlujoSalida<br/>Evaluación: $errorCode = 'SUCCESS'
+
+        ProxyHN-->>Cliente: SOAP Response (Success)
+        Note left of ProxyHN: Header: successIndicator=Success<br/>Body: <eliminarFactorCanjeResponse/>
+
+    else Error de Negocio
+        DBHN-->>BizHN: OutputParameters
+        Note left of DBHN: OUT: PV_CODIGOMENSAJE='ERROR'<br/>OUT: PV_DESCRIPCIONMENSAJE='La promoción no existe'
+
+        BizHN-->>ProxyHN: Response XML
+
+        Note over ProxyHN: Evaluación: $errorCode != 'SUCCESS'
+
+        ProxyHN-->>Cliente: SOAP Response (Error)
+        Note left of ProxyHN: Header: successIndicator=ERROR<br/>messages='La promoción no existe'
+
+    else Error Técnico
+        DBHN-->>BizHN: Exception
+        BizHN-->>ProxyHN: Fault
+
+        Note over ProxyHN: Error Handler: _onErrorHandler<br/>Stage: ManejoError
+
+        ProxyHN-->>Cliente: SOAP Response (Exception)
+        Note left of ProxyHN: Header: messageId=-1<br/>successIndicator=ERROR<br/>messages='[Technical Error]'
+    end
+
+    deactivate DBHN
+    deactivate BizHN
+    deactivate ProxyHN
+
+    Note over Cliente,DBHN: Diferencias con GT01:<br/>- Esquema: (default schema, no explícito)<br/>- Variable XQuery: $eliminarFactorCanje<br/>- Business Service: ABK

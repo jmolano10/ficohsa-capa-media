@@ -1,0 +1,51 @@
+flowchart TD
+    Start([Cliente invoca ConsultaFICOPEN]) --> Auth{Autenticación<br/>Custom Token}
+    Auth -->|Válido| ValidaXSD[Validar XSD<br/>consultaFICOPENTypes.xsd]
+    Auth -->|Inválido| ErrorAuth[Error Autenticación]
+    ErrorAuth --> End1([Retornar Error])
+    
+    ValidaXSD -->|OK| ValidaRegion[Validar Servicio Regional<br/>SP: MW_P_VALIDA_SERVICIO_REGIONAL]
+    ValidaXSD -->|Error| ErrorXSD[Error BEA-382505<br/>mapeoErrorValidate.xq]
+    ErrorXSD --> MapeoErr1[Invocar MapeoErrores<br/>FICBCO0110]
+    MapeoErr1 --> End2([Retornar Error])
+    
+    ValidaRegion -->|SUCCESS| AplicarDefecto[Aplicar valores por defecto<br/>aplicarValoresPorDefectoRegion.xq]
+    ValidaRegion -->|ERROR| End3([Retornar Error Regional])
+    
+    AplicarDefecto --> Branch{Enrutamiento<br/>SourceBank?}
+    
+    Branch -->|HN01| PipelineHN[Pipeline HNBanco_ConsultaFICOPEN]
+    Branch -->|GT01/PA01/NI01/Otro| PipelineDefault[Pipeline Default_ConsultaFICOPEN]
+    
+    PipelineDefault --> ErrorNotImpl[Error MW-0008<br/>SERVICE NOT IMPLEMENTED]
+    ErrorNotImpl --> End4([Retornar Error])
+    
+    PipelineHN --> BuildHeader[Construir Header FPC<br/>getFICOPENHeaderIn.xq]
+    BuildHeader --> GetCreds[Obtener credenciales<br/>Security/OSB12AUTH]
+    GetCreds --> TransformReq[Transformar Request<br/>getFICOPENIn.xq]
+    
+    TransformReq --> InvokeFPC[Invocar getFicopen12c<br/>HTTPS Timeout 70s]
+    
+    InvokeFPC -->|Timeout/Error| CaptureError[Capturar errorCode y message]
+    InvokeFPC -->|Success| EvalResponse{Evaluar<br/>errorCode}
+    
+    CaptureError --> BuildErrorResp[Construir Response Error]
+    BuildErrorResp --> MapeoErr2[Invocar MapeoErrores<br/>FICBCO0110$#$message]
+    MapeoErr2 --> End5([Retornar Error])
+    
+    EvalResponse -->|SUCCESS| TransformResp[Transformar Response<br/>getFICOPENOut.xq]
+    EvalResponse -->|ERROR| BuildErrorResp
+    
+    TransformResp --> BuildSuccess[Construir Header Success]
+    BuildSuccess --> End6([Retornar Response Exitoso])
+    
+    style Start fill:#e1f5e1
+    style End6 fill:#e1f5e1
+    style End1 fill:#ffe1e1
+    style End2 fill:#ffe1e1
+    style End3 fill:#ffe1e1
+    style End4 fill:#ffe1e1
+    style End5 fill:#ffe1e1
+    style PipelineHN fill:#e1e5ff
+    style PipelineDefault fill:#ffe1e1
+    style InvokeFPC fill:#fff4e1

@@ -1,0 +1,79 @@
+sequenceDiagram
+    participant Cliente as Cliente/Aplicación
+    participant ProxyNI as EliminarFactorCanjeNI<br/>(Proxy Service)
+    participant XQueryNI as eliminarFactorCanjeIn.xq<br/>(Transformación)
+    participant BizNI as eliminarFactorCanje_db<br/>(Business Service PXYNIC)
+    participant DBNI as Oracle Database NI<br/>(ConnectionProxyNI)
+
+    Note over Cliente,DBNI: Región: Nicaragua (NI01)
+    Note over Cliente,DBNI: Esquema: PROXYNICARAGUA
+    Note over Cliente,DBNI: Provider: http (URI: /Middleware/v2/ProxyServices/EliminarFactorCanjeNI)
+    Note over Cliente,DBNI: Selector: SOAP action + all-headers=false
+
+    Cliente->>ProxyNI: HTTP/SOAP Request + SOAPAction Header
+    Note right of Cliente: HTTP Header: SOAPAction<br/>SOAP Header: UserName=ADMIN_NI<br/>SOAP Body: PROMO_ID=PROMO_NI_2024_001<br/>Provider: http<br/>all-headers: false (headers personalizados se pierden)
+
+    activate ProxyNI
+    Note over ProxyNI: Pipeline: NI01_EliminarFactorCanje_request<br/>Stage: FlujoEntrada
+
+    ProxyNI->>XQueryNI: Transformar Request
+    Note right of ProxyNI: Parámetros:<br/>$eliminarFactorCanje1<br/>$userName<br/>(usando fn:string)
+
+    activate XQueryNI
+    Note over XQueryNI: Mapeo de Campos:<br/>PROMO_ID → PV_IDPROMOCION<br/>upper-case(UserName) → PV_USUARIO
+
+    XQueryNI-->>ProxyNI: InputParameters XML
+    Note left of XQueryNI: PV_IDPROMOCION=PROMO_NI_2024_001<br/>PV_USUARIO=ADMIN_NI
+    deactivate XQueryNI
+
+    ProxyNI->>BizNI: wsCallout (eliminarFactorCanje)
+    Note right of ProxyNI: Request: $REQeliminarFactorCanje
+
+    activate BizNI
+    Note over BizNI: JCA Adapter<br/>Connection: ConnectionProxyNI<br/>Schema: PROXYNICARAGUA<br/>Operation: eliminarFactorCanje
+
+    BizNI->>DBNI: CALL PROXYNICARAGUA.PL_P_ELIMINAR_FACTOR_CANJE
+    Note right of BizNI: IN: PV_IDPROMOCION='PROMO_NI_2024_001'<br/>IN: PV_USUARIO='ADMIN_NI'
+
+    activate DBNI
+    Note over DBNI: Stored Procedure Execution<br/>Schema: PROXYNICARAGUA<br/>Procedure: PL_P_ELIMINAR_FACTOR_CANJE
+
+    alt Promoción Eliminada Exitosamente
+        DBNI-->>BizNI: OutputParameters
+        Note left of DBNI: OUT: PV_CODIGOMENSAJE='SUCCESS'<br/>OUT: PV_DESCRIPCIONMENSAJE='Factor de canje eliminado en Nicaragua'
+
+        BizNI-->>ProxyNI: Response XML
+
+        Note over ProxyNI: Extracción: $errorCode='SUCCESS'<br/>$validationMessage='Factor de canje eliminado en Nicaragua'
+
+        Note over ProxyNI: Pipeline: NI01_EliminarFactorCanje_response<br/>Stage: FlujoSalida<br/>Evaluación: $errorCode = 'SUCCESS'
+
+        ProxyNI-->>Cliente: SOAP Response (Success)
+        Note left of ProxyNI: Header: successIndicator=Success<br/>Body: <eliminarFactorCanjeResponse/>
+
+    else Error de Negocio
+        DBNI-->>BizNI: OutputParameters
+        Note left of DBNI: OUT: PV_CODIGOMENSAJE='ERROR'<br/>OUT: PV_DESCRIPCIONMENSAJE='Promoción no encontrada en Nicaragua'
+
+        BizNI-->>ProxyNI: Response XML
+
+        Note over ProxyNI: Evaluación: $errorCode != 'SUCCESS'
+
+        ProxyNI-->>Cliente: SOAP Response (Error)
+        Note left of ProxyNI: Header: successIndicator=ERROR<br/>messages='Promoción no encontrada en Nicaragua'
+
+    else Error Técnico
+        DBNI-->>BizNI: Exception
+        BizNI-->>ProxyNI: Fault
+
+        Note over ProxyNI: Error Handler: _onErrorHandler<br/>Stage: ManejoError
+
+        ProxyNI-->>Cliente: SOAP Response (Exception)
+        Note left of ProxyNI: Header: messageId=-1<br/>successIndicator=ERROR<br/>messages='[Technical Error]'
+    end
+
+    deactivate DBNI
+    deactivate BizNI
+    deactivate ProxyNI
+
+    Note over Cliente,DBNI: Diferencias con GT01:<br/>- Provider: http (URI explícito, no local)<br/>- Selector: SOAP action (vs SOAP body)<br/>- Business Service: PXYNIC (vs ABKGT)<br/>- XQuery: eliminarFactorCanjeIn.xq (sin sufijo NI)<br/>- Esquema: PROXYNICARAGUA<br/>- Variable XQuery: $eliminarFactorCanje1<br/>- all-headers: false (pérdida headers personalizados)

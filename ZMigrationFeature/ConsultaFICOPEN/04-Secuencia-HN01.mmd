@@ -1,0 +1,90 @@
+sequenceDiagram
+    participant Cliente as Cliente/Aplicación
+    participant OSB as OSB Proxy ConsultaFICOPEN
+    participant ValidaXSD as Validador XSD
+    participant ValidaBD as ValidaServicioRegional_db
+    participant BD as Base Datos Middleware
+    participant FPC as Servicio FPC getFicopen12c
+    participant MapeoErr as MapeoErrores
+    participant ErrorHandler as Error Handler
+
+    Note over Cliente, ErrorHandler: Flujo Honduras (HN01) - ConsultaFICOPEN
+
+    Cliente->>OSB: SOAP Request
+    Note right of Cliente: Header: SourceBank=HN01<br/>Body: INVESTMENT_CODE, START_DATE, END_DATE
+
+    OSB->>OSB: Autenticación Custom Token
+    Note right of OSB: Valida Username/Password del header
+
+    OSB->>ValidaXSD: Validar Esquema
+    Note right of ValidaXSD: consultaFICOPENTypes.xsd<br/>INVESTMENT_CODE (min 1 char)<br/>START_DATE (8 chars)<br/>END_DATE (8 chars)
+
+    alt Validación XSD Fallida
+        ValidaXSD->>ErrorHandler: Error BEA-382505
+        ErrorHandler->>ErrorHandler: Transformar con mapeoErrorValidate.xq
+        ErrorHandler->>MapeoErr: Invocar mapeoErrores
+        Note right of MapeoErr: Service ID: FICBCO0110<br/>Mapear error
+        MapeoErr-->>ErrorHandler: Error mapeado
+        ErrorHandler->>OSB: Response con error
+        OSB->>Cliente: SOAP Fault
+    end
+
+    ValidaXSD-->>OSB: Validación OK
+
+    OSB->>ValidaBD: Validar Servicio Regional
+    ValidaBD->>BD: CALL MW_P_VALIDA_SERVICIO_REGIONAL
+    Note right of BD: IN: PV_SERVICIO='FICBCO0110'<br/>IN: PV_ORIGEN='HN01'<br/>IN: PV_DESTINO='HN01'
+    
+    BD-->>ValidaBD: OUT: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+    
+    alt Validación Regional Fallida
+        ValidaBD->>OSB: PV_CODIGO_ERROR != 'SUCCESS'
+        OSB->>OSB: Construir error
+        Note right of OSB: successIndicator=ERROR<br/>messages=PV_MENSAJE_ERROR
+        OSB->>Cliente: Response con error
+    end
+
+    ValidaBD-->>OSB: PV_CODIGO_ERROR='SUCCESS'
+    OSB->>OSB: Aplicar valores por defecto región
+    Note right of OSB: XQuery: aplicarValoresPorDefectoRegion.xq
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank='HN01'<br/>Pipeline: HNBanco_ConsultaFICOPEN
+
+    OSB->>OSB: Construir Header FPC
+    Note right of OSB: XQuery: getFICOPENHeaderIn.xq<br/>Obtener credenciales de Security/OSB12AUTH<br/>UserName, Password<br/>SourceBank, DestinationBank
+
+    OSB->>OSB: Transformar Request
+    Note right of OSB: XQuery: getFICOPENIn.xq<br/>Mapeo directo:<br/>INVESTMENT_CODE → INVESTMENT_CODE<br/>START_DATE → START_DATE<br/>END_DATE → END_DATE
+
+    OSB->>FPC: SOAP Request (HTTPS)
+    Note right of FPC: Endpoint: https://dynamoosbdev:8004<br/>/regional/pension/soap/getFICOPEN/v11g<br/>Operation: consultaFICOPEN<br/>Timeout: 70s
+
+    FPC->>FPC: Procesar consulta FICOPEN
+    Note right of FPC: Sistema de Fondos de Pensiones
+
+    alt Error en FPC
+        FPC-->>OSB: Response con error
+        Note left of FPC: successIndicator=ERROR<br/>messages=mensaje error
+        OSB->>OSB: Capturar errorCode y message
+        OSB->>OSB: Construir response error
+        OSB->>MapeoErr: Invocar mapeoErrores
+        Note right of MapeoErr: CODIGO_ERROR=upper-case(errorCode)<br/>MENSAJE_ERROR='FICBCO0110$#$'+message
+        MapeoErr-->>OSB: Error mapeado
+        OSB->>Cliente: Response con error
+    end
+
+    FPC-->>OSB: Response exitoso
+    Note left of FPC: successIndicator=SUCCESS<br/>Datos de cliente, cuenta, contrato<br/>Array de balances
+
+    OSB->>OSB: Evaluar resultado
+    Note right of OSB: upper-case(errorCode)='SUCCESS'
+
+    OSB->>OSB: Transformar Response
+    Note right of OSB: XQuery: getFICOPENOut.xq<br/>Mapear todos los campos:<br/>CUSTOMER_LEGAL_ID, CUSTOMER_NAME<br/>ACCOUNT_NUMBER, ACCOUNT_CURRENCY<br/>CONTRACT_NUMBER, CONTRACT_TYPE<br/>COMPANY, START_DATE<br/>Array: BALANCE_TYPE, PREVIOUS_BALANCE<br/>GROSS_CONTRIBUTIONS_AMOUNT, INTEREST_AMOUNT<br/>WITHDRAWALS_AMOUNT, FEE_AMOUNT<br/>INSURANCE_AMOUNT, CURRENT_BALANCE
+
+    OSB->>OSB: Construir Header Success
+    Note right of OSB: successIndicator=SUCCESS<br/>messages=vacío
+
+    OSB->>Cliente: SOAP Response exitoso
+    Note left of Cliente: Información completa de FICOPEN<br/>con balances por tipo

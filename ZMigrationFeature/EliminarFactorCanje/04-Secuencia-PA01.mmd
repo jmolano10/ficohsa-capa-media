@@ -1,0 +1,78 @@
+sequenceDiagram
+    participant Cliente as Cliente/Aplicación
+    participant ProxyPA as EliminarFactorCanjePA<br/>(Proxy Service)
+    participant XQueryPA as eliminarFactorCanjePAIn.xq<br/>(Transformación)
+    participant BizPA as eliminarFactorCanje_db<br/>(Business Service ABKPA)
+    participant DBPA as Oracle Database PA<br/>(ConnectionProxyAbanksPA)
+
+    Note over Cliente,DBPA: Región: Panamá (PA01)
+    Note over Cliente,DBPA: Esquema: PROXYABANKSPA
+    Note over Cliente,DBPA: Selector: SOAP action (requiere SOAPAction header)
+
+    Cliente->>ProxyPA: SOAP Request + SOAPAction Header
+    Note right of Cliente: HTTP Header: SOAPAction<br/>SOAP Header: UserName=ADMIN_PA<br/>SOAP Body: PROMO_ID=PROMO_PA_2024_001<br/>Selector: SOAP action
+
+    activate ProxyPA
+    Note over ProxyPA: Pipeline: PA01_EliminarFactorCanje_request<br/>Stage: FlujoEntrada
+
+    ProxyPA->>XQueryPA: Transformar Request
+    Note right of ProxyPA: Parámetros:<br/>$eliminarFactorCanje1<br/>$userName
+
+    activate XQueryPA
+    Note over XQueryPA: Mapeo de Campos:<br/>PROMO_ID → PV_IDPROMOCION<br/>upper-case(UserName) → PV_USUARIO
+
+    XQueryPA-->>ProxyPA: InputParameters XML
+    Note left of XQueryPA: PV_IDPROMOCION=PROMO_PA_2024_001<br/>PV_USUARIO=ADMIN_PA
+    deactivate XQueryPA
+
+    ProxyPA->>BizPA: wsCallout (eliminarFactorCanje)
+    Note right of ProxyPA: Request: $REQeliminarFactorCanje
+
+    activate BizPA
+    Note over BizPA: JCA Adapter<br/>Connection: ConnectionProxyAbanksPA<br/>Schema: PROXYABANKSPA<br/>Operation: eliminarFactorCanje
+
+    BizPA->>DBPA: CALL PROXYABANKSPA.PL_P_ELIMINAR_FACTOR_CANJE
+    Note right of BizPA: IN: PV_IDPROMOCION='PROMO_PA_2024_001'<br/>IN: PV_USUARIO='ADMIN_PA'
+
+    activate DBPA
+    Note over DBPA: Stored Procedure Execution<br/>Schema: PROXYABANKSPA<br/>Procedure: PL_P_ELIMINAR_FACTOR_CANJE
+
+    alt Promoción Eliminada Exitosamente
+        DBPA-->>BizPA: OutputParameters
+        Note left of DBPA: OUT: PV_CODIGOMENSAJE='SUCCESS'<br/>OUT: PV_DESCRIPCIONMENSAJE='Eliminación exitosa en Panamá'
+
+        BizPA-->>ProxyPA: Response XML
+
+        Note over ProxyPA: Extracción: $errorCode='SUCCESS'<br/>$validationMessage='Eliminación exitosa en Panamá'
+
+        Note over ProxyPA: Pipeline: PA01_EliminarFactorCanje_response<br/>Stage: FlujoSalida<br/>Evaluación: $errorCode = 'SUCCESS'
+
+        ProxyPA-->>Cliente: SOAP Response (Success)
+        Note left of ProxyPA: Header: successIndicator=Success<br/>Body: <eliminarFactorCanjeResponse/>
+
+    else Error de Negocio
+        DBPA-->>BizPA: OutputParameters
+        Note left of DBPA: OUT: PV_CODIGOMENSAJE='ERROR'<br/>OUT: PV_DESCRIPCIONMENSAJE='Promoción no encontrada en Panamá'
+
+        BizPA-->>ProxyPA: Response XML
+
+        Note over ProxyPA: Evaluación: $errorCode != 'SUCCESS'
+
+        ProxyPA-->>Cliente: SOAP Response (Error)
+        Note left of ProxyPA: Header: successIndicator=ERROR<br/>messages='Promoción no encontrada en Panamá'
+
+    else Error Técnico
+        DBPA-->>BizPA: Exception
+        BizPA-->>ProxyPA: Fault
+
+        Note over ProxyPA: Error Handler: _onErrorHandler<br/>Stage: ManejoError
+
+        ProxyPA-->>Cliente: SOAP Response (Exception)
+        Note left of ProxyPA: Header: messageId=-1<br/>successIndicator=ERROR<br/>messages='[Technical Error]'
+    end
+
+    deactivate DBPA
+    deactivate BizPA
+    deactivate ProxyPA
+
+    Note over Cliente,DBPA: Diferencias con GT01:<br/>- Selector: SOAP action (vs SOAP body en GT01)<br/>- Esquema explícito: PROXYABANKSPA<br/>- Variable XQuery: $eliminarFactorCanje1<br/>- Business Service: ABKPA
