@@ -1,179 +1,55 @@
 sequenceDiagram
+    autonumber
     participant Consumidor as Consumidore/Aplicación
-    participant API as API Proxy Service
-    participant Validator as Validador Regional
-    participant T24 as T24 Core Banking
-    participant CB as Core Banking DB
-    participant Abanks as Sistema Abanks
-    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+    participant API as API Reverso Pago Cheque
+    participant UUID as Generar UUID <br/> Librería de generación de UUID
+    participant Wrapper T24 as Wrapper T24 <br> svcResversaTransaccion <br> Operation: ReversiondePagodeCheques
+    participant Reintentos as Manejo de reintentos <br/> Componente de idempotencia
 
-    Note over Consumidor, Errors: Flujo Honduras (HN01) - Reversar Pago Cheque
+    Note over Consumidor, Reintentos: Flujo Honduras (HN01) - Reversar Pago Cheque
 
-    Consumidor->>API: Rest Request
-    Note right of Consumidor: Header: SourceBank=HN01<br/>Body: TRANSACTION_ID, TRANSACTION_TYPE
+    alt Reverso Exitoso
+        Consumidor->>API: Rest Request
+        Note right of Consumidor: Header: SourceBank=HN01<br/>Body: TRANSACTION_ID, TRANSACTION_TYPE
 
-    API->>API: Validar Esquema XML
-    Note right of API: Validar campos obligatorios<br/>TRANSACTION_ID no vacío
+        API->>API: Validar Rquest
+        Note right of API: Validar campos según contrato OpenAPI
 
-    API->>Validator: Validar Servicio Regional
-    Note right of Validator: ServiceId: FICBCO0084<br/>Region: HN01
+        API->>API: Validación exitosa
 
-    Validator->>Validator: Consultar BD Regional
-    
-    alt Región No Válida
-        Validator->>API: Error Regional
-        API->>Consumidor: Response con Error
-    end
-
-    Validator->>API: Validación Exitosa
-
-    API->>API: Extraer Variables
-    Note right of API: trxId = TRANSACTION_ID<br/>tipoTrx = substring(trxId, 1, 2)<br/>transactionType = TRANSACTION_TYPE
-
-    alt Tipo: CHEQUE_PAYMENT
-        API->>T24: ReversiondePagodeCheques
-        Note right of T24: XQuery: ReversarTransaccionPagoChequeIn.xq<br/>Mapeo: API → T24
-        T24->>API: Response Reversión Cheque
-        API->>API: Transformar Response
-        Note right of API: XQuery: ReversarTransaccionPagoChequeHeaderOut.xq
-    
-    else Tipo: CREDIT_CARD_PAYMENT
-        API->>T24: ReversionpagoTC
-        Note right of T24: XQuery: ReversarTransaccionPagoRetiroTCIn.xq<br/>Mapeo: TRANSACTION_ID → TFS
-        T24->>API: Response Reversión TC
-
-        alt Reversión TC Exitosa
-            API->>T24: AutorizareversapagooretiroTC
-            Note right of T24: XQuery: AutorizarReversionPagoRetiroTCIn.xq<br/>Autorización dual requerida
-            T24->>API: Response Autorización
-            API->>CB: registrarReversionTCCB
-            Note right of CB: SP: registrarReversionTCCB<br/>Registro en Core Banking
-            CB->>API: Response Registro
-        else Reversión TC Fallida
-            API->>API: Asignar Mensaje Error
-            Note right of API: messageReversion = Status/messages
-        end
-    
-    else Tipo: REF_COLLECTION o ABANKS_COLLECTION
-        API->>API: Determinar Tipo Transacción
-        Note right of API: Extraer tipoTrx (FT/TT)
+        API->>API: Validar Servicio Regional
+        Note right of API: key de config: XXXXXXXX
         
-        alt Tipo FT
-            API->>T24: ConsultadetransaccionFT
-            Note right of T24: XQuery: ConsultaTransaccionFT.xq<br/>Consultar detalles transacción
-            T24->>API: Response Consulta FT
-            API->>API: Extraer payMethod, valueDate, inputter
-        else Tipo TT
-            API->>T24: ConsultadetransaccionTT
-            Note right of T24: XQuery: ConsultaTransaccionTT.xq<br/>Consultar detalles transacción
-            T24->>API: Response Consulta TT
-            API->>API: Extraer payMethod, valueDate, inputter
-        end
-        
-        alt Validación Exitosa
-            alt payMethod = CASH
-                API->>T24: Reversionpagorecaudorefefec
-                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefEfectIn.xq
-            else payMethod = DEB.TO.ACCT
-                API->>T24: Reversionpagorecaudorefdbcta
-                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefDebCtaIn.xq
-            else payMethod = FICO.CHEQUE
-                API->>T24: Reversionpagorecaudorefficochq
-                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefFicoChqIn.xq
-            else payMethod = OB.CHEQUE
-                API->>T24: Reversionpagorecaudorefobchq
-                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefOBChqIn.xq
-            else payMethod = INTL.CHEQUE
-                API->>T24: Reversionpagorecaudorefchqtintl
-                Note right of T24: XQuery: ReversarTransaccionPagoRecaudoRefIntChqIn.xq
-            end
-            
-            T24->>API: Response Reversión Recaudo
-            
-            alt ABANKS_COLLECTION y Reversión Exitosa
-                API->>Abanks: reversionRecaudoAbanks_v2
-                Note right of Abanks: XQuery: ReversarTransaccionAbanksIn.xq<br/>SP: reversionRecaudoAbanks_v2
-                Abanks->>API: Response Abanks
-                
-                alt Error en Abanks
-                    alt Tipo TT
-                        API->>T24: EliminacionpagorecaudorefTT
-                        Note right of T24: XQuery: EliminacionRevRecRefTTIn.xq<br/>Rollback transacción
-                    else Tipo FT
-                        API->>T24: EliminacionpagorecaudorefFT
-                        Note right of T24: XQuery: EliminacionRevRecRefFTIn.xq<br/>Rollback transacción
-                    end
-                    T24->>API: Response Eliminación
-                end
-            end
-        else Validación Fallida
-            API->>API: Skip Processing
-            Note right of API: validationMessage contiene error
-        end
-    
-    else Tipo: LOAN_PAYMENT (TFS)
-        API->>T24: Reversiondepositocombinado
-        Note right of T24: XQuery: ReversarTransaccionPagoPrestamoIn.xq<br/>Reversión depósito combinado
-        T24->>API: Response Reversión Depósito
+        API->>API: Validación Regional Exitosa
+        Note right of API: Servicio habilitado para HN01
 
-        alt Reversión Exitosa
-            API->>T24: AuthReversionDepositosCombinados
-            Note right of T24: XQuery: AutorizarReversionDepositoCombinadoIn.xq<br/>Autorización depósito
-            T24->>API: Response Autorización Depósito
-        else Reversión Fallida
-            API->>API: Asignar Mensaje Error
-        end
-    
-    else Tipo: FT o TT (Genérico)
-        alt Tipo FT
-            API->>T24: ReversiondetransaccionFT
-            Note right of T24: XQuery: reversarTransaccionFTIn.xq<br/>Reversión FT genérica
-            T24->>API: Response Reversión FT
-            
-            alt Reversión FT Exitosa
-                API->>T24: AutorizacionreversionFT
-                Note right of T24: XQuery: AutorizarReversionFTIn.xq<br/>Autorización FT
-                T24->>API: Response Autorización FT
-            end
-        
-        else Tipo TT
-            API->>T24: ReversiondetransaccionTT
-            Note right of T24: XQuery: reversarTransaccionTTIn.xq<br/>Reversión TT genérica
-            T24->>API: Response Reversión TT
-            
-            alt Reversión TT Exitosa
-                API->>T24: AutorizacionreversionTT
-                Note right of T24: XQuery: AutorizarReversionTTIn.xq<br/>Autorización TT
-                T24->>API: Response Autorización TT
-            end
-        end
-    
-    else Tipo No Soportado
-        API->>API: Error Tipo No Soportado
-        Note right of API: "UNSUPPORTED TRANSACTION_TYPE"
-    end
+        API->>API: Validación Exitosa
 
-    API->>API: Procesar Response
-    Note right of API: Determinar successIndicator<br/>Construir response header
-
-    alt Proceso Exitoso
         API->>Consumidor: Response Exitoso
-        Note right of API: successIndicator: SUCCESS<br/>Body: reversarTransaccionResponse
-    else Error en Proceso
-        API->>Consumidor: Response con Error
-        Note right of API: successIndicator: ERROR<br/>messages: Descripción del error
-    end
-    
+        Note left of API: code: 202 <br> successIndicator: SUCCESS <br/> Body: Transacción recibida para reverso
+
+        API->>UUID: Solicitar UUID
+        UUID-->>API: Retorna UUID
+
+        API->>API: Construir Request a Wrapper T24
+        Note right of API: trxId = TRANSACTION_ID<br/>transactionType = TRANSACTION_TYPE <br/>requestUUID = UUID generado
+
+        API->>Wrapper T24: CALL ReversiondePagodeCheques
+        Note left of Wrapper T24: El mapeo es exactamente igual al request recibido<br/>por la API, solo se agrega el requestUUID
+
+        Wrapper T24-->>API: Response Reversión Cheque
+
+        API->>API: Procesar Response
+        Note right of API: Determinar successIndicator
+
+    end 
+
     activate API
-    alt Exception occurs
-        note over Errors: Error Library Handler
-        activate Errors
-            API->> Errors: Mapear código de error
-            Errors -->> API: Retorna código mapeado
-        deactivate Errors
-        activate Consumidor
-            API-->> Consumidor: Retorna error
-        deactivate Consumidor
-        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    alt Envío para reintentos
+    note over API, Reintentos: ¿¿¿¿Como se maneja el envío a reintentos???
+        activate Reintentos
+            API->> Reintentos: Envíar información al componente de reintentos
+            Reintentos -->> API: Existe respuesta o se envía a una cola para reintentos???
+        deactivate Reintentos
     end
     deactivate API
