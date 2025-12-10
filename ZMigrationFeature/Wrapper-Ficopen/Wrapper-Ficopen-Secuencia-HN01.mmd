@@ -1,0 +1,46 @@
+sequenceDiagram
+    autonumber
+    participant AO as "AWF-operaciónBIAN"
+    participant WF as "Wrapper Ficopen (EKS)"
+    participant RS as "Redis Cache (AuthToken)"
+    participant PS as "Parameter Store"
+    participant SM as "Secret Manager"
+    participant library as "Library Generate Hash"
+    participant FPToken as "Ficopen Login API" <br> "https://apiqa.afpficohsa.com/api/v2/oauth/login"
+    participant FP as "Ficopen API" <br> "https://apiqa.afpficohsa.com/api/v2"
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    AO->>WF: Invoke /entrypoint (operation, resource, data)
+    WF->>RS: Check local cache for AuthToken (by channel)
+
+    alt No token in local cache
+        WF->>PS: Get public Key (by channel)
+        PS->>WF: Public Key (by channel)
+        WF->>SM: Get Ficopen Credentials (by channel)
+        SM->>WF: Ficopen Credentials (by channel)
+        WF->WF: Concatenate Public Key + Credentials
+        WF->library: Generarte Hash  for concat (SHA-256)
+        library->>WF: Return Hash (SHA-256)
+        WF->WF: Convert hash to Base64
+        WF->>FPToken: POST /api/v2/oauth/login (Base64 Hash) 
+        FPToken->>WF: Return AuthToken
+        WF->>RS: Store AuthToken in redis cache (TTL 24h)
+    end
+
+    WF->>FP: Execute Operation (AuthToken, data)
+    FP->>WF: Return Response
+    WF->>AO: Return Response
+
+    activate WF
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            WF ->> Errors: Mapear código de error
+            Errors -->> WF: Retorna código mapeado
+        deactivate Errors
+        activate AO
+            WF -->> AO: Retorna error
+        deactivate AO
+    end
+    deactivate WF
+    Note over AO,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
