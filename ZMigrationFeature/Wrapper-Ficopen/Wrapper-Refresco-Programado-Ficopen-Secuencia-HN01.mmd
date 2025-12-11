@@ -1,0 +1,27 @@
+sequenceDiagram
+    autonumber
+    participant EB as "EventBridge Scheduler"
+    participant LB as "Lambda RefreshSession"
+    participant WF as "Wrapper Ficopen" 
+    participant RS as "Redis Cache (OauthToken)"
+    participant PS as "Parameter Store"
+    participant SM as "Secret Manager"
+    participant library as "Library Generate Hash"
+    participant FPToken as "Ficopen Login API" <br> "https://apiqa.afpficohsa.com/api/v2/oauth/login"
+
+    EB->>LB: Trigger scheduled event (cada X minutos)
+    LB->>WF: Call /auth/refresh 
+    WF->>RS: Get Info from cache (by channel)
+    RS->>WF: Info from cache (by channel)
+    WF->>PS: Get public Key (by channel)
+    PS->>WF: Public Key (by channel)
+    WF->>SM: Get Ficopen Credentials (by channel)
+    SM->>WF: Ficopen Credentials (by channel)
+    WF->WF: Concatenate Public Key + Credentials
+    WF->library: Generarte Hash  for concat (SHA-256)
+    library->>WF: Return Hash (SHA-256)
+    WF->WF: Convert hash to Base64
+    WF->>FPToken: POST /api/v2/oauth/login (Base64 Hash) 
+    FPToken->>WF: Return OauthToken
+    WF->>RS: Update OauthToken in redis cache (TTL 24h)
+
