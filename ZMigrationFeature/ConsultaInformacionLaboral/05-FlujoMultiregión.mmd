@@ -1,0 +1,57 @@
+flowchart TD
+    A[Cliente/Aplicación] --> B[OSB Proxy Service<br/>ConsultaInformacionLaboral]
+    
+    B --> C{Validación XSD}
+    C -->|Error| D[Error Handler<br/>SOAP Fault]
+    C -->|OK| E[ValidaServicioRegional_db]
+    
+    E --> F{Servicio Regional<br/>Válido?}
+    F -->|Error| G[Response Error Regional]
+    F -->|OK| H[Aplicar Valores por Defecto]
+    
+    H --> I{Enrutamiento Regional<br/>SourceBank}
+    
+    I -->|HN01| J[Default Pipeline]
+    I -->|HN02| K[HNFPC Pipeline]
+    I -->|Otros| J
+    
+    J --> L[Error MW-0008<br/>SERVICE NOT IMPLEMENTED]
+    L --> M[Response Error<br/>Servicio No Implementado]
+    
+    K --> N[Preparar Header<br/>getEmploymentInformationHeaderIn.xq]
+    N --> O[Obtener Credenciales<br/>OSB12AUTH]
+    O --> P[Transformar Request<br/>getEmploymentInformationIn.xq]
+    
+    P --> Q[getEmploymentInformation12c<br/>Business Service]
+    Q --> R[Dynamo Service<br/>https://dynamoosbdev:8004]
+    
+    R --> S{Respuesta<br/>Servicio Externo}
+    S -->|Error/Timeout| T[Error Handler<br/>Conexión/Servicio]
+    S -->|OK| U{Código Respuesta<br/>SUCCESS?}
+    
+    U -->|Error| V[Response Error<br/>del Servicio]
+    U -->|OK| W[Transformar Response<br/>getEmploymentInformationHNOut.xq]
+    
+    W --> X[Response Exitoso<br/>JOB_INFO_HISTORY]
+    
+    D --> Y[Cliente]
+    G --> Y
+    M --> Y
+    T --> Y
+    V --> Y
+    X --> Y
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style J fill:#ffebee
+    style K fill:#e8f5e8
+    style R fill:#fff3e0
+    style Y fill:#e1f5fe
+    
+    classDef errorPath fill:#ffcdd2
+    classDef successPath fill:#c8e6c9
+    classDef notImplemented fill:#ffecb3
+    
+    class D,G,L,M,T,V errorPath
+    class E,H,N,O,P,Q,W,X successPath
+    class J notImplemented

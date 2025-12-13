@@ -1,0 +1,95 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as ValidaServicioRegional_db
+    participant ExtService as getEmploymentInformation12c
+    participant DynamoService as Dynamo Service (External)
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Honduras HN02 (FPC) - ConsultaInformacionLaboral
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN02<br/>Body: CUSTOMER_ACCOUNT, FROM_DATE, TO_DATE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>CUSTOMER_ACCOUNT no vacío<br/>Schema: consultaInformacionLaboralTypes.xsd
+
+    alt Validación XSD Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0181<br/>SourceBank: HN02<br/>DestinationBank: HN02
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        Note right of Validator: PV_CODIGO_ERROR != 'SUCCESS'
+        OSB->>OSB: Crear Response de Error
+        OSB->>Client: Response con Error Regional
+    end
+
+    Validator->>OSB: Validación Exitosa
+    Note right of Validator: PV_CODIGO_ERROR = 'SUCCESS'
+
+    OSB->>OSB: Aplicar Valores por Defecto
+    Note right of OSB: Transformación: aplicarValoresPorDefectoRegion
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'HN02'<br/>→ HNFPC Pipeline
+
+    OSB->>OSB: Preparar Header para Servicio Externo
+    Note right of OSB: Transformación: getEmploymentInformationHeaderIn.xq<br/>ServiceAccount: OSB12AUTH<br/>SourceBank: HN02 → HN01<br/>DestinationBank: HN02 → HN01
+
+    OSB->>OSB: Obtener Credenciales
+    Note right of OSB: Lookup: Middleware/Security/OSB12AUTH<br/>getUsername(), getPassword()
+
+    OSB->>OSB: Transformar Request Body
+    Note right of OSB: Transformación: getEmploymentInformationIn.xq<br/>CUSTOMER_ACCOUNT → directo<br/>FROM_DATE: YYYYMMDD → dd/MM/yyyy<br/>TO_DATE: YYYYMMDD → dd/MM/yyyy
+
+    OSB->>ExtService: Invocar getEmploymentInformation12c
+    Note right of ExtService: Operation: consultaInformacionLaboral<br/>Header: Credenciales OSB12AUTH<br/>Body: Request transformado
+
+    ExtService->>DynamoService: HTTPS Request
+    Note right of DynamoService: URL: https://dynamoosbdev:8004<br/>/regional/pension/soap/getEmploymentInformation/v11g<br/>Timeout: 70s, Connection: 65s
+
+    alt Servicio Externo No Disponible
+        DynamoService-->>ExtService: Connection Error/Timeout
+        ExtService-->>OSB: Error Response
+        OSB->>ErrorHandler: Procesar Error de Conexión
+        ErrorHandler->>OSB: Response de Error
+        OSB->>Client: SOAP Response - Error Conexión
+    end
+
+    DynamoService->>ExtService: Response Exitoso
+    Note right of DynamoService: JOB_INFO_HISTORY con datos laborales
+
+    ExtService->>OSB: Response del Servicio Externo
+    Note right of ExtService: Header: successIndicator<br/>Body: consultaInformacionLaboralResponse
+
+    OSB->>OSB: Evaluar Código de Respuesta
+    Note right of OSB: Verificar: upper-case($errorCode) = 'SUCCESS'
+
+    alt Respuesta con Error del Servicio
+        OSB->>OSB: Procesar Error del Servicio
+        Note right of OSB: successIndicator = 'ERROR'<br/>messages = mensaje de error
+        OSB->>Client: SOAP Response - Error del Servicio
+    end
+
+    OSB->>OSB: Transformar Response Exitoso
+    Note right of OSB: Transformación: getEmploymentInformationHNOut.xq<br/>Mapeo directo de campos<br/>Campos vacíos: START_DATE, SALARY_CURRENCY, etc.
+
+    OSB->>OSB: Crear Response Header Exitoso
+    Note right of OSB: successIndicator = 'Success'<br/>messages = vacío
+
+    OSB->>Client: SOAP Response - Exitoso
+    Note right of OSB: Header: Success<br/>Body: JOB_INFO_HISTORY con datos
+
+    Note over Client, ErrorHandler: Resultado: Historial laboral consultado exitosamente
+
+    rect rgb(255, 255, 200)
+        Note over OSB, DynamoService: Reglas de Negocio Aplicadas:<br/>1. Mapeo HN02 → HN01 para servicio externo<br/>2. Formato fechas: YYYYMMDD → dd/MM/yyyy<br/>3. Credenciales desde OSB12AUTH<br/>4. Timeout 70s para servicio externo<br/>5. Campos específicos siempre vacíos en respuesta
+    end

@@ -1,0 +1,50 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as Consulta FICOPEN - Product <br> Epica 2580: ConsultaInformacionLaboral <br> HU 8270:  GET: /customer-management/customer-profile-retrieves/v1/customer/{accountNumber}/retrieve-employer-history
+    participant WFP as Wrapper FICOPEN <br> "apiqa.afpficohsa.com/api/v2/clientes/historicas/laborales?"
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Consulta Información Laboral del Cliente
+
+    alt FICOPEN Response Exitoso
+        Consumidor->>API: REST Request
+        Note right of Consumidor: Header: SourceBank=HN01 <br/> Param: accountNumber, initiationDate, terminationDate
+
+        API->>API: Validar Request
+        Note over API: Valida campos obligatorios según contrato OpenAPI <br/>investmentProductReference =! vacío
+
+        API->>API: Validación Exitosa
+
+        API->>API: Validar Regionalización
+        Note over API: key de config: CUSTOMER_PROFILE_RETRIEVES
+
+        API->>API: Validación Regional Exitosa
+
+        API->>API: Constuir Request Wrapper FICOPEN
+
+        API->>WFP: CALL Wrapper FICOPEN
+        Note over API: accountNumber <br> initiationDate <br> terminationDate
+
+        WFP->API: Response Exitoso
+        Note left of WFP: Datos de la cuenta <br/> Array del historial
+
+        API->>API: Transformar Response
+
+        API->>Consumidor: REST Response exitoso
+        Note right of Consumidor: body.data
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

@@ -1,0 +1,61 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as ValidaServicioRegional_db
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Honduras HN01 - ConsultaInformacionLaboral
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: CUSTOMER_ACCOUNT, FROM_DATE, TO_DATE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>CUSTOMER_ACCOUNT no vacío
+
+    alt Validación XSD Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0181<br/>Region: HN01
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida o No Implementada
+        Validator->>OSB: Error Regional
+        Note right of Validator: PV_CODIGO_ERROR != 'SUCCESS'
+        OSB->>OSB: Crear Response de Error
+        Note right of OSB: successIndicator = 'ERROR'<br/>messages = mensaje de error
+        OSB->>Client: Response con Error Regional
+    end
+
+    Validator->>OSB: Validación Exitosa
+    Note right of Validator: PV_CODIGO_ERROR = 'SUCCESS'
+
+    OSB->>OSB: Aplicar Valores por Defecto
+    Note right of OSB: Transformación: aplicarValoresPorDefectoRegion
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'HN01'<br/>→ Default Pipeline
+
+    OSB->>OSB: Pipeline Default_ConsultaInformacionLaboral
+    Note right of OSB: Stage: ProxySvcRequest<br/>Action: Skip (no processing)
+
+    OSB->>OSB: Pipeline Default_ConsultaInformacionLaboral_response
+    Note right of OSB: Stage: ProxySvcResponse
+
+    OSB->>ErrorHandler: Error MW-0008
+    Note right of OSB: SERVICE NOT IMPLEMENTED YET<br/>FOR THIS COUNTRY/COMPANY
+
+    ErrorHandler->>ErrorHandler: Procesar Error
+    Note right of ErrorHandler: Código: MW-0008<br/>Mensaje: Servicio no implementado
+
+    ErrorHandler->>OSB: Response de Error
+    Note right of ErrorHandler: successIndicator = 'ERROR'<br/>messages = MW-0008
+
+    OSB->>Client: SOAP Response - Error
+    Note right of OSB: Header: ERROR<br/>Body: consultaInformacionLaboralResponse vacío
+
+    Note over Client, ErrorHandler: Resultado: Servicio no implementado para HN01
