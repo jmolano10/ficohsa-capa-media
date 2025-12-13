@@ -1,0 +1,78 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant ExtService as getPensionFund12c
+    participant DynamoService as Dynamo Service (External)
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Honduras HN02 (FPC) - ConsultaFondoPensiones
+
+    Client->>OSB: SOAP Request (HTTPS)
+    Note right of Client: Header: SourceBank=HN02<br/>Body: ACCOUNT_NUMBER
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'HN02'<br/>→ FPCHN Pipeline
+
+    OSB->>OSB: Preparar Header para Servicio Externo
+    Note right of OSB: Transformación: getPensionFundHeaderIn.xq<br/>ServiceAccount: OSB12AUTH<br/>SourceBank: HN02<br/>DestinationBank: HN02
+
+    OSB->>OSB: Obtener Credenciales
+    Note right of OSB: Lookup: Middleware/Security/OSB12AUTH<br/>getUsername(), getPassword()
+
+    OSB->>OSB: Transformar Request Body
+    Note right of OSB: Transformación: getPensionFundIn.xq<br/>ACCOUNT_NUMBER → AccountCode<br/>GeneralInfo: SourceBank, DestinationBank<br/>Language: 'es'
+
+    OSB->>ExtService: Invocar getPensionFund12c
+    Note right of ExtService: Operation: getPensionFund<br/>Header: Credenciales OSB12AUTH<br/>Body: Request transformado
+
+    ExtService->>DynamoService: HTTPS Request
+    Note right of DynamoService: URL: https://dynamoosbdev:8004<br/>/regional/pension/soap/getPensionFund11g/v1<br/>Timeout: 70s, Connection: 65s
+
+    alt Servicio Externo No Disponible
+        DynamoService-->>ExtService: Connection Error/Timeout
+        ExtService-->>OSB: Error Response
+        OSB->>ErrorHandler: Procesar Error de Conexión
+        ErrorHandler->>OSB: Response de Error
+        Note right of ErrorHandler: successIndicator = 'ERROR'<br/>messages = errorCode + reason
+        OSB->>Client: SOAP Response - Error Conexión
+    end
+
+    DynamoService->>ExtService: Response del Servicio
+    Note right of DynamoService: StatusInfo/Status<br/>Data/Account (información completa)<br/>ErrorInfo/Description (si hay error)
+
+    ExtService->>OSB: Response del Servicio Externo
+    Note right of ExtService: getPensionFundResponse con datos
+
+    OSB->>OSB: Evaluar Status de Respuesta
+    Note right of OSB: Verificar: upper-case(StatusInfo/Status) = 'SUCCESS'<br/>Extraer: ErrorInfo/Description si hay error
+
+    alt Respuesta con Error del Servicio
+        OSB->>OSB: Procesar Error del Servicio
+        Note right of OSB: errorCode = 'Error'<br/>validationMessage = ErrorInfo/Description
+        OSB->>OSB: Crear Response Header de Error
+        Note right of OSB: successIndicator = 'Error'<br/>messages = validationMessage
+        OSB->>OSB: Crear Response Body Vacío
+        OSB->>Client: SOAP Response - Error del Servicio
+    end
+
+    OSB->>OSB: Procesar Respuesta Exitosa
+    Note right of OSB: errorCode = 'SUCCESS'<br/>validationMessage = ''
+
+    OSB->>OSB: Crear Response Header Exitoso
+    Note right of OSB: successIndicator = 'SUCCESS'<br/>messages = vacío
+
+    OSB->>OSB: Transformar Response Body
+    Note right of OSB: Transformación: consultaFondoPensionesHNOut.xq<br/>Mapeo completo de datos de cuenta<br/>Procesamiento de beneficiarios
+
+    OSB->>Client: SOAP Response - Exitoso
+    Note right of OSB: Header: SUCCESS<br/>Body: Información completa de fondo de pensiones
+
+    Note over Client, ErrorHandler: Resultado: Información de fondo de pensiones consultada
+
+    rect rgb(255, 255, 200)
+        Note over OSB, DynamoService: Reglas de Negocio Aplicadas:<br/>1. Solo HN02 implementado<br/>2. Credenciales desde OSB12AUTH<br/>3. Idioma fijo: español<br/>4. Timeout 70s para servicio externo<br/>5. Mapeo condicional de campos opcionales<br/>6. Procesamiento de lista de beneficiarios<br/>7. Evaluación de Status para determinar éxito/error
+    end
+
+    rect rgb(255, 200, 200)
+        Note over OSB: Campos No Mapeados:<br/>- ACCOUNT_TYPE, ACCOUNT_CURRENCY, ACCOUNT_STATUS<br/>- BALANCE_TYPE_INFO (estructura completa)<br/>- Campos detallados de beneficiarios<br/>- Fechas adicionales (vencimiento, cierre)<br/>- Información organizacional
+    end

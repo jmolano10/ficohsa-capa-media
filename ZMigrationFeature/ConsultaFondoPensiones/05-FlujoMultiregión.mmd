@@ -1,0 +1,50 @@
+flowchart TD
+    A[Cliente/Aplicación] --> B[OSB Proxy Service<br/>ConsultaFondoPensiones]
+    
+    B --> C{Enrutamiento Regional<br/>SourceBank}
+    
+    C -->|HN02| D[FPCHN Pipeline]
+    C -->|Otros| E[BranchDefault Pipeline]
+    
+    E --> F[Error: SERVICE NOT IMPLEMENTED<br/>FOR THIS COUNTRY/COMPANY]
+    F --> G[Response Error<br/>Servicio No Implementado]
+    
+    D --> H[Preparar Header<br/>getPensionFundHeaderIn.xq]
+    H --> I[Obtener Credenciales<br/>OSB12AUTH]
+    I --> J[Transformar Request<br/>getPensionFundIn.xq]
+    
+    J --> K[getPensionFund12c<br/>Business Service]
+    K --> L[Dynamo Service<br/>https://dynamoosbdev:8004]
+    
+    L --> M{Respuesta<br/>Servicio Externo}
+    M -->|Error/Timeout| N[Error Handler<br/>Conexión/Servicio]
+    M -->|OK| O{Status Field<br/>SUCCESS?}
+    
+    O -->|Error| P[Extraer ErrorInfo/Description<br/>Crear Response Error]
+    O -->|SUCCESS| Q[Transformar Response<br/>consultaFondoPensionesHNOut.xq]
+    
+    Q --> R[Mapear Datos de Cuenta]
+    R --> S[Procesar Beneficiarios]
+    S --> T[Response Exitoso<br/>Información Completa]
+    
+    N --> U[Cliente]
+    G --> U
+    P --> U
+    T --> U
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style D fill:#e8f5e8
+    style E fill:#ffebee
+    style L fill:#fff3e0
+    style U fill:#e1f5fe
+    
+    classDef errorPath fill:#ffcdd2
+    classDef successPath fill:#c8e6c9
+    classDef notImplemented fill:#ffecb3
+    classDef externalService fill:#e1f5fe
+    
+    class F,G,N,P errorPath
+    class H,I,J,K,Q,R,S,T successPath
+    class E notImplemented
+    class L externalService

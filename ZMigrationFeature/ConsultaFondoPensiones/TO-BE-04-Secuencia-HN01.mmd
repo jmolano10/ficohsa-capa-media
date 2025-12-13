@@ -1,0 +1,50 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as Consulta FICOPEN - Product <br> Epica 2579: ConsultaFondoPensiones <br> HU 10466:  GET - /market-operations/pension-fund-administration-retrieve/v1/product/{accountNumber}/retrieve-balance-history
+    participant WFP as Wrapper FICOPEN <br> "/api/v2/cuentas/fondos/pensiones"
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Consultar Fondos Pensiones
+
+    alt FICOPEN Response Exitoso
+        Consumidor->>API: REST Request
+        Note right of Consumidor: Header: SourceBank=HN01 <br/> pathParam: accountNumber
+
+        API->>API: Validar Request
+        Note over API: Valida campos obligatorios según contrato OpenAPI <br/> accountNumber!= vacío
+
+        API->>API: Validación Exitosa
+
+        API->>API: Validar Regionalización
+        Note over API: key de config: PENSION_FUND_ADMINISTRATION_RETRIEVE
+
+        API->>API: Validación Regional Exitosa
+
+        API->>API: Constuir Request Wrapper FICOPEN
+
+        API->>WFP: CALL Wrapper FICOPEN
+        Note over API: accountNumber
+
+        WFP->API: Response Exitoso
+        Note left of WFP: Datos de la cuenta de pensión
+
+        API->>API: Transformar Response
+
+        API->>Consumidor: REST Response exitoso
+        Note right of Consumidor: body.data
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
