@@ -1,0 +1,117 @@
+sequenceDiagram
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Reverso Credit Card TFS <br> Epica 2490: ReversarTransaccion <br> HU 6627: POST: 
+    participant UUID as Generar UUID <br/> Librería de generación de UUID
+    participant T24  as Wrapper T24 <br> svcResversaTransaccion/services <br> Operation: ReversionpagoTC
+    participant SM as Secret Manager
+    participant T24Auth as Wrapper T24 <br> svcResversaTransaccion/services <br> Operation: AutorizareversapagooretiroTC
+    participant CB as ConnectionPagosWSTC <br> schema: PagosWSTC <br> SP: OSB_P_REGISTRA_REVERSION_TC_CB
+    participant LibraryPipeline as Library Pipeline <br> NOMBRE MICROSERVICIO
+    participant PagosTC as ConnectionTarjetas <br> schema: PagosTC <br> Package: dbo <br> SP: OSBRegistraReversaTC
+    participant Reintentos as Componente de Idempotencia
+
+    Note over Consumidor, Reintentos: Flujo Honduras (HN01) - ReversarTransaccion Credit Card TFS
+
+    Consumidor->>API: Rest Request
+    Note right of Consumidor: Header: SourceBank=HN01<br/>Body: transactionReference, transactionType
+
+    API->>API: Validar Rquest
+    Note over API: Validar campos según contrato OpenAPI <br/> transactionReference != vacío
+
+    API->>API: Validar Servicio Regional
+    Note over API: key de config: XXXXXXXX
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>API: Validación Exitosa
+
+    API->>UUID: Solicitar UUID
+    UUID->>API: Retorna UUID
+
+    API->>API: Construir Request ReversionpagoTC
+    Note over API: Mapeo: <br> messageId = UUID <br> id = transactionReference
+
+    API->>T24 : CALL ReversionpagoTC
+    Note right of API : messageId, id
+
+    T24 ->>API: Response Reversión TC
+    Note left of T24 : successIndicator
+
+    API->>API: Evaluar Response ReversionpagoTC
+    Note over API: Validar successIndicator
+
+    alt ReversionPagoTC Exitoso - successIndicator = SUCCESS
+
+        API->>Consumidor: REST Response exitoso
+        Note right of Consumidor: body.data <br> transactionReference <br> transactionType <br> transactionDate
+
+        Note over API: ¿¿¿¿como disparar flujo asíncrono????
+
+        API->>SM: Consulta credenciales (username, password)
+        Note right of API: Busca por nombre método
+
+        SM->>API: Obtiene credenciales (username, password)
+        Note left of SM: username <br> password
+
+        API->>API: Construir Request AutorizareversapagooretiroTC
+        Note over API: Mapeo: <br> userName = userName <br> password = password <br> transactionId = transactionReference
+
+        API->>T24Auth: CALL AutorizareversapagooretiroTC
+        Note right of API: userName, password, transactionId
+    
+        T24Auth->>API: Response Autorización
+        Note left of T24Auth : successIndicator
+
+        API->>API: Evaluar Response AutorizareversapagooretiroTC
+
+        alt AutorizareversapagooretiroTC No Exitoso - successIndicator != SUCCESS
+            
+            note over API, Reintentos: ¿¿¿¿Como se maneja el envío a reintentos???
+            API->> Reintentos: Envíar información al componente de reintentos
+            Reintentos ->> API: Existe respuesta o se envía a una cola para reintentos???
+
+        else AutorizareversapagooretiroTC Exitoso - successIndicator = SUCCESS
+            
+            API->>API: Construir Request registrarReversionTCCB
+            Note over API: Mapeo: <br> PV_TRANSACTION_ID = transactionReference
+
+            API->>CB: CALL SP registrarReversionTCCB
+            Note right of API: PV_TRANSACTION_ID
+
+            CB->>API: Response Registro
+            Note left of CB: PV_ERRORCODE
+
+            API->>API: Evaluar Response registrarReversionTCCB
+            Note over API: Validar PV_ERRORCODE
+
+            alt registrarReversionTCCB NO Exitoso - PV_ERRORCODE != SUCCESS
+
+                note over API, Reintentos: ¿¿¿¿Como se maneja el envío a reintentos???
+                API->> Reintentos: Envíar información al componente de reintentos
+                Reintentos ->> API: Existe respuesta o se envía a una cola para reintentos???
+
+            else registrarReversionTCCB Exitoso - PV_ERRORCODE = SUCCESS
+                API->>LibraryPipeline: Consulta Constantes de Pipeline
+
+                LibraryPipeline->>API: Retorna Constantes de Pipeline
+                Note left of LibraryPipeline: Constantes que retorna <br> Pais = HND <br/> CodigoError = 0 <br/> MensajeError = temp
+
+                API->>API: Construir Request registraReversaTC
+                Note over API: Mapeo: <br> Pais = HND <br> SecuenciaMovimiento = transactionReference <br>  CodigoError = 0 <br> MensajeError = temp
+
+                API->>PagosTC: CALL registraReversaTC
+                Note right of API: Pais, SecuenciaMovimiento, CodigoError, MensajeError
+
+                PagosTC->>API: Response Registro
+
+                API->>API: Evaluar Response registrarReversionTCCB
+
+                alt registraReversaTC NO Exitoso 
+                    note over API, Reintentos: ¿¿¿¿Como se maneja el envío a reintentos???
+                    API->> Reintentos: Envíar información al componente de reintentos
+                    Reintentos ->> API: Existe respuesta o se envía a una cola para reintentos???
+                end 
+            end 
+        end
+    end

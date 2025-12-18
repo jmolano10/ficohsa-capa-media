@@ -1,0 +1,67 @@
+sequenceDiagram
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Reverso RefCollection <br> Epica 2490: ReversarTransaccion <br> HU 6644: POST: 
+    participant T24  as Wrapper T24 <br> svcResversaTransaccion/services <br> Operation: Reversionpagorecaudorefdbcta
+    participant SM as Secret Manager
+    participant T24Auth as Wrapper T24 <br> svcResversaTransaccion/services <br> Operation: Authrevpagorecaudorefdbcta
+    participant Reintentos as Componente de Idempotencia
+
+    Note over Consumidor, Reintentos: Flujo Honduras (HN01) - ReversarTransaccion Credit Card Payment
+
+    Consumidor->>API: Rest Request
+    Note right of Consumidor: Header: SourceBank=HN01<br/>Body: transactionReference, transactionType
+
+    API->>API: Validar Rquest
+    Note right of API: Validar campos según contrato OpenAPI <br/> transactionReference != vacío
+
+    API->>API: Validar Servicio Regional
+    Note right of API: key de config: XXXXXXXX
+    
+    API->>API: Validación Regional Exitosa
+    Note right of API: Servicio habilitado para HN01
+
+    API->>API: Validación Exitosa
+
+    API->>Consumidor: Response Exitoso
+    Note left of API: code: 202 <br> successIndicator: SUCCESS <br/> Body: Transacción recibida para reverso
+
+    API->>API: Construir Request Reversionpagorecaudorefdbcta
+    Note over API: Mapeo: <br> id = transactionReference
+
+    API->>T24 : CALL Reversionpagorecaudorefdbcta
+    Note right of API : id
+
+    T24 ->>API: Response Reversión TC
+    Note left of T24 : successIndicator
+
+    API->>API: Evaluar Response Reversionpagorecaudorefdbcta
+    Note over API: Validar successIndicator
+
+    alt Reversionpagorecaudorefdbcta NO Exitoso - successIndicator != SUCCESS
+        note over API, Reintentos: ¿¿¿¿Como se maneja el envío a reintentos???
+        API->> Reintentos: Envíar información al componente de reintentos
+        Reintentos ->> API: Existe respuesta o se envía a una cola para reintentos???
+
+    else Reversionpagorecaudorefdbcta Exitoso - successIndicator = SUCCESS
+        
+        API->>SM: Consulta usuario y contraseña
+        
+        SM->>API: Retorna usuario y contraseña
+
+        API->>API: Construir Request Authrevpagorecaudorefdbcta
+        Note over API: Mapeo: <br> userName = Usuario <br> password = PWD <br> transactionId = transactionReference
+
+        API->>T24Auth: CALL Authrevpagorecaudorefdbcta
+        Note right of API: transactionId
+    
+        T24Auth->>API: Response Autorización
+
+        API->>API: Evaluar Response Authrevpagorecaudorefdbcta
+
+        alt Authrevpagorecaudorefdbcta No Exitoso 
+            
+            note over API, Reintentos: ¿¿¿¿Como se maneja el envío a reintentos???
+            API->> Reintentos: Envíar información al componente de reintentos
+            Reintentos ->> API: Existe respuesta o se envía a una cola para reintentos???
+        end
+    end
