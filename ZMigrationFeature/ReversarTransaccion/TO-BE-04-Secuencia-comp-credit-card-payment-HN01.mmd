@@ -1,0 +1,81 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Reversar Credit Card Payment <br> Epica 2490: ReversarTransaccion <br> HU 19412: <br> POST: /credit-card-payment-mgmt/v1/reverse-transaction
+    participant Reversar as HU 6664 <br> API Reversos <br> POST: /payments/payment-execution-admin/v1/reverse-transaction 
+    participant AuthReversar as HU 6627 <br> API Autorizar Reversos <br> POST: /payments/payment-execution-admin/v1/authorize-reverse-transaction 
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Reversar Pagos de Créditos
+
+
+    Consumidor->>API: Rest Request
+    Note right of Consumidor: Header: SourceBank=HN01<br/>Body: transactionReference, transactionType
+
+    API->>API: Validar Request
+    Note over  API: Validar obligatoriedad campos según contrato OpenAPI <br/> transactionReference != vacío, <br> transactionType = "CREDIT_CARD_PAYMENT"
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: key de config: CREDIT_CARD_PAYMENT_MANAGEMENT
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>API: Validación Exitosa
+
+    API->>Reversar: Consume API reversos
+    Note right of API: SourceBank, transactionReference, transactionType
+
+    Reversar->>API: Respose reversos
+    Note left of Reversar: SuccessIndicator
+
+    API->>API: Evalúa response reversos
+
+    alt Response reversos NO Exitoso - successIndicator != "SUCCESS"
+        rect rgba(248, 238, 238, 1)
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+            API->> Consumidor: Retorna error
+        end
+    else Response reversos Exitoso - successIndicator = "SUCCESS"
+
+        API->>AuthReversar: Consume Autorización Reverso
+        Note right of API: SourceBank, transactionReference, transactionType, retryRequired: true
+
+        AuthReversar->>API: Response Autorización Reverso
+        Note left of AuthReversar: SuccessIndicator
+
+        API->>API: Evalúa Response Autorización Reverso
+
+        alt Response Autoriza Reverso successIndicator != "SUCCESS"
+
+            API->>Errors: Mapea Error "Transacción en proceso"
+
+            Errors ->> API: Retorna código mapeado
+
+            API->>Consumidor: Retorna error controlado
+            Note over Consumidor: "Transacción en proceso"
+
+        else Response Autoriza Reverso successIndicator = "SUCCESS"
+
+            API->>Consumidor: Response API
+            Note over Consumidor: "HTTP 200: Transacción Reversada Exitosamente" 
+
+        end
+    end 
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
