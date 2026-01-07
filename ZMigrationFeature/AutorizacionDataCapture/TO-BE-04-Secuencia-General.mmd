@@ -1,0 +1,45 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API AutorizacionDataCapture <br> Epica 2558: AutorizacionDataCapture <br> HU 7900:  PUT - /cross-channel/transaction-authorization-admin/v1/initiate-data-capture-authorization
+    participant API as Validador<br/>autorizacionDataCaptureValidation
+    participant WT24 as Wrapper T24 <br/> Op: Autorizaciondedatacapture
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo General - AutorizacionDataCapture
+
+    Consumidor->>API: REST Request 
+    Note right of Consumidor: Body: dataCaptureReference 
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br/> dataCaptureReference != vacío
+
+    API->>API: Construye Request Wrapper T24
+    Note over API: DATACAPTUREINPUTWSType:transactionId = dataCaptureReference
+
+    API->>WT24: Invocar a Wrapper T24
+    Note right of API: transactionId
+
+    WT24->>API: T24 Response Success
+    Note over WT24: Status.successIndicator = "Success"
+
+    API->>API: Construir Response API
+    Note over API: data.transactionAuthorizationDateTime (YYYY-MM-DD:HH:MM:SSZ)
+
+    API->>Consumidor: REST Response 
+    Note left of API: data.transactionAuthorizationDateTime
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
+

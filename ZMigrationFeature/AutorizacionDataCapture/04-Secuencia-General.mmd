@@ -1,0 +1,118 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service<br/>AutorizacionDataCapture
+    participant Validator as Validador<br/>autorizacionDataCaptureValidation
+    participant LDAPLookup as LDAP Lookup<br/>Middleware/Security
+    participant DataCaptureBS as DataCapture<br/>Business Service
+    participant T24Service as T24 Web Service<br/>mwinterbanca:7003
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, T24Service: Flujo General - AutorizacionDataCapture
+
+    Client->>OSB: SOAP Request AutorizacionDataCapture
+    Note right of Client: Header: AutenticacionRequestHeader<br/>UserName, Password<br/>Body: autorizacionDataCapture con DATA_CAPTURE_ID
+
+    OSB->>OSB: Custom Token Authentication
+    Note right of OSB: Extraer UserName y Password del header<br/>Validar autenticación personalizada
+
+    OSB->>OSB: Validar Esquema SOAP
+    Note right of OSB: Validar estructura XML contra WSDL<br/>Binding: autorizacionDataCapturePSSOAP
+
+    OSB->>Validator: Validar Campo Requerido
+    Note right of OSB: XQuery: autorizacionDataCaptureValidation.xq<br/>Validar DATA_CAPTURE_ID no vacío
+
+    alt Validación Fallida
+        Validator-->>OSB: validationMessage = "REQUIRED FILEDS NOT SUPPLIED"
+        Note left of Validator: DATA_CAPTURE_ID está vacío<br/>Retorna mensaje de error (con typo)
+
+        OSB->>OSB: Preparar Error Response
+        Note right of OSB: successIndicator = "ERROR"<br/>messages = validationMessage<br/>Body vacío
+
+        OSB-->>Client: SOAP Response Error
+        Note left of OSB: Header con error de validación<br/>Body: autorizacionDataCaptureResponse vacío
+    end
+
+    Validator-->>OSB: validationMessage = ""
+    Note left of Validator: DATA_CAPTURE_ID presente y válido<br/>Validación exitosa
+
+    OSB->>OSB: Preparar Request T24
+    Note right of OSB: XQuery: autorizacionDataCaptureIn.xq<br/>Mapear campos OSB a formato T24
+
+    OSB->>LDAPLookup: Lookup Credenciales
+    Note right of OSB: Path: Middleware/Security/{USERNAME}<br/>Función: getUsername(), getPassword()
+
+    alt LDAP Lookup Exitoso
+        LDAPLookup-->>OSB: Credenciales T24
+        Note left of LDAPLookup: userName y password mapeados<br/>desde directorio LDAP
+    else LDAP Lookup Fallido
+        LDAPLookup-->>OSB: Usar Credenciales Originales
+        Note left of LDAPLookup: Fallback a credenciales del header<br/>fn-bea:fail-over()
+    end
+
+    OSB->>OSB: Transformar Request
+    Note right of OSB: WebRequestCommon: userName, password<br/>DATACAPTUREINPUTWSType:<br/>  transactionId = DATA_CAPTURE_ID
+
+    OSB->>DataCaptureBS: WS Callout Autorizaciondedatacapture
+    Note right of OSB: Operation: Autorizaciondedatacapture<br/>Request: REQUEST transformado
+
+    DataCaptureBS->>DataCaptureBS: Configuración HTTP
+    Note right of DataCaptureBS: Timeout: No configurado<br/>Connection Timeout: No configurado<br/>Retry Count: No configurado<br/>Load Balancing: round-robin
+
+    DataCaptureBS->>T24Service: SOAP Request a T24
+    Note right of DataCaptureBS: Endpoint: http://mwinterbanca:7003/svcDataCapture/services<br/>Operation: Autorizaciondedatacapture<br/>Content-Type: text/xml
+
+    alt T24 Autorización Exitosa
+        T24Service-->>DataCaptureBS: T24 Response Success
+        Note left of T24Service: Status.successIndicator = "Success"<br/>DATACAPTUREType con VALUEDATE<br/>RECORDSTATUS = "LIVE"<br/>AUTHORISER con usuario autorizador
+
+        DataCaptureBS-->>OSB: Response T24
+        Note left of DataCaptureBS: RESPONSE = AutorizaciondedatacaptureResponse<br/>con Status y DATACAPTUREType
+
+        OSB->>OSB: Transformar Response Header
+        Note right of OSB: XQuery: autorizacionDataCaptureHeaderOut.xq<br/>Mapear Status a ResponseHeader<br/>transactionId, successIndicator, messages
+
+        OSB->>OSB: Transformar Response Body
+        Note right of OSB: XQuery: autorizacionDataCaptureOut.xq<br/>Extraer VALUEDATE como TRANSACTION_DATE
+
+        OSB->>OSB: Asignar Response Final
+        Note right of OSB: header = ResponseHeader transformado<br/>body = autorizacionDataCaptureResponse
+
+        OSB-->>Client: SOAP Response Success
+        Note left of OSB: Header: ResponseHeader con transactionId<br/>successIndicator = "Success"<br/>Body: TRANSACTION_DATE con fecha de autorización
+
+    else T24 Error de Negocio
+        T24Service-->>DataCaptureBS: T24 Response Error
+        Note left of T24Service: Status.successIndicator = "T24Error"<br/>Status.messages con detalles del error<br/>Ej: "Transaction not found or already authorized"
+
+        DataCaptureBS-->>OSB: Response T24 Error
+        OSB->>OSB: Procesar Error T24
+        Note right of OSB: Mapear error de T24 a ResponseHeader<br/>successIndicator = "T24Error"<br/>messages = error messages de T24
+
+        OSB->>OSB: Transformar Response Body
+        Note right of OSB: XQuery: autorizacionDataCaptureOut.xq<br/>Intentar extraer VALUEDATE<br/>(puede estar vacío en caso de error)
+
+        OSB-->>Client: SOAP Response T24 Error
+        Note left of OSB: Header con error de T24<br/>Body con TRANSACTION_DATE vacío o ausente
+
+    else T24 Timeout o Connection Error
+        T24Service->>T24Service: Timeout o Connection Error
+        Note right of T24Service: Sin respuesta en tiempo esperado<br/>o error de conectividad
+
+        T24Service-->>DataCaptureBS: Connection Fault
+        DataCaptureBS-->>OSB: System Fault
+        Note left of DataCaptureBS: ctx:errorCode<br/>ctx:reason con detalles
+
+        OSB->>ErrorHandler: Pipeline de Error
+        Note right of OSB: Capturar fault del sistema<br/>Procesar error de conectividad
+
+        ErrorHandler->>ErrorHandler: Procesar System Fault
+        Note right of ErrorHandler: errorCode = $fault/ctx:errorCode<br/>reason = $fault/ctx:reason<br/>Concatenar código y razón
+
+        ErrorHandler->>ErrorHandler: Preparar Error Response
+        Note right of ErrorHandler: successIndicator = "ERROR"<br/>messages = errorCode + ": " + reason<br/>Body vacío
+
+        ErrorHandler-->>Client: SOAP Fault Response
+        Note left of ErrorHandler: Header con error del sistema<br/>Body: autorizacionDataCaptureResponse vacío<br/>Reply inmediato
+    end
+
+    Note over Client, T24Service: Fin del flujo AutorizacionDataCapture

@@ -1,0 +1,154 @@
+flowchart TD
+    A[Cliente SOAP Request] --> B[AutorizacionDataCapture Proxy Service<br/>Implementación Centralizada]
+    
+    B --> C{Custom Token<br/>Authentication}
+    
+    C -->|Success| D[Validar Esquema SOAP<br/>autorizacionDataCapturePS.wsdl]
+    C -->|Fail| E[Authentication Error]
+    
+    D --> F[Validar Campo Requerido<br/>autorizacionDataCaptureValidation.xq]
+    
+    F --> G{DATA_CAPTURE_ID<br/>No Vacío?}
+    
+    G -->|No| H[Error: REQUIRED FILEDS NOT SUPPLIED<br/>Nota: Typo en código original]
+    G -->|Yes| I[Lookup Credenciales LDAP<br/>Middleware/Security/USERNAME]
+
+    I --> J{LDAP Lookup<br/>Exitoso?}
+
+    J -->|Yes| K[Usar Credenciales LDAP<br/>getUsername, getPassword]
+    J -->|No| L[Usar Credenciales Originales<br/>fn-bea:fail-over]
+    
+    K --> M[Transformar Request<br/>autorizacionDataCaptureIn.xq]
+    L --> M
+    
+    M --> N[Mapear Campos<br/>DATA_CAPTURE_ID → transactionId]
+    
+    N --> O[Invocar DataCapture BS<br/>T24 Web Service]
+    
+    O --> P[HTTP POST Request<br/>http://mwinterbanca:7003/svcDataCapture/services]
+    
+    P --> Q{T24 Service<br/>Response}
+    
+    Q -->|Success| R[Procesar Response Exitosa<br/>Status.successIndicator Success]
+    Q -->|T24Error| S[Procesar Error T24<br/>Status con error details]
+    Q -->|Timeout/Connection| T[System Fault<br/>ctx:errorCode, ctx:reason]
+    
+    R --> U[Transformar Response Header<br/>autorizacionDataCaptureHeaderOut.xq]
+    S --> V[Mapear Error T24<br/>a ResponseHeader]
+    T --> W[Pipeline de Error<br/>Procesar System Fault]
+    
+    U --> X[Transformar Response Body<br/>autorizacionDataCaptureOut.xq]
+    V --> Y[Response con Error T24]
+    W --> Z[Concatenar Error<br/>errorCode + reason]
+    
+    X --> AA[Extraer TRANSACTION_DATE<br/>del VALUEDATE de T24]
+    
+    AA --> BB[SOAP Response Success<br/>con transactionId y TRANSACTION_DATE]
+    Y --> CC[SOAP Response T24 Error]
+    Z --> DD[SOAP Fault Response<br/>con Reply inmediato]
+    
+    H --> EE[SOAP Response Error]
+    E --> FF[SOAP Authentication Fault]
+    
+    BB --> GG[Cliente recibe respuesta]
+    CC --> GG
+    DD --> GG
+    EE --> GG
+    FF --> GG
+    
+    %% Styling
+    classDef success fill:#90EE90,stroke:#006400,stroke-width:2px
+    classDef error fill:#FFB6C1,stroke:#DC143C,stroke-width:2px
+    classDef process fill:#87CEEB,stroke:#4682B4,stroke-width:2px
+    classDef decision fill:#DDA0DD,stroke:#8B008B,stroke-width:2px
+    classDef service fill:#F0E68C,stroke:#DAA520,stroke-width:2px
+    classDef transform fill:#FFA07A,stroke:#FF4500,stroke-width:2px
+    
+    class B,D,F,I,M,N,O,P,U,X,AA process
+    class C,G,J,Q decision
+    class K,L transform
+    class R,BB success
+    class E,H,S,T,V,W,Y,Z,CC,DD,EE,FF error
+    
+    %% Subgraphs para organizar el flujo
+    subgraph "Validaciones de Entrada"
+        direction TB
+        C
+        D
+        F
+        G
+    end
+    
+    subgraph "Preparación de Credenciales"
+        direction TB
+        I
+        J
+        K
+        L
+    end
+    
+    subgraph "Transformación de Request"
+        direction TB
+        M
+        N
+    end
+    
+    subgraph "Invocación T24"
+        direction TB
+        O
+        P
+        Q
+    end
+    
+    subgraph "Procesamiento de Respuestas"
+        direction TB
+        R
+        S
+        T
+        U
+        V
+        W
+        X
+        Y
+        Z
+        AA
+    end
+    
+    subgraph "Configuración Regional"
+        direction TB
+        R1[Implementación Centralizada<br/>Sin diferenciación regional]
+        R2[Credenciales LDAP<br/>Middleware/Security/REGION]
+        R3[Endpoint T24<br/>Centralizado para todas las regiones]
+        R4[Autorización Universal<br/>Misma lógica para todas las regiones]
+    end
+    
+    subgraph "Reglas de Negocio Principales"
+        direction TB
+        B1[Validación de Campo Requerido<br/>DATA_CAPTURE_ID no vacío]
+        B2[Mapeo Simple<br/>DATA_CAPTURE_ID → transactionId]
+        B3[Extracción de Fecha<br/>VALUEDATE → TRANSACTION_DATE]
+        B4[Autorización T24<br/>Cambio de estado de transacción]
+    end
+    
+    subgraph "Servicios Dependientes"
+        direction TB
+        S1[DataCapture T24<br/>http://mwinterbanca:7003<br/>Operation: Autorizaciondedatacapture]
+        S2[LDAP Lookup<br/>Middleware/Security/USERNAME]
+    end
+    
+    subgraph "Características Técnicas"
+        direction TB
+        T1[Sin Timeouts Configurados<br/>Depende de configuración por defecto]
+        T2[Sin Retry Automático<br/>No configurado explícitamente]
+        T3[Logging Debug<br/>Habilitado a nivel debug]
+        T4[Monitoring<br/>Agregación cada 10 segundos]
+        T5[Throttling<br/>Deshabilitado]
+    end
+    
+    subgraph "Manejo de Errores"
+        direction TB
+        E1[Error de Validación<br/>REQUIRED FILEDS NOT SUPPLIED]
+        E2[Error T24<br/>Transacción no encontrada o ya autorizada]
+        E3[Error de Sistema<br/>Timeout o conexión]
+        E4[Error de Autenticación<br/>Credenciales inválidas]
+    end
