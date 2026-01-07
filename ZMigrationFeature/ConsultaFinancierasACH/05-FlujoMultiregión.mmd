@@ -1,0 +1,97 @@
+flowchart TD
+    A[Cliente SOAP Request] --> B[OSB Proxy Service<br/>ConsultaFinancierasACH]
+    
+    B --> C{Validar Esquema XML<br/>consultaFinancierasACHTypes.xsd}
+    C -->|Error| D[Error Handler<br/>Validación Fallida]
+    D --> E[SOAP Fault Response]
+    
+    C -->|OK| F[Validar Servicio Regional<br/>ServiceId: FICBCO0118]
+    F -->|Error| G[Error Regional<br/>Servicio no disponible]
+    G --> H[Response con Error]
+    
+    F -->|OK| I{Enrutamiento por Región<br/>SourceBank}
+    
+    I -->|HN01| J[Pipeline HN01<br/>Honduras Core]
+    I -->|HN02| K[Pipeline HN02<br/>Honduras FPC]
+    I -->|GT01| L[Pipeline GT01<br/>Guatemala]
+    I -->|PA01| M[Pipeline PA01<br/>Panamá]
+    I -->|NI01| N[Pipeline NI01<br/>Nicaragua]
+    I -->|Otros| O[Pipeline Default<br/>Error MW-0008]
+    
+    %% HN01 Flow
+    J --> J1[Lookup LDAP Credenciales<br/>getUsername/getPassword]
+    J1 --> J2[Transformar Request<br/>consultaFinancierasACHIn.xq]
+    J2 --> J3[Invocar T24 Core Banking<br/>ConsultadedestinosACH]
+    J3 --> J4[Transformar Response<br/>consultaFinanacierasACHOut.xq]
+    
+    %% HN02 Flow
+    K --> K1[Mapear Región HN02→HN01<br/>Service Account: OSB12AUTH]
+    K1 --> K2[Transformar Header<br/>getFinancialACHHeaderIn.xq]
+    K2 --> K3[Invocar FPC Service<br/>consultaFinancierasACH]
+    K3 --> K4[Transformar Response<br/>getFinancialACHOut.xq]
+    
+    %% GT01 Flow
+    L --> L1[Transformar Request<br/>consultaFinancierasACHGTIn.xq]
+    L1 --> L2[Invocar Oracle DB GT<br/>OSB_K_CONFINANCIERAS.TOPLEVEL$OSB_P_CON_FINANCIERA]
+    L2 --> L3[Transformar Response<br/>Agrupación cada 4 registros<br/>Incluir TRANSFER_TYPE]
+    L3 --> L4[consultaFinancierasACHGTOut.xq]
+    
+    %% PA01 Flow
+    M --> M1[Transformar Request<br/>consultaFinancierasACHPAIn.xq]
+    M1 --> M2[Invocar Oracle DB PA<br/>OSB_K_CONFINANCIERAS.TOPLEVEL$OSB_P_CON_FINANCIERA]
+    M2 --> M3[Transformar Response<br/>Agrupación por cambio código<br/>Sin TRANSFER_TYPE]
+    M3 --> M4[consultaFinancierasACHPAOut.xq]
+    
+    %% NI01 Flow
+    N --> N1[Transformar Request<br/>consultaFinanacierasACHNIIn.xq<br/>Contexto COBIS]
+    N1 --> N2[Validar Esquema CTS<br/>services.xsd]
+    N2 --> N3[Invocar CTS COBIS<br/>OpConsultaFinacierasACH]
+    N3 --> N4{Response CTS<br/>Exitosa?}
+    N4 -->|Sí| N5[Obtener Parametrización<br/>FICBCO0118.NI.PRODUCTS_TYPES]
+    N5 --> N6{Parametrización<br/>Exitosa?}
+    N6 -->|Sí| N7[Transformar Response<br/>Tokenizar tipos producto<br/>consultaFinanacierasACHNIOut.xq]
+    N6 -->|No| N8[Error MW-0011<br/>Parametrización fallida]
+    N4 -->|No| N9[Response vacía<br/>Error CTS]
+    
+    %% Default Flow
+    O --> O1[Error MW-0008<br/>SERVICE NOT IMPLEMENTED<br/>FOR THIS COUNTRY/COMPANY]
+    
+    %% Convergence
+    J4 --> P[Validar Response Success]
+    K4 --> P
+    L4 --> P
+    M4 --> P
+    N7 --> P
+    N8 --> Q
+    N9 --> Q
+    O1 --> Q
+    
+    P -->|Success| R[SOAP Response Exitosa<br/>consultaFinancierasACHResponse]
+    P -->|Error| Q[Mapear Errores<br/>MapeoErrores Service]
+    
+    Q --> S[Error Response<br/>successIndicator = ERROR]
+    
+    %% Styling
+    classDef regionHN01 fill:#e1f5fe
+    classDef regionHN02 fill:#f3e5f5
+    classDef regionGT01 fill:#e8f5e8
+    classDef regionPA01 fill:#fff3e0
+    classDef regionNI01 fill:#fce4ec
+    classDef errorNode fill:#ffebee
+    classDef successNode fill:#e8f5e8
+    
+    class J,J1,J2,J3,J4 regionHN01
+    class K,K1,K2,K3,K4 regionHN02
+    class L,L1,L2,L3,L4 regionGT01
+    class M,M1,M2,M3,M4 regionPA01
+    class N,N1,N2,N3,N4,N5,N6,N7 regionNI01
+    class D,E,G,H,N8,N9,O,O1,Q,S errorNode
+    class R successNode
+    
+    %% Notes
+    J3 -.->|"Endpoint: CoreBS<br/>WebRequestCommon<br/>WSACHBANKLISTType"| J3
+    K3 -.->|"Endpoint: getFinancialACH12c<br/>Header: OSB12AUTH<br/>Region mapping"| K3
+    L2 -.->|"JCA: ConnectionProxyAbanksGT<br/>Package: OSB_K_CONFINANCIERAS<br/>Arrays con TRANSFER_TYPE"| L2
+    M2 -.->|"JCA: ConnectionProxyAbanksPA<br/>Package: OSB_K_CONFINANCIERAS<br/>Arrays sin TRANSFER_TYPE"| M2
+    N3 -.->|"HTTP: 10.235.53.149:9080<br/>SOAP 1.2<br/>codCanalOriginador=1"| N3
+    N5 -.->|"Parámetro:<br/>FICBCO0118.NI.PRODUCTS_TYPES<br/>Tokenización por |"| N5

@@ -1,0 +1,161 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as ConsultaFinancierasACH - Product <br> Epica 2218: ConsultaFinancierasACH <br> HU 5600:  GET - /payments/payment-rail-operations-retrieves/v1/retrieve
+    participant LibraryPipeline as Library Pipeline <br> Currency Exchange Retrieves-Product
+    participant WT24 as Wrapper T24 <br> Op: ConsultadedestinosACH
+    participant FPC as Wrapper FICOPEN <br> /api/v2/entes/bancos
+    participant WPABGT as Wrapper Proxy Abanks GT <br> PKG: OSB_K_CONFINANCIERAS <br> SP: TOPLEVEL$OSB_P_CON_FINANCIERA
+    participant WPABPA as Wrapper Proxy Abanks PA <br> PKG: OSB_K_CONFINANCIERAS <br> SP: TOPLEVEL$OSB_P_CON_FINANCIERA
+    participant WCTS as Wrapper CTS NI <br> OpConsultaFinacierasACH
+    participant Lambda as Lambda Parámetros <br>
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras Core (HN01) - ConsultaFinancierasACH | HN02 - Ficopen <br> | GT01 - Proxy Abanks GT | PA01 - Proxy Abanks PA | NI01 - CTS Nicaragua
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header: SourceBank=HN01 <br/> queryParam: destinationInstitutionReference (opcional)
+
+    API->>API: Validar Request
+    Note over  API: Validar obligatoriedad campos según contrato OpenAPI
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: key de config: PAYMENT_RAIL_OPERATIONS_RETRIEVES
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | HN02 | GT01 | PA01 | NI01
+
+    API->>API: Patron Strategy Enrutamiento Regional
+    Note over API: Branch: SourceBank = (HN01 | HN02 | GT01 | PA01 | NI01)
+
+    alt Flujo para HN01
+
+        API->>API: Estrategia Regional Seleccionada: HN01
+
+        API->>LibraryPipeline: Consulta Constantes de Pipeline
+
+        LibraryPipeline->>API: Retorna Constantes de Pipeline
+        Note over LibraryPipeline: Constantes que retorna <br> columnName = @ID <br/> operand = EQ
+        
+        API->>API: Construir Request Wrapper T24
+        Note over API: Request: <br> columnName = @ID <br> criteriaValue = DESTINATION_CODE (Opcional) <br> operand = EQ
+
+        API->>WT24: Invocar Operación ConsultadedestinosACH
+
+        WT24->>API: Response con Datos
+        Note left of WT24: ResponseHeader <br> consultaFinancierasACHResponse
+
+        API->>API: Transformar Response
+        Note over API: Transforma datos de productos separados por "||" <br> según ejemplo transformación de response HN T24 
+
+        API->>Consumidor: REST Response Exitosa
+        Note right of Consumidor: body.data
+
+    end 
+
+    alt Flujo para HN02 - Pensiones
+
+        API->>API: Estrategia Regional Seleccionada: HN02
+        
+        API->>FPC: Consume Wrapper FICOPEN - GET
+
+        FPC->>API: Response Wrapper FICOPEN
+        Note left of FPC: Rest Response JSON
+
+        API->>API: Transformar Response
+        Note over API: destinationInstitutionReference = datos.entes.codigo <br> destinationInstitutionName = datos.entes.descripcion
+
+        API->>Consumidor: REST Response Exitosa
+        Note right of Consumidor: destinationInstitutionReference <br> destinationInstitutionName
+
+    end
+
+    alt Flujo para GT01 - Proxy Abanks Guatemala
+
+        API->>API: Estrategia Regional Seleccionada: GT01
+
+        API->>API: Construye Request ProxyAbanks GT
+        Note over API: DESTINATION_CODE = destinationInstitutionReference (opcional)
+        
+        API->>WPABGT: Consume Wrapper Proxy Abanks GT
+
+        WPABGT->>API: Response Wrapper Proxy Abanks GT
+        Note left of WPABGT: Response con datos planos
+
+        API->>API: Transformar Response
+        Note over API: Realiza agrupación de datos planos <br> según ejemplo transformación response GT
+
+        API->>Consumidor: REST Response Exitosa
+        Note right of Consumidor: body.data
+
+    end
+
+    alt Flujo para PA01 - Proxy Abanks Panamá
+
+        API->>API: Estrategia Regional Seleccionada: PA01
+
+        API->>API: Construye Request ProxyAbanks PA
+        Note over API: DESTINATION_CODE = destinationInstitutionReference (opcional)
+        
+        API->>WPABPA: Consume Wrapper Proxy Abanks PA
+
+        WPABPA->>API: Response Wrapper Proxy Abanks PA
+        Note left of WPABPA: Response con datos planos
+
+        API->>API: Transformar Response
+        Note over API: Realiza agrupación de datos planos <br> según ejemplo transformación response PA
+
+        API->>Consumidor: REST Response Exitosa
+        Note right of Consumidor: body.data
+
+    end
+
+    alt Flujo para NI01 - Wrapper CTS Nicaragua
+
+        API->>API: Estrategia Regional Seleccionada: NI01
+
+        API->>API: Construye Request Wrapper CTS Nicaragua
+        Note over API: DESTINATION_CODE = destinationInstitutionReference (opcional)
+        
+        API->>WCTS: Consume Wrapper CTS Nicaragua
+
+        WCTS->>API: Response Wrapper CTS Nicaragua
+        Note left of WCTS: Response con datos planos
+
+        API->>API: Evalúa Response Wrapper CTS Nicaragua
+
+        alt Si successIndicator = SUCCESS
+
+            API->>Lambda: Consulta Lamda de parámetros
+            Note right of API: Parámetros <br> name: ProducTypesParamNI
+
+            Lambda->>API: Obtiene parámetros
+            Note left of Lambda: Parámetros <br> MIN_PRODUCT_ID_LENGTH = 1 <br> MAX_PRODUCT_ID_LENGTH = 100 <br> LEADING_ZEROS_YES_NO = YES <br> PRODUCT_ID_SAMPLE = ""
+
+            API->>API: Transformar Response
+            Note over API: Delimita productos por cada "|" <br> Asigna valores parametrizados
+
+            API->>Consumidor: REST Response Exitosa
+            Note right of Consumidor: body.data
+
+        end
+
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
+
+    Note over Consumidor, Errors: Reglas de Negocio Aplicadas:<br/>1. Filtro condicional por DESTINATION_CODE opcional

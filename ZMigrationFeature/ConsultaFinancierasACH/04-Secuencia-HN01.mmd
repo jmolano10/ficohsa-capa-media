@@ -1,0 +1,93 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant LDAP as LDAP Service
+    participant T24 as T24 Core Banking
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Honduras Core (HN01) - ConsultaFinancierasACH
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: DESTINATION_CODE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>consultaFinancierasACHTypes.xsd
+
+    alt Validación Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0118<br/>Region: HN01
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    Validator->>OSB: Validación Exitosa
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'HN01'
+
+    OSB->>OSB: Transformar Request (XQuery)
+    Note right of OSB: consultaFinancierasACHIn.xq<br/>Mapear DESTINATION_CODE → enquiryInputCollection
+
+    OSB->>LDAP: Lookup Credenciales
+    Note right of LDAP: Patrón: Middleware/Security/{USERNAME}<br/>Función: fn-bea:lookupBasicCredentials()
+
+    alt LDAP Lookup Exitoso
+        LDAP->>OSB: Credenciales LDAP
+        Note right of OSB: userName/password desde LDAP
+    else LDAP Lookup Falla
+        OSB->>OSB: Usar Credenciales Header
+        Note right of OSB: Failover a credenciales originales
+    end
+
+    OSB->>T24: Invocar ConsultadedestinosACH
+    Note right of T24: Business Service: CoreBS<br/>WebRequestCommon con credenciales<br/>WSACHBANKLISTType con filtros
+
+    T24->>T24: Procesar Consulta ACH
+    Note right of T24: Consultar entidades financieras<br/>Filtrar por @ID si DESTINATION_CODE presente
+
+    alt Consulta Exitosa
+        T24->>OSB: Response con Datos
+        Note right of T24: gTSACHBANKLISTDetailType<br/>bankCode, bankName, productType, etc.
+    else Error en T24
+        T24->>OSB: Error Response
+        OSB->>ErrorHandler: Mapear Error T24
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Transformar Response Header
+    Note right of OSB: consultaFinanacierasACHHeaderOut.xq<br/>Generar ResponseHeader
+
+    OSB->>OSB: Transformar Response Body
+    Note right of OSB: consultaFinanacierasACHOut.xq<br/>Mapear a consultaFinancierasACHResponse
+
+    alt Success Response
+        OSB->>OSB: Validar Response Success
+        Note right of OSB: successIndicator = "SUCCESS"
+        OSB->>Client: SOAP Response Exitosa
+        Note right of Client: consultaFinancierasACHResponse<br/>con lista de entidades financieras
+    else Error Response
+        OSB->>ErrorHandler: Mapear Errores
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>Código: FICBCO0118
+
+        ErrorHandler->>ErrorHandler: Procesar Error
+        Note right of ErrorHandler: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR + MENSAJE_ERROR
+
+        ErrorHandler->>OSB: Error Mapeado
+        Note right of ErrorHandler: mapeoErroresUsageOut.xq<br/>ResponseHeader con error
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: ResponseHeader con<br/>successIndicator = ERROR
+    end
+
+    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:<br/>1. Lookup LDAP con failover<br/>2. Filtro condicional por DESTINATION_CODE<br/>3. Validación XSD obligatoria<br/>4. Validación servicio regional<br/>5. Mapeo centralizado de errores

@@ -1,0 +1,92 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant FPC as FPC Service
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Honduras FPC (HN02) - ConsultaFinancierasACH
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN02<br/>Body: DESTINATION_CODE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>consultaFinancierasACHTypes.xsd
+
+    alt Validación Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0118<br/>Region: HN02
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    Validator->>OSB: Validación Exitosa
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'HN02'
+
+    OSB->>OSB: Preparar Header FPC
+    Note right of OSB: Copiar header original<br/>$header → $REQHeaderConsultaFinancierasACH
+
+    OSB->>OSB: Transformar Header (XQuery)
+    Note right of OSB: getFinancialACHHeaderIn.xq<br/>serviceAccountName = 'OSB12AUTH'<br/>Mapear HN02 → HN01
+
+    Note over OSB: Regla de Mapeo de Región:<br/>if SourceBank = 'HN02' then 'HN01'<br/>if DestinationBank = 'HN02' then 'HN01'
+
+    OSB->>OSB: Preparar Body FPC
+    Note right of OSB: $body/con:consultaFinancierasACH<br/>→ $REQconsultaFinancierasACH
+
+    OSB->>FPC: Invocar consultaFinancierasACH
+    Note right of FPC: Business Service: getFinancialACH12c<br/>Header: OSB12AUTH + Region HN01<br/>Body: consultaFinancierasACH
+
+    FPC->>FPC: Procesar Consulta FPC
+    Note right of FPC: Consultar entidades financieras<br/>en sistema FPC
+
+    alt Consulta FPC Exitosa
+        FPC->>OSB: Response con Datos
+        Note right of FPC: RSPconsultaFinancierasACH<br/>RSPHeaderConsultaFinancierasACH
+        
+        OSB->>OSB: Extraer Códigos de Error
+        Note right of OSB: errorCode = successIndicator<br/>message = messages del header
+        
+    else Error en FPC
+        FPC->>OSB: Error Response
+        Note right of FPC: Header con error<br/>successIndicator != Success
+        
+        OSB->>OSB: Extraer Error FPC
+        Note right of OSB: errorCode y message<br/>del RSPHeaderConsultaFinancierasACH
+    end
+
+    OSB->>OSB: Generar Response Header
+    Note right of OSB: Header estático:<br/>successIndicator = "Success"<br/>messages = vacío
+
+    OSB->>OSB: Transformar Response Body
+    Note right of OSB: getFinancialACHOut.xq<br/>$RSPconsultaFinancierasACH → body
+
+    OSB->>Client: SOAP Response
+    Note right of Client: consultaFinancierasACHResponse<br/>con datos de FPC
+
+    alt Error en Procesamiento
+        OSB->>ErrorHandler: Mapear Errores
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>Código: FICBCO0118
+
+        ErrorHandler->>ErrorHandler: Procesar Error
+        Note right of ErrorHandler: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR + MENSAJE_ERROR
+
+        ErrorHandler->>OSB: Error Mapeado
+        Note right of ErrorHandler: mapeoErroresUsageOut.xq<br/>ResponseHeader con error
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: ResponseHeader con<br/>successIndicator = ERROR
+    end
+
+    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:<br/>1. Mapeo automático HN02 → HN01<br/>2. Service account fijo OSB12AUTH<br/>3. Manejo DestinationBank vacío<br/>4. Validación códigos error FPC<br/>5. Response header estático para éxito<br/>6. Preservación cuerpo request

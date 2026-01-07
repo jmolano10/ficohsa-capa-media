@@ -1,0 +1,119 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant CTS as CTS COBIS Service
+    participant ParamService as Servicio Parametrización
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Nicaragua (NI01) - ConsultaFinancierasACH
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=NI01<br/>Body: DESTINATION_CODE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>consultaFinancierasACHTypes.xsd
+
+    alt Validación Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0118<br/>Region: NI01
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    Validator->>OSB: Validación Exitosa
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'NI01'
+
+    OSB->>OSB: Transformar Request (XQuery)
+    Note right of OSB: consultaFinanacierasACHNIIn.xq<br/>Mapear DESTINATION_CODE → codigoAch<br/>Agregar contextoTransaccional
+
+    OSB->>OSB: Validar Esquema CTS
+    Note right of OSB: Validar contra services.xsd<br/>opConsultaFinacierasACHSolicitud
+
+    OSB->>CTS: Invocar OpConsultaFinacierasACH
+    Note right of CTS: Business Service: transferencia<br/>Endpoint: 10.235.53.149:9080<br/>Operation: OpConsultaFinacierasACH<br/>SOAP 1.2
+
+    CTS->>CTS: Procesar Consulta COBIS
+    Note right of CTS: Sistema CTS COBIS<br/>Consultar bancos ACH<br/>codCanalOriginador = 1
+
+    alt Consulta CTS Exitosa
+        CTS->>OSB: Response con Bancos
+        Note right of CTS: RSPOpConsultaFinacierasACH<br/>Lista de bancos:<br/>codigoAch, nombreBanco
+
+        OSB->>OSB: Extraer Códigos de Error
+        Note right of OSB: Verificar successIndicator<br/>del header de respuesta
+
+        alt Response Exitosa
+            OSB->>ParamService: Obtener Parametrización
+            Note right of ParamService: Business Service: ObtenerParametrizacion<br/>Parámetro: FICBCO0118.NI.PRODUCTS_TYPES
+
+            ParamService->>ParamService: Consultar Configuración
+            Note right of ParamService: Buscar parámetro en BD<br/>FICBCO0118.NI.PRODUCTS_TYPES
+
+            alt Parametrización Exitosa
+                ParamService->>OSB: Tipos de Producto
+                Note right of ParamService: RSPObtenerParametro<br/>ERROR_CODE = SUCCESS<br/>VALUE = "CUENTA_CORRIENTE|CUENTA_AHORRO|..."
+
+                OSB->>OSB: Transformar Response (XQuery)
+                Note right of OSB: consultaFinanacierasACHNIOut.xq<br/>Tokenizar tipos producto por "|"<br/>Valores fijos: MIN=1, MAX=100, LEADING=YES
+
+                Note over OSB: Regla Tokenización NI01:<br/>for $tipo in tokenize($tiposProducto, '\|')<br/>Crear registro por cada tipo<br/>Valores fijos para longitudes
+
+                OSB->>OSB: Generar Response por Banco
+                Note right of OSB: for $banco in respuesta CTS<br/>Crear consultaFinancierasACHResponseRecordType<br/>por cada banco individual
+
+            else Error Parametrización
+                ParamService->>OSB: Error Parametrización
+                Note right of ParamService: ERROR_CODE != SUCCESS
+
+                OSB->>OSB: Generar Error MW-0011
+                Note right of OSB: Error específico<br/>parametrización fallida
+                OSB->>Client: Response con Error MW-0011
+            end
+
+        else Error CTS
+            OSB->>OSB: Generar Response Vacía
+            Note right of OSB: consultaFinancierasACHResponse vacía<br/>successIndicator del CTS != SUCCESS
+        end
+
+    else Error en CTS
+        CTS->>OSB: Error Response
+        Note right of CTS: Error de conexión<br/>o error COBIS
+
+        OSB->>ErrorHandler: Mapear Error CTS
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Transformar Response Header
+    Note right of OSB: consultaFinanacierasACHNIHeaderOut.xq<br/>Procesar header CTS
+
+    OSB->>Client: SOAP Response
+    Note right of Client: consultaFinancierasACHResponse<br/>con agrupación por banco<br/>Tipos producto parametrizados
+
+    alt Error en Procesamiento
+        OSB->>ErrorHandler: Mapear Errores
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>Código: FICBCO0118
+
+        ErrorHandler->>ErrorHandler: Procesar Error
+        Note right of ErrorHandler: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR + MENSAJE_ERROR
+
+        ErrorHandler->>OSB: Error Mapeado
+        Note right of ErrorHandler: mapeoErroresUsageOut.xq<br/>ResponseHeader con error
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: ResponseHeader con<br/>successIndicator = ERROR
+    end
+
+    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:<br/>1. Contexto transaccional COBIS obligatorio<br/>2. Parametrización externa tipos producto<br/>3. Tokenización tipos producto por "|"<br/>4. Valores fijos longitudes/configuraciones<br/>5. Validación parametrización exitosa<br/>6. Agrupación por banco individual<br/>7. Validación esquema CTS

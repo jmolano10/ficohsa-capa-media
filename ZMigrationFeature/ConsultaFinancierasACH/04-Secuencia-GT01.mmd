@@ -1,0 +1,98 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant DBAdapter as DB Adapter GT
+    participant OracleDB as Oracle Database GT
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, OracleDB: Flujo Guatemala (GT01) - ConsultaFinancierasACH
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=GT01<br/>Body: DESTINATION_CODE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>consultaFinancierasACHTypes.xsd
+
+    alt Validación Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0118<br/>Region: GT01
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    Validator->>OSB: Validación Exitosa
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'GT01'
+
+    OSB->>OSB: Transformar Request (XQuery)
+    Note right of OSB: consultaFinancierasACHGTIn.xq<br/>Mapear DESTINATION_CODE → InputParameters
+
+    OSB->>DBAdapter: Invocar Stored Procedure
+    Note right of DBAdapter: Business Service: consultaFinancierasACH_db<br/>JCA: eis/DB/ConnectionProxyAbanksGT<br/>Operation: consultaFinancierasACH
+
+    DBAdapter->>OracleDB: CALL OSB_K_CONFINANCIERAS.TOPLEVEL$OSB_P_CON_FINANCIERA
+    Note right of OracleDB: Package: OSB_K_CONFINANCIERAS<br/>Procedure: TOPLEVEL$OSB_P_CON_FINANCIERA<br/>Input: DESTINATION_CODE
+
+    OracleDB->>OracleDB: Ejecutar Stored Procedure
+    Note right of OracleDB: Consultar entidades financieras<br/>Obtener productos por banco<br/>Incluir TRANSFER_TYPE
+
+    alt Consulta DB Exitosa
+        OracleDB->>DBAdapter: OutputParameters
+        Note right of OracleDB: Arrays Oracle:<br/>DESTINATION_CODES (TVARCHAR31)<br/>DESTINATION_NAMES (TVARCHAR50)<br/>TYPE_OF_PRODUCTS (TVARCHAR304)<br/>MIN/MAX_PRODUCT_ID_LENGTH<br/>LEADING_ZEROS_YES_NO<br/>PRODUCT_ID_SAMPLE (TVARCHAR2565)<br/>TRANSFER_TYPE (TVARCHAR10)<br/>ERROR_CODE = SUCCESS
+
+        DBAdapter->>OSB: Response con Arrays
+        Note right of DBAdapter: $rp = OutputParameters<br/>con todos los arrays poblados
+
+    else Error en DB
+        OracleDB->>DBAdapter: Error Response
+        Note right of OracleDB: ERROR_CODE != SUCCESS<br/>ERROR_MESSAGE con detalle
+        
+        DBAdapter->>OSB: Response con Error
+        OSB->>ErrorHandler: Mapear Error DB
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Transformar Response Header
+    Note right of OSB: consultaFinancierasACHGTHeaderOut.xq<br/>Procesar ERROR_CODE/ERROR_MESSAGE
+
+    OSB->>OSB: Transformar Response Body
+    Note right of OSB: consultaFinancierasACHGTOut.xq<br/>Lógica de agrupación cada 4 registros
+
+    Note over OSB: Regla de Agrupación GT01:<br/>for $i in (1 to count($destinationCodes))<br/>where (($i mod 4) = 0)<br/>Agrupar productos cada 4 registros
+
+    OSB->>OSB: Procesar Arrays Oracle
+    Note right of OSB: Extraer arrays:<br/>$destinationCodes, $destinationNames<br/>$typeOfProducts, $minProductIdLength<br/>$maxProductIdLength, $leadingZerosYesNO<br/>$productIdSampleItem, $transferType
+
+    OSB->>OSB: Generar Detalles por Grupo
+    Note right of OSB: for $j in (($i - 3) to $i)<br/>Crear consultaFinancierasACHDetailResponseRecordType<br/>Incluir TRANSFER_TYPE (único en GT01)
+
+    OSB->>Client: SOAP Response
+    Note right of Client: consultaFinancierasACHResponse<br/>con agrupación cada 4 registros<br/>Incluye campo TRANSFER_TYPE
+
+    alt Error en Procesamiento
+        OSB->>ErrorHandler: Mapear Errores
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>Código: FICBCO0118
+
+        ErrorHandler->>ErrorHandler: Procesar Error
+        Note right of ErrorHandler: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR + MENSAJE_ERROR
+
+        ErrorHandler->>OSB: Error Mapeado
+        Note right of ErrorHandler: mapeoErroresUsageOut.xq<br/>ResponseHeader con error
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: ResponseHeader con<br/>successIndicator = ERROR
+    end
+
+    Note over Client, OracleDB: Reglas de Negocio Aplicadas:<br/>1. Agrupación cada 4 registros por entidad<br/>2. Iteración detalles por grupo (i-3 to i)<br/>3. Campo TRANSFER_TYPE específico GT01<br/>4. Mapeo directo parámetros entrada<br/>5. Validación esquema entrada<br/>6. Manejo arrays Oracle específicos
