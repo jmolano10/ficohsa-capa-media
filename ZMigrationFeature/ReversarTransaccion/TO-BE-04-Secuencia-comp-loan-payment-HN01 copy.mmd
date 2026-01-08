@@ -1,0 +1,159 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Reversar Loan Payment <br> Epica 2490: ReversarTransaccion <br> HU 33776: <br> POST: /loan-payment-mgmt/v1/reverse-transaction
+    participant BD as DynamoDB <br> Registro Transacciones
+    participant Reversar as HU 6664 <br> API Reversos <br> POST: /payments/payment-execution-admin/v1/reverse-transaction 
+    participant AuthReversar as HU 6627 <br> API Autorizar Reversos <br> POST: /payments/payment-execution-admin/v1/authorize-reverse-transaction
+    participant BD as DynamoDB <br> Registro Transacciones
+    participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
+    participant Reintentos as EventBridge <br> Componente de Reintentos    
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Reversar Pagos de Tarjeta de Crédito
+
+    Consumidor->>API: Rest Request
+    Note right of Consumidor: Header: SourceBank=HN01<br/>Body: transactionReference, transactionType
+
+    API->>API: Validar Request
+    Note over  API: Validar obligatoriedad campos según contrato OpenAPI <br/> transactionReference != vacío <br> transactionType (Presente)
+
+    API->>API: Determinar tipo de transacción
+    Note over API: Substring transactionReference: <br> trxType2: substr(transactionReference 1, 2) <br> trxType3: substr(transactionReference 1, 3)
+
+    API->>API: Validar tipo de transacción
+    Note over  API: Validar combinación de campos:  <br> transactionType = " " and trxType2 = "TT" | "FT" or <br> transactionType = "LOAN_PAYMENT" and trxType3 = "TFS"
+
+    alt Validación de la transacción NO Exitosa
+        rect rgba(248, 238, 238, 1)
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+            API->> Consumidor: Retorna error
+            Note over Consumidor: "HTTP 422: Transacción No Válida"
+        end
+    end 
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: key de config: LOAN_PAYMENT_MANAGEMENT
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>API: Validación Exitosa
+
+    API->>BD: Consulta transacción en BD
+    Note right of API: SourceBank, transactionReference, transactionType
+
+    BD->>API: Resultado Consulta transacción en BD
+
+    API->>API: Evalúa resultado de la consulta a la BD
+
+    alt Transacción existe en la BD
+        rect rgba(244, 244, 244, 1)
+            API->>Consumidor: API Response
+            Note over Consumidor: "HTTP 202: Transacción Recibida Exitosamente"
+
+            API->>API: Determina paso que debe ejecutar
+
+            alt Si stateProcess = "AUTHORIZATION"" and stateTransacción = "PENDING"
+
+                API->>AuthReversar: Consume Autorización Reverso
+                Note right of API: SourceBank, transactionReference, transactionType, retryRequired: true
+
+                AuthReversar->>API: Response Autorización Reverso
+                Note left of AuthReversar: SuccessIndicator
+
+                API->>API: Evalúa Response Autorización Reverso
+
+                alt Response Autoriza Reverso successIndicator != "SUCCESS"
+
+                    API->>Reintentos: Envía envento al eventBridge API Idempotencia 
+                    Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: loan_payment_mgmt-comp_reverse_transaction <br> detail-type: "provider.response" <br> request: { transactionReference, transactionType} <br> Transaccion: TimeOut 
+                            
+                else Response Autoriza Reverso successIndicator = "SUCCESS"
+
+                    API->>BD: Update BD - stateProcess = "AUTHORIZATION" and stateTransacción = "COMPLETE"
+
+                    API->>Reintentos: Envía envento al eventBridge API Idempotencia 
+                    Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: payment_execution_admin-Product_authorize_reverse_transaction <br> detail-type: "provider.response" <br> request: {transactionReference, transactionType} <br> Transaccion: Exitosa
+
+                end
+            end
+        end
+    else Transacción NO existe en la BD
+        rect rgba(244, 244, 244, 1)
+
+            API->>Reversar: Consume API reversos
+            Note right of API: SourceBank, transactionReference, transactionType
+
+            Reversar->>API: Respose reversos
+            Note left of Reversar: SuccessIndicator
+
+            API->>API: Evalúa response reversos
+
+            alt Response reversos NO Exitoso - successIndicator != "SUCCESS"
+                rect rgba(248, 238, 238, 1)
+                    API->> Errors: Mapear código de error
+                    Errors ->> API: Retorna código mapeado
+                    API->> Consumidor: Retorna error
+                    Note over Consumidor: "HTTP 422: Transacción No Reversada"
+                end
+            else Response reversos Exitoso - successIndicator = "SUCCESS"
+
+                API->>BD: Insert BD - stateProcess = "AUTHORIZATION" and stateTransacción = "PENDING"
+
+                API->>Idempotencia: Consume API Idempotencia 
+                Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: loan_payment_mgmt-comp_reverse_transaction <br> "methodVersion": "1.0" <br> dataPayload: { transactionReference, transactionType}
+
+                Idempotencia->>API: Response API Idempotencia 
+
+                API->>AuthReversar: Consume Autorización Reverso
+                Note right of API: SourceBank, transactionReference, transactionType, retryRequired: true
+
+                AuthReversar->>API: Response Autorización Reverso
+                Note left of AuthReversar: SuccessIndicator
+
+                API->>API: Evalúa Response Autorización Reverso
+
+                alt Response Autoriza Reverso successIndicator != "SUCCESS"
+
+                    API->>Reintentos: Envía envento al eventBridge API Idempotencia 
+                    Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: loan_payment_mgmt-comp_reverse_transaction <br> detail-type: "provider.response" <br> request: { transactionReference, transactionType} <br> Transaccion: TimeOut 
+
+                    API->>Errors: Mapea Error "HTTP 202: Transacción en proceso"
+
+                    Errors ->> API: Retorna código mapeado
+
+                    API->>Consumidor: Retorna error controlado
+                    Note over Consumidor: "Transacción en proceso"
+
+                else Response Autoriza Reverso successIndicator = "SUCCESS"
+
+                    API->>BD: Update BD - stateProcess = "AUTHORIZATION" and stateTransacción = "COMPLETE"
+
+                    API->>Reintentos: Envía envento al eventBridge API Idempotencia 
+                    Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: payment_execution_admin-Product_authorize_reverse_transaction <br> detail-type: "provider.response" <br> request: {transactionReference, transactionType} <br> Transaccion: Exitosa
+
+                    API->>Consumidor: Response API
+                    Note over Consumidor: "HTTP 200: Transacción Reversada Exitosamente" 
+
+                end
+            end 
+        end
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
