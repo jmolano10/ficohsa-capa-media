@@ -1,0 +1,87 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Otras Regiones (Default) - ConsultaDGI
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01/GT01/PA01/etc<br/>Body: RUC + BILL_NUMBER
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>consultaDGITypes.xsd<br/>RUC y BILL_NUMBER requeridos
+
+    alt Validación Fallida
+        OSB->>ErrorHandler: Error de Validación XSD
+        ErrorHandler->>ErrorHandler: Mapear Error Técnico
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>Código: FICBCO0256<br/>Mensaje: Error XSD
+
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: SOAP Fault
+        Note right of Client: Error de validación<br/>Esquema no válido
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0256<br/>Region: HN01/GT01/PA01/etc
+
+    Validator->>Validator: Consultar BD Regional
+    Note right of Validator: Verificar disponibilidad<br/>servicio por región
+
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        Note right of Validator: PV_CODIGO_ERROR != SUCCESS<br/>PV_MENSAJE_ERROR con detalle
+
+        OSB->>OSB: Generar Response Error Regional
+        Note right of OSB: successIndicator = ERROR<br/>messages = mensaje validador
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: Servicio no disponible<br/>para la región
+    end
+
+    Validator->>OSB: Validación Exitosa
+    Note right of Validator: PV_CODIGO_ERROR = SUCCESS<br/>Servicio disponible
+
+    OSB->>OSB: Aplicar Valores por Defecto
+    Note right of OSB: aplicarValoresPorDefectoRegion.xq<br/>Normalizar headers
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank != 'NI01'<br/>Dirigir a Default Branch
+
+    OSB->>OSB: Pipeline Default Request
+    Note right of OSB: Etapa: FlujoEntrada<br/>Sin acciones - Pipeline vacío<br/>No hay procesamiento
+
+    OSB->>OSB: Pipeline Default Response
+    Note right of OSB: Etapa: FlujoSalida<br/>Generar Error MW-0008
+
+    OSB->>OSB: Generar Error MW-0008
+    Note right of OSB: errCode: MW-0008<br/>message: SERVICE NOT IMPLEMENTED<br/>YET FOR THIS COUNTRY/COMPANY
+
+    OSB->>Client: SOAP Fault MW-0008
+    Note right of Client: Servicio no implementado<br/>para esta región
+
+    alt Error Técnico Durante Procesamiento
+        OSB->>ErrorHandler: Error Técnico
+        Note right of ErrorHandler: Cualquier error no controlado<br/>durante validaciones
+
+        ErrorHandler->>ErrorHandler: Extraer Información Error
+        Note right of ErrorHandler: errorCode = $fault/ctx:errorCode<br/>errorMessage = $fault/ctx:reason
+
+        ErrorHandler->>ErrorHandler: Mapear Error
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>CODIGO_ERROR + MENSAJE_ERROR<br/>Prefijo: FICBCO0256$#$
+
+        ErrorHandler->>OSB: Error Mapeado
+        Note right of ErrorHandler: mapeoErroresUsageOut.xq<br/>ResponseHeader con error
+
+        OSB->>OSB: Generar Response Vacía
+        Note right of OSB: consultaDGIResponse vacía
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: ResponseHeader con<br/>successIndicator = ERROR<br/>messages = error mapeado
+    end
+
+    Note over Client, ErrorHandler: Características del Flujo Default:<br/>1. Solo ejecuta validaciones generales<br/>2. No hay procesamiento de negocio<br/>3. No hay servicios externos<br/>4. Error MW-0008 inmediato<br/>5. Pipeline request vacío<br/>6. Sin transformaciones de datos<br/>7. Manejo de errores técnicos estándar
+
+    Note over Client, ErrorHandler: Regiones que Ejecutan Default:<br/>• HN01 (Honduras)<br/>• HN02 (Honduras FPC)<br/>• GT01 (Guatemala)<br/>• PA01 (Panamá)<br/>• Cualquier otra región
+```

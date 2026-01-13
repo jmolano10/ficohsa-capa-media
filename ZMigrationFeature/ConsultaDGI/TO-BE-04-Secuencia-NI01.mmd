@@ -1,0 +1,75 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API ConsultaDGI <br> Epica 2286: ConsultaDGI <br> HU 5997:  GET - /operational-services/customer-billing-retrieve/v1/retrieve-general-directorate-revenue
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant WCobis as Wrapper Cobis <br> Op: OpConsultaDGI
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Nicaragua (NI01) - ConsultaDGI
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header: SourceBank=NI01 <br/> queryParam: <br> taxpayerIdentification <br> billingDocumentNumber
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> taxpayerIdentification (obligatorio) <br> billingDocumentNumber (obligatorio)
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: CUSTOMER_BILLING_RETRIEVE <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para NI01
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros caché local
+        Note right of API: Domain: CUSTOMER_BILLING_RETRIEVE <br> name: PARAM
+
+        CL->>API: Obtiene parámetros 
+        Note left of CL: ObtenerParametrizacion 3 Parámetros: <br> codCanalOriginador <br> tipoConsulta <br/> valCodigoBanco 
+
+    else Consulta  parametros en Lambda Parámetros
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: CUSTOMER_BILLING_RETRIEVE <br> name: PARAM
+
+        Lambda->>API: Obtiene parámetros 
+        Note left of Lambda: ObtenerParametrizacion 3 Parámetros: <br> codCanalOriginador <br> tipoConsulta <br/> valCodigoBanco 
+
+        API->>CL: Guarda parámetros en caché local
+        Note right of API: codCanalOriginador <br> tipoConsulta <br/> valCodigoBanco 
+
+    end
+
+    API->>API: Construir Request Wrapper Cobis
+    Note over API: valRUC = request.taxpayerIdentification <br/> bit = request.billingDocumentNumber <br/>Parámetros → codCanalOriginador, tipoConsulta, valCodigoBanco
+
+    API->>WCobis: Invocar Wrapper Cobis OpConsultaDGI
+
+    WCobis->>API: Respesta Wrapper Cobis OpConsultaDGI
+
+    API->>API: Transformar Response Wrapper Cobis
+    Note over API: Mapeo de Campos: <br> totalPaymentAmount = valMontoBit <br> paymentDueDate = fechaVencimiento (Ajuste de timezone a YYYY-MM-DD) <br> taxBaseValue = valImpuesto <br> exchangeRateCommission = valMontoMantenimiento <br> lateFeeAmount = valMora <br> penaltyAmount = valMulta <br> billAmount = valMontoBit <br> accountingCode = codigoCuenta <br> appliedTaxDescription = descripcionImpuesto
+
+    API->>Consumidor: REST Response Exitosa
+    Note right of Consumidor: Response body: <br> totalPaymentAmount <br> paymentDueDate <br> taxBaseValue <br> exchangeRateCommission <br> lateFeeAmount <br> penaltyAmoun <br> billAmount <br> accountingCode <br> appliedTaxDescription
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
+
+    Note over Consumidor, Errors: Reglas de Negocio Aplicadas:<br/>1. Parametrización obligatoria (3 parámetros) <br/> 2. Transformación fechas con timezone

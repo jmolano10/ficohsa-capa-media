@@ -1,0 +1,128 @@
+
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant ParamService as Servicio Parametrización
+    participant CTS as CTS COBIS Impuestos
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Nicaragua (NI01) - ConsultaDGI
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=NI01<br/>Body: RUC + BILL_NUMBER
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>consultaDGITypes.xsd<br/>RUC y BILL_NUMBER requeridos
+
+    alt Validación Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0256<br/>Region: NI01
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    Validator->>OSB: Validación Exitosa
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'NI01'
+
+    OSB->>ParamService: Obtener Parametrización
+    Note right of ParamService: Business Service: ObtenerParametrizacion<br/>Parámetros: FICBCO0256.TIPOCONSULTADGI<br/>FICBCO0256.CODIGOBANCODGI
+
+    ParamService->>ParamService: Consultar Configuración
+    Note right of ParamService: Buscar parámetros en BD<br/>Concatenar con ||
+
+    alt Parametrización Exitosa
+        ParamService->>OSB: Parámetros DGI
+        Note right of ParamService: ERROR_CODE = SUCCESS<br/>tipoConsultaDGI = valor1<br/>codigoBancoDGI = valor2
+
+        OSB->>OSB: Validar Parámetros
+        Note right of OSB: if validationMessage = ''<br/>Proceder con consulta CTS
+
+        OSB->>OSB: Transformar Request (XQuery)
+        Note right of OSB: consultaDGIIn.xq<br/>RUC → valRUC<br/>BILL_NUMBER → bit<br/>Parámetros → tipoConsulta, valCodigoBanco
+
+        OSB->>OSB: Agregar Contexto COBIS
+        Note right of OSB: contextoTransaccional<br/>codCanalOriginador = 1
+
+        OSB->>OSB: Validar Esquema CTS
+        Note right of OSB: Validar contra services.xsd<br/>opConsultaDGISolicitud
+
+        OSB->>CTS: Invocar OpConsultaDGI
+        Note right of CTS: Business Service: impuesto<br/>Endpoint: 10.235.53.149:9080<br/>Operation: OpConsultaDGI<br/>SOAP 1.2
+
+        CTS->>CTS: Procesar Consulta DGI
+        Note right of CTS: Sistema COBIS Impuestos<br/>Consultar BIT en DGI Nicaragua<br/>Obtener datos fiscales
+
+        alt Consulta CTS Exitosa
+            CTS->>OSB: Response con Datos Fiscales
+            Note right of CTS: opConsultaDGIRespuesta<br/>contextoRespuesta: codTipoRespuesta<br/>datosBITN900: datos fiscales completos
+
+            OSB->>OSB: Transformar Response Header
+            Note right of OSB: consultaDGIHeaderOut.xq<br/>if codTipoRespuesta = "0" then Success<br/>else Error con mensaje
+
+            alt Response Header Success
+                OSB->>OSB: Transformar Response Body
+                Note right of OSB: consultaDGIOut.xq<br/>Mapear 9 campos fiscales<br/>Ajustar fechas con timezone
+
+                Note over OSB: Mapeo de Campos Fiscales:<br/>valMontoBit → TOTAL_AMOUNT + BILL_AMOUNT<br/>fechaVencimiento → DUE_DATE (ajuste timezone)<br/>valImpuesto → TAX_VALUE<br/>valMontoMantenimiento → EXCH_RATE_FEE<br/>valMora → LATE_FEE<br/>valMulta → PENALTY_FEE<br/>codigoCuenta → ACCOUNT_CODE<br/>descripcionImpuesto → TAX_DESCRIPTION
+
+                OSB->>Client: SOAP Response Exitosa
+                Note right of Client: consultaDGIResponse<br/>con datos fiscales completos
+
+            else Response Header Error
+                OSB->>OSB: Generar Response Vacía
+                Note right of OSB: consultaDGIResponse vacía<br/>Header con error CTS
+
+                OSB->>Client: SOAP Response con Error CTS
+                Note right of Client: successIndicator = código error<br/>messages = descripción CTS
+            end
+
+        else Error en CTS
+            CTS->>OSB: Error Response
+            Note right of CTS: Error de conexión<br/>o error COBIS
+
+            OSB->>ErrorHandler: Mapear Error CTS
+            ErrorHandler->>OSB: Error Mapeado
+            OSB->>Client: Response con Error
+        end
+
+    else Error Parametrización
+        ParamService->>OSB: Error Parametrización
+        Note right of ParamService: ERROR_MESSAGE != ''
+
+        OSB->>OSB: Generar Error Parametrización
+        Note right of OSB: validationMessage con error<br/>Omitir consulta CTS
+
+        OSB->>OSB: Response con Error Parametrización
+        Note right of OSB: successIndicator = ERROR<br/>messages = validationMessage
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: Error de configuración<br/>Parámetros no encontrados
+    end
+
+    alt Error en Procesamiento General
+        OSB->>ErrorHandler: Mapear Errores
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>Código: FICBCO0256
+
+        ErrorHandler->>ErrorHandler: Procesar Error
+        Note right of ErrorHandler: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR + MENSAJE_ERROR
+
+        ErrorHandler->>OSB: Error Mapeado
+        Note right of ErrorHandler: mapeoErroresUsageOut.xq<br/>ResponseHeader con error
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: ResponseHeader con<br/>successIndicator = ERROR
+    end
+
+    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:<br/>1. Parametrización obligatoria (2 parámetros)<br/>2. Contexto transaccional COBIS (canal=1)<br/>3. Validación esquema CTS<br/>4. Mapeo códigos respuesta CTS (0=Success)<br/>5. Transformación fechas con timezone<br/>6. Duplicación monto (TOTAL + BILL)<br/>7. Manejo errores parametrización

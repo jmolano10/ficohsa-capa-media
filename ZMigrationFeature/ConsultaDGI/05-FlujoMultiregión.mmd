@@ -1,0 +1,82 @@
+
+flowchart TD
+    A[Cliente SOAP Request] --> B[OSB Proxy Service<br/>ConsultaDGI]
+    
+    B --> C{Validar Esquema XML<br/>consultaDGITypes.xsd}
+    C -->|Error| D[Error Handler<br/>Validación Fallida]
+    D --> E[SOAP Fault Response]
+    
+    C -->|OK| F[Validar Servicio Regional<br/>ServiceId: FICBCO0256]
+    F -->|Error| G[Error Regional<br/>Servicio no disponible]
+    G --> H[Response con Error]
+    
+    F -->|OK| I{Enrutamiento por Región<br/>SourceBank}
+    
+    I -->|NI01| J[Pipeline NI01<br/>Nicaragua DGI]
+    I -->|Otros| K[Pipeline Default<br/>Error MW-0008]
+    
+    %% NI01 Flow
+    J --> J1[Obtener Parametrización<br/>TIPOCONSULTADGI + CODIGOBANCODGI]
+    J1 --> J2{Parametrización<br/>Válida?}
+    J2 -->|No| J3[Error Parametrización<br/>validationMessage]
+    J3 --> J4[Response con Error Config]
+    
+    J2 -->|Sí| J5[Transformar Request<br/>consultaDGIIn.xq]
+    J5 --> J6[Agregar Contexto COBIS<br/>codCanalOriginador = 1]
+    J6 --> J7[Validar Esquema CTS<br/>services.xsd]
+    J7 --> J8[Invocar CTS COBIS<br/>OpConsultaDGI]
+    
+    J8 --> J9{Response CTS<br/>Exitosa?}
+    J9 -->|No| J10[Error CTS COBIS]
+    J10 --> J11[Response con Error CTS]
+    
+    J9 -->|Sí| J12[Transformar Header<br/>consultaDGIHeaderOut.xq]
+    J12 --> J13{Código Respuesta<br/>CTS = 0}
+    J13 -->|No| J14[Response con Error DGI<br/>Código + Mensaje CTS]
+    
+    J13 -->|Sí| J15[Transformar Body<br/>consultaDGIOut.xq]
+    J15 --> J16[Mapear 9 Campos Fiscales<br/>Ajustar Fechas Timezone]
+    J16 --> J17[Response Exitosa DGI]
+    
+    %% Default Flow
+    K --> K1[Pipeline Request Vacío<br/>Sin procesamiento]
+    K1 --> K2[Pipeline Response<br/>Error MW-0008]
+    K2 --> K3[SOAP Fault<br/>SERVICE NOT IMPLEMENTED]
+    
+    %% Convergence
+    J4 --> L[Validar Response Success]
+    J11 --> L
+    J14 --> L
+    J17 --> L
+    K3 --> M
+    
+    L -->|Success| N[SOAP Response Exitosa<br/>consultaDGIResponse]
+    L -->|Error| M[Mapear Errores<br/>MapeoErrores Service]
+    
+    M --> O[Error Response<br/>successIndicator = ERROR]
+    
+    %% Error Handler
+    P[Error Técnico] --> Q[Extraer Error Info<br/>errorCode + errorMessage]
+    Q --> R[Mapear Error<br/>FICBCO0256 + mensaje]
+    R --> S[Response Vacía + Error Header]
+    S --> O
+    
+    %% Styling
+    classDef regionNI01 fill:#fce4ec
+    classDef regionDefault fill:#f3e5f5
+    classDef errorNode fill:#ffebee
+    classDef successNode fill:#e8f5e8
+    classDef paramNode fill:#e3f2fd
+    
+    class J,J1,J2,J5,J6,J7,J8,J9,J12,J13,J15,J16,J17 regionNI01
+    class K,K1,K2,K3 regionDefault
+    class D,E,G,H,J3,J4,J10,J11,J14,M,O,P,Q,R,S errorNode
+    class N successNode
+    class J1,J2 paramNode
+    
+    %% Notes
+    J8 -.->|"Endpoint: 10.235.53.149:9080<br/>GerenciaCobisImpuestos<br/>SOAP 1.2"| J8
+    J1 -.->|"Parámetros:<br/>FICBCO0256.TIPOCONSULTADGI<br/>FICBCO0256.CODIGOBANCODGI"| J1
+    J15 -.->|"Mapeo Campos:<br/>valMontoBit → TOTAL_AMOUNT<br/>fechaVencimiento → DUE_DATE<br/>valImpuesto → TAX_VALUE<br/>+ 6 campos más"| J15
+    K2 -.->|"Error: MW-0008<br/>Mensaje: SERVICE NOT IMPLEMENTED<br/>YET FOR THIS COUNTRY/COMPANY"| K2
+```
