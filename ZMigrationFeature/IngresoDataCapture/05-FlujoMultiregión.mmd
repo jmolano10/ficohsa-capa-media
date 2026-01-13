@@ -1,0 +1,198 @@
+flowchart TD
+    A[Cliente SOAP Request] --> B[IngresoDataCapture Proxy Service<br/>Implementación Centralizada]
+    
+    B --> C{Custom Token<br/>Authentication}
+    
+    C -->|Success| D[Validar Esquema SOAP<br/>ingresoDataCapturePS.wsdl]
+    C -->|Fail| E[Authentication Error]
+    
+    D --> F[Validar Campos Requeridos<br/>ingresoDataCaptureValidateRequired.xq]
+    
+    F --> G{Validación<br/>Exitosa}
+    
+    G -->|No| H[Error: REQUIRED FIELDS NOT SUPPLIED]
+    G -->|Yes| I[Validar DEBIT_CREDIT<br/>Debe ser DEBIT o CREDIT]
+    
+    I --> J{DEBIT_CREDIT<br/>Válido}
+    
+    J -->|No| K[Error: VALUE NOT ALLOWED FOR FIELD DEBIT_CREDIT]
+    J -->|Yes| L[Obtener Parametrización<br/>ObtenerParametrizacion BS]
+    
+    L --> M[Query Base de Datos<br/>ORA_BANK.OSB_GET_CONFIG]
+    
+    M --> N{Parametrización<br/>Exitosa}
+    
+    N -->|No| O[Error: Parametrización Fallida<br/>errorParametrizacion]
+    N -->|Yes| P[Extraer Códigos de Transacción<br/>T24T099.TXNCODEDR/CR]
+    
+    P --> Q[Generar UUID<br/>obtenerUUID]
+    
+    Q --> R[Lookup Credenciales LDAP<br/>Middleware/Security/USERNAME]
+    
+    R --> S{LDAP Lookup<br/>Exitoso}
+    
+    S -->|Yes| T[Usar Credenciales LDAP<br/>getUsername, getPassword]
+    S -->|No| U[Usar Credenciales Originales<br/>fn-bea:fail-over]
+    
+    T --> V[Transformar Request<br/>ingresoDataCaptureIn.xq]
+    U --> V
+    
+    V --> W[Aplicar Reglas de Negocio<br/>Mapeo de Campos]
+    
+    W --> X{Tipo de<br/>Transacción}
+    
+    X -->|DEBIT| Y[SIGN = D<br/>TRANSACTIONCODE = débito]
+    X -->|CREDIT| Z[SIGN = C<br/>TRANSACTIONCODE = crédito]
+    
+    Y --> AA[Lógica de Moneda]
+    Z --> AA
+    
+    AA --> BB{Moneda = HNL?}
+    
+    BB -->|Yes| CC[AMOUNTLCY = AMOUNT<br/>Moneda Local Honduras]
+    BB -->|No| DD[CURRENCY + AMOUNTFCY = AMOUNT<br/>Moneda Extranjera]
+    
+    CC --> EE[Procesar Narrativa<br/>Dividir en líneas de 34 chars]
+    DD --> EE
+    
+    EE --> FF[Generar ID Transacción<br/>DEPARTMENT_CODE + BATCH_ID]
+    
+    FF --> GG[Invocar DataCapture BS<br/>T24 Web Service]
+    
+    GG --> HH[HTTP POST Request<br/>http://mwinterbanca:7003/svcDataCapture/services]
+    
+    HH --> II{T24 Service<br/>Response}
+    
+    II -->|Success| JJ[Procesar Response Exitosa<br/>Status.successIndicator = Success]
+    II -->|T24Error| KK[Procesar Error T24<br/>Status con error details]
+    II -->|Timeout/Connection| LL[System Fault<br/>ctx:errorCode, ctx:reason]
+    
+    JJ --> MM[Transformar Response Header<br/>ingresoDataCaptureHeaderOut.xq]
+    KK --> NN[Mapear Error T24<br/>a ResponseHeader]
+    LL --> OO[Pipeline de Error<br/>Procesar System Fault]
+    
+    MM --> PP[Transformar Response Body<br/>ingresoDataCaptureOut.xq]
+    NN --> QQ[Response con Error T24]
+    OO --> RR[Concatenar Error<br/>errorCode + : + reason]
+    
+    PP --> SS[Extraer RECORD_STATUS<br/>del DATACAPTUREType]
+    
+    SS --> TT[SOAP Response Success<br/>con transactionId y RECORD_STATUS]
+    QQ --> UU[SOAP Response T24 Error]
+    RR --> VV[SOAP Fault Response]
+    
+    H --> WW[SOAP Response Error]
+    K --> WW
+    O --> WW
+    E --> XX[SOAP Authentication Fault]
+    
+    TT --> YY[Cliente recibe respuesta]
+    UU --> YY
+    VV --> YY
+    WW --> YY
+    XX --> YY
+    
+    %% Styling
+    classDef success fill:#90EE90,stroke:#006400,stroke-width:2px
+    classDef error fill:#FFB6C1,stroke:#DC143C,stroke-width:2px
+    classDef process fill:#87CEEB,stroke:#4682B4,stroke-width:2px
+    classDef decision fill:#DDA0DD,stroke:#8B008B,stroke-width:2px
+    classDef service fill:#F0E68C,stroke:#DAA520,stroke-width:2px
+    classDef transform fill:#FFA07A,stroke:#FF4500,stroke-width:2px
+    
+    class B,D,F,I,L,M,P,Q,R,V,W,EE,FF,GG,HH,MM,PP,SS process
+    class C,G,J,N,S,X,BB,II decision
+    class T,U,Y,Z,CC,DD transform
+    class JJ,TT success
+    class E,H,K,O,KK,LL,NN,OO,QQ,RR,UU,VV,WW,XX error
+    class AA service
+    
+    %% Subgraphs para organizar el flujo
+    subgraph "Validaciones de Entrada"
+        direction TB
+        C
+        D
+        F
+        G
+        I
+        J
+    end
+    
+    subgraph "Obtención de Parámetros"
+        direction TB
+        L
+        M
+        N
+        P
+    end
+    
+    subgraph "Preparación de Credenciales"
+        direction TB
+        Q
+        R
+        S
+        T
+        U
+    end
+    
+    subgraph "Transformación y Reglas de Negocio"
+        direction TB
+        V
+        W
+        X
+        Y
+        Z
+        AA
+        BB
+        CC
+        DD
+        EE
+        FF
+    end
+    
+    subgraph "Invocación T24"
+        direction TB
+        GG
+        HH
+        II
+    end
+    
+    subgraph "Procesamiento de Respuestas"
+        direction TB
+        JJ
+        KK
+        LL
+        MM
+        NN
+        OO
+        PP
+        QQ
+        RR
+        SS
+    end
+    
+    subgraph "Configuración Regional"
+        direction TB
+        R1[Códigos de Transacción<br/>Configurables por región<br/>T24T099.TXNCODEDR/CR]
+        R2[Moneda Base<br/>HNL para Honduras<br/>Otras para regiones]
+        R3[Credenciales LDAP<br/>Middleware/Security/REGION]
+        R4[Endpoint T24<br/>Centralizado para todas las regiones]
+    end
+    
+    subgraph "Reglas de Negocio Principales"
+        direction TB
+        B1[Validación de Campos Requeridos<br/>BATCH_ID, CURRENCY, AMOUNT, DESCRIPTION]
+        B2[Validación DEBIT_CREDIT<br/>Solo DEBIT o CREDIT]
+        B3[Mapeo de Moneda<br/>HNL → Local, Otras → Extranjera]
+        B4[División de Narrativa<br/>Máximo 34 caracteres por línea]
+        B5[Generación de ID<br/>DEPARTMENT_CODE + BATCH_ID]
+        B6[Mapeo de Transacción<br/>DEBIT → D + código débito<br/>CREDIT → C + código crédito]
+    end
+    
+    subgraph "Servicios Dependientes"
+        direction TB
+        S1[ObtenerParametrizacion<br/>Base de datos ORA_BANK<br/>Esquema OSB_GET_CONFIG]
+        S2[DataCapture T24<br/>http://mwinterbanca:7003<br/>Operation: IngresodeDataCapture]
+        S3[obtenerUUID<br/>Generador de identificadores únicos]
+        S4[LDAP Lookup<br/>Middleware/Security/USERNAME]
+    end

@@ -1,0 +1,166 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service<br/>IngresoDataCapture
+    participant Validator as Validador<br/>ingresoDataCaptureValidateRequired
+    participant ParamService as ObtenerParametrizacion<br/>Business Service
+    participant ParamDB as Base de Datos<br/>ORA_BANK.OSB_GET_CONFIG
+    participant UUIDService as obtenerUUID<br/>Service
+    participant LDAPLookup as LDAP Lookup<br/>Middleware/Security
+    participant DataCaptureBS as DataCapture<br/>Business Service
+    participant T24Service as T24 Web Service<br/>mwinterbanca:7003
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, T24Service: Flujo General - IngresoDataCapture
+
+    Client->>OSB: SOAP Request IngresoDataCapture
+    Note right of Client: Header: AutenticacionRequestHeader<br/>UserName, Password<br/>Body: ingresoDataCapture con campos requeridos
+
+    OSB->>OSB: Custom Token Authentication
+    Note right of OSB: Extraer UserName y Password del header<br/>Validar autenticación personalizada
+
+    OSB->>OSB: Validar Esquema SOAP
+    Note right of OSB: Validar estructura XML contra WSDL<br/>Binding: ingresoDataCapturePSSOAP
+
+    OSB->>Validator: Validar Campos Requeridos
+    Note right of OSB: XQuery: ingresoDataCaptureValidateRequired.xq<br/>Validar BATCH_ID, CURRENCY, AMOUNT, DESCRIPTION<br/>Validar DEBIT_CREDIT = "DEBIT" o "CREDIT"
+
+    alt Validación Fallida
+        Validator-->>OSB: isRequestValid = "false"
+        OSB->>OSB: Preparar Error Response
+        Note right of OSB: successIndicator = "ERROR"<br/>messages = "REQUIRED FIELDS NOT SUPPLIED"
+        OSB-->>Client: SOAP Response Error
+    end
+
+    Validator-->>OSB: isRequestValid = "true"
+    Note left of Validator: Todos los campos requeridos presentes<br/>DEBIT_CREDIT válido
+
+    OSB->>OSB: Asignar Variables Comunes
+    Note right of OSB: bodyInput = $body/ing:ingresoDataCapture<br/>Preparar request para parametrización
+
+    OSB->>ParamService: WS Callout obtenerParametrizacion
+    Note right of OSB: Obtener códigos de transacción<br/>Parámetros: "T24T099.TXNCODEDR||T24T099.TXNCODECR"
+
+    ParamService->>ParamDB: Query Configuraciones
+    Note right of ParamService: JCA Adapter: obtenerParametrizacion_db.jca<br/>Schema: ORA_BANK.OSB_GET_CONFIG<br/>Buscar parámetros por nombre
+
+    alt Parametrización Exitosa
+        ParamDB-->>ParamService: Configuraciones Encontradas
+        Note left of ParamDB: ERROR_CODE = "SUCCESS"<br/>CONFIGURACIONES con valores<br/>T24T099.TXNCODEDR y T24T099.TXNCODECR
+
+        ParamService-->>OSB: Response Parametrización
+        Note left of ParamService: statusParametrizacion = "SUCCESS"<br/>transactionCodeDebit = valor DR<br/>transactionCodeCredit = valor CR
+
+        OSB->>UUIDService: Generar UUID
+        Note right of OSB: XQuery: obtenerUUID<br/>Generar identificador único para transacción
+
+        UUIDService-->>OSB: UUID Generado
+        Note left of UUIDService: uuid = identificador único
+
+        OSB->>OSB: Preparar Request T24
+        Note right of OSB: XQuery: ingresoDataCaptureIn.xq<br/>Mapear campos OSB a formato T24
+
+        OSB->>LDAPLookup: Lookup Credenciales
+        Note right of OSB: Path: Middleware/Security/{USERNAME}<br/>Función: getUsername(), getPassword()
+
+        alt LDAP Lookup Exitoso
+            LDAPLookup-->>OSB: Credenciales T24
+            Note left of LDAPLookup: userName y password mapeados<br/>desde directorio LDAP
+        else LDAP Lookup Fallido
+            LDAPLookup-->>OSB: Usar Credenciales Originales
+            Note left of LDAPLookup: Fallback a credenciales del header<br/>fn-bea:fail-over()
+        end
+
+        OSB->>OSB: Transformar Request
+        Note right of OSB: WebRequestCommon: userName, password<br/>OfsFunction: messageId = uuid<br/>DATACAPTUREINPUTWSType: mapeo completo
+
+        OSB->>OSB: Aplicar Reglas de Negocio
+        Note right of OSB: ID = DEPARTMENT_CODE + BATCH_ID<br/>SIGN = "D" si DEBIT, "C" si CREDIT<br/>TRANSACTIONCODE según tipo<br/>Narrativa dividida en líneas de 34 chars
+
+        OSB->>OSB: Lógica de Moneda
+        Note right of OSB: Si CURRENCY = "HNL":<br/>  AMOUNTLCY = AMOUNT<br/>Si CURRENCY != "HNL":<br/>  CURRENCY + AMOUNTFCY = AMOUNT
+
+        OSB->>DataCaptureBS: WS Callout IngresodeDataCapture
+        Note right of OSB: Operation: IngresodeDataCapture<br/>Request: REQUEST transformado
+
+        DataCaptureBS->>DataCaptureBS: Configuración HTTP
+        Note right of DataCaptureBS: Timeout: 0 (sin límite)<br/>Connection Timeout: 0<br/>Retry Count: 0<br/>Load Balancing: round-robin
+
+        DataCaptureBS->>T24Service: SOAP Request a T24
+        Note right of DataCaptureBS: Endpoint: http://mwinterbanca:7003/svcDataCapture/services<br/>Operation: IngresodeDataCapture<br/>Content-Type: text/xml
+
+        alt T24 Procesamiento Exitoso
+            T24Service-->>DataCaptureBS: T24 Response Success
+            Note left of T24Service: Status.successIndicator = "Success"<br/>DATACAPTUREType con RECORDSTATUS<br/>transactionId generado
+
+            DataCaptureBS-->>OSB: Response T24
+            Note left of DataCaptureBS: RESPONSE = IngresodeDataCaptureResponse<br/>con Status y DATACAPTUREType
+
+            OSB->>OSB: Transformar Response Header
+            Note right of OSB: XQuery: ingresoDataCaptureHeaderOut.xq<br/>Mapear Status a ResponseHeader
+
+            OSB->>OSB: Transformar Response Body
+            Note right of OSB: XQuery: ingresoDataCaptureOut.xq<br/>Extraer RECORDSTATUS
+
+            OSB->>OSB: Asignar Response Final
+            Note right of OSB: header = finalResponseHdr<br/>body = finalResponse
+
+            OSB-->>Client: SOAP Response Success
+            Note left of OSB: Header: ResponseHeader con transactionId<br/>successIndicator = "Success"<br/>Body: ingresoDataCaptureResponse con RECORD_STATUS
+
+        else T24 Error de Negocio
+            T24Service-->>DataCaptureBS: T24 Response Error
+            Note left of T24Service: Status.successIndicator = "T24Error"<br/>Status.messages con detalles del error
+
+            DataCaptureBS-->>OSB: Response T24 Error
+            OSB->>OSB: Procesar Error T24
+            Note right of OSB: Mapear error de T24 a ResponseHeader<br/>successIndicator = error indicator<br/>messages = error messages
+
+            OSB-->>Client: SOAP Response T24 Error
+            Note left of OSB: Header con error de T24<br/>Body con respuesta vacía o parcial
+
+        else T24 Timeout o Connection Error
+            T24Service->>T24Service: Timeout o Connection Error
+            Note right of T24Service: Sin respuesta en tiempo configurado<br/>o error de conectividad
+
+            T24Service-->>DataCaptureBS: Connection Fault
+            DataCaptureBS-->>OSB: System Fault
+            Note left of DataCaptureBS: ctx:errorCode<br/>ctx:reason con detalles
+
+            OSB->>ErrorHandler: Pipeline de Error
+            Note right of OSB: Capturar fault del sistema<br/>Procesar error de conectividad
+
+            ErrorHandler->>ErrorHandler: Procesar System Fault
+            Note right of ErrorHandler: errorCode = $fault/ctx:errorCode<br/>reason = $fault/ctx:reason<br/>Concatenar código y razón
+
+            ErrorHandler->>ErrorHandler: Preparar Error Response
+            Note right of ErrorHandler: successIndicator = "ERROR"<br/>messages = errorCode + ": " + reason
+
+            ErrorHandler-->>Client: SOAP Fault Response
+            Note left of ErrorHandler: Header con error del sistema<br/>Body vacío con reply
+        end
+
+    else Parametrización Fallida
+        ParamDB-->>ParamService: Error en Configuración
+        Note left of ParamDB: ERROR_CODE != "SUCCESS"<br/>ERROR_MESSAGE con detalles
+
+        ParamService-->>OSB: Response Error
+        Note left of ParamService: statusParametrizacion != "SUCCESS"<br/>errorParametrizacion con mensaje
+
+        OSB->>OSB: Procesar Error Parametrización
+        Note right of OSB: successIndicator = "ERROR"<br/>messages = errorParametrizacion
+
+        OSB-->>Client: SOAP Response Error
+        Note left of OSB: Header con error de parametrización<br/>Body vacío
+    end
+
+    alt Validación DEBIT_CREDIT en Pipeline
+        OSB->>OSB: Validar DEBIT_CREDIT
+        Note right of OSB: Condición: not (fn:string($body/ing:ingresoDataCapture/DEBIT_CREDIT/text()) = ("DEBIT","CREDIT"))
+
+        OSB->>OSB: Error DEBIT_CREDIT
+        Note right of OSB: successIndicator = "ERROR"<br/>messages = "VALUE NOT ALLOWED FOR FIELD DEBIT_CREDIT..."
+
+        OSB-->>Client: SOAP Response Validation Error
+    end
+
+    Note over Client, T24Service: Fin del flujo IngresoDataCapture
