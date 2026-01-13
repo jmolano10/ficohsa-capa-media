@@ -1,0 +1,143 @@
+
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant ParamService as Servicio Parametrización
+    participant CTS as CTS COBIS Impuestos
+    participant DGI as Sistema DGI Nicaragua
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Nicaragua (NI01) - PagoDGI
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=NI01<br/>Body: 12 campos obligatorios<br/>RUC, BILL_NUMBER, TOTAL_AMOUNT<br/>PAYMENT_AMOUNT, ACCOUNT_NUMBER<br/>+ 7 campos fiscales más
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar 12 campos obligatorios<br/>pagoDGITypes.xsd<br/>Todos los campos requeridos
+
+    alt Validación Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0257<br/>Region: NI01
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    Validator->>OSB: Validación Exitosa
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'NI01'
+
+    OSB->>ParamService: Obtener Parametrización
+    Note right of ParamService: Business Service: ObtenerParametrizacion<br/>4 Parámetros: FICBCO0257.CAJADGI<br/>FICBCO0257.FORMAPAGODGI<br/>FICBCO0256.CODIGOBANCODGI<br/>FICBCO0257.TIPOIMPUESTODGI
+
+    ParamService->>ParamService: Consultar Configuración
+    Note right of ParamService: Buscar 4 parámetros en BD<br/>Concatenar con ||
+
+    alt Parametrización Exitosa
+        ParamService->>OSB: Parámetros Pago DGI
+        Note right of ParamService: ERROR_CODE = SUCCESS<br/>cajaDGI = valor1<br/>formaPagoDGI = valor2<br/>codigoBancoDGI = valor3<br/>tipoImpuestoDGI = valor4
+
+        OSB->>OSB: Validar Parámetros
+        Note right of OSB: if validationMessage = ''<br/>Proceder con pago CTS
+
+        OSB->>OSB: Transformar Request (XQuery)
+        Note right of OSB: pagoDGIIn.xq<br/>Mapear 12 campos OSB → datosPagN900<br/>+ Cálculos automáticos
+
+        OSB->>OSB: Calcular Indicador de Pago
+        Note right of OSB: obtenerIndicadorPago()<br/>if (TOTAL - PAYMENT = 0) then '1' else '2'<br/>1=Pago completo, 2=Pago parcial
+
+        OSB->>OSB: Generar Timestamps
+        Note right of OSB: fechaPago = current-dateTime()<br/>horaPago = HH:mm:ss actual<br/>Ajuste de timezone
+
+        OSB->>OSB: Agregar Contexto COBIS
+        Note right of OSB: contextoTransaccional<br/>codCanalOriginador = 1
+
+        OSB->>OSB: Validar Esquema CTS
+        Note right of OSB: Validar contra services.xsd<br/>opPagoDGISolicitud
+
+        OSB->>CTS: Invocar OpPagoDGI
+        Note right of CTS: Business Service: impuesto<br/>Endpoint: 10.235.53.149:9080<br/>Operation: OpPagoDGI<br/>SOAP 1.2
+
+        CTS->>DGI: Procesar Pago DGI
+        Note right of DGI: Sistema DGI Nicaragua<br/>Procesar pago de impuesto<br/>Generar SIF y secuencial
+
+        alt Pago DGI Exitoso
+            DGI->>CTS: Pago Confirmado
+            Note right of DGI: Pago registrado en DGI<br/>SIF generado<br/>Secuencial asignado
+
+            CTS->>OSB: Response con Confirmación
+            Note right of CTS: opPagoDGIRespuesta<br/>contextoRespuesta: codTipoRespuesta=0<br/>datosPagN900Respuesta: datos fiscales<br/>detallePagoDGI: secuencial + SIF
+
+            OSB->>OSB: Transformar Response Header
+            Note right of OSB: pagoDGIHeaderOut.xq<br/>if codTipoRespuesta = "0" then Success<br/>+ transactionId = secuencial
+
+            OSB->>OSB: Transformar Response Body
+            Note right of OSB: pagoDGIOut.xq<br/>Combinar request + response CTS<br/>Redondear PAYMENT_AMOUNT
+
+            Note over OSB: Mapeo Combinado:<br/>Request → TOTAL_AMOUNT, DUE_DATE<br/>CTS Response → TAX_VALUE, EXCH_RATE_FEE<br/>LATE_FEE, PENALTY_FEE<br/>Request redondeado → BILL_AMOUNT<br/>CTS → SIF_CODE<br/>CTS → transactionId (header)
+
+            OSB->>Client: SOAP Response Exitosa
+            Note right of Client: pagoDGIResponse con:<br/>8 campos fiscales + SIF_CODE<br/>Header con transactionId
+
+        else Error en Pago DGI
+            DGI->>CTS: Error de Pago
+            Note right of DGI: Pago rechazado<br/>Error específico DGI
+
+            CTS->>OSB: Response con Error DGI
+            Note right of CTS: codTipoRespuesta != 0<br/>valDescripcionRespuesta con error
+
+            OSB->>OSB: Generar Response Error
+            Note right of OSB: successIndicator = código error<br/>messages = descripción DGI<br/>Response vacía
+
+            OSB->>Client: SOAP Response con Error DGI
+            Note right of Client: Error específico de DGI<br/>Sin transactionId ni SIF
+        end
+
+        else Error en CTS
+            CTS->>OSB: Error CTS
+            Note right of CTS: Error de conexión<br/>o error COBIS
+
+            OSB->>ErrorHandler: Mapear Error CTS
+            ErrorHandler->>OSB: Error Mapeado
+            OSB->>Client: Response con Error
+        end
+
+    alt Error Parametrización
+        ParamService->>OSB: Error Parametrización
+        Note right of ParamService: ERROR_MESSAGE != ''<br/>Parámetros no encontrados
+
+        OSB->>OSB: Generar Error Parametrización
+        Note right of OSB: validationMessage con error<br/>Omitir pago CTS
+
+        OSB->>OSB: Response con Error Config
+        Note right of OSB: successIndicator = ERROR<br/>messages = validationMessage
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: Error de configuración<br/>Parámetros faltantes
+    end
+
+    alt Error en Procesamiento General
+        OSB->>ErrorHandler: Mapear Errores
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>Código: FICBCO0257
+
+        ErrorHandler->>ErrorHandler: Procesar Error
+        Note right of ErrorHandler: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR + MENSAJE_ERROR
+
+        ErrorHandler->>OSB: Error Mapeado
+        Note right of ErrorHandler: mapeoErroresUsageOut.xq<br/>ResponseHeader con error
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: ResponseHeader con<br/>successIndicator = ERROR
+    end
+
+    Note over Client, ErrorHandler: Reglas de Negocio Aplicadas:<br/>1. Parametrización obligatoria (4 parámetros)<br/>2. Cálculo indicador pago (1=completo, 2=parcial)<br/>3. Generación timestamps automática<br/>4. Contexto transaccional COBIS (canal=1)<br/>5. Validación esquema CTS<br/>6. Mapeo códigos respuesta + transactionId<br/>7. Redondeo montos (half-to-even)<br/>8. Combinación request + response CTS<br/>9. Generación SIF por DGI<br/>10. Transaccionalidad real (pago efectivo)

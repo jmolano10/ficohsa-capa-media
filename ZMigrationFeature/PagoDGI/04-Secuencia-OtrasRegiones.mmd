@@ -1,0 +1,88 @@
+
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Otras Regiones (Default) - PagoDGI
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01/GT01/PA01/etc<br/>Body: 12 campos obligatorios<br/>RUC, BILL_NUMBER, TOTAL_AMOUNT<br/>PAYMENT_AMOUNT, ACCOUNT_NUMBER<br/>+ 7 campos fiscales más
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar 12 campos obligatorios<br/>pagoDGITypes.xsd<br/>Todos los campos requeridos<br/>para transacción de pago
+
+    alt Validación Fallida
+        OSB->>ErrorHandler: Error de Validación XSD
+        ErrorHandler->>ErrorHandler: Mapear Error Técnico
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>Código: FICBCO0257<br/>Mensaje: Error XSD
+
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: SOAP Fault
+        Note right of Client: Error de validación<br/>Esquema no válido<br/>Campos faltantes o incorrectos
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0257<br/>Region: HN01/GT01/PA01/etc
+
+    Validator->>Validator: Consultar BD Regional
+    Note right of Validator: Verificar disponibilidad<br/>servicio de pago por región
+
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        Note right of Validator: PV_CODIGO_ERROR != SUCCESS<br/>PV_MENSAJE_ERROR con detalle
+
+        OSB->>OSB: Generar Response Error Regional
+        Note right of OSB: successIndicator = ERROR<br/>messages = mensaje validador
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: Servicio de pago no disponible<br/>para la región solicitada
+    end
+
+    Validator->>OSB: Validación Exitosa
+    Note right of Validator: PV_CODIGO_ERROR = SUCCESS<br/>Servicio disponible
+
+    OSB->>OSB: Aplicar Valores por Defecto
+    Note right of OSB: aplicarValoresPorDefectoRegion.xq<br/>Normalizar headers
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank != 'NI01'<br/>Dirigir a Default Branch
+
+    OSB->>OSB: Pipeline Default Request
+    Note right of OSB: Etapa: FlujoEntrada<br/>Sin acciones - Pipeline vacío<br/>No hay procesamiento de pagos<br/>No hay parametrización<br/>No hay transformaciones
+
+    OSB->>OSB: Pipeline Default Response
+    Note right of OSB: Etapa: FlujoSalida<br/>Generar Error MW-0008
+
+    OSB->>OSB: Generar Error MW-0008
+    Note right of OSB: errCode: MW-0008<br/>message: SERVICE NOT IMPLEMENTED<br/>YET FOR THIS COUNTRY/COMPANY<br/>Sin procesamiento de pagos
+
+    OSB->>Client: SOAP Fault MW-0008
+    Note right of Client: Servicio de pago no implementado<br/>para esta región<br/>Sin transacción procesada<br/>Sin SIF ni transactionId
+
+    alt Error Técnico Durante Procesamiento
+        OSB->>ErrorHandler: Error Técnico
+        Note right of ErrorHandler: Cualquier error no controlado<br/>durante validaciones
+
+        ErrorHandler->>ErrorHandler: Extraer Información Error
+        Note right of ErrorHandler: errorCode = $fault/ctx:errorCode<br/>errorMessage = $fault/ctx:reason
+
+        ErrorHandler->>ErrorHandler: Mapear Error
+        Note right of ErrorHandler: Servicio: MapeoErrores<br/>CODIGO_ERROR + MENSAJE_ERROR<br/>Prefijo: FICBCO0257$#$
+
+        ErrorHandler->>OSB: Error Mapeado
+        Note right of ErrorHandler: mapeoErroresUsageOut.xq<br/>ResponseHeader con error
+
+        OSB->>OSB: Generar Response Vacía
+        Note right of OSB: pagoDGIResponse vacía<br/>Sin datos de pago
+
+        OSB->>Client: SOAP Response con Error
+        Note right of Client: ResponseHeader con<br/>successIndicator = ERROR<br/>messages = error mapeado<br/>Sin transacción procesada
+    end
+
+    Note over Client, ErrorHandler: Características del Flujo Default:<br/>1. Solo ejecuta validaciones generales<br/>2. No hay procesamiento de pagos<br/>3. No hay servicios externos<br/>4. No hay parametrización (4 parámetros)<br/>5. Error MW-0008 inmediato<br/>6. Pipeline request vacío<br/>7. Sin transformaciones de datos<br/>8. Sin cálculos de negocio<br/>9. Sin generación de SIF<br/>10. Sin transactionId<br/>11. Manejo de errores técnicos estándar
+
+    Note over Client, ErrorHandler: Regiones que Ejecutan Default:<br/>• HN01 (Honduras)<br/>• HN02 (Honduras FPC)<br/>• GT01 (Guatemala)<br/>• PA01 (Panamá)<br/>• Cualquier otra región
+
+    Note over Client, ErrorHandler: Impacto de No Implementación:<br/>• No se procesan pagos reales<br/>• No se generan comprobantes fiscales<br/>• No hay integración con sistemas fiscales locales<br/>• Clientes no pueden pagar impuestos<br/>• Funcionalidad limitada a Nicaragua únicamente

@@ -1,0 +1,90 @@
+
+flowchart TD
+    A[Cliente SOAP Request] --> B[OSB Proxy Service<br/>PagoDGI]
+    
+    B --> C{Validar Esquema XML<br/>pagoDGITypes.xsd<br/>12 campos obligatorios}
+    C -->|Error| D[Error Handler<br/>Validación Fallida]
+    D --> E[SOAP Fault Response]
+    
+    C -->|OK| F[Validar Servicio Regional<br/>ServiceId: FICBCO0257]
+    F -->|Error| G[Error Regional<br/>Servicio no disponible]
+    G --> H[Response con Error]
+    
+    F -->|OK| I{Enrutamiento por Región<br/>SourceBank}
+    
+    I -->|NI01| J[Pipeline NI01<br/>Nicaragua Pago DGI]
+    I -->|Otros| K[Pipeline Default<br/>Error MW-0008]
+    
+    %% NI01 Flow
+    J --> J1[Obtener Parametrización<br/>4 parámetros DGI]
+    J1 --> J2{Parametrización<br/>Válida}
+    J2 -->|No| J3[Error Parametrización<br/>validationMessage]
+    J3 --> J4[Response con Error Config]
+    
+    J2 -->|Sí| J5[Transformar Request<br/>pagoDGIIn.xq]
+    J5 --> J6[Calcular Indicador Pago<br/>obtenerIndicadorPago]
+    J6 --> J7[Generar Timestamps<br/>fechaPago + horaPago]
+    J7 --> J8[Agregar Contexto COBIS<br/>codCanalOriginador = 1]
+    J8 --> J9[Validar Esquema CTS<br/>services.xsd]
+    J9 --> J10[Invocar CTS COBIS<br/>OpPagoDGI]
+    
+    J10 --> J11{Response CTS<br/>Exitosa}
+    J11 -->|No| J12[Error CTS COBIS]
+    J12 --> J13[Response con Error CTS]
+    
+    J11 -->|Sí| J14[Transformar Header<br/>pagoDGIHeaderOut.xq]
+    J14 --> J15{Código Respuesta<br/>CTS = 0}
+    J15 -->|No| J16[Response con Error DGI<br/>Código + Mensaje CTS]
+    
+    J15 -->|Sí| J17[Transformar Body<br/>pagoDGIOut.xq]
+    J17 --> J18[Combinar Request + CTS<br/>Redondear PAYMENT_AMOUNT]
+    J18 --> J19[Response Exitosa<br/>+ SIF + transactionId]
+    
+    %% Default Flow
+    K --> K1[Pipeline Request Vacío<br/>Sin procesamiento pagos]
+    K1 --> K2[Pipeline Response<br/>Error MW-0008]
+    K2 --> K3[SOAP Fault<br/>SERVICE NOT IMPLEMENTED]
+    
+    %% Convergence
+    J4 --> L[Validar Response Success]
+    J13 --> L
+    J16 --> L
+    J19 --> L
+    K3 --> M
+    
+    L -->|Success| N[SOAP Response Exitosa<br/>pagoDGIResponse + SIF]
+    L -->|Error| M[Mapear Errores<br/>MapeoErrores Service]
+    
+    M --> O[Error Response<br/>successIndicator = ERROR]
+    
+    %% Error Handler
+    P[Error Técnico] --> Q[Extraer Error Info<br/>errorCode + errorMessage]
+    Q --> R[Mapear Error<br/>FICBCO0257 + mensaje]
+    R --> S[Response Vacía + Error Header]
+    S --> O
+    
+    %% Styling
+    classDef regionNI01 fill:#fce4ec
+    classDef regionDefault fill:#f3e5f5
+    classDef errorNode fill:#ffebee
+    classDef successNode fill:#e8f5e8
+    classDef paramNode fill:#e3f2fd
+    classDef calcNode fill:#fff3e0
+    classDef transNode fill:#e0f2f1
+    
+    class J,J1,J2,J5,J6,J7,J8,J9,J10,J11,J14,J15,J17,J18,J19 regionNI01
+    class K,K1,K2,K3 regionDefault
+    class D,E,G,H,J3,J4,J12,J13,J16,M,O,P,Q,R,S errorNode
+    class N successNode
+    class J1,J2 paramNode
+    class J6,J7,J18 calcNode
+    class J19 transNode
+    
+    %% Notes
+    J10 -.->|"Endpoint: 10.235.53.149:9080<br/>GerenciaCobisImpuestos<br/>SOAP 1.2<br/>Transacción real"| J10
+    J1 -.->|"4 Parámetros:<br/>FICBCO0257.CAJADGI<br/>FICBCO0257.FORMAPAGODGI<br/>FICBCO0256.CODIGOBANCODGI<br/>FICBCO0257.TIPOIMPUESTODGI"| J1
+    J6 -.->|"Cálculo:<br/>if (TOTAL - PAYMENT = 0)<br/>then '1' (completo)<br/>else '2' (parcial)"| J6
+    J7 -.->|"Timestamps:<br/>fechaPago = current-dateTime()<br/>horaPago = HH:mm:ss<br/>Ajuste timezone"| J7
+    J17 -.->|"Mapeo Combinado:<br/>Request → TOTAL_AMOUNT, DUE_DATE<br/>CTS → TAX_VALUE, FEES<br/>Redondeo → BILL_AMOUNT<br/>CTS → SIF_CODE"| J17
+    J19 -.->|"Pago Exitoso:<br/>SIF_CODE generado<br/>transactionId en header<br/>Comprobante válido DGI"| J19
+    K2 -.->|"Error: MW-0008<br/>Mensaje: SERVICE NOT IMPLEMENTED<br/>YET FOR THIS COUNTRY/COMPANY<br/>Sin procesamiento de pagos"| K2

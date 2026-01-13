@@ -1,0 +1,80 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API PagoDGI <br> Epica 2304: PagoDGI <br> HU 6185:  POST - /payments/payment-execution-admin/v1/initiate-payment-general-directorate-revenue
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant WCobis as Wrapper Cobis <br> Op: OpPagoDGI
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Nicaragua (NI01) - PagoDGI
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header: SourceBank=NI01 <br/> Body: taxpayerIdentification <br> billingDocumentNumber <br> totalPaymentAmount <br> paymentAmount <br> accountNumber <br> taxBaseValue <br> exchangeRateCommission <br> lateFeeAmount <br> enaltyAmount <br> paymentDueDate <br> appliedTaxDescription <br> accountingCode
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: PAYMENT_EXECUTION_ADMIN <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para NI01
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros
+        Note right of API: Domain: PAYMENT_EXECUTION_ADMIN <br> name: PARAM
+
+        CL->>API: Obtiene parámetros
+        Note left of CL: ObtenerParametrizacion 5 Parámetros: <br> codCanalOriginador <br> caja <br/> formaPago <br/> codigoBanco <br/> tipoImpuesto
+
+    else Consulta información de operación a consumir con Lambda Parámetros
+
+        API->>Lambda: Consultar parámetros
+        Note right of API: Domain: PAYMENT_EXECUTION_ADMIN <br> name: PARAM
+
+        Lambda->>API: Obtiene parámetros
+        Note left of Lambda: ObtenerParametrizacion 5 Parámetros: <br> codCanalOriginador <br> caja <br/> formaPago <br/> codigoBanco <br/> tipoImpuesto
+
+        API->>CL: Guarda parámetros en caché local
+        Note right of API: codCanalOriginador <br> caja <br/> formaPago <br/> codigoBanco <br/> tipoImpuesto
+    end
+
+    API->>API: Calcular Indicador de Pago
+    Note over API: If (request.totalPaymentAmount - request.paymentAmount = 0) then <br> indicadorPago = '1' else indicadorPago = '2' <br/> 1 = Pago completo, 2 = Pago parcial
+
+    API->>API: Generar Timestamps
+    Note over API: fechaPago = current-dateTime()<br/>horaPago = HH:mm:ss actual
+
+    API->>API: Construye Request Wrapper CTS Cobis
+    Note over API: Construye request según ejemplo de mapeo de campos request
+
+    API->>WCobis: Invocar Wrapper Cobis OpPagoDGI
+
+    WCobis->>API: Response Wrapper Cobis OpPagoDGI
+
+    API->>API: Transformar Response 
+    Note over API: Transforma response según ejemplo de mapeo de campos response <br> request.paymentAmount → response.billAmount (Redondeo método Banker's Rounding)
+
+    API->>Consumidor: REST Response Exitosa
+    Note over Consumidor: body.data
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
+
+    Note over Consumidor, Errors: Reglas de Negocio Aplicadas:<br/>1. Parametrización obligatoria (5 parámetros)<br/>2. Cálculo indicador pago (1=completo, 2=parcial)<br/>3. Generación timestamps automática<br/>4. request.paymentAmount → response billAmount Redondeo método Banker's Rounding
