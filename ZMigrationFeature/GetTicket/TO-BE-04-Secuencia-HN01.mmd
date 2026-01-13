@@ -1,0 +1,53 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API API GetTicket ACH <br> Epica 34594: AchTransfer_GetTicket <br> HU 34609:  POST - /cross-channel/party-authentication-retrieve/v1/retrieve-authentication-tickets
+    participant WACH as Wrapper ACH <br> URL: https://cdservices.ficohsa.com:9023/ach/getticket
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01 | GT01 | NI01 | PA01) - GetTicket
+
+    Consumidor->>API: REST Request GetTicket
+    Note right of Consumidor: Header: SourceBank=HN01| GT01 | NI01 | PA01<br/>ApplicationId<br/>Body: partyReference, authenticationMessageType
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: PARTY_AUTHENTICATION_RETRIEVE <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>API: Construye Request Wrapper ACH
+    Note over API: Header: <br> DestinationBank = DestinationBank <br> Language = Language <br> ApplicationId = ApplicationId <br> SourceBank = SourceBank <br> Body: <br> messageType = authenticationMessageType <br> originatorId = partyReference
+
+    API->>WACH: Consume Wrapper ACH
+    Note over API: Header: <br> DestinationBank, Language, ApplicationId, SourceBank <br> Body: <br> messageType, originatorId
+
+    WACH->>API: HTTP 200 OK
+    Note left of WACH: JSON Response:<br/>{"ticket": "eyJhbGc...", "StatusCode": "", "Message": ""}
+    
+    API->>API: Transformar Response Wrapper ACH
+    Note over API: Body: <br> authenticationToken = ticket <br> serviceTransactionReference = TransactionId <br> authenticationDateTime = ValueDate
+
+    API->>Consumidor: HTTP 200 - REST Response GetTicket
+    Note left of API: Body: authenticationToken, serviceTransactionReference, authenticationDateTime
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
+
+    Note over Consumidor, Errors: Consideraciones: <br> El registro de logs con los request y response de todos los consumos se realiza en AWS CloudWatch.

@@ -1,0 +1,165 @@
+flowchart TD
+    A[Cliente SOAP Request] --> B{Validar Región}
+    
+    B -->|HN01| C[GetTicket_PS HN01<br/>Proxy Service]
+    B -->|GT01| D[❌ No Implementado<br/>Guatemala]
+    B -->|PA01| E[❌ No Implementado<br/>Panamá]
+    B -->|NI01| F[❌ No Implementado<br/>Nicaragua]
+    
+    D --> G[Error: Servicio no disponible]
+    E --> G
+    F --> G
+    G --> H[SOAP Fault Response]
+    
+    C --> I[GetTicket_PP Pipeline<br/>Honduras]
+    
+    I --> J[Stage: CommonParams<br/>- codigoServicio = '5'<br/>- uuid = fn-bea:uuid()<br/>- sourceBank = Header<br/>- destinationBank = Header]
+    
+    J --> K[Stage: LogInitialRequest<br/>Registrar request inicial]
+    
+    K --> L[SetLogInfoService_BS<br/>Log Request]
+    
+    L --> M[Stage: GetTicketACHREQ<br/>Preparar request ACH]
+    
+    M --> N[Mapeo de Datos:<br/>ApplicationId → userName]
+    
+    N --> O[Stage: GetTicketACH<br/>WS Callout]
+    
+    O --> P[ACHRest_BS<br/>Business Service]
+    
+    P --> Q{Autenticación<br/>HTTP Basic}
+    
+    Q -->|Success| R[POST Request<br/>https://saliente-ach-dev2.gfficohsa.hn/api/Ach]
+    Q -->|Fail| S[Authentication Error]
+    
+    R --> T{ACH Service<br/>Response}
+    
+    T -->|Success<br/>StatusCode empty| U[Response Processing<br/>Ticket Generated]
+    T -->|Error<br/>StatusCode not empty| V[Error Processing<br/>Error Message]
+    T -->|Timeout/Connection| W[System Error<br/>Fault Generated]
+    
+    U --> X[XQuery: GetTicketHeaderOut<br/>SuccessIndicator = 'Success']
+    V --> Y[XQuery: GetTicketHeaderOut<br/>SuccessIndicator = 'Error']
+    W --> Z[Error Handler Pipeline]
+    
+    X --> AA[XQuery: GetTicketOUT<br/>Extract ticket field]
+    Y --> BB[XQuery: GetTicketOUT<br/>Empty ticket response]
+    
+    AA --> CC[Stage: LogFinalResponse<br/>Log successful response]
+    BB --> DD[Stage: LogFinalResponse<br/>Log error response]
+    
+    CC --> EE[SetLogInfoService_BS<br/>Log Response Success]
+    DD --> FF[SetLogInfoService_BS<br/>Log Response Error]
+    
+    EE --> GG[Stage: FinalResponse<br/>Assign final header & body]
+    FF --> GG
+    
+    GG --> HH[SOAP Response Success<br/>with ticket]
+    
+    Z --> II[Stage: GetErrors<br/>Extract error details]
+    II --> JJ[GetErrorMessages_BS<br/>Get localized error]
+    JJ --> KK[Stage: TxErrorMessage<br/>Transform error response]
+    KK --> LL[Stage: LogErrorRequest<br/>Log error details]
+    LL --> MM[SetLogInfoService_BS<br/>Log Error]
+    MM --> NN[Stage: Response Error<br/>Prepare error response]
+    NN --> OO[SOAP Fault Response]
+    
+    S --> PP[Authentication Fault]
+    PP --> OO
+    
+    HH --> QQ[Cliente recibe respuesta]
+    OO --> QQ
+    H --> QQ
+    
+    %% Styling
+    classDef implemented fill:#90EE90,stroke:#006400,stroke-width:2px
+    classDef notImplemented fill:#FFB6C1,stroke:#DC143C,stroke-width:2px
+    classDef error fill:#FFA07A,stroke:#FF4500,stroke-width:2px
+    classDef process fill:#87CEEB,stroke:#4682B4,stroke-width:2px
+    classDef service fill:#DDA0DD,stroke:#8B008B,stroke-width:2px
+    
+    class C,I,J,K,M,N,O,P,R,U,X,AA,CC,EE,GG,HH implemented
+    class D,E,F notImplemented
+    class G,H,S,V,W,Y,Z,BB,DD,FF,II,JJ,KK,LL,MM,NN,OO,PP error
+    class L,T process
+    class Q service
+    
+    %% Notes
+    subgraph "Región HN01 - Implementada"
+        C
+        I
+        J
+        K
+        L
+        M
+        N
+        O
+        P
+        Q
+        R
+        T
+        U
+        V
+        W
+        X
+        Y
+        Z
+        AA
+        BB
+        CC
+        DD
+        EE
+        FF
+        GG
+        HH
+        II
+        JJ
+        KK
+        LL
+        MM
+        NN
+        OO
+        S
+        PP
+    end
+    
+    subgraph "Regiones No Implementadas"
+        D
+        E
+        F
+        G
+        H
+    end
+    
+    subgraph "Servicios Dependientes"
+        subgraph "ACH REST Service"
+            direction TB
+            R1[Endpoint: saliente-ach-dev2.gfficohsa.hn]
+            R2[Operation: GetAchTicket]
+            R3[Auth: HTTP Basic]
+            R4[Timeout: 65s]
+            R5[Connection Timeout: 60s]
+        end
+        
+        subgraph "Logging Services"
+            direction TB
+            L1[SetLogInfoService_BS]
+            L2[GetErrorMessages_BS]
+            L3[Quality of Service: best-effort]
+        end
+    end
+    
+    subgraph "Transformaciones XQuery"
+        direction TB
+        X1[GetTicketHeaderOut.xqy<br/>- Mapea StatusCode a SuccessIndicator<br/>- Incluye Messages si existe]
+        X2[GetTicketOUT.xqy<br/>- Extrae ticket de respuesta<br/>- Maneja campos opcionales]
+        X3[Tx_ErrorMap_To_ErrorHeaderRSP<br/>- Transforma errores a ResponseHeader<br/>- Localización de mensajes]
+    end
+    
+    subgraph "Configuración Regional"
+        direction TB
+        C1[HN01: Honduras<br/>✅ Completamente implementado]
+        C2[GT01: Guatemala<br/>❌ No implementado]
+        C3[PA01: Panamá<br/>❌ No implementado]
+        C4[NI01: Nicaragua<br/>❌ No implementado]
+    end

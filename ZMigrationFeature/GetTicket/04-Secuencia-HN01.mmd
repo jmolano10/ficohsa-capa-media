@@ -1,0 +1,155 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service<br/>GetTicket_PS
+    participant Pipeline as Pipeline<br/>GetTicket_PP
+    participant LogService as SetLogInfoService_BS
+    participant ACHService as ACHRest_BS<br/>(REST)
+    participant ACHEndpoint as ACH REST API<br/>saliente-ach-dev2.gfficohsa.hn
+    participant ErrorService as GetErrorMessages_BS
+
+    Note over Client, ACHEndpoint: Flujo Honduras (HN01) - GetTicket
+
+    Client->>OSB: SOAP Request GetTicket
+    Note right of Client: Header: SourceBank=HN01<br/>ApplicationId=MOBILE_APP<br/>Body: originatorId, messageType
+
+    OSB->>OSB: Validar Esquema SOAP
+    Note right of OSB: Validar estructura XML<br/>Procesar WSS Headers
+
+    OSB->>Pipeline: Invoke GetTicket_PP
+    Note right of OSB: Binding: AchSoapRouter_PS_ptt-binding<br/>Operation: GetTicket
+
+    Pipeline->>Pipeline: Stage: CommonParams
+    Note right of Pipeline: codigoServicio = '5'<br/>uuid = fn-bea:uuid()<br/>sourceBank = Header.SourceBank<br/>destinationBank = Header.DestinationBank
+
+    Pipeline->>Pipeline: Assign bodyInput
+    Note right of Pipeline: bodyInput = $body/ach:GetTicketRequest
+
+    Pipeline->>Pipeline: Stage: LogInitialRequest
+    Note right of Pipeline: Preparar log de request inicial
+
+    Pipeline->>LogService: Route SetLogInfoService_BS
+    Note right of Pipeline: codigoAplicacion=1<br/>codigoServicio=5<br/>operacionServicio='GetTicket'<br/>tipoMensaje='Request'<br/>contenido=serialized request
+
+    LogService-->>Pipeline: Log Response (async)
+    Note left of LogService: Quality of Service: best-effort
+
+    Pipeline->>Pipeline: Stage: GetTicketACHREQ
+    Note right of Pipeline: Crear request para ACH:<br/>userName = ApplicationId
+
+    Pipeline->>Pipeline: Assign GetAchTicketREQ
+    Note right of Pipeline: <ach:GetAchTicket_params><br/>  <ach:userName>MOBILE_APP</ach:userName><br/></ach:GetAchTicket_params>
+
+    Pipeline->>Pipeline: Stage: GetTicketACH
+    Note right of Pipeline: Preparar llamada a ACHRest_BS
+
+    Pipeline->>ACHService: WS Callout GetAchTicket
+    Note right of Pipeline: Operation: GetAchTicket<br/>Request: GetAchTicketREQ<br/>Response: GetAchTicketRSP
+
+    ACHService->>ACHService: HTTP Basic Auth
+    Note right of ACHService: Service Account: ACHRest_SA<br/>Timeout: 65s<br/>Connection Timeout: 60s
+
+    ACHService->>ACHEndpoint: POST /api/Ach/GetAchTicket
+    Note right of ACHService: Content-Type: application/xml<br/>Authorization: Basic<br/>Body: userName parameter
+
+    alt Respuesta Exitosa ACH
+        ACHEndpoint-->>ACHService: HTTP 200 OK
+        Note left of ACHEndpoint: JSON Response:<br/>{"ticket": "eyJhbGc...", "StatusCode": "", "Message": ""}
+        
+        ACHService-->>Pipeline: GetAchTicketRSP (XML)
+        Note left of ACHService: <ach:GetTicketResponse><br/>  <ach:ticket>eyJhbGc...</ach:ticket><br/>  <ach:StatusCode></ach:StatusCode><br/>  <ach:Message></ach:Message><br/></ach:GetTicketResponse>
+
+        Pipeline->>Pipeline: Stage: AssignResponse
+        Note right of Pipeline: Transformar respuesta ACH a OSB
+
+        Pipeline->>Pipeline: XQuery GetTicketHeaderOut
+        Note right of Pipeline: Mapear StatusCode a SuccessIndicator<br/>if StatusCode != '' then 'Error' else 'Success'<br/>Incluir Messages si existe
+
+        Pipeline->>Pipeline: Assign finalResponseHdr
+        Note right of Pipeline: <com:ResponseHeader><br/>  <com:SuccessIndicator>Success</com:SuccessIndicator><br/>  <com:Messages></com:Messages><br/></com:ResponseHeader>
+
+        Pipeline->>Pipeline: XQuery GetTicketOUT
+        Note right of Pipeline: Extraer ticket de respuesta ACH<br/>if ticket exists then include else empty
+
+        Pipeline->>Pipeline: Assign finalResponse
+        Note right of Pipeline: <ach:GetTicketResponse><br/>  <ach:ticket>eyJhbGc...</ach:ticket><br/></ach:GetTicketResponse>
+
+        Pipeline->>Pipeline: Stage: LogFinalResponse
+        Note right of Pipeline: Preparar log de respuesta final
+
+        Pipeline->>LogService: Route SetLogInfoService_BS
+        Note right of Pipeline: tipoMensaje='Response'<br/>contenido=serialized finalResponse<br/>codigoError=''<br/>estado=''
+
+        LogService-->>Pipeline: Log Response (async)
+
+        Pipeline->>Pipeline: Stage: FinalResponse
+        Note right of Pipeline: Asignar header y body finales
+
+        Pipeline-->>OSB: Response Success
+        Note left of Pipeline: Header: finalResponseHdr<br/>Body: finalResponse
+
+        OSB-->>Client: SOAP Response GetTicket
+        Note left of OSB: Header: ResponseHeader con Success<br/>Body: GetTicketResponse con ticket
+
+    else Error en ACH Service
+        ACHEndpoint-->>ACHService: HTTP 500 Error
+        Note left of ACHEndpoint: JSON Response:<br/>{"ticket": "", "StatusCode": "500", "Message": "Internal Server Error"}
+
+        ACHService-->>Pipeline: GetAchTicketRSP (Error)
+        Note left of ACHService: <ach:GetTicketResponse><br/>  <ach:ticket></ach:ticket><br/>  <ach:StatusCode>500</ach:StatusCode><br/>  <ach:Message>Internal Server Error</ach:Message><br/></ach:GetTicketResponse>
+
+        Pipeline->>Pipeline: XQuery GetTicketHeaderOut
+        Note right of Pipeline: StatusCode='500' != ''<br/>SuccessIndicator='Error'<br/>Messages='Internal Server Error'
+
+        Pipeline->>Pipeline: Assign finalResponseHdr
+        Note right of Pipeline: <com:ResponseHeader><br/>  <com:SuccessIndicator>Error</com:SuccessIndicator><br/>  <com:Messages>Internal Server Error</com:Messages><br/></com:ResponseHeader>
+
+        Pipeline-->>OSB: Response with Error
+        OSB-->>Client: SOAP Response with Error
+
+    else Timeout o Connection Error
+        ACHService->>ACHService: Timeout (65s)
+        Note right of ACHService: Connection timeout o read timeout
+
+        ACHService-->>Pipeline: Fault/Exception
+        Note left of ACHService: ctx:errorCode<br/>ctx:reason
+
+        Pipeline->>Pipeline: Error Handler Pipeline
+        Note right of Pipeline: Capturar fault y procesar error
+
+        Pipeline->>Pipeline: Stage: GetErrors
+        Note right of Pipeline: errorCode = $fault/ctx:errorCode<br/>errorDescription = $fault/ctx:reason
+
+        Pipeline->>Pipeline: Prepare GetErrorReq
+        Note right of Pipeline: codigoErrorSistema = errorCode<br/>codigoServicio = 5<br/>codigoSistema = '1'<br/>codigoLenguaje = Language o 'es'
+
+        Pipeline->>ErrorService: WS Callout GetErrorMessages_BS
+        Note right of Pipeline: Obtener mensaje de error localizado
+
+        ErrorService-->>Pipeline: Error Message Response
+        Note left of ErrorService: Mensaje de error en idioma solicitado
+
+        Pipeline->>Pipeline: Stage: TxErrorMessage
+        Note right of Pipeline: Transformar error a ResponseHeader<br/>XQuery: Tx_ErrorMap_To_ErrorHeaderRSP
+
+        Pipeline->>Pipeline: Assign errorHeaderRSP
+        Note right of Pipeline: <com:ResponseHeader><br/>  <com:SuccessIndicator>Error</com:SuccessIndicator><br/>  <com:Messages>Error message</com:Messages><br/></com:ResponseHeader>
+
+        Pipeline->>Pipeline: Stage: LogErrorRequest
+        Note right of Pipeline: Registrar error en logs
+
+        Pipeline->>LogService: Route SetLogInfoService_BS
+        Note right of Pipeline: estado='Error'<br/>codigoError=errorCode<br/>contenido=serialized fault<br/>tipoMensaje='Response'
+
+        LogService-->>Pipeline: Log Response (async)
+
+        Pipeline->>Pipeline: Stage: Response (Error)
+        Note right of Pipeline: Preparar respuesta de error final
+
+        Pipeline-->>OSB: Error Response
+        Note left of Pipeline: Header: errorHeaderRSP<br/>Body: Empty GetReportTransactionResponse
+
+        OSB-->>Client: SOAP Fault Response
+        Note left of OSB: SOAP Fault con detalles del error
+    end
+
+    Note over Client, ACHEndpoint: Fin del flujo GetTicket HN01
