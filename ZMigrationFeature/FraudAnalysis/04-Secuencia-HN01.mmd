@@ -1,0 +1,158 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant PS as FraudAnalysis_PS<br/>(Proxy Service)
+    participant PP as FraudAnalysis_PP<br/>(Pipeline)
+    participant BitacoraBS as RegistrarBitacoraOSB_v2
+    participant ValidaDB as ValidaServicioRegional_db<br/>(DB Adapter)
+    participant OracleDB as Oracle Database<br/>(ConnectionMiddleware)
+    participant GetAuthDB as GetAPIAuth_BS<br/>(DB Adapter)
+    participant VUSecurity as FraudAnalysis_BS<br/>(VU Security REST)
+    participant MapeoErr as MapeoErrores<br/>(Proxy Service)
+
+    Note over Client,MapeoErr: Flujo Honduras (HN01) - FraudAnalysis
+
+    Client->>PS: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>DestinationBank=HN01<br/>Authentication: Username/Password<br/>Body: FraudAnalysisRequest
+
+    PS->>PS: Autenticación Custom Token
+    Note right of PS: Validar Username/Password<br/>del SOAP Header
+
+    PS->>PP: Invocar Pipeline
+    
+    PP->>PP: Stage: ValidacionXSD
+    Note right of PP: Validar contra<br/>FraudAnalysisTypes.xsd<br/>Elemento: FraudAnalysisRequest
+
+    alt Validación XSD Fallida
+        PP->>Client: SOAP Fault (Error de Validación)
+    end
+
+    PP->>PP: Stage: CommonParams
+    Note right of PP: Asignar $bodyInput =<br/>$body/FraudAnalysisRequest
+
+    PP->>PP: Stage: BitacoraRequest
+    Note right of PP: Generar UUID<br/>Guardar $originalHeader<br/>Construir request bitácora
+
+    PP->>BitacoraBS: registrarBitacoraOSB (Request)
+    Note right of PP: IdServicio: FICBCO0498<br/>TipoMensaje: REQ<br/>Usuario, BancoOrigen, BancoDestino<br/>Contenido: $body
+
+    BitacoraBS-->>PP: Respuesta Bitácora
+
+    PP->>PP: Stage: ValidacionServicioRegional
+    Note right of PP: Construir request validación<br/>XQuery: validaServicioRegionalIn.xqy
+
+    PP->>ValidaDB: ValidaServicioRegional
+    Note right of PP: PV_SERVICIO: FICBCO0498<br/>PV_ORIGEN: HN01<br/>PV_DESTINO: HN01
+
+    ValidaDB->>OracleDB: CALL MW_P_VALIDA_SERVICIO_REGIONAL
+    Note right of ValidaDB: Validar servicio habilitado<br/>para región HN01
+
+    OracleDB-->>ValidaDB: Resultado SP
+    ValidaDB-->>PP: Response Validación
+    Note left of ValidaDB: PV_CODIGO_ERROR<br/>PV_MENSAJE_ERROR
+
+    alt Validación Regional Fallida
+        PP->>PP: Construir ResponseHeader ERROR
+        Note right of PP: successIndicator: ERROR<br/>messages: PV_MENSAJE_ERROR
+        PP->>Client: SOAP Response (Error Regional)
+    end
+
+    PP->>PP: Aplicar Valores por Defecto
+    Note right of PP: XQuery: aplicarValoresPorDefectoRegion.xqy<br/>Si SourceBank vacío → HN01<br/>Si DestinationBank vacío → SourceBank
+
+    PP->>PP: Stage: GetAPIToken
+
+    PP->>GetAuthDB: GetAPIAuth_BS
+    Note right of PP: XQuery: DeviceManagement_To_API_Token_Request.xqy<br/>PV_NOMBRE_APP: REGFRAUD
+
+    GetAuthDB->>OracleDB: CALL MW_P_OBTENER_APIREST_AUT
+    Note right of GetAuthDB: Schema: MIDDLEWARE2<br/>Obtener API Key para VU Security
+
+    OracleDB-->>GetAuthDB: Resultado SP
+    GetAuthDB-->>PP: Response API Auth
+    Note left of GetAuthDB: PV_CLAVE: <API_KEY>
+
+    PP->>PP: Asignar $apiKey
+    Note right of PP: $apiKey = fn:data($rspApiAuth/*:PV_CLAVE)
+
+    PP->>PP: Stage: Tx_To_VU
+    Note right of PP: XQuery: FraudAnalysis_To_VU.xqy<br/>Transformar request OSB a formato VU
+
+    PP->>PP: Mapeo de Campos
+    Note right of PP: channel → idChannel (mapeo):<br/>INTERBANCA_WEB → 1<br/>IVR → 2, ATM → 3<br/>INTERBANCA_APP → 4<br/>user → userId<br/>idOperationType → idOperation<br/>dateTime → eventDate<br/>amount, debitAccount, creditAccount<br/>optionalParams: entry → name/value
+
+    PP->>VUSecurity: POST /FraudAnalysis/service (analyze)
+    Note right of PP: REST/JSON Request<br/>Endpoint: https://10.242.25.20:8080<br/>Body: FraudAnalysisRequestVU<br/>Incluye: apiKey, idChannel, userId, etc.
+
+    VUSecurity->>VUSecurity: Análisis de Fraude
+    Note right of VUSecurity: Evaluar riesgo<br/>Aplicar reglas de negocio<br/>Calcular score<br/>Determinar acción
+
+    VUSecurity-->>PP: REST/JSON Response
+    Note left of VUSecurity: fraudAnalysisResponseVU:<br/>result, score, eventId<br/>triggeredRules, status, error
+
+    PP->>PP: Asignar $bodyResponse
+
+    PP->>PP: Stage: MapeoError (Response)
+    Note right of PP: Evaluar status de respuesta VU
+
+    alt Status VU = 1 (Éxito)
+        PP->>PP: Transformar Respuesta Exitosa
+        Note right of PP: XQuery: Vu_To_FraudAnalysis_Response.xqy<br/>Mapeo result → ACTION:<br/>1→ALLOW, 2→AUTHENTICATE<br/>3→DENY, 4→CHECK_OPERATION<br/>5→BLOCK, 6→CHECK_BY_AGENT<br/>score → SCORERISK<br/>triggeredRules → TRIGGEREDRULENAME<br/>eventId → EVENTID
+
+        PP->>PP: Construir ResponseHeader Success
+        Note right of PP: messageId: 0<br/>successIndicator: Success<br/>messages: vacío
+
+    else Status VU != 1 (Error)
+        PP->>MapeoErr: mapeoErrores
+        Note right of PP: CODIGO_ERROR: ERROR<br/>MENSAJE_ERROR: FICBCO0498$#$<description>
+
+        MapeoErr-->>PP: Response Mapeo
+        Note left of MapeoErr: CODIGO_ERROR mapeado<br/>MENSAJE_MAPEADO
+
+        PP->>PP: Transformar Respuesta con Error
+        Note right of PP: XQuery: Vu_To_FraudAnalysis_Response.xqy<br/>Mismo mapeo pero con error
+
+        PP->>PP: Construir ResponseHeader ERROR
+        Note right of PP: messageId: CODIGO_ERROR<br/>successIndicator: ERROR<br/>messages: error de VU
+    end
+
+    PP->>PP: Stage: BitacoraResponse
+
+    alt UUID Bitácora Request existe
+        PP->>PP: Construir request bitácora response
+        Note right of PP: XQuery: registrarBitacoraOSBIn.xqy<br/>IdServicio: FICBCO0500<br/>TipoMensaje: RSP
+
+        PP->>BitacoraBS: registrarBitacoraOSB (Response)
+        Note right of PP: Usuario, BancoOrigen, BancoDestino<br/>UUID: $uuidBitacoraRequest<br/>Contenido: $body<br/>MensajeError: si aplica
+
+        BitacoraBS-->>PP: Respuesta Bitácora
+    end
+
+    PP-->>PS: Response Pipeline
+    PS-->>Client: SOAP Response
+    Note left of PS: Header: ResponseHeader<br/>Body: FraudAnalysisResponse<br/>ACTION, SCORERISK<br/>TRIGGEREDRULENAME, EVENTID
+
+    Note over Client,MapeoErr: Flujo de Error (Pipeline Error Handler)
+
+    alt Error en Pipeline
+        PP->>PP: Error Handler: ManejoError
+        Note right of PP: Capturar $fault<br/>Extraer errorCode y errorMessage
+
+        PP->>MapeoErr: mapeoErrores
+        Note right of PP: CODIGO_ERROR: $errorCode<br/>MENSAJE_ERROR: FICBCO0498$#$<errorMessage>
+
+        MapeoErr-->>PP: Response Mapeo
+
+        PP->>PP: Construir ResponseHeader ERROR
+        Note right of PP: messageId: CODIGO_ERROR<br/>successIndicator: ERROR<br/>messages: MENSAJE_MAPEADO
+
+        PP->>PP: Stage: BitacoraResponseError
+
+        alt UUID Bitácora Request existe
+            PP->>BitacoraBS: registrarBitacoraOSB (Error)
+            Note right of PP: IdServicio: FICBCO0491<br/>TipoMensaje: RSP<br/>Resultado: ERROR
+
+            BitacoraBS-->>PP: Respuesta Bitácora
+        end
+
+        PP->>Client: SOAP Response (Error)
+    end

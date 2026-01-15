@@ -1,0 +1,99 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant PS as FraudAnalysis_PS<br/>(Proxy Service)
+    participant PP as FraudAnalysis_PP<br/>(Pipeline)
+    participant BitacoraBS as RegistrarBitacoraOSB_v2
+    participant ValidaDB as ValidaServicioRegional_db<br/>(DB Adapter)
+    participant OracleDB as Oracle Database<br/>(ConnectionMiddleware)
+    participant GetAuthDB as GetAPIAuth_BS<br/>(DB Adapter)
+    participant VUSecurity as FraudAnalysis_BS<br/>(VU Security REST)
+    participant MapeoErr as MapeoErrores<br/>(Proxy Service)
+
+    Note over Client,MapeoErr: Flujo Panamá (PA01) - FraudAnalysis
+
+    Client->>PS: SOAP Request
+    Note right of Client: Header: SourceBank=PA01<br/>DestinationBank=PA01<br/>Authentication: Username/Password<br/>Body: FraudAnalysisRequest
+
+    PS->>PS: Autenticación Custom Token
+    PS->>PP: Invocar Pipeline
+    PP->>PP: Stage: ValidacionXSD
+    Note right of PP: Validar contra FraudAnalysisTypes.xsd
+
+    alt Validación XSD Fallida
+        PP->>Client: SOAP Fault
+    end
+
+    PP->>PP: Stage: CommonParams
+    PP->>PP: Stage: BitacoraRequest
+    PP->>BitacoraBS: registrarBitacoraOSB (Request)
+    Note right of PP: IdServicio: FICBCO0498<br/>TipoMensaje: REQ
+    BitacoraBS-->>PP: Respuesta
+
+    PP->>PP: Stage: ValidacionServicioRegional
+    PP->>ValidaDB: ValidaServicioRegional
+    Note right of PP: PV_SERVICIO: FICBCO0498<br/>PV_ORIGEN: PA01<br/>PV_DESTINO: PA01
+
+    ValidaDB->>OracleDB: CALL MW_P_VALIDA_SERVICIO_REGIONAL
+    Note right of ValidaDB: Validar servicio para PA01
+    OracleDB-->>ValidaDB: Resultado
+    ValidaDB-->>PP: Response
+
+    alt Validación Regional Fallida
+        PP->>Client: SOAP Response (Error)
+    end
+
+    PP->>PP: Aplicar Valores por Defecto
+    Note right of PP: PA01 debe especificarse explícitamente<br/>(no hay default para PA01)
+
+    PP->>PP: Stage: GetAPIToken
+    PP->>GetAuthDB: GetAPIAuth_BS
+    Note right of PP: PV_NOMBRE_APP: REGFRAUD
+    GetAuthDB->>OracleDB: CALL MW_P_OBTENER_APIREST_AUT
+    OracleDB-->>GetAuthDB: Resultado
+    GetAuthDB-->>PP: PV_CLAVE
+    PP->>PP: Asignar $apiKey
+
+    PP->>PP: Stage: Tx_To_VU
+    Note right of PP: XQuery: FraudAnalysis_To_VU.xqy<br/>Mapeo de canales y campos
+
+    PP->>VUSecurity: POST /FraudAnalysis/service
+    Note right of PP: REST/JSON<br/>https://10.242.25.20:8080
+
+    VUSecurity->>VUSecurity: Análisis de Fraude
+    VUSecurity-->>PP: REST/JSON Response
+    PP->>PP: Asignar $bodyResponse
+
+    PP->>PP: Stage: MapeoError (Response)
+
+    alt Status VU = 1
+        PP->>PP: Transformar Respuesta Exitosa
+        Note right of PP: XQuery: Vu_To_FraudAnalysis_Response.xqy<br/>result → ACTION
+        PP->>PP: Construir ResponseHeader Success
+    else Status VU != 1
+        PP->>MapeoErr: mapeoErrores
+        MapeoErr-->>PP: Response
+        PP->>PP: Transformar con Error
+        PP->>PP: Construir ResponseHeader ERROR
+    end
+
+    PP->>PP: Stage: BitacoraResponse
+    alt UUID existe
+        PP->>BitacoraBS: registrarBitacoraOSB (Response)
+        Note right of PP: IdServicio: FICBCO0500
+        BitacoraBS-->>PP: Respuesta
+    end
+
+    PP-->>PS: Response
+    PS-->>Client: SOAP Response
+    Note left of PS: FraudAnalysisResponse
+
+    alt Error en Pipeline
+        PP->>PP: Error Handler
+        PP->>MapeoErr: mapeoErrores
+        MapeoErr-->>PP: Response
+        PP->>PP: Construir Error
+        PP->>BitacoraBS: registrarBitacoraOSB (Error)
+        Note right of PP: IdServicio: FICBCO0491
+        BitacoraBS-->>PP: Respuesta
+        PP->>Client: SOAP Response (Error)
+    end

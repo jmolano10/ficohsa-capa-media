@@ -1,0 +1,134 @@
+flowchart TD
+    Start([Cliente invoca FraudAnalysis_PS]) --> Auth{Autenticación<br/>Custom Token}
+    Auth -->|Válida| ValidXSD[Validación XSD<br/>FraudAnalysisTypes.xsd]
+    Auth -->|Inválida| ErrorAuth[Error: Autenticación Fallida]
+    ErrorAuth --> End1([Retornar SOAP Fault])
+    
+    ValidXSD -->|Válida| CommonParams[Asignar Variables Comunes<br/>$bodyInput]
+    ValidXSD -->|Inválida| ErrorXSD[Error: Validación XSD Fallida]
+    ErrorXSD --> End2([Retornar SOAP Fault])
+    
+    CommonParams --> BitacoraReq[Bitácora Request<br/>UUID, IdServicio: FICBCO0498]
+    BitacoraReq --> CallBitReq[Invocar RegistrarBitacoraOSB_v2]
+    CallBitReq --> ValidaRegion[Validación Regional]
+    
+    ValidaRegion --> BuildValidReq[Construir Request Validación<br/>XQuery: validaServicioRegionalIn.xqy]
+    BuildValidReq --> CallValidDB[Invocar ValidaServicioRegional_db<br/>SP: MW_P_VALIDA_SERVICIO_REGIONAL]
+    
+    CallValidDB --> CheckRegion{PV_CODIGO_ERROR<br/>== 'SUCCESS'?}
+    CheckRegion -->|No| ErrorRegion[Construir ResponseHeader ERROR<br/>messages: PV_MENSAJE_ERROR]
+    ErrorRegion --> End3([Retornar SOAP Response Error])
+    
+    CheckRegion -->|Sí| ApplyDefaults[Aplicar Valores por Defecto<br/>XQuery: aplicarValoresPorDefectoRegion.xqy]
+    
+    ApplyDefaults --> CheckSourceBank{SourceBank<br/>vacío?}
+    CheckSourceBank -->|Sí| SetHN01[SourceBank = 'HN01']
+    CheckSourceBank -->|No| KeepSource[Mantener SourceBank]
+    SetHN01 --> CheckDestBank
+    KeepSource --> CheckDestBank
+    
+    CheckDestBank{DestinationBank<br/>vacío?}
+    CheckDestBank -->|Sí| SetDestSource[DestinationBank = SourceBank]
+    CheckDestBank -->|No| KeepDest[Mantener DestinationBank]
+    SetDestSource --> GetAPIToken
+    KeepDest --> GetAPIToken
+    
+    GetAPIToken[Obtener API Token]
+    GetAPIToken --> BuildAuthReq[Construir Request<br/>XQuery: DeviceManagement_To_API_Token_Request.xqy<br/>PV_NOMBRE_APP: 'REGFRAUD']
+    BuildAuthReq --> CallAuthDB[Invocar GetAPIAuth_BS<br/>SP: MW_P_OBTENER_APIREST_AUT<br/>Schema: MIDDLEWARE2]
+    CallAuthDB --> SaveAPIKey[Asignar $apiKey = PV_CLAVE]
+    
+    SaveAPIKey --> TransformReq[Transformar Request a VU<br/>XQuery: FraudAnalysis_To_VU.xqy]
+    
+    TransformReq --> MapChannel{Mapeo de Canal}
+    MapChannel -->|INTERBANCA_WEB| SetCh1[idChannel = 1]
+    MapChannel -->|IVR| SetCh2[idChannel = 2]
+    MapChannel -->|ATM| SetCh3[idChannel = 3]
+    MapChannel -->|INTERBANCA_APP| SetCh4[idChannel = 4]
+    MapChannel -->|Otro| SetChEmpty[idChannel = vacío]
+    
+    SetCh1 --> MapFields
+    SetCh2 --> MapFields
+    SetCh3 --> MapFields
+    SetCh4 --> MapFields
+    SetChEmpty --> MapFields
+    
+    MapFields[Mapear Campos:<br/>user → userId<br/>idOperationType → idOperation<br/>dateTime → eventDate<br/>amount, debitAccount, creditAccount<br/>optionalParams: entry → name/value]
+    
+    MapFields --> CallVU[Invocar FraudAnalysis_BS<br/>POST https://10.242.25.20:8080/FraudAnalysis/service<br/>Operación: analyze<br/>REST/JSON]
+    
+    CallVU --> CheckStatus{status == 1?}
+    
+    CheckStatus -->|Sí| TransformSuccess[Transformar Respuesta Exitosa<br/>XQuery: Vu_To_FraudAnalysis_Response.xqy]
+    
+    TransformSuccess --> MapResult{Mapeo de Result}
+    MapResult -->|result=1| SetAllow[ACTION = 'ALLOW']
+    MapResult -->|result=2| SetAuth[ACTION = 'AUTHENTICATE']
+    MapResult -->|result=3| SetDeny[ACTION = 'DENY']
+    MapResult -->|result=4| SetCheck[ACTION = 'CHECK_OPERATION']
+    MapResult -->|result=5| SetBlock[ACTION = 'BLOCK']
+    MapResult -->|result=6| SetAgent[ACTION = 'CHECK_BY_AGENT']
+    
+    SetAllow --> MapOtherFields
+    SetAuth --> MapOtherFields
+    SetDeny --> MapOtherFields
+    SetCheck --> MapOtherFields
+    SetBlock --> MapOtherFields
+    SetAgent --> MapOtherFields
+    
+    MapOtherFields[Mapear Otros Campos:<br/>score → SCORERISK<br/>triggeredRules → TRIGGEREDRULENAME<br/>eventId → EVENTID]
+    
+    MapOtherFields --> BuildSuccessHeader[Construir ResponseHeader<br/>messageId: 0<br/>successIndicator: 'Success'<br/>messages: vacío]
+    BuildSuccessHeader --> BitacoraResp
+    
+    CheckStatus -->|No| CallMapeoErr[Invocar MapeoErrores<br/>CODIGO_ERROR: 'ERROR'<br/>MENSAJE_ERROR: 'FICBCO0498$#$' + description]
+    CallMapeoErr --> TransformError[Transformar Respuesta con Error<br/>XQuery: Vu_To_FraudAnalysis_Response.xqy]
+    TransformError --> BuildErrorHeader[Construir ResponseHeader<br/>messageId: CODIGO_ERROR<br/>successIndicator: 'ERROR'<br/>messages: error de VU]
+    BuildErrorHeader --> BitacoraResp
+    
+    BitacoraResp{UUID Bitácora<br/>Request existe?}
+    BitacoraResp -->|Sí| BuildBitResp[Construir Bitácora Response<br/>IdServicio: FICBCO0500<br/>TipoMensaje: RSP]
+    BitacoraResp -->|No| ReturnResp
+    BuildBitResp --> CallBitResp[Invocar RegistrarBitacoraOSB_v2]
+    CallBitResp --> ReturnResp
+    
+    ReturnResp([Retornar SOAP Response<br/>FraudAnalysisResponse])
+    
+    %% Error Handler
+    Start -.Error en Pipeline.-> ErrorHandler[Error Handler:<br/>ManejoError]
+    ValidXSD -.Error.-> ErrorHandler
+    CommonParams -.Error.-> ErrorHandler
+    BitacoraReq -.Error.-> ErrorHandler
+    ValidaRegion -.Error.-> ErrorHandler
+    GetAPIToken -.Error.-> ErrorHandler
+    TransformReq -.Error.-> ErrorHandler
+    CallVU -.Error.-> ErrorHandler
+    
+    ErrorHandler --> ExtractError[Extraer $fault:<br/>errorCode, errorMessage]
+    ExtractError --> CallMapeoErrPipe[Invocar MapeoErrores<br/>'FICBCO0498$#$' + errorMessage]
+    CallMapeoErrPipe --> BuildErrHeader[Construir ResponseHeader ERROR<br/>messageId: CODIGO_ERROR<br/>messages: MENSAJE_MAPEADO]
+    BuildErrHeader --> BitacoraErr{UUID existe?}
+    BitacoraErr -->|Sí| BuildBitErr[Construir Bitácora Error<br/>IdServicio: FICBCO0491<br/>TipoMensaje: RSP<br/>Resultado: ERROR]
+    BitacoraErr -->|No| ReturnErr
+    BuildBitErr --> CallBitErr[Invocar RegistrarBitacoraOSB_v2]
+    CallBitErr --> ReturnErr([Retornar SOAP Response Error])
+    
+    %% Notas de Región
+    note1[Nota: Todas las regiones HN01, GT01, PA01, NI01<br/>usan el mismo flujo.<br/>La diferencia está en los valores de<br/>SourceBank y DestinationBank]
+    
+    style Start fill:#e1f5e1
+    style ReturnResp fill:#e1f5e1
+    style End1 fill:#ffe1e1
+    style End2 fill:#ffe1e1
+    style End3 fill:#ffe1e1
+    style ReturnErr fill:#ffe1e1
+    style ErrorAuth fill:#ffcccc
+    style ErrorXSD fill:#ffcccc
+    style ErrorRegion fill:#ffcccc
+    style ErrorHandler fill:#ffcccc
+    style CheckRegion fill:#fff4e1
+    style CheckStatus fill:#fff4e1
+    style CheckSourceBank fill:#fff4e1
+    style CheckDestBank fill:#fff4e1
+    style MapChannel fill:#e1f0ff
+    style MapResult fill:#e1f0ff

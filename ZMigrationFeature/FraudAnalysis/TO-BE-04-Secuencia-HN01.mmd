@@ -1,0 +1,75 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API Analisis Fraude <br> Epica 35001: VUSecurity_fraudAnalysis <br> HU 36135:  POST - /account-management/fraud-evaluation-admin/v1/initiate-fraud-analysis
+    participant SM as Secret Manager
+    participant Homologador as Liberería de <br> Homologación
+    participant VUSecurity as REST API FraudAnalysis <br/> https://10.242.25.20:8080/FraudAnalysis/service/analyze-event
+    participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
+
+    Note over Consumidor,Errors: Flujo Multiregión (HN01 | GT01 | PA01 | NI01) - FraudAnalysis
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header: SourceBank <br/> Body: FraudAnalysisRequest
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: FRAUD_EVALUATION_ADMIN <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para NIHN01 | GT01 | PA01 | NI0101
+
+    API->>SM: Consulta API Key VU Security
+    Note right of API: Secret Name: ban-xrs-ap-secm-vu-fraud-analysis<env> 
+
+    SM->>API: Respuesta Secret Manager
+    Note left of SM: apiKey: eyJhbGciOiJIUzI1NiIsInRkpXVCJ9...
+
+    API->>Homologador: Consulta Homologación channelReference
+    Note right of API: domain: FRAUD_EVALUATION_ADMIN_ANALYSIS_CHANNEL_REFERENCE <br> name: CATALOGATE <br> value.name: request.channelReference
+
+    Homologador->>API: Retorna Valor Homologado 
+    Note left of Homologador: INTERBANCA_WEB → 1 <br> IVR → 2 <br> ATM → 3 <br> INTERBANCA_APP → 4 
+
+    API->>API: Construye Request VU Security
+    Note over API: response.secretManager.apiKey → apiKey <br> channelReference (Honmologado) → idChannel <br/> partyReference → userId <br/> transactionTypeReference → idOperation <br/> transactionDateTime → eventDate <br/> transactionAmount → amount <br/> debitAccountNumber → debitAccount <br/>creditAccountNumber → creditAccount <br/> additionalTransactionParameters → optionalParams
+
+    API->>VUSecurity: Consumir POST - /FraudAnalysis/service/analyze-event
+    Note right of API: REST/JSON Request <br/>Incluye: apiKey, idChannel, userId, etc.
+
+    VUSecurity->>API: REST/JSON Response
+    Note left of VUSecurity: result, score, eventId, triggeredRules, status, error
+
+    API->>API: Evalúa status de respuesta VU
+
+    alt Si response.status = 1 (Éxito)
+        API->>Homologador: Consulta Homologación result
+        Note right of API: domain: FRAUD_EVALUATION_ADMIN_ANALYSIS_RESULT <br> name: CATALOGATE <br> value.name: request.result
+
+        Homologador->>API: Retorna Valor Homologado 
+        Note left of Homologador: 1 → ALLOW <br> 2 → AUTHENTICATE <br> 3 → DENY <br> 4 → CHECK_OPERATION <br> 5 → BLOCK <br> 6 → CHECK_BY_AGENT 
+
+        API->>API: Transformar Respuesta Exitosa
+        Note over API: Mapeo: <br> result (Homologado) → fraudAssessmentDecision <br/> score → fraudRiskScore <br/> triggeredRules → triggeredRuleReference <br/> eventId → fraudEventReference
+
+        API->>Consumidor: REST Response
+        Note left of API: Body: fraudAssessmentDecision,  fraudRiskScore, triggeredRuleReference, fraudEventReference
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
