@@ -1,0 +1,113 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant ProxyMain as ModificaClienteDesembolsoLineaCredito
+    participant ValidaSvc as ValidaServicioRegional_db
+    participant ProxyHN as ModificaClienteDesembolsoLineaCreditoHN
+    participant ConsultaCli as ConsultaCliente (v3)
+    participant DBAdapter as modificaClienteSolEmprendedor_db
+    participant OracleDB as Oracle DB (Schema DLC)
+    participant MapeoErr as MapeoErrores
+
+    Note over Client,OracleDB: Flujo Honduras (HN01)
+
+    Client->>ProxyMain: SOAP Request modificaClienteDesembolsoLineaCredito
+    Note right of Client: Header: SourceBank=HN01<br/>ServiceID: FICBCO0364<br/>Body: CUSTOMER data
+
+    ProxyMain->>ProxyMain: Validar XSD
+    Note right of ProxyMain: Schema: serviciosEmpresarialesTypes.xsd<br/>Element: modificaClienteDesembolsoLineaCredito
+
+    alt Validación XSD Falla
+        ProxyMain->>MapeoErr: Mapear Error
+        Note right of MapeoErr: ServiceID: FICBCO0364<br/>ErrorCode + ErrorMessage
+        MapeoErr-->>ProxyMain: Error Mapeado
+        ProxyMain->>Client: SOAP Fault
+    end
+
+    ProxyMain->>ValidaSvc: ValidaServicioRegional
+    Note right of ValidaSvc: ServiceId: FICBCO0364<br/>Region: HN01
+
+    ValidaSvc->>OracleDB: Query validación regional
+    OracleDB-->>ValidaSvc: Resultado validación
+
+    alt Región No Válida
+        ValidaSvc-->>ProxyMain: PV_CODIGO_ERROR != SUCCESS
+        ProxyMain->>ProxyMain: Construir ResponseHeader Error
+        ProxyMain->>Client: Response con Error
+    end
+
+    ValidaSvc-->>ProxyMain: Validación OK
+    ProxyMain->>ProxyMain: Aplicar Valores Por Defecto Región
+
+    ProxyMain->>ProxyMain: Branch: SourceBank = 'HN01'
+    ProxyMain->>ProxyHN: Route a ProxyHN
+
+    Note over ProxyHN: Stage: ConsultaCliente
+
+    ProxyHN->>ProxyHN: Transform consultaClienteHNIn.xq
+    Note right of ProxyHN: Mapeo:<br/>CUSTOMER_ID_TYPE = "CUSTOMER_ID"<br/>CUSTOMER_ID_VALUE = BASIC/ID
+
+    ProxyHN->>ConsultaCli: consultaCliente Request
+    Note right of ConsultaCli: CUSTOMER_ID_TYPE: CUSTOMER_ID<br/>CUSTOMER_ID_VALUE: {ID}
+
+    ConsultaCli->>ConsultaCli: Procesar Consulta
+    ConsultaCli-->>ProxyHN: consultaClienteResponse
+    Note left of ConsultaCli: SHORT_NAME<br/>LEGAL_ID<br/>TARGET<br/>TARGET_DESCRIPTION
+
+    ProxyHN->>ProxyHN: Evaluar successIndicator
+    Note right of ProxyHN: if(upper-case($errorCode) = 'SUCCESS')<br/>then '' else messages
+
+    alt ConsultaCliente Falla
+        ProxyHN->>ProxyHN: Asignar validationMessage = error
+        ProxyHN->>ProxyHN: Construir ResponseHeader
+        ProxyHN->>Client: Response con Error
+    end
+
+    Note over ProxyHN: Stage: ModificaClienteDLC
+
+    ProxyHN->>ProxyHN: Verificar validationMessage = ''
+
+    ProxyHN->>ProxyHN: Transform modificaClienteSolEmprendedorHNIn.xq
+    Note right of ProxyHN: Mapeo Complejo:<br/>P_CUSTOMER_ID = BASIC/ID<br/>P_CUSTOMER_NAME = consultaResp/SHORT_NAME<br/>P_LEGAL_ID = consultaResp/LEGAL_ID<br/>P_TARGET_ID = consultaResp/TARGET<br/>P_BRANCH_CODE, P_EXPIRATION_DAY<br/>P_FINANCIAL_STMT_DATE<br/>P_EMAILS_OLD/NEW (arrays)<br/>P_LOAN_LIMITS (array)<br/>P_DESTINATION_PRODUCTS (array)<br/>P_DEBIT_ACCOUNTS (array)<br/>P_CREDIT_LINES (array anidado)
+
+    ProxyHN->>DBAdapter: Invoke modificaClienteSolEmprendedor
+    Note right of DBAdapter: Connection: eis/DB/ConnectionDLC<br/>Schema: DLC<br/>SP: DLC_P_MODIFICAR_CLIENTE
+
+    DBAdapter->>OracleDB: CALL DLC_P_MODIFICAR_CLIENTE(...)
+    Note right of OracleDB: 18 parámetros IN<br/>2 parámetros OUT
+
+    OracleDB->>OracleDB: Ejecutar Lógica Modificación
+    Note right of OracleDB: Actualizar cliente<br/>Procesar arrays con ACTION<br/>Validar reglas de negocio
+
+    alt Modificación Falla en BD
+        OracleDB-->>DBAdapter: P_SUCCESSINDICATOR = ERROR<br/>P_MESSAGES = descripción
+        DBAdapter-->>ProxyHN: OutputParameters
+        ProxyHN->>ProxyHN: Asignar errorCode y validationMessage
+    end
+
+    OracleDB-->>DBAdapter: P_SUCCESSINDICATOR = SUCCESS<br/>P_MESSAGES = null/empty
+    DBAdapter-->>ProxyHN: OutputParameters
+
+    ProxyHN->>ProxyHN: Evaluar P_SUCCESSINDICATOR
+    Note right of ProxyHN: if(upper-case($errorCode) = 'SUCCESS')<br/>then '' else P_MESSAGES
+
+    Note over ProxyHN: Stage: FlujoSalida
+
+    ProxyHN->>ProxyHN: Construir ResponseHeader
+    Note right of ProxyHN: if ($validationMessage = '')<br/>then successIndicator=Success<br/>else successIndicator=$errorCode<br/>messages=$validationMessage
+
+    ProxyHN->>ProxyHN: Construir Body vacío
+    Note right of ProxyHN: <modificaClienteDesembolsoLineaCreditoResponse/>
+
+    ProxyHN-->>ProxyMain: Response
+    ProxyMain->>ProxyMain: Pipeline Response: MapeoError
+
+    alt successIndicator != SUCCESS
+        ProxyMain->>MapeoErr: Mapear Error
+        Note right of MapeoErr: ServiceID + ErrorCode + Messages
+        MapeoErr-->>ProxyMain: ResponseHeader Mapeado
+    end
+
+    ProxyMain-->>Client: SOAP Response
+    Note left of Client: ResponseHeader:<br/>successIndicator<br/>messages (si error)<br/>Body: vacío
+
+    Note over Client,OracleDB: Fin del Flujo

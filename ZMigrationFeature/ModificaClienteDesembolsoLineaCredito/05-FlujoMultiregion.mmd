@@ -1,0 +1,95 @@
+flowchart TD
+    Start([Cliente SOAP Request]) --> ValidateXSD[Validar XSD<br/>serviciosEmpresarialesTypes]
+    
+    ValidateXSD -->|Error| ErrorXSD[Asignar serviceID=FICBCO0364<br/>Extraer errorCode y errorMessage]
+    ErrorXSD --> MapError1[Invocar MapeoErrores]
+    MapError1 --> ReturnError1[Construir ResponseHeader Error<br/>Body vacío]
+    ReturnError1 --> End1([Reply Error])
+    
+    ValidateXSD -->|OK| ValidateRegion[Validar Servicio Regional<br/>ValidaServicioRegional_db]
+    
+    ValidateRegion --> CheckRegionResult{PV_CODIGO_ERROR<br/>= SUCCESS?}
+    
+    CheckRegionResult -->|No| BuildRegionError[Construir ResponseHeader<br/>successIndicator=ERROR<br/>messages=PV_MENSAJE_ERROR]
+    BuildRegionError --> ReturnError2[Body vacío]
+    ReturnError2 --> End2([Reply Error])
+    
+    CheckRegionResult -->|Sí| ApplyDefaults[Aplicar Valores Por Defecto Región<br/>aplicarValoresPorDefectoRegion.xq]
+    
+    ApplyDefaults --> BranchRegion{Evaluar<br/>SourceBank}
+    
+    BranchRegion -->|HN01| RouteHN[Route a<br/>ModificaClienteDesembolsoLineaCreditoHN]
+    
+    BranchRegion -->|Otros| DefaultBranch[Pipeline Default]
+    DefaultBranch --> ErrorNotImpl[Error MW-0008<br/>SERVICE NOT IMPLEMENTED YET]
+    ErrorNotImpl --> End3([Reply Error])
+    
+    RouteHN --> StageConsulta[Stage: ConsultaCliente]
+    
+    StageConsulta --> TransformConsulta[Transform consultaClienteHNIn.xq<br/>CUSTOMER_ID_TYPE=CUSTOMER_ID<br/>CUSTOMER_ID_VALUE=BASIC/ID]
+    
+    TransformConsulta --> InvokeConsulta[Invoke ConsultaCliente v3<br/>Middleware/v3/ProxyServices/ConsultaCliente]
+    
+    InvokeConsulta --> CheckConsulta{successIndicator<br/>= SUCCESS?}
+    
+    CheckConsulta -->|No| AssignErrorConsulta[errorCode = successIndicator<br/>validationMessage = messages]
+    AssignErrorConsulta --> BuildResponseError[Construir ResponseHeader Error]
+    BuildResponseError --> End4([Reply Error])
+    
+    CheckConsulta -->|Sí| AssignConsultaVars[Asignar variables:<br/>RSPConsultaCliente<br/>errorCode = SUCCESS<br/>validationMessage = empty]
+    
+    AssignConsultaVars --> StageModifica[Stage: ModificaClienteDLC]
+    
+    StageModifica --> CheckValidation{validationMessage<br/>= empty?}
+    
+    CheckValidation -->|No| SkipModifica[Saltar modificación]
+    SkipModifica --> StageSalida
+    
+    CheckValidation -->|Sí| TransformModifica[Transform modificaClienteSolEmprendedorHNIn.xq]
+    
+    TransformModifica --> MapBasic[Mapear Campos Básicos:<br/>P_CUSTOMER_ID=BASIC/ID<br/>P_CUSTOMER_NAME=consultaResp/SHORT_NAME<br/>P_LEGAL_ID=consultaResp/LEGAL_ID<br/>P_TARGET_ID=consultaResp/TARGET<br/>P_BRANCH_CODE, P_EXPIRATION_DAY<br/>P_FINANCIAL_STMT_DATE, etc]
+    
+    MapBasic --> MapArrays[Mapear Arrays:<br/>P_EMAILS_OLD/NEW<br/>P_LOAN_LIMITS<br/>P_DESTINATION_PRODUCTS<br/>P_DEBIT_ACCOUNTS<br/>P_CREDIT_LINES con anidados]
+    
+    MapArrays --> InvokeDB[Invoke modificaClienteSolEmprendedor_db<br/>Connection: eis/DB/ConnectionDLC<br/>Schema: DLC<br/>SP: DLC_P_MODIFICAR_CLIENTE]
+    
+    InvokeDB --> CheckDBResult{P_SUCCESSINDICATOR<br/>= SUCCESS?}
+    
+    CheckDBResult -->|No| AssignErrorDB[errorCode = P_SUCCESSINDICATOR<br/>validationMessage = P_MESSAGES]
+    AssignErrorDB --> StageSalida
+    
+    CheckDBResult -->|Sí| AssignSuccessDB[errorCode = SUCCESS<br/>validationMessage = empty]
+    AssignSuccessDB --> StageSalida[Stage: FlujoSalida]
+    
+    StageSalida --> BuildFinalResponse{validationMessage<br/>= empty?}
+    
+    BuildFinalResponse -->|Sí| BuildSuccess[ResponseHeader:<br/>successIndicator=Success]
+    BuildSuccess --> EmptyBody[Body vacío]
+    EmptyBody --> ReturnToMain[Return a Proxy Principal]
+    
+    BuildFinalResponse -->|No| BuildError[ResponseHeader:<br/>successIndicator=errorCode<br/>messages=validationMessage]
+    BuildError --> EmptyBody2[Body vacío]
+    EmptyBody2 --> ReturnToMain
+    
+    ReturnToMain --> PipelineResponse[Pipeline Response:<br/>MapeoError]
+    
+    PipelineResponse --> CheckFinalSuccess{successIndicator<br/>!= SUCCESS?}
+    
+    CheckFinalSuccess -->|Sí| InvokeMapError[Invoke MapeoErrores<br/>ServiceID + ErrorCode + Messages]
+    InvokeMapError --> ReplaceHeader[Replace ResponseHeader<br/>con error mapeado]
+    ReplaceHeader --> FinalReply
+    
+    CheckFinalSuccess -->|No| FinalReply([Reply al Cliente])
+    
+    FinalReply --> EndSuccess([Fin])
+    
+    style Start fill:#e1f5e1
+    style EndSuccess fill:#e1f5e1
+    style End1 fill:#ffe1e1
+    style End2 fill:#ffe1e1
+    style End3 fill:#ffe1e1
+    style End4 fill:#ffe1e1
+    style RouteHN fill:#e1e5ff
+    style InvokeConsulta fill:#fff4e1
+    style InvokeDB fill:#fff4e1
+    style InvokeMapError fill:#fff4e1

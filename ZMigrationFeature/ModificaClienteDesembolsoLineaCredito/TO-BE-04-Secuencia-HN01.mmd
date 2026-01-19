@@ -1,0 +1,83 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API Modifica Cliente Desembolso Crédito <br> Epica 2264: ModificaClienteDesembolsoLineaCredito <br> HU 5546:  PUT - /trade-banking/credit-facility-admin/v1/update-customer-disbursement
+    participant getCustomer as Consulta Clientes <br> Epica 2315: ConsultaCliente <br> HU 6945:  GET - /customer-management/customer-profile-retrieves/v1/retrieve-customer
+    participant DLC as Wrapper Connection DLC <br> Package: DLC <br> SP: DLC_P_MODIFICAR_CLIENTE
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+
+    Note over Consumidor,Errors: Flujo Honduras (HN01)
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, body with CUSTOMER data
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: CREDIT_FACILITY <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>API: Construye request API getCustomer
+    Note over API: Mapeo: <br> customerType = "CUSTOMER_ID" <br> customerReferenceValue = request.basic.customerReference
+
+    API->>getCustomer: Consulta cliente
+    Note right of API: queryparam: customerType, customerReferenceValue 
+
+    getCustomer->>API: Obtiene datos cliente
+    Note over getCustomer: HTTP CODE <br> shortName <br> legalIdentificationInfo.customerLegalReference <br> customerSegment <br> customerSegmentDescription
+
+    API->>API: Evalua Response API getCustomer
+
+    alt HTTP CODE != 200
+
+        API->> Consumidor: Retorna error API getCustomer
+    
+    else HTTP CODE == 200
+
+        API->>API: Construye Request Wrapper DLC
+        Note over API: Mapeo Parameters: <br> P_CUSTOMER_ID = request.basic.customerReference <br> P_CUSTOMER_NAME = responseGetCustomer.shortName <br> P_LEGAL_ID = responseGetCustomer.customerLegalReference <br> P_TARGET_ID = consultresponseGetCustomer.customerSegment <br> P_TARGET_DESCRIPTION = consultresponseGetCustomer.customerSegmentDescription <br> Campos adicionales y arrays (según contrato)
+
+        API->>DLC: CALL Wrapper Connection DLC
+        Note right of API: procedureName, schema, parameters, cacheEnabled, <br> cacheKey, cacheTtlMinutes
+
+        DLC->>API: Response Wrapper DLC
+        Note left of DLC: success, data.outputParameters
+
+        API->>API: Evalúa Response Wrapper DLC
+
+        alt success == "false"
+
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+            API->> Consumidor: Retorna error
+
+        else success == "true"
+
+            API->>API: Construye Response
+            Note over API: transactionDateTime = date-time (Format YYYY-MM-DDTHH:MM:SSZ) <br> customerReference = request.basic.customerReference 
+            
+            API->>Consumidor: REST Response exitoso
+            Note left of API: HTTP 200: Response Body
+        end
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
+
+    Note over Consumidor,DLC: Fin del Flujo
