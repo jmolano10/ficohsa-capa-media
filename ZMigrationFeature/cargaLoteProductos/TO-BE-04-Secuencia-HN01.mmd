@@ -1,0 +1,114 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor
+    participant API as API Carga Lote Productos <br> Epica 5278: cargaLoteProductos <br> HU 36135:  POST - /loans-and-deposit/deposit-account-management/v1/initiate-load-batches-products
+    participant Lib as Librería Pipeline
+    participant ValidaH2H as Validación H2H <br> Conexión: jca://eis/DB/ConnectionInterfazdbvalidaAccesoH2H <br> SP: HTH_P_VALIDA_ACCESO_H2H <br> Package: HTH_K_SEGURIDAD_H2H
+    participant getCustomer as Consulta Clientes <br> Epica 2315: ConsultaCliente <br> HU 6945:  GET - /customer-management/customer-profile-retrieves/v1/retrieve-customer
+    participant SP as Oracle DB <br> SP: HTH_P_CARGA_LOTE_PRODUCTOS <br> Package: HTH_K_APERTURA_MASIVA <br> Conexión: eis/DB/ConnectionWebServices
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - cargaLoteProductos
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Headers <br> body: corporateCustomerReference <br> payrollGroupReference <br> customerPortfolio (array empleados) <br> kvPairs
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: DEPOSIT_ACCOUNT_MANAGEMENT <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>Lib: Consulta Constantes
+   
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: operacion = "CARGA_LOTE_PRODUCTOS" <br> idProxy = "FICBCO0379"
+
+    API->>API: Construye request Validación H2H
+    Note over API: Mapeo: <br> PV_NOMBREUSUARIO = header.Application-User <br> PV_CODIGOCLIENTE = request.corporateCustomerReference <br> PV_CODIGOPAIS = header.SourceBank <br> PV_OPERACION = "CARGA_LOTE_PRODUCTOS" <br> PV_IDPROXY = "FICBCO0379"
+
+    API->>ValidaH2H: Consume SP Validación H2H
+    Note right of API: PV_NOMBREUSUARIO <br> PV_CODIGOCLIENTE <br>P V_CODIGOPAIS <br> PV_OPERACION <br> PV_IDPROXY
+
+    ValidaH2H-->>API: Resposne Validación H2H
+    Note left of ValidaH2H: PV_DESCRIPCIONMENSAJE
+
+    alt PV_DESCRIPCIONMENSAJE != ''
+        
+        API->> Errors: Mapear código de error
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->>Consumidor: Rest Response Error H2H
+        Note right of Consumidor: HTTP 422: "El usuario y/o Consumidor no tiene acceso a operaciones host to host"
+
+    else PV_DESCRIPCIONMENSAJE == ''
+
+        API->>API: Construye request API getCustomer
+        Note over API: Mapeo: <br> customerType = "CUSTOMER_ID" <br> customerReferenceValue = request.corporateCustomerReference 
+
+        API->>getCustomer: Consulta cliente
+        Note right of API: queryparam: customerType, customerReferenceValue 
+
+        getCustomer->>API: Obtiene datos cliente
+        Note left of getCustomer: HTTP CODE <br> businessName <br> partyAddressInfo.neighborhoodCode <br> partyAddressInfo.streetName <br> partyAddressInfo.blockNumber <br> partyAddressInfo.houseNumber <br> partyAddressInfoaddressReferences <br> contactPhoneInfo.phoneNumber
+
+        API->>API: Evalua Response API getCustomer
+
+        alt HTTP CODE != 200
+
+            API->> Consumidor: Retorna error API getCustomer
+        
+        else HTTP CODE == 200
+
+            API->>API: Cuenta número de empleados (request.customerPortfolio)
+            Note over API: count(customerPortfolio.customerRecord) → PN_NUMEROCLIENTES
+
+            API->>API: Construye Request a SP
+            Note over API: Mapeo:<br> - customerIdentification → PV_CODIGOCLIENTE <br> - payrollGroup → PV_CODIGOGRUPOPLANILLA <br> - header.Application-User → PV_USUARIO <br> - Datos empresa (7 campos response getCustomer) <br> - Arrays empleados (26 campos request)
+
+            API->>SP: Consume SP cargaLoteProductos
+            Note right of API: Parámetros: <br> - PV_CODIGOCLIENTE <br> - PV_CODIGOGRUPOPLANILLA <br> - PV_USUARIO <br> - PN_NUMEROCLIENTES <br> - Datos empresa (7 campos) <br> - Arrays empleados (26 campos)
+
+            SP->>API: OutputParameters SP
+            Note left of SP: PV_CODIGOCLIENTE<br>PV_CODIGOLOTE<br>PV_CODIGOERROR<br>PV_DESCRIPCIONMENSAJE
+
+            API->>API: Evalúa OutputParameters SP
+
+            alt PV_CODIGOERROR != "SUCCESS"
+
+                API->> Errors: Mapear código de error
+                Errors ->> API: Retorna código mapeado
+                API->> Consumidor: Retorna error
+
+            else PV_CODIGOERROR == "SUCCESS"
+
+                API->>API: Transformar Response
+                Note over API: BANK_BATCH_ID → response.codeLote
+
+                API->>Consumidor: Response exitoso
+                Note left of API: response.codeLote
+            end
+        end
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
+
+    Note over Consumidor, Errors: Fin del Flujo HN01

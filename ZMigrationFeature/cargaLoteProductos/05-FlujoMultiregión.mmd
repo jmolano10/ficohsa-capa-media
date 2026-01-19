@@ -1,0 +1,125 @@
+flowchart TD
+    Start([Cliente invoca<br/>cargaLoteProductos]) --> ReceiveReq[Recibir SOAP Request]
+    
+    ReceiveReq --> ValidateSchema{Validar Esquema XML<br/>aperturaMasivaTypes.xsd}
+    ValidateSchema -->|Inválido| ErrorSchema[Error: Schema Validation]
+    ErrorSchema --> MapError1[Mapear Error]
+    MapError1 --> ReturnError1[Retornar SOAP Fault]
+    ReturnError1 --> End1([Fin])
+    
+    ValidateSchema -->|Válido| ValidateCustomer{CUSTOMER_ID<br/>no vacío?}
+    ValidateCustomer -->|No| ErrorCustomer[Error: NO CUSTOMER ID<br/>'El id de cliente no puede ir vacio']
+    ErrorCustomer --> MapError2[Mapear Error]
+    MapError2 --> ReturnError2[Retornar Error]
+    ReturnError2 --> End2([Fin])
+    
+    ValidateCustomer -->|Sí| ValidatePayroll{PAYROLL_GROUP_ID<br/>no vacío?}
+    ValidatePayroll -->|No| ErrorPayroll[Error: NO PAYROLL GROUP<br/>'El código de grupo planilla es necesario']
+    ErrorPayroll --> MapError3[Mapear Error]
+    MapError3 --> ReturnError3[Retornar Error]
+    ReturnError3 --> End3([Fin])
+    
+    ValidatePayroll -->|Sí| CallValidaRegion[Llamar validaServicioRegional]
+    CallValidaRegion --> ValidaRegionDB[(DB: ValidaServicioRegional<br/>serviceId: FICBCO0380<br/>region: SourceBank)]
+    ValidaRegionDB --> CheckRegion{PV_CODIGO_ERROR<br/>== 'SUCCESS'?}
+    
+    CheckRegion -->|No| ErrorRegion[Error Regional<br/>PV_MENSAJE_ERROR]
+    ErrorRegion --> BuildErrorResp1[Construir ResponseHeader<br/>successIndicator: ERROR]
+    BuildErrorResp1 --> ReturnError4[Retornar Error]
+    ReturnError4 --> End4([Fin])
+    
+    CheckRegion -->|Sí| CallValidaH2H[Llamar validaAccesoH2H]
+    CallValidaH2H --> ValidaH2HDB[(DB: validaAccesoH2H<br/>usuario, cliente, país<br/>operación, idProxy: FICBCO0379)]
+    ValidaH2HDB --> CheckH2H{PV_DESCRIPCIONMENSAJE<br/>vacío?}
+    
+    CheckH2H -->|No| ErrorH2H[Error: ERROR<br/>'El usuario y/o cliente no tiene<br/>acceso a operaciones host to host']
+    ErrorH2H --> MapError4[Mapear Error]
+    MapError4 --> ReturnError5[Retornar Error]
+    ReturnError5 --> End5([Fin])
+    
+    CheckH2H -->|Sí| BranchRegion{Evaluar<br/>SourceBank}
+    
+    BranchRegion -->|HN01| PipelineHN[Pipeline:<br/>ConsultaDetalleLoteHN_request]
+    BranchRegion -->|GT01, PA01, NI01<br/>u otros| PipelineDefault[Pipeline:<br/>Default_response]
+    
+    PipelineDefault --> ErrorNotImpl[Error: MW-0008<br/>'SERVICE NOT IMPLEMENTED YET<br/>FOR THIS COUNTRY/COMPANY']
+    ErrorNotImpl --> MapError5[Mapear Error]
+    MapError5 --> ReturnError6[Retornar Error]
+    ReturnError6 --> End6([Fin])
+    
+    PipelineHN --> CallT24[Llamar sjConsultaClienteResiliencia]
+    CallT24 --> GetLDAP[Obtener credenciales LDAP<br/>Path: Middleware/Security/USER]
+    GetLDAP --> T24Service[T24: Consultadecliente<br/>@ID = CUSTOMER_ID]
+    T24Service --> CheckT24{Status/successIndicator<br/>== 'Success'}
+    
+    CheckT24 -->|No| ErrorT24[Error: NO RECORDS<br/>'No se encontró la información<br/>del cliente']
+    ErrorT24 --> MapError6[Mapear Error]
+    MapError6 --> ReturnError7[Retornar Error]
+    ReturnError7 --> End7([Fin])
+    
+    CheckT24 -->|Sí| ExtractT24[Extraer datos T24:<br/>NAMEOFBUSINESS, COLONYCODE<br/>ADDSTREET, BLOCK, HOUSENUMBER<br/>PHONE, REFERENCES]
+    
+    ExtractT24 --> TransformIN[Transformar Request<br/>XQuery: cargaLoteProductosIN.xq]
+    TransformIN --> MapData[Mapear 37 parámetros:<br/>- Datos empresa desde T24<br/>- Datos request OSB<br/>- Arrays de empleados]
+    
+    MapData --> CallSP[Llamar Stored Procedure]
+    CallSP --> SPDB[(Oracle DB:<br/>HTH_K_APERTURA_MASIVA.<br/>HTH_P_CARGA_LOTE_PRODUCTOS<br/>Conexión: eis/DB/ConnectionWebServices)]
+    
+    SPDB --> ProcessSP[Procesar Carga de Lote:<br/>- Validar datos<br/>- Insertar lote<br/>- Insertar empleados]
+    
+    ProcessSP --> ReturnSP[Retornar OutputParameters:<br/>PV_CODIGOCLIENTE<br/>PV_CODIGOLOTE<br/>PV_CODIGOERROR<br/>PV_DESCRIPCIONMENSAJE]
+    
+    ReturnSP --> AssignVars[Asignar variables:<br/>codError = PV_CODIGOERROR<br/>descMens = PV_DESCRIPCIONMENSAJE<br/>codLote = PV_CODIGOLOTE]
+    
+    AssignVars --> PipelineHNResp[Pipeline:<br/>ConsultaDetalleLoteHN_response]
+    
+    PipelineHNResp --> CheckSPError{codError<br/>== 'SUCCESS'?}
+    
+    CheckSPError -->|No| BuildErrorSP[Construir ResponseHeader:<br/>successIndicator: codError<br/>messages: descMens]
+    BuildErrorSP --> EmptyBody1[Construir body vacío:<br/><cargaLoteProductosResponse/>]
+    EmptyBody1 --> PipelinePPResp1[Pipeline:<br/>ConsultaDetalleLotePP_response]
+    PipelinePPResp1 --> MapErrorSP[Stage: MapeoError<br/>Llamar mapeoErrores]
+    MapErrorSP --> MapErrorService1[(OSB: mapeoErrores<br/>CODIGO_ERROR: codError<br/>MENSAJE_ERROR: FICBCO0380$#$descMens)]
+    MapErrorService1 --> UpdateHeader1[Actualizar ResponseHeader<br/>con mensaje mapeado]
+    UpdateHeader1 --> ReturnError8[Retornar Response con error]
+    ReturnError8 --> End8([Fin])
+    
+    CheckSPError -->|Sí| BuildSuccessHeader[Construir ResponseHeader:<br/>successIndicator: SUCCESS]
+    BuildSuccessHeader --> TransformOUT[Transformar Response<br/>XQuery: cargaLoteProductosOUT.xq]
+    TransformOUT --> MapLote[Mapear:<br/>codLote → BANK_BATCH_ID]
+    MapLote --> BuildBody[Construir body:<br/><cargaLoteProductosResponse><br/>  <BANK_BATCH_ID>codLote</BANK_BATCH_ID><br/></cargaLoteProductosResponse>]
+    
+    BuildBody --> PipelinePPResp2[Pipeline:<br/>ConsultaDetalleLotePP_response]
+    PipelinePPResp2 --> CheckSuccess{successIndicator<br/>== 'SUCCESS'?}
+    
+    CheckSuccess -->|No| MapErrorFinal[Stage: MapeoError<br/>Llamar mapeoErrores]
+    MapErrorFinal --> MapErrorService2[(OSB: mapeoErrores)]
+    MapErrorService2 --> UpdateHeader2[Actualizar ResponseHeader]
+    UpdateHeader2 --> ReturnError9[Retornar Response]
+    ReturnError9 --> End9([Fin])
+    
+    CheckSuccess -->|Sí| ReturnSuccess[Retornar Response Exitoso]
+    ReturnSuccess --> End10([Fin - Éxito])
+    
+    style Start fill:#90EE90
+    style End1 fill:#FFB6C1
+    style End2 fill:#FFB6C1
+    style End3 fill:#FFB6C1
+    style End4 fill:#FFB6C1
+    style End5 fill:#FFB6C1
+    style End6 fill:#FFB6C1
+    style End7 fill:#FFB6C1
+    style End8 fill:#FFB6C1
+    style End9 fill:#FFB6C1
+    style End10 fill:#90EE90
+    
+    style ValidaRegionDB fill:#87CEEB
+    style ValidaH2HDB fill:#87CEEB
+    style T24Service fill:#FFD700
+    style SPDB fill:#87CEEB
+    style MapErrorService1 fill:#DDA0DD
+    style MapErrorService2 fill:#DDA0DD
+    
+    style BranchRegion fill:#FFA500
+    style PipelineHN fill:#98FB98
+    style PipelineDefault fill:#FFB6C1

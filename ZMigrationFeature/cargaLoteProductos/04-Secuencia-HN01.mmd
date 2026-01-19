@@ -1,0 +1,146 @@
+sequenceDiagram
+    participant Cliente as Cliente/Aplicación H2H
+    participant OSB as OSB Proxy<br/>CargaLoteProductos
+    participant ValidaRegion as DB Adapter<br/>validaServicioRegional
+    participant ValidaH2H as DB Adapter<br/>validaAccesoH2H
+    participant T24 as T24 Core Banking<br/>sjConsultaClienteResiliencia
+    participant SP as Oracle DB<br/>HTH_P_CARGA_LOTE_PRODUCTOS
+    participant MapeoErr as OSB Service<br/>mapeoErrores
+    participant ErrorHandler as Error Handler
+
+    Note over Cliente, ErrorHandler: Flujo Honduras (HN01) - cargaLoteProductos
+
+    Cliente->>OSB: SOAP Request cargaLoteProductos
+    Note right of Cliente: Header: SourceBank=HN01<br/>Body: CUSTOMER_ID, PAYROLL_GROUP_ID<br/>CUSTOMERS array (empleados)
+
+    OSB->>OSB: Pipeline: ConsultaDetalleLotePP_request
+    OSB->>OSB: Stage: ValidateMessage
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Schema: aperturaMasivaTypes.xsd<br/>Element: cargaLoteProductosRequest
+
+    alt Esquema Inválido
+        OSB->>ErrorHandler: Validation Error
+        ErrorHandler->>MapeoErr: mapeoErrores(errorCode, errorMessage)
+        Note right of ErrorHandler: Concat: "FICBCO0380$#$" + mensaje
+        MapeoErr-->>ErrorHandler: Mensaje mapeado
+        ErrorHandler->>OSB: ResponseHeader con error
+        OSB->>Cliente: SOAP Fault / Error Response
+    end
+
+    OSB->>OSB: Validar CUSTOMER_ID no vacío
+    alt CUSTOMER_ID vacío
+        OSB->>ErrorHandler: Error: NO CUSTOMER ID
+        ErrorHandler->>MapeoErr: mapeoErrores
+        MapeoErr-->>ErrorHandler: Mensaje mapeado
+        ErrorHandler->>Cliente: "El id de cliente no puede ir vacio"
+    end
+
+    OSB->>OSB: Validar PAYROLL_GROUP_ID no vacío
+    alt PAYROLL_GROUP_ID vacío
+        OSB->>ErrorHandler: Error: NO PAYROLL GROUP
+        ErrorHandler->>MapeoErr: mapeoErrores
+        MapeoErr-->>ErrorHandler: Mensaje mapeado
+        ErrorHandler->>Cliente: "El código de grupo planilla es necesario"
+    end
+
+    OSB->>OSB: Stage: ValidacionServicioRegional
+    OSB->>ValidaRegion: ValidaServicioRegional(serviceId, region)
+    Note right of OSB: XQuery: validaServicioRegionalIn.xq<br/>serviceId: "FICBCO0380"<br/>region: RequestHeader/Region
+
+    ValidaRegion->>ValidaRegion: Ejecutar SP ValidaServicioRegional
+    Note right of ValidaRegion: Conexión: eis/DB/ConnectionWebServices<br/>Verificar servicio habilitado para región
+
+    ValidaRegion-->>OSB: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+
+    alt PV_CODIGO_ERROR != 'SUCCESS'
+        OSB->>OSB: Construir ResponseHeader con error
+        Note right of OSB: successIndicator: ERROR<br/>messages: PV_MENSAJE_ERROR
+        OSB->>OSB: Construir body vacío
+        OSB->>Cliente: Response con error regional
+    end
+
+    OSB->>OSB: Stage: ValidaAccesso
+    OSB->>ValidaH2H: validaAccesoH2H(usuario, cliente, país, operación, idProxy)
+    Note right of OSB: XQuery: validaAccesoH2HIn.xq<br/>usuario: upper-case(UserName)<br/>codigoCliente: CUSTOMER_ID<br/>codigoPais: SourceBank<br/>operacion: upper-case($operation)<br/>idProxy: "FICBCO0379"
+
+    ValidaH2H->>ValidaH2H: Ejecutar SP validaAccesoH2H
+    Note right of ValidaH2H: Conexión: eis/DB/ConnectionWebServices<br/>Verificar permisos H2H
+
+    ValidaH2H-->>OSB: PV_DESCRIPCIONMENSAJE
+
+    alt PV_DESCRIPCIONMENSAJE != ''
+        OSB->>ErrorHandler: Error: ERROR
+        ErrorHandler->>MapeoErr: mapeoErrores
+        MapeoErr-->>ErrorHandler: Mensaje mapeado
+        ErrorHandler->>Cliente: "El usuario y/o cliente no tiene acceso a operaciones host to host"
+    end
+
+    OSB->>OSB: Branch Node: Regionalizacion
+    Note right of OSB: Evaluar: SourceBank<br/>Branch: HN01
+
+    alt SourceBank != "HN01"
+        OSB->>OSB: Pipeline: Default_response
+        OSB->>ErrorHandler: Error: MW-0008
+        ErrorHandler->>Cliente: "SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY"
+    end
+
+    OSB->>OSB: Pipeline: ConsultaDetalleLoteHN_request
+    OSB->>OSB: Stage: FlujoEntrada
+
+    OSB->>T24: Consultadecliente(CUSTOMER_ID)
+    Note right of OSB: XQuery: ConsultaClienteIN.xq<br/>userName: getUsername(LDAP)<br/>password: getPassword(LDAP)<br/>LDAP Path: Middleware/Security/{USER}<br/>enquiryInputCollection:<br/>  columnName: @ID<br/>  criteriaValue: CUSTOMER_ID<br/>  operand: EQ
+
+    T24->>T24: Consultar Cliente Corporativo
+    Note right of T24: Sistema: T24 Core Banking<br/>Operación: Consultadecliente<br/>Buscar por @ID = CUSTOMER_ID
+
+    T24-->>OSB: WSCUSTOMERType (datos cliente)
+    Note left of T24: Status/successIndicator<br/>NAMEOFBUSINESS<br/>COLONYCODE, ADDSTREET<br/>BLOCK, HOUSENUMBER<br/>PHONE, REFERENCES
+
+    alt Status/successIndicator != "Success"
+        OSB->>ErrorHandler: Error: NO RECORDS
+        ErrorHandler->>MapeoErr: mapeoErrores
+        MapeoErr-->>ErrorHandler: Mensaje mapeado
+        ErrorHandler->>Cliente: "No se encontró la información del cliente"
+    end
+
+    OSB->>OSB: Transformar Request a SP
+    Note right of OSB: XQuery: cargaLoteProductosIN.xq<br/>Mapear:<br/>- Datos empresa desde T24<br/>- Datos request OSB<br/>- Arrays de empleados (37 parámetros)
+
+    OSB->>SP: cargaLoteProductos(InputParameters)
+    Note right of OSB: Package: HTH_K_APERTURA_MASIVA<br/>SP: HTH_P_CARGA_LOTE_PRODUCTOS<br/>Conexión: eis/DB/ConnectionWebServices<br/>Parámetros:<br/>- PV_CODIGOCLIENTE<br/>- PV_CODIGOGRUPOPLANILLA<br/>- PV_USUARIO<br/>- PN_NUMEROCLIENTES<br/>- Datos empresa (7 params)<br/>- Arrays empleados (26 arrays)
+
+    SP->>SP: Procesar Carga de Lote
+    Note right of SP: Esquema: PAGOSWS<br/>Insertar/Actualizar:<br/>- Registro de lote<br/>- Registros de empleados<br/>- Validaciones de negocio
+
+    SP-->>OSB: OutputParameters
+    Note left of SP: PV_CODIGOCLIENTE<br/>PV_CODIGOLOTE<br/>PV_CODIGOERROR<br/>PV_DESCRIPCIONMENSAJE
+
+    OSB->>OSB: Asignar variables
+    Note right of OSB: $codError = PV_CODIGOERROR<br/>$descMens = PV_DESCRIPCIONMENSAJE<br/>$codLote = PV_CODIGOLOTE
+
+    OSB->>OSB: Pipeline: ConsultaDetalleLoteHN_response
+    OSB->>OSB: Stage: FlujoSalida
+
+    alt $codError != "SUCCESS"
+        OSB->>OSB: Construir ResponseHeader con error
+        Note right of OSB: successIndicator: $codError<br/>messages: $descMens
+        OSB->>OSB: Construir body vacío
+        Note right of OSB: <cargaLoteProductosResponse/>
+        OSB->>OSB: Pipeline: ConsultaDetalleLotePP_response
+        OSB->>OSB: Stage: MapeoError
+        OSB->>MapeoErr: mapeoErrores(codError, mensaje)
+        Note right of OSB: XQuery: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: upper-case(successIndicator)<br/>MENSAJE_ERROR: "FICBCO0380$#$" + messages
+        MapeoErr-->>OSB: Mensaje mapeado
+        OSB->>OSB: Actualizar ResponseHeader
+        Note right of OSB: XQuery: mapeoErroresUsageOut.xq
+        OSB->>Cliente: Response con error mapeado
+    else $codError == "SUCCESS"
+        OSB->>OSB: Construir ResponseHeader exitoso
+        Note right of OSB: successIndicator: SUCCESS
+        OSB->>OSB: Transformar Response
+        Note right of OSB: XQuery: cargaLoteProductosOUT.xq<br/>Mapear: $codLote → BANK_BATCH_ID
+        OSB->>Cliente: Response exitoso
+        Note left of Cliente: <cargaLoteProductosResponse><br/>  <BANK_BATCH_ID>LOTE20240115001</BANK_BATCH_ID><br/></cargaLoteProductosResponse>
+    end
+
+    Note over Cliente, ErrorHandler: Fin del Flujo HN01
