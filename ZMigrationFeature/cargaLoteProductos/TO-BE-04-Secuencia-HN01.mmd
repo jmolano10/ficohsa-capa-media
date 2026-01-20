@@ -2,8 +2,9 @@ sequenceDiagram
     autonumber
     participant Consumidor as Consumidor
     participant API as API Carga Lote Productos <br> Epica 5278: cargaLoteProductos <br> HU 36135:  POST - /loans-and-deposit/deposit-account-management/v1/initiate-load-batches-products
-    participant Lib as Librería Pipeline
-    participant ValidaH2H as Validación H2H <br> Conexión: jca://eis/DB/ConnectionInterfazdbvalidaAccesoH2H <br> SP: HTH_P_VALIDA_ACCESO_H2H <br> Package: HTH_K_SEGURIDAD_H2H
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant ValidaH2H as API Validación H2H  <br> Epica XXXX: cargaLoteProductos <br> HU XXXX:  POST - 
     participant getCustomer as Consulta Clientes <br> Epica 2315: ConsultaCliente <br> HU 6945:  GET - /customer-management/customer-profile-retrieves/v1/retrieve-customer
     participant SP as Oracle DB <br> SP: HTH_P_CARGA_LOTE_PRODUCTOS <br> Package: HTH_K_APERTURA_MASIVA <br> Conexión: eis/DB/ConnectionWebServices
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
@@ -24,15 +25,31 @@ sequenceDiagram
     API->>API: Validación Regional Exitosa
     Note over API: Servicio habilitado para HN01
 
-    API->>Lib: Consulta Constantes
-   
-    Lib->>API: Retorna constantes necesarias
-    Note left of Lib: operacion = "CARGA_LOTE_PRODUCTOS" <br> idProxy = "FICBCO0379"
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros caché local
+        Note right of API: Domain: DEPOSIT_ACCOUNT_MANAGEMENT_H2H_VALIDATION <br> name: PARAM
+
+        CL->>API: Obtiene parámetros 
+        Note left of CL: ObtenerParametrizacion 2 Parámetros: <br> operation = "CARGA_LOTE_PRODUCTOS" <br> idProxy = "FICBCO0379"
+
+    else Consulta  parametros en Lambda Parámetros
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: DEPOSIT_ACCOUNT_MANAGEMENT_H2H_VALIDATION <br> name: PARAM
+
+        Lambda->>API: Obtiene parámetros 
+        Note left of Lambda: ObtenerParametrizacion 2 Parámetros: <br> operation = "CARGA_LOTE_PRODUCTOS" <br> idProxy = "FICBCO0379"
+
+        API->>CL: Guarda parámetros en caché local
+        Note right of API: operation <br> idProxy 
+
+    end
 
     API->>API: Construye request Validación H2H
     Note over API: Mapeo: <br> PV_NOMBREUSUARIO = header.Application-User <br> PV_CODIGOCLIENTE = request.corporateCustomerReference <br> PV_CODIGOPAIS = header.SourceBank <br> PV_OPERACION = "CARGA_LOTE_PRODUCTOS" <br> PV_IDPROXY = "FICBCO0379"
 
-    API->>ValidaH2H: Consume SP Validación H2H
+    API->>ValidaH2H: Consume API Validación H2H
     Note right of API: PV_NOMBREUSUARIO <br> PV_CODIGOCLIENTE <br>P V_CODIGOPAIS <br> PV_OPERACION <br> PV_IDPROXY
 
     ValidaH2H-->>API: Resposne Validación H2H

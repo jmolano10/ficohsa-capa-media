@@ -1,0 +1,71 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Transacción Switch <br> Epica 2384: ConsultaTransaccionSwitch <br> HU 7060:  GET - /payments/payment-execution-retrieves/v1/retrieve-switch-transaction
+    participant Lib as Librería Pipeline
+    participant T24 as Wrapper T24 <br> Operación: Consultadetransaccionswitch
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - ConsultaTransaccionSwitch
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: transactionReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> transactionReference (obligatorio)
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: PAYMENT_EXECUTION_RETRIEVES <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>Lib: Consulta Constantes
+   
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: columnName = "TXN.RE" <br> operand = "EQ"
+
+    API->>API: Construye Request Wrapper T24
+    Note over API: Mapeo: <br> columnName = TXN.REF <br> criteriaValue = request.transactionReference <br> operand = EQ 
+
+    API->>T24: Consume Wrapper T24 OP: Consultadetransaccionswitch
+
+    T24->>API: Response Wrapper T24
+    Note left of T24: ID, TXNREFERENCE, ATMID<br/>NETWORKID, TRACENUMBER<br/>TXNDATE, TXNTIME, AMOUNT<br/>CURRENCY, AUTHCODE<br/>MCCCODE, BRANCHNAME
+
+    API->>API: Evaluar Resultado Wrapper T24
+
+    alt Response con ZERORECORDS
+
+        API->> Errors: Mapear código de error
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: REST Response Error
+        Note left of API: HTTP 404: No Records Found
+
+    else Response con Data
+
+        API->>API: Construye Response API
+        Note over API: Mapeo campos directo
+
+        API->>Consumidor: REST Response Successful
+        Note left of API: HTTP 200: Response Body
+
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

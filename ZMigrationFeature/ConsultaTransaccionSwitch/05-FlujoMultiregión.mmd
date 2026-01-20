@@ -1,0 +1,84 @@
+flowchart TD
+    Start([Cliente invoca ConsultaTransaccionSwitch]) --> ValidateXSD[Validar Esquema XSD]
+    
+    ValidateXSD -->|Válido| ValidateRegion[Validar Servicio Regional]
+    ValidateXSD -->|Inválido| ErrorXSD[Generar Fault XSD]
+    
+    ErrorXSD --> ErrorHandler[Error Handler]
+    
+    ValidateRegion -->|Construir Request| CallValidaDB[(Llamar ValidaServicioRegional_db)]
+    
+    CallValidaDB --> CheckValidation{PV_CODIGO_ERROR<br/>== SUCCESS?}
+    
+    CheckValidation -->|No| BuildErrorResponse[Construir Response Error]
+    BuildErrorResponse --> ReturnError[Reply con Error Regional]
+    ReturnError --> End([Fin])
+    
+    CheckValidation -->|Sí| ApplyDefaults[Aplicar Valores por Defecto Región]
+    
+    ApplyDefaults --> RouteRegion{Enrutamiento<br/>SourceBank?}
+    
+    RouteRegion -->|HN01| PipelineHN01[Pipeline ConsultaTxnHND]
+    RouteRegion -->|GT01, PA01, NI01, HN02, Otros| PipelineDefault[Pipeline Default]
+    
+    PipelineDefault --> ErrorNotImplemented[Error MW-0008:<br/>SERVICE NOT IMPLEMENTED]
+    ErrorNotImplemented --> MapError1[Mapear Error]
+    MapError1 --> End
+    
+    PipelineHN01 --> GetCredentials[Obtener Credenciales LDAP]
+    
+    GetCredentials -->|Lookup| LDAPConfig[(Middleware/Security/USERNAME)]
+    
+    LDAPConfig -->|Success| TransformRequest[Transformar Request OSB → T24]
+    LDAPConfig -->|Fail| ErrorCredentials[Error Credenciales]
+    ErrorCredentials --> ErrorHandler
+    
+    TransformRequest -->|XQuery: consultaTransaccionSwitchHNIn.xq| BuildT24Request[Construir Request T24]
+    
+    BuildT24Request --> CallT24[(Llamar consultasTransacciones)]
+    
+    CallT24 -->|Load Balanced<br/>4 endpoints| T24Service[T24 Web Service]
+    
+    T24Service -->|Execute Enquiry| T24Enquiry[(WS.SWITCH.TRANSACTION)]
+    
+    T24Enquiry -->|Criteria: TXN.REF EQ| T24Response{Response<br/>T24}
+    
+    T24Response -->|ZERORECORDS presente| NoRecords[Sin Resultados]
+    T24Response -->|Datos presentes| HasData[Datos Encontrados]
+    
+    NoRecords --> SetIndicatorNR[successIndicator = NO RECORDS]
+    SetIndicatorNR --> BuildHeaderNR[Construir ResponseHeader]
+    BuildHeaderNR --> EmptyBody[Body Vacío]
+    EmptyBody --> CheckError
+    
+    HasData --> TransformResponse[Transformar Response T24 → OSB]
+    TransformResponse -->|XQuery: consultaTransaccionSwitchHNOut.xq| MapFields[Mapear 12 Campos]
+    MapFields --> SetIndicatorOK[successIndicator = SUCCESS]
+    SetIndicatorOK --> BuildHeaderOK[Construir ResponseHeader]
+    BuildHeaderOK --> PopulateBody[Poblar Body con Datos]
+    PopulateBody --> CheckError{successIndicator<br/>!= SUCCESS?}
+    
+    CheckError -->|Sí| CallMapeoErrores[(Llamar MapeoErrores)]
+    CheckError -->|No| ReturnSuccess[Reply Success]
+    
+    CallMapeoErrores --> UpdateHeader[Actualizar ResponseHeader]
+    UpdateHeader --> ReturnMappedError[Reply con Error Mapeado]
+    ReturnMappedError --> End
+    
+    ReturnSuccess --> End
+    
+    ErrorHandler --> ExtractError[Extraer errorCode y errorMessage]
+    ExtractError --> CallMapeoErrores2[(Llamar MapeoErrores)]
+    CallMapeoErrores2 --> BuildErrorBody[Construir Body Vacío]
+    BuildErrorBody --> ReturnFault[Reply con Fault]
+    ReturnFault --> End
+    
+    style Start fill:#e1f5e1
+    style End fill:#ffe1e1
+    style PipelineHN01 fill:#e1e5ff
+    style PipelineDefault fill:#ffe1e1
+    style ErrorHandler fill:#ffcccc
+    style T24Service fill:#fff4e1
+    style CallValidaDB fill:#e1f5ff
+    style LDAPConfig fill:#f0e1ff
+    style T24Enquiry fill:#fff4e1

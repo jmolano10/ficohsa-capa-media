@@ -1,0 +1,108 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Proxy as ConsultaTransaccionSwitch Proxy
+    participant ValidaDB as ValidaServicioRegional_db
+    participant OracleDB as Oracle Database
+    participant T24WS as consultasTransacciones (T24)
+    participant T24Core as T24 Core Banking
+    participant MapeoErr as MapeoErrores Proxy
+
+    Note over Client, T24Core: Flujo Honduras (HN01) - ConsultaTransaccionSwitch
+
+    Client->>Proxy: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: TRANSACTION_ID
+
+    Proxy->>Proxy: Validar Esquema XML
+    Note right of Proxy: Schema: consultaTransaccionSwitchTypes.xsd<br/>Element: consultaTransaccionSwitch
+
+    alt Validación XSD Fallida
+        Proxy->>Proxy: Generar Fault
+        Proxy->>Proxy: Error Handler
+        Proxy->>MapeoErr: mapeoErrores(errorCode, errorMessage)
+        MapeoErr-->>Proxy: Error Homologado
+        Proxy->>Client: SOAP Fault con Error Mapeado
+    end
+
+    Proxy->>Proxy: Construir Request Validación
+    Note right of Proxy: XQuery: validaServicioRegionalIn.xq<br/>PV_SERVICIO=FICBCO0141<br/>PV_ORIGEN=HN01<br/>PV_DESTINO=HN01
+
+    Proxy->>ValidaDB: ValidaServicioRegional(PV_SERVICIO, PV_ORIGEN, PV_DESTINO)
+    ValidaDB->>OracleDB: CALL MW_P_VALIDA_SERVICIO_REGIONAL
+    Note right of OracleDB: Stored Procedure<br/>Valida habilitación regional
+
+    OracleDB-->>ValidaDB: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+    ValidaDB-->>Proxy: Response Validación
+
+    alt Validación Regional Fallida
+        Proxy->>Proxy: PV_CODIGO_ERROR != 'SUCCESS'
+        Proxy->>Proxy: Construir Response Error
+        Note right of Proxy: successIndicator=ERROR<br/>messages=PV_MENSAJE_ERROR
+        Proxy->>Client: Response con Error Regional
+    end
+
+    Proxy->>Proxy: Aplicar Valores por Defecto
+    Note right of Proxy: XQuery: aplicarValoresPorDefectoRegion.xq<br/>Si SourceBank vacío → HN01
+
+    Proxy->>Proxy: Enrutamiento Regional
+    Note right of Proxy: Branch: SourceBank = 'HN01'<br/>Pipeline: ConsultaTxnHND
+
+    Proxy->>Proxy: Obtener Credenciales LDAP
+    Note right of Proxy: Path: Middleware/Security/{USERNAME}<br/>getUsername(), getPassword()
+
+    Proxy->>Proxy: Transformar Request
+    Note right of Proxy: XQuery: consultaTransaccionSwitchHNIn.xq<br/>TRANSACTION_ID → TXN.REF<br/>Operand: EQ
+
+    Proxy->>T24WS: Consultadetransaccionswitch(WebRequestCommon, WSSWITCHTRANSACTIONType)
+    Note right of T24WS: Endpoints Load Balanced:<br/>10.9.104.97:7003/7005<br/>10.9.104.32:7004/7006<br/>Timeout: 60s
+
+    T24WS->>T24Core: Execute Enquiry WS.SWITCH.TRANSACTION
+    Note right of T24Core: Criteria: TXN.REF EQ {TRANSACTION_ID}
+
+    alt Transacción No Encontrada
+        T24Core-->>T24WS: ZERORECORDS populated
+        T24WS-->>Proxy: Response con ZERORECORDS
+        Proxy->>Proxy: Detectar Sin Resultados
+        Note right of Proxy: empty(ZERORECORDS) = false<br/>successIndicator=NO RECORDS
+        Proxy->>Proxy: Construir Header
+        Note right of Proxy: XQuery: consultaTransaccionSwitchHOut.xq<br/>Message=data(ZERORECORDS)
+        Proxy->>Client: Response Vacío con NO RECORDS
+    end
+
+    T24Core-->>T24WS: WSSWITCHTRANSACTIONType Data
+    Note left of T24Core: ID, TXNREFERENCE, ATMID<br/>NETWORKID, TRACENUMBER<br/>TXNDATE, TXNTIME, AMOUNT<br/>CURRENCY, AUTHCODE<br/>MCCCODE, BRANCHNAME
+
+    T24WS-->>Proxy: ConsultadetransaccionswitchResponse
+
+    Proxy->>Proxy: Evaluar Resultado
+    Note right of Proxy: if empty(ZERORECORDS)<br/>then SUCCESS else NO RECORDS
+
+    Proxy->>Proxy: Transformar Response
+    Note right of Proxy: XQuery: consultaTransaccionSwitchHNOut.xq<br/>Mapeo campos T24 → OSB
+
+    Proxy->>Proxy: Construir ResponseHeader
+    Note right of Proxy: XQuery: consultaTransaccionSwitchHOut.xq<br/>successIndicator=SUCCESS<br/>messages=Consulta Exitosa
+
+    Proxy->>Proxy: Validar Success Indicator
+    Note right of Proxy: Stage: MapeoError<br/>if successIndicator != SUCCESS
+
+    alt Error en Response
+        Proxy->>MapeoErr: mapeoErrores(CODIGO_ERROR, MENSAJE_ERROR)
+        Note right of MapeoErr: MENSAJE_ERROR format:<br/>FICBCO0141$#${messages}
+        MapeoErr-->>Proxy: Error Homologado
+        Proxy->>Proxy: Actualizar ResponseHeader
+    end
+
+    Proxy->>Client: SOAP Response
+    Note left of Client: Header: ResponseHeader<br/>Body: consultaTransaccionSwitchResponse<br/>12 campos poblados
+
+    Note over Client, T24Core: Manejo de Errores Generales
+
+    alt Error No Manejado (Fault)
+        Proxy->>Proxy: Error Handler Activado
+        Proxy->>Proxy: Extraer errorCode y errorMessage
+        Note right of Proxy: $fault/ctx:errorCode<br/>$fault/ctx:reason
+        Proxy->>MapeoErr: mapeoErrores(errorCode, errorMessage)
+        MapeoErr-->>Proxy: Error Homologado
+        Proxy->>Proxy: Construir Response Vacío
+        Proxy->>Client: Response con Error Mapeado
+    end
