@@ -1,0 +1,130 @@
+flowchart TD
+    Start([Cliente SOAP Request]) --> ValidateXSD[Validar Esquema XSD]
+    ValidateXSD -->|Error| ErrorXSD[Error BEA-382505]
+    ErrorXSD --> MapError1[mapeoErrorValidate.xq]
+    MapError1 --> ErrorResponse1[SOAP Fault]
+    
+    ValidateXSD -->|OK| ValidateRegion[ValidaServicioRegional<br/>ServiceId: FICBCO0044]
+    ValidateRegion -->|Error| ErrorRegion[Error Regional]
+    ErrorRegion --> ErrorResponse2[Response con Error]
+    
+    ValidateRegion -->|SUCCESS| ApplyDefaults[aplicarValoresPorDefectoRegion]
+    ApplyDefaults --> RouteRegion{SourceBank?}
+    
+    RouteRegion -->|HN01| HN01Flow[Pipeline Honduras]
+    RouteRegion -->|GT01| GT01Flow[Pipeline Guatemala]
+    RouteRegion -->|PA01| PA01Flow[Pipeline Panamá]
+    RouteRegion -->|NI01| NI01Flow[Pipeline Nicaragua]
+    RouteRegion -->|Otro| DefaultFlow[Pipeline Default]
+    
+    DefaultFlow --> ErrorNotImpl[Error: SERVICE NOT IMPLEMENTED]
+    ErrorNotImpl --> ErrorResponse3[Response con Error]
+    
+    subgraph HN01 [Honduras HN01]
+        HN01Flow --> HN01Convert[convertirCodigoPais<br/>HN01 → HND]
+        HN01Convert --> HN01Product{LIABILITY_TYPE?}
+        
+        HN01Product -->|PTM| HN01PTM[ConsultaPrestamosCliente<br/>Split-Join]
+        HN01PTM --> HN01PTMOut[consultaPrestamosOut.xq]
+        
+        HN01Product -->|TRC| HN01TRC[conDatoTarjetaClienteHN_db<br/>Pais=HND, NumCliente=pad19]
+        HN01TRC --> HN01TRCValidate{errorCode?}
+        
+        HN01Product -->|LCR| HN01LCR[consultaLineasCreditoCliente_db]
+        HN01LCR --> HN01LCRValidate{errorCode?}
+        
+        HN01Product -->|ALL| HN01ALL[sjConsultaPasivosCliente<br/>Split-Join PTM+TRC+LCR]
+        HN01ALL --> HN01ALLOut[consultaPasivosClienteOut.xq<br/>Convertir fecha: yyyy-MM-dd → yyyyMMdd]
+        
+        HN01PTMOut --> HN01Func[ValidaFuncionalidadUsuario<br/>SALDOS_PASIVOS]
+        HN01TRCValidate --> HN01Func
+        HN01LCRValidate --> HN01Func
+        HN01ALLOut --> HN01Func
+        
+        HN01Func --> HN01Response[Construir Response<br/>consultaPasivosClienteSPOut.xq<br/>o consultaPasivosClienteOut.xq]
+    end
+    
+    subgraph GT01 [Guatemala GT01]
+        GT01Flow --> GT01Convert[convertirCodigoPais<br/>GT01 → GTM]
+        GT01Convert --> GT01Product{LIABILITY_TYPE?}
+        
+        GT01Product -->|PTM| GT01PTM[consultaPasivosCliente_db<br/>Connection: AbanksGT<br/>Package: OSB_K_CONLISTAPRESTAMOS<br/>SP: TOPLEVEL$OSB_P_CON_LISTA_PRES]
+        GT01PTM --> GT01PTMOut[consultaPasivosClientePtmoGTIn.xq]
+        
+        GT01Product -->|TRC| GT01TRC[conDatosTarjetaCliente_db<br/>Connection: MasterDataGT<br/>Pais=GTM, NumCliente=pad19]
+        GT01TRC --> GT01TRCOut[Validar errorCode]
+        
+        GT01Product -->|ALL| GT01ALL[Ejecutar PTM + TRC<br/>secuencialmente]
+        GT01ALL --> GT01ALLOut[Ambas respuestas]
+        
+        GT01PTMOut --> GT01Transform[consultaPasivosClienteGTOut.xq<br/>Préstamos: Iterar arrays<br/>Tarjetas: distinct-values + agrupar<br/>BASE/ALT para monedas<br/>BUG: LIABILITY_SOURCE_BANK=PA01]
+        GT01TRCOut --> GT01Transform
+        GT01ALLOut --> GT01Transform
+        
+        GT01Transform --> GT01Header[consultaPasivosClienteGTHeaderOut.xq]
+    end
+    
+    subgraph PA01 [Panamá PA01]
+        PA01Flow --> PA01Convert[convertirCodigoPais<br/>PA01 → PAN]
+        PA01Convert --> PA01Product{LIABILITY_TYPE?}
+        
+        PA01Product -->|PTM| PA01PTM[consultaPasivosCliente_db<br/>Connection: AbanksPA<br/>Package: OSB_K_CONLISTAPRESTAMOS<br/>Operation: consultaListaPrestamos]
+        PA01PTM --> PA01PTMOut[consultaPasivosClientePtmoPAIn.xq]
+        
+        PA01Product -->|TRC| PA01TRC[conDatosTarjetaCliente_db<br/>Connection: MasterDataPA<br/>Pais=PAN, NumCliente=pad19]
+        PA01TRC --> PA01TRCOut[Validar errorCode<br/>Variable: validationMessagess]
+        
+        PA01Product -->|ALL| PA01ALL[Ejecutar PTM + TRC<br/>secuencialmente]
+        PA01ALL --> PA01ALLOut[Ambas respuestas]
+        
+        PA01PTMOut --> PA01Transform[consultaPasivosClientePAOut.xq<br/>Iteración directa sin agrupación<br/>Validaciones condicionales<br/>Fecha: YYY-MM-dd typo<br/>LIABILITY_SOURCE_BANK=PA01]
+        PA01TRCOut --> PA01Transform
+        PA01ALLOut --> PA01Transform
+        
+        PA01Transform --> PA01Header[consultaPasivosClientePAHeaderOut.xq]
+    end
+    
+    subgraph NI01 [Nicaragua NI01]
+        NI01Flow --> NI01Config[ObtenerParametrizacion<br/>CODIGOSBLOQUEO<br/>BINES.PTC]
+        NI01Config --> NI01ConfigValidate{validationMessage?}
+        
+        NI01ConfigValidate -->|Error| NI01ConfigError[Error de Configuración]
+        NI01ConfigError --> NI01ErrorResp[Response con Error]
+        
+        NI01ConfigValidate -->|OK| NI01Transform[consultaPasivosClienteNIIn.xq<br/>codCanalOriginador=1<br/>valIdCliente=UserName<br/>PTC→TRC en request]
+        
+        NI01Transform --> NI01Validate[Validar Request XSD]
+        NI01Validate --> NI01SOAP[OpConsultaPasivosCliente<br/>SOAP 1.2<br/>Endpoint: COBIS<br/>Timeout: 0<br/>Retry: 0]
+        
+        NI01SOAP --> NI01Response[consultaPasivosClienteNIOut.xq<br/>Filtrar PTM: codTipoProducto=CCA<br/>Filtrar TRC: TCR NOT IN BINes PTC<br/>Filtrar PTC: TCR IN BINes PTC<br/>Excluir por códigos bloqueo<br/>Redondeo: round-half-to-even 2<br/>Fecha: yyyyMMdd]
+        
+        NI01Response --> NI01Header[consultaPasivosClienteNIHeaderOut.xq]
+    end
+    
+    HN01Response --> CheckError{successIndicator<br/>!= SUCCESS?}
+    GT01Header --> CheckError
+    PA01Header --> CheckError
+    NI01Header --> CheckError
+    
+    CheckError -->|Sí| MapError2[MapeoErrores<br/>FICBCO0044$#$mensaje]
+    MapError2 --> FinalResponse[SOAP Response]
+    
+    CheckError -->|No| FinalResponse
+    
+    FinalResponse --> End([Cliente recibe Response])
+    
+    ErrorResponse1 --> End
+    ErrorResponse2 --> End
+    ErrorResponse3 --> End
+    NI01ErrorResp --> End
+    
+    style HN01 fill:#e1f5ff
+    style GT01 fill:#fff4e1
+    style PA01 fill:#ffe1f5
+    style NI01 fill:#e1ffe1
+    style Start fill:#90EE90
+    style End fill:#FFB6C1
+    style ErrorXSD fill:#ffcccc
+    style ErrorRegion fill:#ffcccc
+    style ErrorNotImpl fill:#ffcccc
+    style NI01ConfigError fill:#ffcccc

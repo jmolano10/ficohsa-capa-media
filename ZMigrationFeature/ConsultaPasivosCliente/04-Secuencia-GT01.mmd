@@ -1,0 +1,163 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>ConsultaPasivosCliente
+    participant Validator as ValidaServicioRegional
+    participant DBValidator as DB Validación
+    participant Converter as convertirCodigoPais
+    participant DBPrestamos as DB Adapter<br/>consultaPasivosCliente_db
+    participant OracleGT as Oracle AbanksGT<br/>Package: OSB_K_CONLISTAPRESTAMOS
+    participant DBTarjetas as DB Adapter<br/>conDatosTarjetaCliente_db
+    participant OracleMaster as Oracle MasterDataGT
+    participant ErrorMapper as MapeoErrores
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Guatemala (GT01) - ConsultaPasivosCliente
+
+    Client->>OSB: SOAP Request (HTTPS)
+    Note right of Client: Header: SourceBank=GT01<br/>Body: CUSTOMER_ID, LIABILITY_TYPE
+
+    rect rgb(240, 248, 255)
+        Note over OSB: Pipeline: ValidacionesGenerales_request
+        OSB->>OSB: Validar Esquema XSD
+        Note right of OSB: Schema: consultaPasivosClienteTypes.xsd<br/>Validar CUSTOMER_ID y LIABILITY_TYPE obligatorios
+
+        alt Validación XSD Fallida
+            OSB->>ErrorHandler: Error BEA-382505
+            ErrorHandler->>ErrorMapper: Mapear Error
+            ErrorMapper-->>ErrorHandler: Error Mapeado
+            ErrorHandler->>OSB: Response con Error
+            OSB->>Client: SOAP Fault
+        end
+
+        OSB->>Validator: ValidaServicioRegional
+        Note right of OSB: ServiceId: FICBCO0044<br/>Region: GT01
+        Validator->>DBValidator: Query BD Regional
+        DBValidator-->>Validator: Resultado Validación
+        
+        alt Región No Válida
+            Validator-->>OSB: PV_CODIGO_ERROR != SUCCESS
+            OSB->>OSB: Construir Error
+            OSB->>Client: Response con Error
+        end
+
+        Validator-->>OSB: PV_CODIGO_ERROR = SUCCESS
+        OSB->>OSB: aplicarValoresPorDefectoRegion
+    end
+
+    rect rgb(255, 250, 240)
+        Note over OSB: Pipeline: GT01_ConsultaPasivosCliente_request
+        OSB->>OSB: Asignar Variables
+        Note right of OSB: product = upper-case(LIABILITY_TYPE)<br/>customer = CUSTOMER_ID
+
+        OSB->>Converter: convertirCodigoPais
+        Note right of OSB: Parámetros:<br/>sentidoConversion: 'OSB-ISO3'<br/>codigoPais: 'GT01'
+        Converter-->>OSB: codigoPais = 'GTM'
+
+        alt LIABILITY_TYPE = "PTM"
+            OSB->>OSB: Transformar Request (XQuery)
+            Note right of OSB: consultaPasivosClientePtmoGTIn.xq<br/>Mapear CUSTOMER_ID → CUSTOMER_ID<br/>Mapear LIABILITY_TYPE → LIABILITY_TYPE
+
+            OSB->>DBPrestamos: Invocar Stored Procedure
+            Note right of DBPrestamos: Connection: eis/DB/ConnectionProxyAbanksGT<br/>Operation: consultaPasivosCliente<br/>Retry: 1 vez, 30 seg
+
+            DBPrestamos->>OracleGT: CALL OSB_K_CONLISTAPRESTAMOS.TOPLEVEL$OSB_P_CON_LISTA_PRES
+            Note right of OracleGT: Parámetros IN:<br/>CUSTOMER_ID<br/>LIABILITY_TYPE
+
+            OracleGT-->>DBPrestamos: OutputParameters
+            Note left of OracleGT: ERROR_CODE<br/>LIABILITY_NUMBER (array)<br/>LIABILITY_CUST_NAME (array)<br/>LIABILITY_CURRENCY_1 (array)<br/>LIABILITY_PRINCIPAL_AMT_1 (array)<br/>LIABILITY_INT_COM_AMT_1 (array)<br/>LIABILITY_TOTAL_AMT_1 (array)<br/>LIABILITY_TOTAL_DEBT (array)
+
+            DBPrestamos-->>OSB: RSPConsPtmosCliente
+
+            OSB->>OSB: Asignar RSPconDatosTarjetaCliente
+            Note right of OSB: Valor por defecto:<br/>CodigoError = "NO RECORDS"
+
+        else LIABILITY_TYPE = "TRC"
+            OSB->>OSB: Transformar Request (XQuery)
+            Note right of OSB: conDatosTarjetaClienteGTIn.xq<br/>Pais = 'GTM'<br/>NumCliente = pad-left(CUSTOMER_ID, 19, '0')
+
+            OSB->>DBTarjetas: Invocar Stored Procedure
+            Note right of DBTarjetas: Connection: eis/DB/ConnectionProxyMasterDataGT<br/>Operation: conDatosTarjetaCliente
+
+            DBTarjetas->>OracleMaster: CALL conDatosTarjetaCliente
+            Note right of OracleMaster: Parámetros IN:<br/>Pais: 'GTM'<br/>NumCliente: '0000000000087654321'
+
+            OracleMaster-->>DBTarjetas: OutputParameters
+            Note left of OracleMaster: CodigoError<br/>MensajeError<br/>RowSet/Row:<br/>  - numtarjeta<br/>  - cardholder_name<br/>  - codMoneda<br/>  - MontoPrincipal<br/>  - MontoTotal<br/>  - BalanceTotal<br/>  - FechaMaximaPago<br/>  - MontoCancelacion<br/>  - TipoOrg (BASE/ALT)
+
+            DBTarjetas-->>OSB: RSPconDatosTarjetaCliente
+
+            OSB->>OSB: Validar errorCode
+            Note right of OSB: errorCode = CodigoError<br/>validationMessage = MensajeError si error
+
+            OSB->>OSB: Asignar RSPConsPtmosCliente
+            Note right of OSB: Valor por defecto:<br/>ERROR_CODE = "NO RECORDS"
+
+        else LIABILITY_TYPE = "ALL"
+            Note over OSB: Ejecutar ambas consultas secuencialmente
+
+            OSB->>OSB: Transformar Request Préstamos
+            OSB->>DBPrestamos: Invocar SP Préstamos
+            DBPrestamos->>OracleGT: CALL SP
+            OracleGT-->>DBPrestamos: OutputParameters
+            DBPrestamos-->>OSB: RSPConsPtmosCliente
+
+            OSB->>OSB: Transformar Request Tarjetas
+            OSB->>DBTarjetas: Invocar SP Tarjetas
+            DBTarjetas->>OracleMaster: CALL SP
+            OracleMaster-->>DBTarjetas: OutputParameters
+            DBTarjetas-->>OSB: RSPconDatosTarjetaCliente
+
+            OSB->>OSB: Validar errorCode
+        end
+    end
+
+    rect rgb(240, 255, 240)
+        Note over OSB: Pipeline: GT01_ConsultaPasivosCliente_response
+
+        alt LIABILITY_TYPE in ("PTM", "TRC", "ALL")
+            OSB->>OSB: Transformar Header (XQuery)
+            Note right of OSB: consultaPasivosClienteGTHeaderOut.xq<br/>Evaluar ERROR_CODE y CodigoError<br/>Construir successIndicator
+
+            OSB->>OSB: Transformar Body (XQuery)
+            Note right of OSB: consultaPasivosClienteGTOut.xq<br/><br/>Préstamos (si ERROR_CODE = "SUCCESS"):<br/>  - Iterar sobre arrays paralelos<br/>  - Mapear campos<br/>  - LIABILITY_SOURCE_BANK = "PA01" (BUG)<br/><br/>Tarjetas (si CodigoError = "-1"):<br/>  - distinct-values(numtarjeta)<br/>  - Agrupar por tarjeta<br/>  - Buscar TipoOrg='BASE' para moneda 1<br/>  - Buscar TipoOrg='ALT' para moneda 2<br/>  - Convertir fecha: yyyy-MM-dd<br/>  - LIABILITY_SOURCE_BANK = "GT01"
+
+        else Producto No Soportado
+            OSB->>OSB: Construir Error
+            Note right of OSB: successIndicator = "ERROR"<br/>messages = "PRODUCT NOT SUPPORTED"
+        end
+    end
+
+    rect rgb(255, 240, 240)
+        Note over OSB: Pipeline: ValidacionesGenerales_response
+
+        alt successIndicator != "SUCCESS"
+            OSB->>ErrorMapper: wsCallout MapeoErrores
+            Note right of OSB: REQMapeoErrores:<br/>CODIGO_ERROR = successIndicator<br/>MENSAJE_ERROR = "FICBCO0044$#$" + messages
+
+            ErrorMapper->>ErrorMapper: Mapear Error
+            ErrorMapper-->>OSB: RSPMapeoErrores
+
+            OSB->>OSB: Reemplazar Header
+            Note right of OSB: mapeoErroresUsageOut.xq<br/>Aplicar error mapeado
+        end
+    end
+
+    OSB->>Client: SOAP Response
+    Note left of OSB: Header: ResponseHeader<br/>  - successIndicator<br/>  - messages<br/>Body: consultaPasivosClienteResponse<br/>  - consultaPasivosClientePrestamosResponseType<br/>  - consultaPasivosClienteTCreditoResponseType
+
+    rect rgb(255, 230, 230)
+        Note over ErrorHandler: Error Handler (si ocurre excepción)
+        
+        alt Error de Validación XSD
+            ErrorHandler->>ErrorHandler: Detectar BEA-382505
+            ErrorHandler->>ErrorHandler: Aplicar mapeoErrorValidate.xq
+        else Error Genérico
+            ErrorHandler->>ErrorHandler: Construir Error Genérico
+            Note right of ErrorHandler: successIndicator = "ERROR"<br/>messages = errorCode + ": " + reason
+        end
+
+        ErrorHandler->>ErrorMapper: wsCallout MapeoErrores
+        ErrorMapper-->>ErrorHandler: Error Mapeado
+        ErrorHandler->>ErrorHandler: Construir Response Vacío
+        ErrorHandler->>Client: SOAP Response con Error
+    end

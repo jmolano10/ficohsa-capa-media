@@ -1,0 +1,56 @@
+sequenceDiagram
+    participant Client as Cliente
+    participant OSB as OSB Proxy
+    participant Validator as ValidaServicioRegional
+    participant ConfigService as ObtenerParametrizacion
+    participant DBConfig as DB Configuración
+    participant SOAPService as SrvAplCobisPasivosService
+    participant COBIS as Sistema COBIS
+    participant ErrorMapper as MapeoErrores
+
+    Note over Client, ErrorMapper: Flujo Nicaragua (NI01) - ConsultaPasivosCliente
+
+    Client->>OSB: SOAP Request (SourceBank=NI01)
+    
+    OSB->>OSB: Validar XSD
+    OSB->>Validator: ValidaServicioRegional(FICBCO0044)
+    Validator-->>OSB: SUCCESS
+
+    OSB->>ConfigService: obtenerParametrizacion
+    Note right of ConfigService: Parámetros:<br/>FICBCO0044.CODIGOSBLOQUEO<br/>FICBCO0044.BINES.PTC
+    ConfigService->>DBConfig: Query Configuración
+    DBConfig-->>ConfigService: CONFIGURACIONES
+    ConfigService-->>OSB: RSPObtenerParametrizacion
+    
+    OSB->>OSB: Validar validationMessage
+    Note right of OSB: Si error en config, detener
+
+    alt validationMessage = ''
+        OSB->>OSB: consultaPasivosClienteNIIn.xq
+        Note right of OSB: codCanalOriginador = 1<br/>codCliente = CUSTOMER_ID<br/>valIdCliente = UserName<br/>codTipoProducto = (PTC→TRC)
+
+        OSB->>OSB: Validar Request XSD
+        OSB->>SOAPService: OpConsultaPasivosCliente
+        Note right of SOAPService: Endpoint: http://10.235.53.149:9082<br/>Protocol: SOAP 1.2<br/>Timeout: 0 (sin timeout)<br/>Retry: 0 (sin retry)
+        
+        SOAPService->>COBIS: Consultar Pasivos
+        COBIS-->>SOAPService: opConsultaPasivosClienteRespuesta
+        Note left of COBIS: contextoTransaccional<br/>pasivos[]:<br/>  - cuenta (codTipoProducto, codCuentaHabiente)<br/>  - deudaPrincipalAmt1/2<br/>  - deudaIntComAmt1/2<br/>  - deudaTotalAmt1/2<br/>  - deudaTotal<br/>  - fechaDePago<br/>  - codigoDelBloque1<br/>  - codigoDelBloqueDol1
+        SOAPService-->>OSB: RSPOpConsultaPasivosCliente
+    end
+
+    alt validationMessage = ''
+        OSB->>OSB: consultaPasivosClienteNIHeaderOut.xq
+        OSB->>OSB: consultaPasivosClienteNIOut.xq
+        Note right of OSB: Filtrado Préstamos (PTM):<br/>  - codTipoProducto = 'CCA'<br/><br/>Filtrado Tarjetas (TRC):<br/>  - codTipoProducto = 'TCR'<br/>  - NOT IN (lista BINes PTC)<br/>  - Excluir si códigos bloqueo en lista<br/><br/>Filtrado PTC:<br/>  - codTipoProducto = 'TCR'<br/>  - IN (lista BINes PTC)<br/>  - Incluir si ambos bloqueos en lista<br/>  - Validar estado "A" y saldo<br/><br/>Redondeo: round-half-to-even(2)<br/>Fecha: yyyyMMdd<br/>LIABILITY_SOURCE_BANK = NI01
+    else Error de Configuración
+        OSB->>OSB: Construir Error
+        Note right of OSB: successIndicator = ERROR<br/>messages = validationMessage
+    end
+
+    alt Error
+        OSB->>ErrorMapper: MapeoErrores(FICBCO0044)
+        ErrorMapper-->>OSB: Error Mapeado
+    end
+
+    OSB->>Client: SOAP Response

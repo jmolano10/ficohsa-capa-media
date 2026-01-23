@@ -1,0 +1,64 @@
+sequenceDiagram
+    participant Client as Cliente
+    participant OSB as OSB Proxy
+    participant Validator as ValidaServicioRegional
+    participant DBPrestamos as consultaPasivosCliente_db
+    participant OraclePA as Oracle AbanksPA
+    participant DBTarjetas as conDatosTarjetaCliente_db
+    participant OracleMaster as Oracle MasterDataPA
+    participant ErrorMapper as MapeoErrores
+
+    Note over Client, ErrorMapper: Flujo Panamá (PA01) - ConsultaPasivosCliente
+
+    Client->>OSB: SOAP Request (SourceBank=PA01)
+    
+    OSB->>OSB: Validar XSD
+    OSB->>Validator: ValidaServicioRegional(FICBCO0044)
+    Validator-->>OSB: SUCCESS
+    OSB->>OSB: convertirCodigoPais(PA01→PAN)
+
+    alt LIABILITY_TYPE = "PTM"
+        OSB->>OSB: consultaPasivosClientePtmoPAIn.xq
+        OSB->>DBPrestamos: consultaListaPrestamos
+        Note right of DBPrestamos: Connection: eis/DB/ConnectionProxyAbanksPA<br/>Package: OSB_K_CONLISTAPRESTAMOS<br/>Procedure: TOPLEVEL$OSB_P_CON_LISTA_PRES<br/>Retry: 1, 30seg
+        DBPrestamos->>OraclePA: CALL SP
+        OraclePA-->>DBPrestamos: OutputParameters
+        DBPrestamos-->>OSB: rp
+        OSB->>OSB: Asignar RSPconDatosTarjetaCliente (NO RECORDS)
+    else LIABILITY_TYPE = "TRC"
+        OSB->>OSB: conDatosTarjetaClientePAIn.xq
+        Note right of OSB: Pais=PAN, NumCliente=pad(19,'0')
+        OSB->>DBTarjetas: conDatosTarjetaCliente
+        DBTarjetas->>OracleMaster: CALL SP
+        OracleMaster-->>DBTarjetas: OutputParameters
+        DBTarjetas-->>OSB: RSPconDatosTarjetaCliente
+        OSB->>OSB: Validar errorCode
+        OSB->>OSB: Asignar rp (NO RECORDS)
+    else LIABILITY_TYPE = "ALL"
+        OSB->>DBPrestamos: consultaListaPrestamos
+        DBPrestamos->>OraclePA: CALL SP
+        OraclePA-->>DBPrestamos: OutputParameters
+        DBPrestamos-->>OSB: rp
+        
+        OSB->>DBTarjetas: conDatosTarjetaCliente
+        DBTarjetas->>OracleMaster: CALL SP
+        OracleMaster-->>DBTarjetas: OutputParameters
+        DBTarjetas-->>OSB: RSPconDatosTarjetaCliente
+        OSB->>OSB: Validar errorCode
+    end
+
+    alt PTM, TRC o ALL
+        OSB->>OSB: consultaPasivosClientePAHeaderOut.xq
+        OSB->>OSB: consultaPasivosClientePAOut.xq
+        Note right of OSB: Iteración directa (sin agrupación)<br/>Validaciones condicionales por campo<br/>Fecha: YYY-MM-dd (typo)<br/>LIABILITY_SOURCE_BANK = PA01
+    else Producto No Soportado
+        OSB->>OSB: Construir Error
+        Note right of OSB: Variable: validationMessagess (doble s)
+    end
+
+    alt Error
+        OSB->>ErrorMapper: MapeoErrores(FICBCO0044)
+        ErrorMapper-->>OSB: Error Mapeado
+    end
+
+    OSB->>Client: SOAP Response

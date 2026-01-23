@@ -1,0 +1,63 @@
+sequenceDiagram
+    participant Client as Cliente
+    participant OSB as OSB Proxy
+    participant Validator as ValidaServicioRegional
+    participant FuncValidator as ValidaFuncionalidadUsuario
+    participant SplitJoin as sjConsultaPasivosCliente
+    participant DBPrestamos as ConsultaPrestamosCliente
+    participant DBTarjetas as conDatoTarjetaClienteHN_db
+    participant DBLCR as consultaLineasCreditoCliente_db
+    participant ErrorMapper as MapeoErrores
+
+    Note over Client, ErrorMapper: Flujo Honduras (HN01) - ConsultaPasivosCliente
+
+    Client->>OSB: SOAP Request (SourceBank=HN01)
+    
+    OSB->>OSB: Validar XSD
+    OSB->>Validator: ValidaServicioRegional(FICBCO0044)
+    Validator-->>OSB: SUCCESS
+    
+    OSB->>OSB: convertirCodigoPais(HN01→HND)
+    OSB->>OSB: Asignar product, customer
+
+    alt LIABILITY_TYPE = "PTM"
+        OSB->>DBPrestamos: ConsultaPrestamosCliente (Split-Join)
+        Note right of DBPrestamos: Orquesta múltiples servicios T24
+        DBPrestamos-->>OSB: RSPPrestamosCliente
+        OSB->>OSB: consultaPrestamosOut.xq
+        OSB->>OSB: Asignar valores por defecto para TRC
+    else LIABILITY_TYPE = "TRC"
+        OSB->>DBTarjetas: conDatoTarjetaClienteHN
+        Note right of DBTarjetas: Pais=HND, NumCliente=pad(19,'0')
+        DBTarjetas-->>OSB: RSPconDatosTarjetaCliente
+        OSB->>OSB: Asignar valores por defecto para PTM
+    else LIABILITY_TYPE = "ALL"
+        OSB->>SplitJoin: sjConsultaPasivosCliente
+        Note right of SplitJoin: Consultas paralelas PTM+TRC+LCR
+        SplitJoin-->>OSB: RSPConsPasivosCliente
+    else LIABILITY_TYPE = "LCR"
+        OSB->>DBLCR: consultaLineasCreditoCliente
+        DBLCR-->>OSB: RSPConsultaLineasCreditoCliente
+    end
+
+    OSB->>FuncValidator: ValidaFuncionalidadUsuario(SALDOS_PASIVOS)
+    FuncValidator-->>OSB: functionalityIndicator
+
+    alt PTM o TRC
+        OSB->>OSB: consultaPasivosClienteHeaderSPOut.xq
+        OSB->>OSB: consultaPasivosClienteSPOut.xq
+    else ALL
+        OSB->>OSB: consultaPasivosClienteHeaderOut.xq
+        OSB->>OSB: consultaPasivosClienteOut.xq
+        Note right of OSB: Convertir fecha: yyyy-MM-dd → yyyyMMdd
+    else LCR
+        OSB->>OSB: Construir header con validationMessage
+        OSB->>OSB: consultaPasivosClienteLCROut.xq
+    end
+
+    alt Error
+        OSB->>ErrorMapper: MapeoErrores(FICBCO0044)
+        ErrorMapper-->>OSB: Error Mapeado
+    end
+
+    OSB->>Client: SOAP Response
