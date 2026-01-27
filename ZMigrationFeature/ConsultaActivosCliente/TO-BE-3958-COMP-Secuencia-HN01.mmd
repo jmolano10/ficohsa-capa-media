@@ -1,0 +1,231 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Activos Cliente <br> Epica 880: ConsultaActivosCliente <br> HU 3958:  GET - /customer-assets-retrieve/v1/{customerIdentification}{assetType}/assets-retrieve
+    participant AHOHN as API Consulta Cuentas Ahorro HN <br> Epica 880: ConsultaActivosCliente <br> HU 3933:  GET - /loans-and-deposits/savings-account-retrieves/v1/{customerIdentification}/{assetType}/assets-retrieve
+    participant CHQHN as API Consulta Cuentas Corrientes HN <br> Epica 880: ConsultaActivosCliente <br> HU 3942:  GET - /loans-and-deposits/current-account-retrieves/v1/customer/{customerReference}/{assetType}/assets-retrieve
+    participant DEPHN as API Consulta Certificados de Depósito HN <br> Epica 880: ConsultaActivosCliente <br> HU 3576:  GET - /loans-and-deposits/term-deposit-retrieves/v1/{customerIdentification}/{assetType}/assets-retrieve
+    participant FPCHN as API Consulta Fondos de Pensión HN <br> Epica 880: ConsultaActivosCliente <br> HU 3950:  GET - /market-operations/pension-fund-administration-retrieve/v1/{customerReference}/{assetType}/assets-retrieve
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Consulta Cuentas Ahorros 
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: assetType, customerReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> assetType (obligatorio) - enum: AHO, CHQ, DEP, FPC, CTA, ALL <br> customerReference (obligatorio)
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: CUSTOMER_ASSETS_RETRIEVES <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>API: Aplica patrón strategy
+    Note over API: Selecciona lógica de negocio según header.sourceBank
+
+    API->>API: Valida assetType
+
+    alt assetType == AHO
+        API->>AHOHN: Consume API Producto Consulta Cuentas Ahorro HN
+        Note right of API: customerReference
+
+        AHOHN->>API: Response  API Producto Consulta Cuentas Ahorro HN
+        Note left of AHOHN: response.body
+
+        API->>API: Evalúa Response API Producto Consulta Cuentas Ahorro HN
+
+        alt HTTP CODE != 200
+
+            API->> Consumidor: Retorna error API Producto Consulta Cuentas Ahorro HN
+            Note left of API: HTTP 4XX/5XX: Error Body
+
+        else HTTP CODE == 200
+
+            API->>API: Construye Response API Composición
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body
+
+        end
+    end
+
+    alt assetType == CHQ
+        API->>CHQHN: Consume API Producto Consulta Cuentas Corrientes HN
+        Note right of API: customerReference
+
+        CHQHN->>API: Response  API Producto Consulta Cuentas Corrientes HN
+        Note left of CHQHN: response.body
+
+        API->>API: Evalúa Response API Producto Consulta Cuentas Corrientes HN
+
+        alt HTTP CODE != 200
+
+            API->> Consumidor: Retorna error API Producto Consulta Cuentas Corrientes HN
+            Note left of API: HTTP 4XX/5XX: Error Body
+
+        else HTTP CODE == 200
+
+            API->>API: Construye Response API Composición
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body
+
+        end
+    end
+
+    alt assetType == DEP
+        API->>DEPHN: Consume API Producto Consulta Certificados de Depósito HN
+        Note right of API: customerReference
+
+        DEPHN->>API: Response  API Producto Consulta Certificados de Depósito HN
+        Note left of DEPHN: response.body
+
+        API->>API: Evalúa Response API Producto Consulta Certificados de Depósito HN
+
+        alt HTTP CODE != 200
+
+            API->> Consumidor: Retorna error API Producto Consulta Certificados de Depósito HN
+            Note left of API: HTTP 4XX/5XX: Error Body
+
+        else HTTP CODE == 200
+
+            API->>API: Construye Response API Composición
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body 
+        
+        end
+    end
+
+    alt assetType == FPC
+        API->>FPCHN: Consume API Producto Consulta Fondos de Pensión HN
+        Note right of API: customerReference
+
+        FPCHN->>API: Response  API Producto Consulta Fondos de Pensión HN
+        Note left of FPCHN: response.body
+
+        API->>API: Evalúa Response API Producto Consulta Fondos de Pensión HN
+
+        alt HTTP CODE != 200
+
+            API->> Consumidor: Retorna error API Producto Consulta Fondos de Pensión HN
+            Note left of API: HTTP 4XX/5XX: Error Body
+
+        else HTTP CODE == 200
+
+            API->>API: Construye Response API Composición
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body 
+
+        end
+    end
+    
+    alt assetType == CTA (SE REALIZA LLAMADO EN PARALELO A TODOS LOS SERVICIOS)
+        API->>AHOHN: Consume API Producto Consulta Cuentas Ahorro HN
+        Note right of API: customerReference
+
+        AHOHN->>API: Response  API Producto Consulta Cuentas Ahorro HN
+        Note left of AHOHN: response.body
+
+        API->>CHQHN: Consume API Producto Consulta Cuentas Corrientes HN
+        Note right of API: customerReference
+
+        CHQHN->>API: Response  API Producto Consulta Cuentas Corrientes HN
+        Note left of CHQHN: response.body
+
+        API->>API: Evalúa Responses APIs Producto 
+
+        alt Si HTTP CODE de ambas respuestas != 200 y != 404
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: REST Response Error
+            Note left of API: HTTP 500: Error inesperado en el servicio
+        
+        else Si HTTP CODE de ambas respuestas = 404
+
+            API->> Consumidor: REST Response Error
+            Note left of API: HTTP 404: No Records Found
+
+        else si al menos una de las respuestas tiene HTTP CODE == 200
+
+            API->>API: Construye Response API Composición
+            Note over API: Consolida respuestas de ambos servicios <br> Si uno de los servicios retorna error, entrega ese objeto como vacío. 
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body
+        end
+    end
+
+    alt assetType == ALL (SE REALIZA LLAMADO EN PARALELO A TODOS LOS SERVICIOS)
+        API->>AHOHN: Consume API Producto Consulta Cuentas Ahorro HN
+        Note right of API: customerReference
+
+        AHOHN->>API: Response  API Producto Consulta Cuentas Ahorro HN
+        Note left of AHOHN: response.body
+
+        API->>CHQHN: Consume API Producto Consulta Cuentas Corrientes HN
+        Note right of API: customerReference
+
+        CHQHN->>API: Response  API Producto Consulta Cuentas Corrientes HN
+        Note left of CHQHN: response.body
+
+        API->>DEPHN: Consume API Producto Consulta Certificados de Depósito HN
+        Note right of API: customerReference
+
+        DEPHN->>API: Response  API Producto Consulta Certificados de Depósito HN
+        Note left of DEPHN: response.body
+
+        API->>FPCHN: Consume API Producto Consulta Fondos de Pensión HN
+        Note right of API: customerReference
+
+        FPCHN->>API: Response  API Producto Consulta Fondos de Pensión HN
+        Note left of FPCHN: response.body
+
+        API->>API: Evalúa Responses APIs Producto 
+
+        alt Si HTTP CODE de todas respuestas != 200 y != 404
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: REST Response Error
+            Note left of API: HTTP 500: Error inesperado en el servicio
+        
+        else Si HTTP CODE de todas respuestas = 404
+
+            API->> Consumidor: REST Response Error
+            Note left of API: HTTP 404: No Records Found
+
+        else si al menos una de las respuestas tiene HTTP CODE == 200
+
+            API->>API: Construye Response API Composición
+            Note over API: Consolida respuestas de ambos servicios <br> Si uno de los servicios retorna error, entrega ese objeto como vacío. 
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body 
+
+        end
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

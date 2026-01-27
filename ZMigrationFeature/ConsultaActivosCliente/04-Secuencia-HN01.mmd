@@ -1,0 +1,147 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>ConsultaActivosCliente
+    participant ValidaSvc as ValidaServicioRegional<br/>(DB)
+    participant ConsultaCliente as ConsultaCliente<br/>(T24)
+    participant T24Ahorro as ConsultaCuentaAhorro<br/>(T24)
+    participant T24Corriente as ConsultaCuentaCorriente<br/>(T24)
+    participant OracleDB as ConsultaDepositos<br/>(Oracle DB)
+    participant Pensiones as consultaFondoPensiones<br/>(OSB 12c)
+    participant ValidaFunc as ValidaFuncionalidadUsuario<br/>(DB)
+    participant MapeoErr as MapeoErrores<br/>(OSB)
+
+    Note over Client, MapeoErr: Flujo Honduras (HN01) - ConsultaActivosCliente
+
+    Client->>OSB: SOAP Request HTTPS
+    Note right of Client: Header: SourceBank=HN01<br/>UserName, Password<br/>Body: CUSTOMER_ID, ASSET_TYPE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Schema: consultaClientesTypes.xsd<br/>Element: consultaActivosClienteRequest
+
+    alt Validación XSD Fallida
+        OSB->>OSB: Error BEA-382505
+        OSB->>MapeoErr: mapeoErrorValidate.xq
+        MapeoErr-->>OSB: Error Transformado
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>ValidaSvc: ValidaServicioRegional
+    Note right of OSB: PV_SERVICE_ID: FICBCO0043<br/>PV_SOURCE_BANK: HN01
+
+    ValidaSvc-->>OSB: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+
+    alt Región No Válida
+        OSB->>OSB: successIndicator=ERROR
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: aplicarValoresPorDefectoRegion.xq
+    Note right of OSB: Aplica valores por defecto<br/>para la región
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'HN01'
+
+    OSB->>OSB: Asignar Variables
+    Note right of OSB: $product = ASSET_TYPE<br/>$customer = CUSTOMER_ID
+
+    OSB->>ConsultaCliente: Consultadecliente
+    Note right of OSB: XQuery: ConsultaClienteFPIn.xq<br/>CUSTOMER_ID → CUSTOMER_ID
+
+    ConsultaCliente-->>OSB: WSCUSTOMERType
+    Note left of ConsultaCliente: LEGALID, LEGALDOCNAME
+
+    OSB->>OSB: Extraer Legal ID
+    Note right of OSB: $legalId = LEGALID<br/>$legalIdType = convertirTipoDocumento(LEGALDOCNAME)
+
+    alt ASSET_TYPE = "AHO"
+        OSB->>T24Ahorro: ConsultaCuentaAhorroxCliente
+        Note right of OSB: XQuery: consultaActivosAhorrosClienteV2In.xq<br/>CUSTOMER_ID → CUSTOMER_ID
+
+        T24Ahorro-->>OSB: ConsultaCuentaAhorroxClienteResponse
+        Note left of T24Ahorro: ACCOUNTNUMBER, ACCOUNTNAME<br/>CURRENCY, TOTALBALANCE<br/>RESERVEBALANCE, AVAILABLEBAL
+
+        OSB->>OSB: Asignar Respuestas Vacías
+        Note right of OSB: RESPONSECorriente = empty<br/>RESPONSEDeposito = empty<br/>RESPONSEPensiones = empty
+    end
+
+    alt ASSET_TYPE = "FPC"
+        OSB->>Pensiones: getAssetsCustomer
+        Note right of OSB: XQuery: getAssetsCustomerIn.xq<br/>legalId, legalIdType<br/>sourceBank, destinationBank<br/>Header: OSB12AUTH
+
+        Pensiones-->>OSB: OutputParameters
+        Note left of Pensiones: PV_ASSET_NUMBER<br/>PV_ASSET_NAME<br/>PV_ASSET_TOTAL_BALANCE
+
+        OSB->>OSB: Asignar Respuestas Vacías
+        Note right of OSB: RESPONSEAhorros = empty<br/>RESPONSECorriente = empty<br/>RESPONSEDeposito = empty
+    end
+
+    alt ASSET_TYPE = "CHQ"
+        OSB->>T24Corriente: ConsultaCuentaCorrientexCliente
+        Note right of OSB: XQuery: consultaActivosCorrientesClienteV2In.xq<br/>CUSTOMER_ID → CUSTOMER_ID
+
+        T24Corriente-->>OSB: ConsultaCuentaCorrientexClienteResponse
+        Note left of T24Corriente: ACCOUNTNUMBER, ACCOUNTNAME<br/>CURRENCY, TOTALBALANCE
+
+        OSB->>OSB: Asignar Respuestas Vacías
+        Note right of OSB: RESPONSEAhorros = empty<br/>RESPONSEDeposito = empty<br/>RESPONSEPensiones = empty
+    end
+
+    alt ASSET_TYPE = "DEP"
+        OSB->>OracleDB: Consultadecertifdepporcliente
+        Note right of OSB: XQuery: consultaActivosDepositosClienteIn.xq<br/>CUSTOMER_ID → CUSTOMER_ID
+
+        OracleDB-->>OSB: ConsultadecertifdepporclienteResponse
+        Note left of OracleDB: Certificados de depósito
+
+        OSB->>OSB: Asignar Respuestas Vacías
+        Note right of OSB: RESPONSEAhorros = empty<br/>RESPONSECorriente = empty<br/>RESPONSEPensiones = empty
+    end
+
+    alt ASSET_TYPE = "CTA" OR "ALL"
+        OSB->>OSB: sjConsultaCuentasCliente (Split-Join)
+        Note right of OSB: XQuery: consultaActivosClienteSjIn.xq<br/>Consulta consolidada de todos los activos
+    end
+
+    OSB->>ValidaFunc: ValidaFuncionalidadUsuario
+    Note right of OSB: XQuery: consultaFuncionalidadUsuario.xq<br/>PV_USER_NAME: UserName<br/>PV_FUNCTIONALITY: SALDOS_ACTIVOS<br/>PV_SOURCE_BANK: HN01
+
+    ValidaFunc-->>OSB: PV_CODIGO_ERROR, PV_VALOR
+
+    alt Validación Exitosa
+        OSB->>OSB: $functionalityIndicator = PV_VALOR
+    else Validación Fallida
+        OSB->>OSB: $functionalityIndicator = "ALL"
+    end
+
+    OSB->>OSB: Transformar Response
+    Note right of OSB: Pipeline: HN01_ConsultaActivosCliente_response
+
+    alt ASSET_TYPE = AHO, CHQ, DEP, FPC
+        OSB->>OSB: consultaActivosClienteHeaderV2Out.xq
+        Note right of OSB: Mapeo Header:<br/>corrienteResponse → Header<br/>ahorroResponse → Header<br/>depositoResponse → Header<br/>pensionesResponse → Header
+
+        OSB->>OSB: consultaActivosClienteV2Out.xq
+        Note right of OSB: Mapeo Body:<br/>Agrega respuestas por tipo<br/>functionalityIndicator → Filtro
+    end
+
+    alt ASSET_TYPE = CTA, ALL
+        OSB->>OSB: consultaActivosClienteSjHeaderOut.xq
+        Note right of OSB: Mapeo Header desde Split-Join
+
+        OSB->>OSB: consultaActivosClienteSjOut.xq
+        Note right of OSB: Mapeo Body desde Split-Join<br/>functionalityIndicator → Filtro
+    end
+
+    alt successIndicator != SUCCESS
+        OSB->>MapeoErr: mapeoErrores
+        Note right of OSB: XQuery: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0043$#$messages
+
+        MapeoErr-->>OSB: mapeoErroresResponse
+        Note left of MapeoErr: Error normalizado
+
+        OSB->>OSB: mapeoErroresUsageOut.xq
+        Note right of OSB: Actualiza ResponseHeader
+    end
+
+    OSB->>Client: SOAP Response
+    Note left of OSB: ResponseHeader:<br/>successIndicator, messages<br/>Body: consultaActivosClienteResponse<br/>Ahorros, Corrientes, Depósitos, Pensiones

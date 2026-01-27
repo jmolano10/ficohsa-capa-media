@@ -1,0 +1,99 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Fondos de Pensión <br> Epica 880: ConsultaActivosCliente <br> HU 3950:  GET - /market-operations/pension-fund-administration-retrieve/v1/{customerReference}/assets-retrieve
+    participant retrieveCustomer as Consulta Clientes <br> Epica 2315: ConsultaCliente <br> HU 6945:  GET - /customer-management/customer-profile-retrieves/v1/retrieve-customer
+    participant Homologador as Liberería de <br> Homologación
+    participant Ficopen as Wrapper FICOPEN <br> Endpoint: apidev.afpficohsa.com/api/v2/cuentas/saldos
+    participant VAL as Componente Valida Funcionalidad Usuario <br> Epica 59: Componentes transversales <br> HU 17488
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Consulta Certificados Depósito 
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: customerReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> customerReference (obligatorio)
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: PENSION_FUND_ADMINISTRATION_RETRIEVE <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>API: Construye request API retrieveCustomer
+    Note over API: Mapeo: <br> customerType = "CUSTOMER_ID" <br> customerReferenceValue = request.customerReference 
+
+    API->>retrieveCustomer: Consulta cliente
+    Note right of API: queryparam: customerType, customerReferenceValue 
+
+    retrieveCustomer->>API: Obtiene datos cliente
+    Note left of retrieveCustomer: HTTP CODE <br> legalDocumentName <br> customerLegalReference
+
+    API->>API: Evalua Response API retrieveCustomer
+
+    alt HTTP CODE != 200
+
+        API->> Consumidor: Retorna error API retrieveCustomer
+    
+    else HTTP CODE == 200
+
+        API->>Homologador: Consulta Homologación legalDocumentName
+        Note right of API: domain: LEGAL_DOCUMENT_NAME <br> name: CATALOGATE <br> value.name: responseRetrieveCustomer.legalDocumentName
+
+        Homologador->>API: Retorna Valor Homologado 
+        Note left of Homologador: response.value.ficopen <br> IDENTIDAD → 1 <br> RTN → 2
+
+        API->>API: Construye Request Wrapper FICOPEN
+        Note over API: Mapeo: <br> codigoTipoIdentificacion = responseRetrieveCustomer.legalDocumentName (Homologado) <br> numeroIdentificacion = responseRetrieveCustomer.customerLegalReference
+
+        API->>Ficopen: Consume Wrapper Ficopen
+        Note right of API: codigoTipoIdentificacion, numeroIdentificacion
+
+        Ficopen->>API: Response Wrapper Ficopen
+        Note left of Ficopen: NUMERO_CUENTA, DESCRIPCION_CUENTA, <br/> MONEDA, SALDO_TOTAL
+
+        API->>API: Evalua Response Wrapper FICOPEN
+
+        alt HTTP CODE != 200
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: REST Response Error
+            Note left of API: Retorna error de FICOPEN
+
+        else if (upper-case($successIndicator) = 'SUCCESS' and count($registros) > 0)
+
+            API->>API: Construye Response API
+            Note over API: assetType = "FPC" <br> assetProductNumber = NUMERO_CUENTA <br/> assetProductName = DESCRIPCION_CUENTA <br/> assetCurrency = MONEDA <br/> assetTotalBalance = SALDO_TOTAL <br/> assetReservedBalance = "0.00" <br/> assetBlockedBalance = "0.00" <br/> visaFloatingBalance = "0.00" <br> availableBalance = "0.00" <br/> productType  = "" <br> assetOriginBank = "" <br> internationalProductNumber = "" <br> openingDate = "" <br> productStatus = ""
+
+            API->>VAL: Valida Funcionalidad Usuario
+            Note right of API: Envía datos para validación de campos
+
+            VAL->>API: Response Validación Funcionalidad Usuario
+            Note left of VAL: Entrega Campos a Presentar
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body
+        
+        end
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

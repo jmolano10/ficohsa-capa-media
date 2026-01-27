@@ -1,0 +1,157 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Activos Cliente <br> Epica 880: ConsultaActivosCliente <br> HU 3958:  GET - /customer-assets-retrieve/v1/{customerIdentification}{assetType}/assets-retrieve
+    participant AHOCHQGT as API Consulta Cuentas Ahorro / Corriente GT | PA <br> Epica 880: ConsultaActivosCliente <br> HU 48783:  /loans-and-deposits/deposit-account-facility-retrieve/v1/{customerReference}/{assetType}/assets-retrieve
+    participant DEPGT as API Consulta Certificados de Depósito GT | PA <br> Epica 2454: ValidaProductoCliente <br> HU 9440:  GET - /loans-and-deposits/term-deposit-retrieves/v1/customer/{customerReference}/term-deposit-retrieves
+    participant VAL as Componente Valida Funcionalidad Usuario <br> Epica 59: Componentes transversales <br> HU 17488
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (GT01 | PA01) - Consulta Cuentas Ahorros 
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: assetType, customerReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> assetType (obligatorio) - enum: AHO, CHQ, DEP, CTA, ALL <br> customerReference (obligatorio)
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: CUSTOMER_ASSETS_RETRIEVES <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para GT01 | PA01
+
+    API->>API: Aplica patrón strategy
+    Note over API: Selecciona lógica de negocio según header.sourceBank
+
+    API->>API: Valida assetType
+
+    alt assetType == AHO | CHQ | CTA
+        API->>AHOCHQGT: Consume API Producto Consulta Cuentas Ahorro / Corriente GT | PA
+        Note right of API: customerReference, assetType
+
+        AHOCHQGT->>API: Response API Producto Consulta Cuentas Ahorro / Corriente GT | PA
+        Note left of AHOCHQGT: response.body
+
+        API->>API: Evalúa Response API Producto Consulta Cuentas Ahorro / Corriente GT | PA
+
+        alt HTTP CODE != 200
+
+            API->> Consumidor: Retorna error API Producto Consulta Cuentas Ahorro GT
+            Note left of API: HTTP 4XX/5XX: Error Body
+
+        else HTTP CODE == 200
+
+            API->>API: Construye Response API Composición
+
+            API->>VAL: Valida Funcionalidad Usuario
+            Note right of API: Envía datos para validación de campos
+
+            VAL->>API: Response Validación Funcionalidad Usuario
+            Note left of VAL: Entrega Campos a Presentar
+
+            API->>API: Construye Response Final
+            Note over API: Consruye response final de acuerdo a la validación de funcionalidad de usuario  
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body 
+        
+        end
+    end
+
+    alt assetType == DEP
+        API->>DEPGT: Consume API Producto Consulta Certificados de Depósito GT
+        Note right of API: customerReference
+
+        DEPGT->>API: Response API Producto Consulta Certificados de Depósito GT
+        Note left of DEPGT: response.body
+
+        API->>API: Evalúa Response API ProductoConsulta Certificados de Depósito GT
+
+        alt HTTP CODE != 200
+
+            API->> Consumidor: Retorna error API Producto Consulta Certificados de Depósito GT
+            Note left of API: HTTP 4XX/5XX: Error Body
+
+        else HTTP CODE == 200
+
+            API->>API: Construye Response API Composición
+
+            API->>VAL: Valida Funcionalidad Usuario
+            Note right of API: Envía datos para validación de campos
+
+            VAL->>API: Response Validación Funcionalidad Usuario
+            Note left of VAL: Entrega Campos a Presentar 
+
+            API->>API: Construye Response Final
+            Note over API: Consruye response final de acuerdo a la validación de funcionalidad de usuario           
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body 
+
+        end
+    end
+
+    alt assetType == ALL (SE REALIZA LLAMADO EN PARALELO A TODOS LOS SERVICIOS)
+        API->>AHOCHQGT: Consume API Producto Consulta Cuentas Ahorro / Corriente GT | PA
+        Note right of API: customerReference, assetType
+
+        AHOCHQGT->>API: Response API Producto Consulta Cuentas Ahorro / Corriente GT | PA
+        Note left of AHOCHQGT: response.body
+
+        API->>DEPGT: Consume API Producto Consulta Certificados de Depósito GT
+        Note right of API: customerReference
+
+        DEPGT->>API: Response API Producto Consulta Certificados de Depósito GT
+        Note left of DEPGT: response.body
+
+        API->>API: Evalúa Responses APIs Producto 
+
+        alt Si HTTP CODE de ambas respuestas != 200 y != 404
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: REST Response Error
+            Note left of API: HTTP 500: Error inesperado en el servicio
+        
+        else Si HTTP CODE de ambas respuestas = 404
+
+            API->> Consumidor: REST Response Error
+            Note left of API: HTTP 404: No Records Found
+
+        else si al menos una de las respuestas tiene HTTP CODE == 200
+
+            API->>API: Construye Response API Composición
+            Note over API: Consolida respuestas de ambos servicios <br> Si uno de los servicios retorna error, entrega ese objeto como vacío.
+
+            API->>VAL: Valida Funcionalidad Usuario
+            Note right of API: Envía datos para validación de campos
+
+            VAL->>API: Response Validación Funcionalidad Usuario
+            Note left of VAL: Entrega Campos a Presentar 
+
+            API->>API: Construye Response Final
+            Note over API: Consruye response final de acuerdo a la validación de funcionalidad de usuario
+
+            API->>Consumidor: REST Response Successful
+            Note left of API: HTTP 200: Response Body
+        end
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

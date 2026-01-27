@@ -1,0 +1,136 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>ConsultaActivosCliente
+    participant ValidaSvc as ValidaServicioRegional<br/>(DB)
+    participant SplitJoin as sjConsultaActivosCliente<br/>(Split-Join Flow)
+    participant DBCuentas as consultaListaCuentas_db<br/>(Oracle DB)
+    participant DBDepositos as consultaListaDepositosCliente_db<br/>(Oracle DB)
+    participant ValidaFunc as ValidaFuncionalidadUsuario<br/>(DB)
+    participant MapeoErr as MapeoErrores<br/>(OSB)
+
+    Note over Client, MapeoErr: Flujo Panamá (PA01) - ConsultaActivosCliente
+
+    Client->>OSB: SOAP Request HTTPS
+    Note right of Client: Header: SourceBank=PA01<br/>UserName, Password<br/>Body: CUSTOMER_ID, ASSET_TYPE
+
+    OSB->>ValidaSvc: ValidaServicioRegional
+    Note right of OSB: PV_SERVICE_ID: FICBCO0043<br/>PV_SOURCE_BANK: PA01
+
+    ValidaSvc-->>OSB: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+
+    alt Región No Válida
+        OSB->>OSB: successIndicator=ERROR
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: aplicarValoresPorDefectoRegion.xq
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'PA01'
+
+    OSB->>OSB: Asignar Variables
+    Note right of OSB: $product = ASSET_TYPE<br/>$customer = CUSTOMER_ID
+
+    alt ASSET_TYPE = "AHO" OR "CHQ" OR "CTA"
+        OSB->>DBCuentas: consultaListaCuentas
+        Note right of OSB: XQuery: consultaListaCuentasPAIn.xq<br/>CUSTOMER_ID → PV_CUSTOMER_ID<br/>Conexión: ConnectionProxyAbanksPA<br/>SP: OSB_K_CONLISTACUENTAS.TOPLEVEL$OSB_P_CON_LISTA_CUEN<br/>Retry: 1, Interval: 30s
+
+        DBCuentas-->>OSB: OutputParameters
+        Note left of DBCuentas: PV_ERROR_CODE<br/>PV_ASSET_TYPE_OUT (array)<br/>PV_ASSET_NUMBER (array)<br/>Campos de saldo (arrays)
+
+        OSB->>OSB: consultaListaCuentasPAOut.xq
+        Note right of OSB: Filtrar por tipo (AHO/CHQ)<br/>ASSET_SOURCE_BANK = "PA01"
+    end
+
+    alt ASSET_TYPE = "DEP"
+        OSB->>DBDepositos: consultaListaDepositosCliente
+        Note right of OSB: XQuery: consultaListaDepositosPAIn.xq<br/>CUSTOMER_ID → PV_CUSTOMER_ID<br/>Conexión: ConnectionProxyAbanksPA
+
+        DBDepositos-->>OSB: OutputParameters
+        Note left of DBDepositos: PV_ERROR_CODE<br/>Arrays con depósitos
+
+        OSB->>OSB: consultaListaDepositosPAOut.xq
+        Note right of OSB: ASSET_TYPE = "DEP"<br/>ASSET_SOURCE_BANK = "PA01"
+    end
+
+    alt ASSET_TYPE = "ALL"
+        OSB->>SplitJoin: sjConsultaActivosCliente
+        Note right of OSB: XQuery: sjConsultaActivosClientesPAIn.xq<br/>CUSTOMER_ID → PV_CUSTOMER_ID<br/>ASSET_TYPE → PV_ASSET_TYPE
+
+        Note over SplitJoin: Ejecución Paralela (BPEL Flow)
+
+        par Consulta Cuentas
+            SplitJoin->>DBCuentas: consultaListaCuentas
+            Note right of SplitJoin: XQuery: consultaActivosClienteCtasPAIn.xq<br/>InputParameters → PV_CUSTOMER_ID<br/>Conexión: ConnectionProxyAbanksPA<br/>Dispatch Policy: weblogic.wsee.mdb.DispatchPolicy
+
+            DBCuentas-->>SplitJoin: OutputParameters Cuentas
+            Note left of DBCuentas: Arrays con AHO y CHQ
+        and Consulta Depósitos
+            SplitJoin->>DBDepositos: consultaListaDepositosCliente
+            Note right of SplitJoin: XQuery: consultaActivosClienteDepsPAIn.xq<br/>InputParameters → PV_CUSTOMER_ID<br/>Conexión: ConnectionProxyAbanksPA
+
+            DBDepositos-->>SplitJoin: OutputParameters Depósitos
+            Note left of DBDepositos: Arrays con DEP
+        end
+
+        SplitJoin->>SplitJoin: Agregar Resultados
+        Note right of SplitJoin: XQuery: consultaActivosClientePAOut.xq<br/>Combina OutputParametersCuentas<br/>y OutputParametersDepositos
+
+        SplitJoin-->>OSB: OutputParameters Consolidado
+
+        OSB->>OSB: sjConsultaActivosClientePAOut.xq
+        Note right of OSB: Mapeo completo:<br/>- Filtrar AHO de PV_ASSET_TYPE_OUT<br/>- Filtrar CHQ de PV_ASSET_TYPE_OUT<br/>- Mapear DEP<br/>- ASSET_SOURCE_BANK = "PA01"<br/>- Función mensajeRespuesta()
+    end
+
+    OSB->>ValidaFunc: ValidaFuncionalidadUsuario
+    Note right of OSB: XQuery: consultaFuncionalidadUsuario.xq<br/>PV_USER_NAME: UserName<br/>PV_FUNCTIONALITY: SALDOS_ACTIVOS<br/>PV_SOURCE_BANK: PA01
+
+    ValidaFunc-->>OSB: PV_CODIGO_ERROR, PV_VALOR
+
+    alt Validación Exitosa
+        OSB->>OSB: $functionalityIndicator = PV_VALOR
+    else Validación Fallida
+        OSB->>OSB: $functionalityIndicator = "ALL"
+    end
+
+    OSB->>OSB: Transformar Response
+    Note right of OSB: Pipeline: PA01_ConsultaActivosCliente_response
+
+    alt ASSET_TYPE = AHO, CHQ, CTA
+        OSB->>OSB: consultaListaCuentasPAHeaderOut.xq
+        Note right of OSB: OutputParameters → ResponseHeader
+
+        OSB->>OSB: consultaListaCuentasPAOut.xq
+        Note right of OSB: OutputParameters → Body
+    end
+
+    alt ASSET_TYPE = DEP
+        OSB->>OSB: consultaListaDepositosPAHeaderOut.xq
+        Note right of OSB: OutputParameters → ResponseHeader
+
+        OSB->>OSB: consultaListaDepositosPAOut.xq
+        Note right of OSB: OutputParameters → Body
+    end
+
+    alt ASSET_TYPE = ALL
+        OSB->>OSB: sjConsultaActivosClientePAHeaderOut.xq
+        Note right of OSB: OutputParameters → ResponseHeader
+
+        OSB->>OSB: sjConsultaActivosClientePAOut.xq
+        Note right of OSB: OutputParameters → Body<br/>Incluye Ahorros, Corrientes, Depósitos
+    end
+
+    alt successIndicator != SUCCESS
+        OSB->>MapeoErr: mapeoErrores
+        Note right of OSB: XQuery: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0043$#$messages
+
+        MapeoErr-->>OSB: mapeoErroresResponse
+
+        OSB->>OSB: mapeoErroresUsageOut.xq
+        Note right of OSB: Actualiza ResponseHeader
+    end
+
+    OSB->>Client: SOAP Response
+    Note left of OSB: ResponseHeader: successIndicator<br/>Body: consultaActivosClienteResponse<br/>Ahorros, Corrientes, Depósitos<br/>ASSET_SOURCE_BANK = "PA01"<br/>Moneda: USD
+
+    Note over Client, MapeoErr: Diferencias con GT01:<br/>- Retry configurado: 1<br/>- Dispatch Policy: weblogic.wsee.mdb.DispatchPolicy<br/>- Conexión: ConnectionProxyAbanksPA<br/>- ASSET_SOURCE_BANK = "PA01"

@@ -1,0 +1,99 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Activos Cliente <br> Epica 880: ConsultaActivosCliente <br> HU 3958:  GET - /customer-assets-retrieve/v1/{customerIdentification}{assetType}/assets-retrieve
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant CTS as Wrapper CTS Cobis <br> BIZ: /Middleware/v2/BusinessServices/CTS/activos/biz/activos.biz <br> Operación: OpConsultaActivosCliente
+    participant Homologador as Liberería de <br> Homologación
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (NI01) - Consulta Cuentas Ahorros 
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: assetType, customerReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> assetType (obligatorio) - enum: AHO, CHQ, DEP, CTA, ALL <br> customerReference (obligatorio)
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: CUSTOMER_ASSETS_RETRIEVES <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para NI01
+
+    API->>API: Aplica patrón strategy
+    Note over API: Selecciona lógica de negocio según header.sourceBank
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros caché local
+        Note right of API: Domain: CUSTOMER_ASSETS_RETRIEVES_NI <br> name: PARAM
+
+        CL->>API: Obtiene parámetros 
+        Note left of CL: ObtenerParametrizacion 1 Parámetros: <br> codCanalOriginador 
+
+    else Consulta  parametros en Lambda Parámetros
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: CUSTOMER_ASSETS_RETRIEVES_NI <br> name: PARAM
+
+        Lambda->>API: Obtiene parámetros 
+        Note left of Lambda: ObtenerParametrizacion 1 Parámetros: <br> codCanalOriginador 
+
+        API->>CL: Guarda parámetros en caché local
+        Note right of API: codCanalOriginador 
+
+    end
+
+    API->>API: Consruye Request CTS Cobis
+    Note over API: codCanalOriginador = param.codCanalOriginador <br>  cliente.codCliente = customerReference, <br> cliente.valIdCliente = header.application-user, <br> producto.codTipoProducto = assetType
+
+    API->>CTS: Consume Wrapper CTS Cobis: Consulta Productos Cliente
+    Note right of API: customerReference
+
+    CTS->>API: Response Wrapper CTS Cobis: Consulta Productos Cliente
+    Note left of CTS: codTipoRespuesta, codTipoProducto, codCuentaHabiente, <br> valTipoProducto, valSimboloMoneda, <br> valSaldoTotal, montoReserva, <br> valMontoBloqueado, valBalanceFlotante, <br> valSaldoDisponible, codigoIBAN
+
+    API->>API: Validar Response CTS Cobis
+
+    alt if (codTipoRespuesta = 'SUCCESS' and count($registros) = 0)
+
+        API->> Errors: Mapear código de error
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: REST Response Error
+        Note left of API: HTTP 404: No Records Found
+
+    else if (codTipoRespuesta = 'SUCCESS' and count($registros) > 0)
+
+        API->>Homologador: Consulta Homologación codTipoProducto
+        Note right of API: domain: CUSTOMER_ASSETS_RETRIEVES_NI_ASSET_TYPE <br> name: CATALOGATE <br> value.name: request.codTipoProducto
+
+        Homologador->>API: Retorna Valor Homologado 
+        Note left of Homologador: AHO → AHO <br> CTE → CHQ <br> PFI → DEP
+       
+        API->>API: Consruyte Response Success
+        Note over API: Mapeo: <br> assetType → codTipoProducto (Homologado) <br> assetProductNumber = codCuentaHabiente <br/> assetProductName = valTipoProducto <br/> assetCurrency = valSimboloMoneda <br/> assetTotalBalance = valSaldoTotal (Redondeo método Banker's Rounding) <br/> assetReservedBalance = montoReserva (Redondeo método Banker's Rounding) <br/> assetBlockedBalance = valMontoBloqueado (Redondeo método Banker's Rounding) <br/> visaFloatingBalance = valBalanceFlotante (Redondeo método Banker's Rounding) <br> availableBalance = valSaldoDisponible (Redondeo método Banker's Rounding) <br/> productType  = "" <br> assetOriginBank = "" <br> internationalProductNumber = "codigoIBAN" <br> openingDate = "" <br> productStatus = ""
+
+        API->>Consumidor: REST Response Successful / Error
+        Note left of API: HTTP 200: Response Body 
+    
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

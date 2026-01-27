@@ -1,0 +1,82 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Cuentas Ahorro <br> Epica 880: ConsultaActivosCliente <br> HU 3933:  GET - /loans-and-deposits/savings-account-retrieves/v1/{customerReference}/assets-retrieve
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant T24 as Wrapper T24 <br> Operación: ConsultaCuentaAhorroxCliente
+    participant VAL as Componente Valida Funcionalidad Usuario <br> Epica 59: Componentes transversales <br> HU 17488
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Consulta Cuentas Ahorros 
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: customerReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> customerReference (obligatorio)
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: SAVINGS_ACCOUNT_RETRIEVES <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    API->>Lib: Consulta Constantes
+   
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: columnName = "CUSTOMER" <br> operand = "EQ"
+
+    API->>API: Construye Request Wrapper T24
+    Note over API: Mapeo: <br> columnName = cons.columnName <br> criteriaValue = request.customerReference <br> operand = cons.operand
+
+    API->>T24: Consume Wrapper T24 OP: ConsultaCuentaAhorroxCliente
+    Note right of API: columnName, criteriaValue, operand
+
+    T24->>API: Response Wrapper T24
+    Note left of T24: ALTACCTID, ACCOUNTNUMBER, ACCOUNTTITLE, <br> CURRENCY,  TOTALBALANCE, RESERVEBALANCE <br> LIENBALANCE, BLOCKEDFUNDSPOS, <br> BLOCKEDFUNDSATM, AVAILABLEBAL, OPERATIONTYPE
+
+    API->>API: Evalua Response Wrapper T24
+
+    alt if (upper-case($successIndicator) = 'SUCCESS' and count($registros) = 0)
+
+        API->> Errors: Mapear código de error
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: REST Response Error
+        Note left of API: HTTP 404: No Records Found
+
+    else if (upper-case($successIndicator) = 'SUCCESS' and count($registros) > 0)
+
+        API->>API: Construye Response campo visaFloatingBalance
+        Note over API:If (BLOCKEDFUNDSPOS = "NaN" and BLOCKEDFUNDSATM = "NaN") then visaFloatingBalance = "0.00" <br> else If (BLOCKEDFUNDSPOS != "NaN" and BLOCKEDFUNDSATM != "NaN") then visaFloatingBalance = BLOCKEDFUNDSPOS + BLOCKEDFUNDSATM <br> else If (BLOCKEDFUNDSPOS = "NaN") then visaFloatingBalance =  BLOCKEDFUNDSATM <br> else visaFloatingBalance = BLOCKEDFUNDSPOS 
+
+        API->>API: Construye Response API
+        Note over API: assetType = "AHO" <br> If (ALTACCTID exist) then assetProductNumber = ALTACCTID else assetProductNumber = ACCOUNTNUMBER <br> assetProductName = ACCOUNTTITLE <br> assetCurrency = CURRENCY <br> assetTotalBalance = TOTALBALANCE <br> assetReservedBalance = RESERVEBALANCE <br> assetBlockedBalance = LIENBALANCE <br> availableBalance = AVAILABLEBAL <br> productType  = OPERATIONTYPE <br> assetOriginBank = "" <br> internationalProductNumber = "" <br> openingDate = "" <br> productStatus = ""
+
+        API->>VAL: Valida Funcionalidad Usuario
+        Note right of API: Envía datos para validación de campos
+
+        VAL->>API: Response Validación Funcionalidad Usuario
+        Note left of VAL: Entrega Campos a Presentar
+
+        API->>Consumidor: REST Response Successful
+        Note left of API: HTTP 200: Response Body
+        
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

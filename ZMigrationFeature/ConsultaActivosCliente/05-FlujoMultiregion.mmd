@@ -1,0 +1,154 @@
+flowchart TD
+    Start([Cliente SOAP Request]) --> ValidateXSD{Validar XSD?}
+    
+    ValidateXSD -->|HN01: Sí| ValidXSD[Validar Esquema XML<br/>consultaClientesTypes.xsd]
+    ValidateXSD -->|GT01, PA01, NI01| ValidateRegion
+    
+    ValidXSD -->|Error BEA-382505| ErrorXSD[mapeoErrorValidate.xq]
+    ErrorXSD --> ErrorResponse([SOAP Fault])
+    
+    ValidXSD -->|Válido| ValidateRegion[ValidaServicioRegional<br/>PV_SERVICE_ID: FICBCO0043]
+    
+    ValidateRegion -->|PV_CODIGO_ERROR != SUCCESS| RegionError[successIndicator=ERROR]
+    RegionError --> ErrorResponse
+    
+    ValidateRegion -->|SUCCESS| ApplyDefaults[aplicarValoresPorDefectoRegion.xq]
+    
+    ApplyDefaults --> RouteRegion{SourceBank?}
+    
+    RouteRegion -->|HN01| HN01Flow[Pipeline HN01]
+    RouteRegion -->|GT01| GT01Flow[Pipeline GT01]
+    RouteRegion -->|PA01| PA01Flow[Pipeline PA01]
+    RouteRegion -->|NI01| NI01Flow[Pipeline NI01]
+    RouteRegion -->|Otro| DefaultFlow[Pipeline Default<br/>Error: MW-0008]
+    
+    DefaultFlow --> ErrorResponse
+    
+    %% HN01 Flow
+    HN01Flow --> HN01Assign[Asignar Variables<br/>$product = ASSET_TYPE<br/>$customer = CUSTOMER_ID]
+    HN01Assign --> HN01ConsultaCliente[ConsultaCliente T24<br/>Obtener LEGALID]
+    HN01ConsultaCliente --> HN01ConvertDoc[convertirTipoDocumento.xq<br/>$legalIdType]
+    HN01ConvertDoc --> HN01Route{ASSET_TYPE?}
+    
+    HN01Route -->|AHO| HN01Ahorro[ConsultaCuentaAhorro T24<br/>consultaActivosAhorrosClienteV2In.xq]
+    HN01Route -->|FPC| HN01Pension[consultaFondoPensiones12c<br/>getAssetsCustomerIn.xq<br/>Header: OSB12AUTH]
+    HN01Route -->|CHQ| HN01Corriente[ConsultaCuentaCorriente T24<br/>consultaActivosCorrientesClienteV2In.xq]
+    HN01Route -->|DEP| HN01Deposito[Consultadecertifdepporcliente DB<br/>consultaActivosDepositosClienteIn.xq]
+    HN01Route -->|CTA/ALL| HN01SJ[sjConsultaCuentasCliente<br/>consultaActivosClienteSjIn.xq]
+    
+    HN01Ahorro --> HN01ValidaFunc
+    HN01Pension --> HN01ValidaFunc
+    HN01Corriente --> HN01ValidaFunc
+    HN01Deposito --> HN01ValidaFunc
+    HN01SJ --> HN01ValidaFunc
+    
+    HN01ValidaFunc[ValidaFuncionalidadUsuario<br/>SALDOS_ACTIVOS] --> HN01Transform{Tipo Producto?}
+    
+    HN01Transform -->|AHO/CHQ/DEP/FPC| HN01TransformV2[consultaActivosClienteHeaderV2Out.xq<br/>consultaActivosClienteV2Out.xq]
+    HN01Transform -->|CTA/ALL| HN01TransformSJ[consultaActivosClienteSjHeaderOut.xq<br/>consultaActivosClienteSjOut.xq]
+    
+    HN01TransformV2 --> CheckError
+    HN01TransformSJ --> CheckError
+    
+    %% GT01 Flow
+    GT01Flow --> GT01Assign[Asignar Variables<br/>$product, $customer]
+    GT01Assign --> GT01Route{ASSET_TYPE?}
+    
+    GT01Route -->|AHO/CHQ/CTA| GT01Cuentas[consultaListaCuentas_db<br/>ConnectionProxyAbanksGT<br/>SP: OSB_K_CONLISTACUENTAS<br/>consultaListaCuentasGTIn.xq]
+    GT01Route -->|DEP| GT01Depositos[consultaListaDepositosCliente_db<br/>ConnectionProxyAbanksGT<br/>consultaListaDepositosGTIn.xq]
+    GT01Route -->|ALL| GT01SJ[sjConsultaActivosCliente<br/>Split-Join Flow]
+    
+    GT01SJ --> GT01Parallel{{"Ejecución Paralela"}}
+    GT01Parallel -->|Scope 1| GT01SJCuentas[consultaListaCuentas_db<br/>consultaActivosClienteCtasGTIn.xq]
+    GT01Parallel -->|Scope 2| GT01SJDepositos[consultaListaDepositosCliente_db<br/>consultaActivosClienteDepsGTIn.xq]
+    
+    GT01SJCuentas --> GT01Aggregate[Agregar Resultados<br/>consultaActivosClienteGTOut.xq]
+    GT01SJDepositos --> GT01Aggregate
+    
+    GT01Cuentas --> GT01ValidaFunc
+    GT01Depositos --> GT01ValidaFunc
+    GT01Aggregate --> GT01ValidaFunc
+    
+    GT01ValidaFunc[ValidaFuncionalidadUsuario<br/>SALDOS_ACTIVOS] --> GT01Transform{Tipo Producto?}
+    
+    GT01Transform -->|AHO/CHQ/CTA| GT01TransformCtas[consultaListaCuentasGTHeaderOut.xq<br/>consultaListaCuentasGTOut.xq<br/>ASSET_SOURCE_BANK=GT01]
+    GT01Transform -->|DEP| GT01TransformDep[consultaListaDepositosGTHeaderOut.xq<br/>consultaListaDepositosGTOut.xq<br/>ASSET_SOURCE_BANK=GT01]
+    GT01Transform -->|ALL| GT01TransformSJ[sjConsultaActivosClienteGTHdrOut.xq<br/>sjConsultaActivosClienteGTOut.xq<br/>ASSET_SOURCE_BANK=GT01]
+    
+    GT01TransformCtas --> CheckError
+    GT01TransformDep --> CheckError
+    GT01TransformSJ --> CheckError
+    
+    %% PA01 Flow
+    PA01Flow --> PA01Assign[Asignar Variables<br/>$product, $customer]
+    PA01Assign --> PA01Route{ASSET_TYPE?}
+    
+    PA01Route -->|AHO/CHQ/CTA| PA01Cuentas[consultaListaCuentas_db<br/>ConnectionProxyAbanksPA<br/>SP: OSB_K_CONLISTACUENTAS<br/>Retry: 1<br/>consultaListaCuentasPAIn.xq]
+    PA01Route -->|DEP| PA01Depositos[consultaListaDepositosCliente_db<br/>ConnectionProxyAbanksPA<br/>consultaListaDepositosPAIn.xq]
+    PA01Route -->|ALL| PA01SJ[sjConsultaActivosCliente<br/>Split-Join Flow<br/>Dispatch Policy: weblogic.wsee.mdb]
+    
+    PA01SJ --> PA01Parallel{{"Ejecución Paralela"}}
+    PA01Parallel -->|Scope 1| PA01SJCuentas[consultaListaCuentas_db<br/>consultaActivosClienteCtasPAIn.xq]
+    PA01Parallel -->|Scope 2| PA01SJDepositos[consultaListaDepositosCliente_db<br/>consultaActivosClienteDepsPAIn.xq]
+    
+    PA01SJCuentas --> PA01Aggregate[Agregar Resultados<br/>consultaActivosClientePAOut.xq]
+    PA01SJDepositos --> PA01Aggregate
+    
+    PA01Cuentas --> PA01ValidaFunc
+    PA01Depositos --> PA01ValidaFunc
+    PA01Aggregate --> PA01ValidaFunc
+    
+    PA01ValidaFunc[ValidaFuncionalidadUsuario<br/>SALDOS_ACTIVOS] --> PA01Transform{Tipo Producto?}
+    
+    PA01Transform -->|AHO/CHQ/CTA| PA01TransformCtas[consultaListaCuentasPAHeaderOut.xq<br/>consultaListaCuentasPAOut.xq<br/>ASSET_SOURCE_BANK=PA01]
+    PA01Transform -->|DEP| PA01TransformDep[consultaListaDepositosPAHeaderOut.xq<br/>consultaListaDepositosPAOut.xq<br/>ASSET_SOURCE_BANK=PA01]
+    PA01Transform -->|ALL| PA01TransformSJ[sjConsultaActivosClientePAHeaderOut.xq<br/>sjConsultaActivosClientePAOut.xq<br/>ASSET_SOURCE_BANK=PA01]
+    
+    PA01TransformCtas --> CheckError
+    PA01TransformDep --> CheckError
+    PA01TransformSJ --> CheckError
+    
+    %% NI01 Flow
+    NI01Flow --> NI01Transform[consultaActivosClienteNIIn.xq<br/>Mapeo a Cobis CTS]
+    NI01Transform --> NI01Validate[Validar Esquema Cobis<br/>services.xsd]
+    NI01Validate -->|Error| ErrorResponse
+    NI01Validate -->|Válido| NI01Cobis[OpConsultaActivosCliente<br/>Cobis CTS Web Service<br/>contextoTransaccional.codCanalOriginador=1]
+    
+    NI01Cobis --> NI01Header[consultaActivosClienteNIHeaderOut.xq<br/>codTipoRespuesta: 0=SUCCESS]
+    
+    NI01Header --> NI01CheckSuccess{codTipoRespuesta}
+    
+    NI01CheckSuccess -->|!= 0| NI01Empty[Body vacío]
+    NI01Empty --> CheckError
+    
+    NI01CheckSuccess -->|= 0| NI01Body[consultaActivosClienteNIOut.xq]
+    
+    NI01Body --> NI01FilterAHO["Filtrar AHO<br/>activos[codTipoProducto=AHO]<br/>Redondeo 2 decimales<br/>INTERNATIONAL_ACCOUNT_NUMBER"]
+    NI01Body --> NI01FilterCTE["Filtrar CTE → CHQ<br/>activos[codTipoProducto=CTE]<br/>Transformación de tipo<br/>Redondeo 2 decimales"]
+    NI01Body --> NI01FilterPFI["Filtrar PFI → DEP<br/>activos[codTipoProducto=PFI]<br/>Transformación de tipo<br/>Redondeo 2 decimales"]
+    
+    NI01FilterAHO --> CheckError
+    NI01FilterCTE --> CheckError
+    NI01FilterPFI --> CheckError
+    
+    %% Error Handling
+    CheckError{"successIndicator != SUCCESS?"}
+    
+    CheckError -->|Sí| MapeoErrores[MapeoErrores<br/>mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0043$#$messages]
+    
+    MapeoErrores --> MapeoErroresOut[mapeoErroresUsageOut.xq<br/>Actualizar ResponseHeader]
+    
+    MapeoErroresOut --> Response
+    CheckError -->|No| Response
+    
+    Response([SOAP Response<br/>ResponseHeader + Body])
+    
+    style Start fill:#e1f5e1
+    style Response fill:#e1f5e1
+    style ErrorResponse fill:#ffe1e1
+    style HN01Flow fill:#fff4e1
+    style GT01Flow fill:#e1f0ff
+    style PA01Flow fill:#ffe1f0
+    style NI01Flow fill:#f0e1ff
+    style GT01Parallel fill:#d0e8ff
+    style PA01Parallel fill:#ffd0e8

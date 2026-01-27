@@ -1,0 +1,80 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>ConsultaActivosCliente
+    participant ValidaSvc as ValidaServicioRegional<br/>(DB)
+    participant CobisCTS as Cobis CTS<br/>activos (Web Service)
+    participant MapeoErr as MapeoErrores<br/>(OSB)
+
+    Note over Client, MapeoErr: Flujo Nicaragua (NI01) - ConsultaActivosCliente
+
+    Client->>OSB: SOAP Request HTTPS
+    Note right of Client: Header: SourceBank=NI01<br/>UserName, Password<br/>Body: CUSTOMER_ID, ASSET_TYPE
+
+    OSB->>ValidaSvc: ValidaServicioRegional
+    Note right of OSB: PV_SERVICE_ID: FICBCO0043<br/>PV_SOURCE_BANK: NI01
+
+    ValidaSvc-->>OSB: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+
+    alt Región No Válida
+        OSB->>OSB: successIndicator=ERROR
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: aplicarValoresPorDefectoRegion.xq
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'NI01'
+
+    OSB->>OSB: Transformar Request
+    Note right of OSB: XQuery: consultaActivosClienteNIIn.xq<br/>Mapeo:<br/>CUSTOMER_ID → cliente/codCliente<br/>ASSET_TYPE → producto/codTipoProducto<br/>UserName → cliente/valIdCliente<br/>Constante 1 → contextoTransaccional/codCanalOriginador
+
+    OSB->>OSB: Validar Esquema Cobis
+    Note right of OSB: Schema: services.xsd<br/>Element: opConsultaActivosClienteSolicitud
+
+    OSB->>CobisCTS: OpConsultaActivosCliente
+    Note right of OSB: SOAP Web Service<br/>Namespace: http://service.srvaplcobisactivos.ecobis.cobiscorp<br/>Request:<br/><opConsultaActivosClienteSolicitud><br/>  <contextoTransaccional><br/>    <codCanalOriginador>1</codCanalOriginador><br/>  </contextoTransaccional><br/>  <cliente><br/>    <codCliente>CUSTOMER_ID</codCliente><br/>    <valIdCliente>UserName</valIdCliente><br/>  </cliente><br/>  <producto><br/>    <codTipoProducto>ASSET_TYPE</codTipoProducto><br/>  </producto><br/></opConsultaActivosClienteSolicitud>
+
+    CobisCTS-->>OSB: opConsultaActivosClienteRespuesta
+    Note left of CobisCTS: <contextoRespuesta><br/>  <codTipoRespuesta>0</codTipoRespuesta><br/></contextoRespuesta><br/><activos> (múltiples)<br/>  <cuenta><br/>    <codCuentaHabiente>...</codCuentaHabiente><br/>    <codTipoProducto>AHO/CTE/PFI</codTipoProducto><br/>    <valTipoProducto>...</valTipoProducto><br/>    <moneda><br/>      <valSimboloMoneda>NIO</valSimboloMoneda><br/>    </moneda><br/>    <valSaldoTotal>...</valSaldoTotal><br/>    <valMontoBloqueado>...</valMontoBloqueado><br/>    <valSaldoDisponible>...</valSaldoDisponible><br/>    <codigoIBAN>...</codigoIBAN><br/>  </cuenta><br/>  <cuentaReserva><br/>    <montoReserva>...</montoReserva><br/>  </cuentaReserva><br/>  <valBalanceFlotante>...</valBalanceFlotante><br/></activos>
+
+    OSB->>OSB: Transformar Response Header
+    Note right of OSB: XQuery: consultaActivosClienteNIHeaderOut.xq<br/>Mapeo:<br/>contextoRespuesta/codTipoRespuesta → successIndicator<br/>Evaluación: 0 = SUCCESS
+
+    alt codTipoRespuesta != 0 (Error)
+        OSB->>OSB: successIndicator = ERROR
+        OSB->>OSB: Body vacío
+        Note right of OSB: <consultaActivosClienteResponse/>
+    else codTipoRespuesta = 0 (Éxito)
+        OSB->>OSB: Transformar Response Body
+        Note right of OSB: XQuery: consultaActivosClienteNIOut.xq
+
+        Note over OSB: Filtrar y Mapear Ahorros (AHO)
+        OSB->>OSB: Filtrar activos[cuenta/codTipoProducto = 'AHO']
+        Note right of OSB: Mapeo:<br/>codCuentaHabiente → ASSET_NUMBER<br/>valTipoProducto → ASSET_NAME<br/>valSimboloMoneda → ASSET_CURRENCY<br/>valSaldoTotal → ASSET_TOTAL_BALANCE (round 2 decimales)<br/>montoReserva → ASSET_RESERVE_BALANCE (round 2 decimales)<br/>valMontoBloqueado → ASSET_LOCKED_BALANCE (round 2 decimales)<br/>valBalanceFlotante → ASSET_VISA_FLOATING_BALANCE (round 2 decimales)<br/>valSaldoDisponible → ASSET_AVAILABLE_BALANCE (round 2 decimales)<br/>codigoIBAN → INTERNATIONAL_ACCOUNT_NUMBER<br/>Constante "AHO" → ASSET_TYPE
+
+        Note over OSB: Filtrar y Mapear Corrientes (CTE → CHQ)
+        OSB->>OSB: Filtrar activos[cuenta/codTipoProducto = 'CTE']
+        Note right of OSB: Transformación de Tipo:<br/>CTE (Cobis) → CHQ (OSB)<br/>Mapeo idéntico a Ahorros<br/>Constante "CHQ" → ASSET_TYPE
+
+        Note over OSB: Filtrar y Mapear Depósitos (PFI → DEP)
+        OSB->>OSB: Filtrar activos[cuenta/codTipoProducto = 'PFI']
+        Note right of OSB: Transformación de Tipo:<br/>PFI (Cobis) → DEP (OSB)<br/>Mapeo idéntico a Ahorros<br/>Constante "DEP" → ASSET_TYPE
+
+        OSB->>OSB: Función mensajeRespuesta()
+        Note right of OSB: if ((SUCCESS or '0') and count > 0) then 'Success'<br/>else if ((SUCCESS or '0') and count = 0) then 'No Records'<br/>else 'Error'
+    end
+
+    alt successIndicator != SUCCESS
+        OSB->>MapeoErr: mapeoErrores
+        Note right of OSB: XQuery: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0043$#$messages
+
+        MapeoErr-->>OSB: mapeoErroresResponse
+
+        OSB->>OSB: mapeoErroresUsageOut.xq
+        Note right of OSB: Actualiza ResponseHeader
+    end
+
+    OSB->>Client: SOAP Response
+    Note left of OSB: ResponseHeader: successIndicator<br/>Body: consultaActivosClienteResponse<br/>Ahorros (AHO), Corrientes (CHQ), Depósitos (DEP)<br/>Campo único: INTERNATIONAL_ACCOUNT_NUMBER<br/>Moneda: NIO<br/>Todos los montos redondeados a 2 decimales
+
+    Note over Client, MapeoErr: Características Únicas NI01:<br/>- Servicio externo Cobis CTS (no DB)<br/>- Transformación de tipos: CTE→CHQ, PFI→DEP<br/>- Campo IBAN incluido<br/>- Redondeo explícito: fn:round-half-to-even(valor, 2)<br/>- Código éxito: "0" (no "SUCCESS")<br/>- Sin ValidaFuncionalidadUsuario<br/>- Validación XSD del request Cobis

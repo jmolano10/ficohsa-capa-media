@@ -1,0 +1,108 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Cuentas Ahorro / Corriente <br> Epica 880: ConsultaActivosCliente <br> HU 48783:  GET - /loans-and-deposits/deposit-account-facility-retrieves/v1/{customerReference}/{assetType}/assets-retrieve
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
+    participant Abanks as ProxyAbanksGT <br> Connection: jca://eis/DB/ConnectionProxyAbanksGT <br> Package: OSB_K_CONLISTACUENTAS <br> SP: TOPLEVEL$OSB_P_CON_LISTA_CUEN
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+
+    Note over Consumidor, Errors: Flujo Honduras (GT01 | PA01) - Consulta Cuentas Ahorros 
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: assetType, customerReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> assetType (obligatorio) <br> customerReference (obligatorio)
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: DEPOSIT_ACCOUNT_FACILITY_RETRIEVES <br> name: CONFIG
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para GT01 | PA01
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: DEPOSIT_ACCOUNT_FACILITY_RETRIEVES <br> name: PARAM
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: ObtenerParametrizacion 1 Parámetro: <br> value.param-name = ban-xrs-ap-abanks-consulta-ahorros-corriente-param-wsdl-<env>
+
+        API->>CL: Consultar parámetros Parameter Store caché local
+        Note right of API: Param Name: ban-xrs-ap-abanks-consulta-ahorros-corriente-param-wsdl-<env>
+
+        CL->>API: Obtiene parámetros Parameter Store Caché Local
+        Note left of CL: ObtenerParametrizacion 6 Campos: <br> connection = "ConnectionProxyAbanksGT" <br> connectionType = "jca" <br> operationType = "query" <br> catalogueName = proxyabanksgt <br> package = "OSB_K_CONLISTACUENTAS" <br> procedureName = "TOPLEVEL$OSB_P_CON_LISTA_CUEN"
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: DEPOSIT_ACCOUNT_FACILITY_RETRIEVES <br> name: PARAM
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: ObtenerParametrizacion 1 Parámetro: <br> value.param-name = ban-xrs-ap-abanks-consulta-ahorros-corriente-param-wsdl-<env>
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name
+
+        API->>Parameter: Consultar parámetros Parameter Store
+        Note right of API: Param Name: ban-xrs-ap-abanks-consulta-ahorros-corriente-param-wsdl-<env>
+
+        Parameter->>API: Obtiene parámetros Parameter Store
+        Note left of Parameter: ObtenerParametrizacion 6 Campos: <br> connection = "ConnectionProxyAbanksGT" <br> connectionType = "jca" <br> operationType = "query" <br> catalogueName = proxyabanksgt <br> package = "OSB_K_CONLISTACUENTAS" <br> procedureName = "TOPLEVEL$OSB_P_CON_LISTA_CUEN"
+
+        API->>CL: Guarda parámetros Parameter Store en caché local
+        Note right of API: Connection, connectionType, operationType, catalogueName, package, procedureName
+
+    end
+
+    API->>API: Convertir assetType = ALL
+    Note over API: if request.assetType = "ALL" then PV_ASSET_TYPE = "CTA" else <br> PV_ASSET_TYPE = request.assetType
+
+    API->>API: Construye Request Wrapper ProxyAbanksGT
+    Note over API: Mapeo: Params (connection, connectionType, operationType, catalogueName, procedureName) <br> params {PV_CUSTOMER_ID = request.customerReference, PV_ASSET_TYPE}
+
+    API->>Abanks: Consume Wrapper ProxyAbanksGT 
+    Note right of API: connection, connectionType, operationType, catalogueName, procedureName, params
+
+    Abanks->>API: Response Wrapper ProxyAbanksGT
+    Note left of Abanks: PV_ERROR_CODE, <br/> PV_ASSET_TYPE_OUT, <br/> PV_ASSET_NUMBER, PV_ASSET_NAME, <br/> PV_ASSET_CURRENCY, <br/> PV_ASSET_TOTAL_BALANCE, <br/> PV_ASSET_RESERVE_BALANCE, <br/> PV_ASSET_LOCKED_BALANCE, <br/> PV_ASSET_VISA_FLOATING_BALANCE, <br/> PV_ASSET_AVAILABLE_BALANCE, <br/> PV_ASSET_PRODUCT_TYPE 
+
+    API->>API: Evaluar PV_ERROR_CODE
+
+    alt if (upper-case(PV_ERROR_CODE) = 'SUCCESS' and count($registros) = 0)
+
+        API->> Errors: Mapear código de error
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: REST Response Error
+        Note left of API: HTTP 404: No Records Found
+
+    else if (upper-case(PV_ERROR_CODE) = 'SUCCESS' and count($registros) > 0)
+
+        API->>API: Construye Response API
+        Note over API: assetType = PV_ASSET_TYPE_OUT <br> assetProductNumber = PV_ASSET_NUMBER <br/> assetProductName = PV_ASSET_NAME <br/> assetCurrency = PV_ASSET_CURRENCY <br/> assetTotalBalance = PV_ASSET_TOTAL_BALANCE <br/> assetReservedBalance = PV_ASSET_RESERVE_BALANCE <br/> assetBlockedBalance = PV_ASSET_LOCKED_BALANCE <br/> visaFloatingBalance = PV_ASSET_VISA_FLOATING_BALANCE <br> availableBalance = PV_ASSET_AVAILABLE_BALANCE <br/> productType  = PV_ASSET_PRODUCT_TYPE <br> assetOriginBank = "GT01 | PA01" <br> internationalProductNumber = "" <br> openingDate = "" <br> productStatus = ""
+
+        API->>Consumidor: REST Response Successful
+        Note left of API: HTTP 200: Response Body
+
+    end
+
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
