@@ -65,19 +65,19 @@ sequenceDiagram
                     rect rgba(242, 247, 211, 1)    
 
                         API->>AuthReversar: Consume Autorización Reverso
-                        Note right of API: SourceBank, transactionReference, transactionType, retryRequired: false
+                        Note right of API: SourceBank, transactionReference, transactionType
 
                         AuthReversar->>API: Response Autorización Reverso
                         Note left of AuthReversar: SuccessIndicator
 
                         API->>API: Evalúa Response Autorización Reverso
 
-                        alt Response Autoriza Reverso successIndicator != "SUCCESS"
+                        alt Response Autoriza Reverso HTTP Code != 200
 
                             API->>Reintentos: Envía envento al eventBridge API Idempotencia 
                             Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: transaction_financial_services_mgmt-comp-reverse_transaction <br> detail-type: "provider.response" <br> request: {transactionReference, transactionType} <br> Transaccion: TimeOut 
 
-                        else Response Autoriza Reverso successIndicator = "SUCCESS"
+                        else Response Autoriza Reverso HTTP Code = 200
 
                             API->>BD: Update BD - stateProcess = "AUTHORIZATION" and stateTransacción = "COMPLETE"
 
@@ -244,14 +244,14 @@ sequenceDiagram
 
                 API->>API: Evalúa response reversos
 
-                alt Response reversos NO Exitoso - successIndicator != "SUCCESS"
+                alt Response reversos NO Exitoso - HTTP Code != 200
                     rect rgba(248, 238, 238, 1)
                         API->> Errors: Mapear código de error
                         Errors ->> API: Retorna código mapeado
                         API->> Consumidor: Retorna error
                         Note over Consumidor: "HTTP 422: Transacción No Reversada"
                     end
-                else Response reversos Exitoso - successIndicator = "SUCCESS"
+                else Response reversos Exitoso - HTTP Code = 200
 
                     API->>BD: Insert BD - stateProcess = "AUTHORIZATION" and stateTransacción = "PENDING"
 
@@ -261,14 +261,14 @@ sequenceDiagram
                     API->>Idempotencia: Response API Idempotencia 
 
                     API->>AuthReversar: Consume Autorización Reverso
-                    Note right of API: SourceBank, transactionReference, transactionType, retryRequired: false
+                    Note right of API: SourceBank, transactionReference, transactionType
 
                     AuthReversar->>API: Response Autorización Reverso
                     Note left of AuthReversar: SuccessIndicator
 
                     API->>API: Evalúa Response Autorización Reverso
 
-                    alt Response Autoriza Reverso successIndicator != "SUCCESS"
+                    alt Response Autoriza Reverso HTTP Code != 200
 
                         API->>Reintentos: Envía envento al eventBridge API Idempotencia 
                         Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: transaction_financial_services_mgmt-comp-reverse_transaction <br> detail-type: "provider.response" <br> request: {transactionReference, transactionType} <br> Transaccion: TimeOut 
@@ -280,7 +280,7 @@ sequenceDiagram
                         API->>Consumidor: Retorna error controlado
                         Note over Consumidor: "Transacción en proceso"
 
-                    else Response Autoriza Reverso successIndicator = "SUCCESS"
+                    else Response Autoriza Reverso HTTP Code = 200
 
                         API->>BD: Update BD - stateProcess = "AUTHORIZATION" and stateTransacción = "COMPLETE"
 
