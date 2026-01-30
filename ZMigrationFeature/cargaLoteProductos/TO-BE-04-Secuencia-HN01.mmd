@@ -5,7 +5,7 @@ sequenceDiagram
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
     participant ValidaH2H as API Validación H2H  <br> Epica 2313: cargaLoteProductos <br> HU 54666:  POST - 
-    participant getCustomer as Consulta Clientes <br> Epica 2315: ConsultaCliente <br> HU 6945:  GET - /customer-management/customer-profile-retrieves/v1/retrieve-customer
+    participant retrieveCustomer as Consulta Clientes <br> Epica 2315: ConsultaCliente <br> HU 6945:  GET - /customer-management/customer-profile-retrieves/v1/retrieve-customer
     participant SP as Oracle DB <br> SP: HTH_P_CARGA_LOTE_PRODUCTOS <br> Package: HTH_K_APERTURA_MASIVA <br> Conexión: eis/DB/ConnectionWebServices
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
 
@@ -47,15 +47,15 @@ sequenceDiagram
     end
 
     API->>API: Construye request API Validación H2H
-    Note over API: Mapeo: <br> PV_NOMBREUSUARIO = header.Application-User <br> PV_CODIGOCLIENTE = request.corporateCustomerReference <br> PV_CODIGOPAIS = header.SourceBank <br> PV_OPERACION = "CARGA_LOTE_PRODUCTOS" <br> PV_IDPROXY = "FICBCO0379"
+    Note over API: Mapeo: <br> query.userReference = header.Application-User <br> query.customerReference = request.corporateCustomerReference <br> query.countryCode = header.SourceBank <br> query.operationType = param.operation <br> query.proxyIdentifier = param.idProxy
 
     API->>ValidaH2H: Consume API Validación H2H
-    Note right of API: PV_NOMBREUSUARIO <br> PV_CODIGOCLIENTE <br>P V_CODIGOPAIS <br> PV_OPERACION <br> PV_IDPROXY
+    Note right of API: userReference <br> customerReference <br> countryCode <br> operationType <br> proxyIdentifier
 
     ValidaH2H-->>API: Resposne Validación H2H
-    Note left of ValidaH2H: PV_DESCRIPCIONMENSAJE
+    Note left of ValidaH2H: authorizationReference
 
-    alt PV_DESCRIPCIONMENSAJE != ''
+    alt authorizationReference != ''
         
         API->> Errors: Mapear código de error
         
@@ -64,22 +64,22 @@ sequenceDiagram
         API->>Consumidor: Rest Response Error H2H
         Note right of Consumidor: HTTP 422: "El usuario y/o Consumidor no tiene acceso a operaciones host to host"
 
-    else PV_DESCRIPCIONMENSAJE == ''
+    else authorizationReference == ''
 
-        API->>API: Construye request API getCustomer
+        API->>API: Construye request API retrieveCustomer
         Note over API: Mapeo: <br> customerType = "CUSTOMER_ID" <br> customerReferenceValue = request.corporateCustomerReference 
 
-        API->>getCustomer: Consulta cliente
+        API->>retrieveCustomer: Consulta cliente
         Note right of API: queryparam: customerType, customerReferenceValue 
 
-        getCustomer->>API: Obtiene datos cliente
-        Note left of getCustomer: HTTP CODE <br> businessName <br> partyAddressInfo.neighborhoodCode <br> partyAddressInfo.streetName <br> partyAddressInfo.blockNumber <br> partyAddressInfo.houseNumber <br> partyAddressInfoaddressReferences <br> contactPhoneInfo.phoneNumber
+        retrieveCustomer->>API: Obtiene datos cliente
+        Note left of retrieveCustomer: HTTP CODE <br> businessName <br> partyAddressInfo.neighborhoodCode <br> partyAddressInfo.streetName <br> partyAddressInfo.blockNumber <br> partyAddressInfo.houseNumber <br> partyAddressInfoaddressReferences <br> contactPhoneInfo.phoneNumber
 
-        API->>API: Evalua Response API getCustomer
+        API->>API: Evalua Response API retrieveCustomer
 
         alt HTTP CODE != 200
 
-            API->> Consumidor: Retorna error API getCustomer
+            API->> Consumidor: Retorna error API retrieveCustomer
         
         else HTTP CODE == 200
 
@@ -87,13 +87,13 @@ sequenceDiagram
             Note over API: count(customerPortfolio.customerRecord) → PN_NUMEROCLIENTES
 
             API->>API: Construye Request a SP
-            Note over API: Mapeo:<br> - customerIdentification → PV_CODIGOCLIENTE <br> - payrollGroup → PV_CODIGOGRUPOPLANILLA <br> - header.Application-User → PV_USUARIO <br> - Datos empresa (7 campos response getCustomer) <br> - Arrays empleados (26 campos request)
+            Note over API: Mapeo:<br> - customerIdentification → PV_CODIGOCLIENTE <br> - payrollGroup → PV_CODIGOGRUPOPLANILLA <br> - header.Application-User → PV_USUARIO <br> - Datos empresa (7 campos response retrieveCustomer) <br> - Arrays empleados (26 campos request)
 
             API->>SP: Consume SP cargaLoteProductos
             Note right of API: Parámetros: <br> - PV_CODIGOCLIENTE <br> - PV_CODIGOGRUPOPLANILLA <br> - PV_USUARIO <br> - PN_NUMEROCLIENTES <br> - Datos empresa (7 campos) <br> - Arrays empleados (26 campos)
 
             SP->>API: OutputParameters SP
-            Note left of SP: PV_CODIGOCLIENTE<br>PV_CODIGOLOTE<br>PV_CODIGOERROR<br>PV_DESCRIPCIONMENSAJE
+            Note left of SP: PV_CODIGOCLIENTE<br>PV_CODIGOLOTE<br>PV_CODIGOERROR<br>authorizationReference
 
             API->>API: Evalúa OutputParameters SP
 
