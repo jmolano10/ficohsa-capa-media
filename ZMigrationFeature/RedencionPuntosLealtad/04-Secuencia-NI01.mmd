@@ -1,0 +1,73 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB RedencionPuntosLealtadNI
+    participant ConTipo as sjConsultaTipoTarjetaNI
+    participant ObtTipo as obtenerTipoProgramaLealtad_db
+    participant ConProg as consultaProgramaLealtad_db
+    participant CanjeaPts as canjearPuntosEfectivo_db (PXYNIC)
+    participant ObtParam as ObtenerParametrizacion
+    participant MRS as Mastercard RedemptionService
+    participant VP as VisionPlus PointsRedeem
+
+    Note over Client, VP: Flujo Nicaragua (NI01) - RedencionPuntosLealtad
+
+    Client->>OSB: SOAP Request
+    Note right of Client: CUSTOMER_ID_TYPE: CARD_NUMBER<br/>CUSTOMER_ID_VALUE: 6011123456789012<br/>REDEMPTION_TYPE: CASH<br/>REDEMPTION_AMOUNT: 100.00<br/>SourceBank: NI01
+
+    OSB->>OSB: Validar Esquema XSD
+    OSB->>OSB: Validar CUSTOMER_ID_TYPE = CARD_NUMBER
+
+    OSB->>ConTipo: sjConsultaTipoTarjeta(6011123456789012)
+    Note right of ConTipo: SP: SJS.ConsultaTipoTarjeta<br/>CARD_NUMBER: 6011123456789012
+    ConTipo-->>OSB: SUCCESS_INDICATOR: SUCCESS<br/>LOGO: 601<br/>CUSTOMER_ID: 12345<br/>CUSTOMER_NAME: ANA MARTINEZ<br/>LEGAL_ID: 001-010180-0001A<br/>CARD_TYPE: DEBIT<br/>CARD_STATUS: ACTIVE
+
+    alt CARD_STATUS != ACTIVE
+        OSB->>Client: ERROR: La tarjeta de debito no se encuentra activa
+    end
+
+    alt CARD_TYPE = DEBIT and CARD_STATUS = ACTIVE
+        OSB->>OSB: Extraer BIN (primeros 6 dígitos)
+        Note right of OSB: binNumber: 601112
+
+        OSB->>ObtTipo: obtenerTipoProgramaLealtad(TD0000, 000, 601112)
+        Note right of ObtTipo: SP: INTFC.obtenerTipoProgramaLealtad<br/>PV_PRODUCTO: TD0000<br/>PV_GRUPOAFINIDAD: 000<br/>PV_BIN: 601112
+        ObtTipo-->>OSB: PN_PROGRAMA_LEALTAD: 1<br/>PV_CODIGO_ERROR: SUCCESS
+    end
+
+    alt CARD_TYPE = CREDIT and logo != ""
+        OSB->>ConProg: consultaProgramaLealtad(logo, NI01)
+        ConProg-->>OSB: PV_CODIGOLEALTAD: 2
+    end
+
+    alt REDEMPTION_TYPE = CASH
+        OSB->>CanjeaPts: canjearPuntosEfectivo(2, 100.00, 601, TERM004, RETAIL, 111222333)
+        Note right of CanjeaPts: SP: PXYNIC.canjearPuntosEfectivo<br/>Si logo vacío, usa binNumber
+        CanjeaPts-->>OSB: PN_VALORSALIDA: 1000<br/>PV_CODIGOMENSAJE: SUCCESS
+    end
+
+    OSB->>ObtParam: obtenerParametrizacion(FICBCO0229.MRS.MATRIXID.NI01||...)
+    ObtParam-->>OSB: matrixId, institutionName, rewardItem
+
+    alt Programa 1 (Mastercard)
+        OSB->>OSB: Padding customerId a 19 caracteres
+        Note right of OSB: fn-bea:pad-left(12345, 19, '0')<br/>Resultado: 0000000000000012345
+
+        OSB->>MRS: doItemRedemption(matrixId, 1000, customerId_padded)
+        Note right of MRS: Header MRSIdentity:<br/>appID: 0000000000000012345
+        MRS-->>OSB: redemptionId: 987654321<br/>pointTotalRemaining: 8500
+    end
+
+    alt Programa 2 (VisionPlus)
+        OSB->>VP: PointsRedeem(1000, CANJE POR SALESFORC, org, scheme, acc)
+        Note right of VP: Datos de sjConsultaTipoTarjeta
+        VP-->>OSB: SVC-RETURN: P
+
+        OSB->>OSB: Generar redemptionId con timestamp
+        Note right of OSB: Formato: yyyyMMddHHmmssSSS<br/>Ejemplo: 20240115143530456
+    end
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: XQuery: redencionPuntosLealtadNIOut.xq
+
+    OSB->>Client: SOAP Response
+    Note right of OSB: LEGAL_ID: 001-010180-0001A<br/>CUSTOMER_NAME: ANA MARTINEZ<br/>POINTS_REDEEMED: 1000<br/>REMAINING_BALANCE: 8500<br/>REDEMPTION_ID: 987654321

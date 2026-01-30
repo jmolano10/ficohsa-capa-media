@@ -1,0 +1,49 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB RedencionPuntosLealtadPA
+    participant ConDato as conDatoCuenta_db (PA)
+    participant ConProg as consultaProgramaLealtad_db
+    participant CanjeaPts as canjearPuntosEfectivo_db (PXYNIC)
+    participant ObtParam as ObtenerParametrizacion
+    participant VP as VisionPlus PointsRedeem
+
+    Note over Client, VP: Flujo Panamá (PA01) - RedencionPuntosLealtad
+
+    Client->>OSB: SOAP Request
+    Note right of Client: CUSTOMER_ID_TYPE: CARD_NUMBER<br/>CUSTOMER_ID_VALUE: 4111111111111111<br/>REDEMPTION_TYPE: POINTS<br/>REDEMPTION_AMOUNT: 1000<br/>SourceBank: PA01
+
+    OSB->>OSB: Validar Esquema XSD
+    OSB->>OSB: Validar CUSTOMER_ID_TYPE = CARD_NUMBER
+
+    OSB->>ConDato: conDatoCuenta(4111111111111111, PAN, '')
+    Note right of ConDato: SP: MASTERDATA_PA.conDatoCuenta<br/>PV_ACCOUNTNUMBER: 4111111111111111<br/>PV_COUNTRYCODE: PAN
+    ConDato-->>OSB: logo: 625<br/>customerId: 67890<br/>customerName: CARLOS RODRIGUEZ<br/>legalId: 8-123-4567
+
+    OSB->>ConProg: consultaProgramaLealtad(625, PA01)
+    ConProg-->>OSB: PV_CODIGOLEALTAD: 2
+
+    alt REDEMPTION_TYPE = CASH
+        OSB->>CanjeaPts: canjearPuntosEfectivo(2, monto, 625, terminal, merchant, merchantId)
+        Note right of CanjeaPts: SP: PXYNIC.canjearPuntosEfectivo
+        CanjeaPts-->>OSB: PN_VALORSALIDA: puntos
+    else REDEMPTION_TYPE = POINTS
+        OSB->>OSB: totalPoints = REDEMPTION_AMOUNT
+    end
+
+    OSB->>ObtParam: obtenerParametrizacion(FICBCO0229.MRS.MATRIXID.PA01||...)
+    ObtParam-->>OSB: matrixId, institutionName, rewardItem
+
+    alt Programa 2 (VisionPlus)
+        OSB->>VP: PointsRedeem(1000, CANJE POR SALESFORC, org, scheme, acc)
+        Note right of VP: Datos de conDatoCuenta
+        VP-->>OSB: SVC-RETURN: P
+
+        OSB->>OSB: Generar redemptionId con timestamp
+        Note right of OSB: fn-bea:dateTime-to-string-with-format<br/>Formato: yyyyMMddHHmmssSSS<br/>Ejemplo: 20240115143025123
+    end
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: XQuery: redencionPuntosLealtadNIOut.xq<br/>Sin registro en BD<br/>Sin consulta de saldo
+
+    OSB->>Client: SOAP Response
+    Note right of OSB: LEGAL_ID: 8-123-4567<br/>CUSTOMER_NAME: CARLOS RODRIGUEZ<br/>POINTS_REDEEMED: 1000<br/>REMAINING_BALANCE: <br/>REDEMPTION_ID: 20240115143025123

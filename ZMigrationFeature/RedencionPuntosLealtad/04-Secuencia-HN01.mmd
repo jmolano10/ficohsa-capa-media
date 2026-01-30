@@ -1,0 +1,88 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB RedencionPuntosLealtadHN
+    participant ValidaSvc as ValidaServicioRegional_db
+    participant ConInfo as conInfoLealtad_db
+    participant ConProg as consultaProgramaLealtad_db
+    participant CanjeaPts as canjearPuntosEfectivo_db
+    participant ObtParam as ObtenerParametrizacion
+    participant ConDato as conDatoCuenta_db
+    participant InsTrans as INSTransaccionRedencion_db
+    participant MRS as Mastercard RedemptionService
+    participant VP as VisionPlus PointsRedeem
+    participant VPInq as VisionPlus PointsAdjustmentInquiry
+    participant MapErr as MapeoErrores
+
+    Note over Client, MapErr: Flujo Honduras (HN01) - RedencionPuntosLealtad
+
+    Client->>OSB: SOAP Request
+    Note right of Client: CUSTOMER_ID_TYPE: CARD_NUMBER<br/>CUSTOMER_ID_VALUE: 4567123456789012<br/>REDEMPTION_TYPE: CASH<br/>REDEMPTION_AMOUNT: 500.00<br/>SourceBank: HN01
+
+    OSB->>OSB: Validar Esquema XSD
+    Note right of OSB: programaLealtadTypes.xsd
+
+    OSB->>ValidaSvc: ValidaServicioRegional(FICBCO0229, HN01)
+    ValidaSvc-->>OSB: PV_CODIGO_ERROR: SUCCESS
+
+    alt Validación Regional Fallida
+        ValidaSvc-->>OSB: PV_CODIGO_ERROR: ERROR
+        OSB->>Client: Response ERROR
+    end
+
+    OSB->>OSB: Validar REDEMPTION_METHOD
+    Note right of OSB: Solo permite CASH
+
+    OSB->>ConInfo: conInfoLealtad(HND, 4567123456789012)
+    Note right of ConInfo: SP: PROCESOS_HN.conInfoLealtad<br/>PV_COUNTRY: HND<br/>PV_CARDNUMBER: 4567123456789012
+    ConInfo-->>OSB: legalId: 0801199012345<br/>customerName: JUAN PEREZ<br/>cardType: CREDIT<br/>logo: 625
+
+    alt cardType = CREDIT
+        OSB->>ConProg: consultaProgramaLealtad(625, HN01)
+        Note right of ConProg: SP: INTFC.consultaProgramaLealtad<br/>PV_LOGO: 625<br/>PV_CODIGOPAIS: HN01
+        ConProg-->>OSB: PV_CODIGOLEALTAD: 2
+    end
+
+    alt REDEMPTION_TYPE = CASH
+        OSB->>CanjeaPts: canjearPuntosEfectivo(2, 500.00, 625, TERM001, RETAIL, 123456789)
+        Note right of CanjeaPts: SP: ABK.canjearPuntosEfectivo<br/>PN_TIPOCONVERSION: 2<br/>PN_MONTOCONVERSION: 500.00<br/>PV_LOGO: 625
+        CanjeaPts-->>OSB: PN_VALORSALIDA: 5000<br/>PV_CODIGOMENSAJE: SUCCESS
+    end
+
+    OSB->>ObtParam: obtenerParametrizacion(FICBCO0229.MRS.MATRIXID.HN01||...)
+    Note right of ObtParam: SP: OSB_GET_CONFIG<br/>Parámetros: matrixId, institutionName, rewardItem
+    ObtParam-->>OSB: matrixId: 12345<br/>institutionName: FICOHSA<br/>rewardItem: CANJE POR SALESFORC
+
+    alt Programa 2 (VisionPlus)
+        OSB->>ConDato: conDatoCuenta(4567123456789012, HND, '')
+        Note right of ConDato: SP: MASTERDATA_HN.conDatoCuenta<br/>Filtro: TipoOrg = ALT
+        ConDato-->>OSB: org: ALT<br/>scheme: 001<br/>acc: 1234567890<br/>nRowsBase: 1
+
+        OSB->>InsTrans: INSTransaccionRedencion(4567123456789012, 5000, TERM001, DESC 35, '', '', HND)
+        Note right of InsTrans: SP: MASTERDATA.INSTransaccionRedencion
+        InsTrans-->>OSB: IDTransaccion: 987654321
+
+        OSB->>VP: PointsRedeem(5000, CANJE POR SALESFORC, ALT, 001, 1234567890)
+        Note right of VP: GPXAIO-POINTS-TO-REDEEM: 5000<br/>GPXAIO-REWARD-ITEM: CANJE POR SALESFORC<br/>GPXAIO-ORG: ALT
+        VP-->>OSB: SVC-RETURN: P
+
+        OSB->>VPInq: PointsAdjustmentInquiry(1234567890, ALT, 001)
+        Note right of VPInq: Consulta saldo disponible
+        VPInq-->>OSB: GPXAIO-OPEN-TO-RED-ON-SCR: 15000000<br/>pointTotalRemaining: 15000
+    end
+
+    alt Programa 1 (Mastercard)
+        OSB->>MRS: doItemRedemption(matrixId: 12345, quantity: 5000)
+        Note right of MRS: Header MRSIdentity:<br/>institutionName: FICOHSA<br/>appID: 0801199012345
+        MRS-->>OSB: redemptionId: 987654321<br/>pointTotalRemaining: 15000
+    end
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: XQuery: redencionPuntosLealtadHNOut.xq
+
+    alt successIndicator != SUCCESS
+        OSB->>MapErr: mapeoErrores(errorCode, FICBCO0229$#$mensaje)
+        MapErr-->>OSB: Error homologado
+    end
+
+    OSB->>Client: SOAP Response
+    Note right of OSB: LEGAL_ID: 0801199012345<br/>CUSTOMER_NAME: JUAN PEREZ<br/>POINTS_REDEEMED: 5000<br/>REMAINING_BALANCE: 15000<br/>REDEMPTION_ID: 987654321

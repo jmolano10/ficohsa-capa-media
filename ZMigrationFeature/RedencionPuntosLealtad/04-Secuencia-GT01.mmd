@@ -1,0 +1,56 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB RedencionPuntosLealtadGT
+    participant ConDato as conDatoCuenta_db (GT)
+    participant ConProg as consultaProgramaLealtad_db
+    participant CanjeaPts as canjearPuntosEfectivo_db (GT)
+    participant ObtParam as ObtenerParametrizacion
+    participant InsTrans as INSTransaccionRedencion_db
+    participant VP as VisionPlus PointsRedeem
+
+    Note over Client, VP: Flujo Guatemala (GT01) - RedencionPuntosLealtad
+
+    Client->>OSB: SOAP Request
+    Note right of Client: CUSTOMER_ID_TYPE: CARD_NUMBER<br/>CUSTOMER_ID_VALUE: 5412345678901234<br/>REDEMPTION_TYPE: CASH<br/>REDEMPTION_AMOUNT: 250.00<br/>SourceBank: GT01
+
+    OSB->>OSB: Validar Esquema XSD
+    OSB->>OSB: Validar CUSTOMER_ID_TYPE = CARD_NUMBER
+
+    alt CUSTOMER_ID_TYPE != CARD_NUMBER
+        OSB->>Client: ERROR: CUSTOMER_ID_TYPE no soportado
+    end
+
+    OSB->>ConDato: conDatoCuenta(5412345678901234, GTM, '')
+    Note right of ConDato: SP: MASTERDATA_GT.conDatoCuenta<br/>PV_ACCOUNTNUMBER: 5412345678901234<br/>PV_COUNTRYCODE: GTM<br/>Filtro: TipoOrg = BASE
+    ConDato-->>OSB: logo: 625<br/>customerId: 12345<br/>customerName: MARIA LOPEZ<br/>legalId: 1234567890101<br/>nRowsBase: 1
+
+    alt logo != ""
+        OSB->>ConProg: consultaProgramaLealtad(625, GT01)
+        Note right of ConProg: SP: INTFC.consultaProgramaLealtad
+        ConProg-->>OSB: PV_CODIGOLEALTAD: 2
+    end
+
+    alt REDEMPTION_TYPE = CASH
+        OSB->>CanjeaPts: canjearPuntosEfectivo(2, 250.00, 625, TERM002, RETAIL, 987654321)
+        Note right of CanjeaPts: SP: ABKGT.canjearPuntosEfectivo
+        CanjeaPts-->>OSB: PN_VALORSALIDA: 2500<br/>PV_CODIGOMENSAJE: SUCCESS
+    end
+
+    OSB->>ObtParam: obtenerParametrizacion(FICBCO0229.MRS.MATRIXID.GT01||...)
+    ObtParam-->>OSB: matrixId, institutionName, rewardItem
+
+    alt Programa 2 (VisionPlus)
+        OSB->>InsTrans: INSTransaccionRedencion(5412345678901234, 2500, TERM002)
+        Note right of InsTrans: SP: MASTERDATA.INSTransaccionRedencion
+        InsTrans-->>OSB: IDTransaccion: 123456789
+
+        OSB->>VP: PointsRedeem(2500, CANJE POR SALESFORC, BASE, scheme, acc)
+        Note right of VP: Datos de conDatoCuenta
+        VP-->>OSB: SVC-RETURN: P
+    end
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: XQuery: redencionPuntosLealtadGTOut.xq<br/>REMAINING_BALANCE: vacío (no consulta)
+
+    OSB->>Client: SOAP Response
+    Note right of OSB: LEGAL_ID: 1234567890101<br/>CUSTOMER_NAME: MARIA LOPEZ<br/>POINTS_REDEEMED: 2500<br/>REMAINING_BALANCE: <br/>REDEMPTION_ID: 123456789

@@ -1,0 +1,97 @@
+
+sequenceDiagram
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Puntos Disponible MasterCard<br> Epica 2382: ConsultaPuntosLealtad <br> HU 54363:  GET - XXXXXX
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant MRS as Mastercard CustomerService <br/> Operación: getPointDetails <br> URI DEV: https://192.168.55.21:7021/mastercard-webservices/CustomerService
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujos Honduras, Panamá y Nicaragua (HN01 | PN01 | NI01) - ConsultaPuntosMastercard
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: appIDRequestAPI, institutionNameRequestAPI
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> appIDRequestAPI (obligatorio) <br> institutionNameRequestAPI (obligatorio)
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: XXXXX <br> name: CONFIG
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | PN01 | NI01
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: XXXXX <br> name: PARAM 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: ObtenerParametrizacion 1 Parámetro: <br> value.param-name = ban-xrs-XXX-mastercard-ws-param-wsdl-<env>
+
+        API->>CL: Consultar parámetros Parameter Store caché local
+        Note right of API: Param Name: ban-xrs-XXX-mastercard-ws-param-wsdl-<env>
+
+        CL->>API: Obtiene parámetros Parameter Store Caché Local
+        Note left of CL: ObtenerParametrizacion 3 Campos: <br> ip = “htts://192.168.50.54” <br> port = "7021" <br> basePath = “/mastercard-webservices/CustomerService” 
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: XXXXX <br> name: PARAM
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: ObtenerParametrizacion 1 Parámetro: <br> value.param-name = ban-xrs-XXX-mastercard-ws-param-wsdl-<env>
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+        API->>Parameter: Consultar parámetros Parameter Store
+        Note right of API: Param Name: ban-xrs-XXX-mastercard-ws-param-wsdl-<env>
+
+        Parameter->>API: Obtiene parámetros Parameter Store
+        Note left of Parameter: ObtenerParametrizacion 3 Campos: <br> ip = “htts://192.168.50.54” <br> port = "7021" <br> basePath = “/mastercard-webservices/CustomerService” 
+
+        API->>CL: Guarda parámetros Parameter Store en caché local
+        Note right of API: ip, port, basepPath
+
+    end
+
+    API->>Lib: Consulta Constantes
+   
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: operation = "getPointDetails"
+
+    API->>API: Construye Request WS Mastercard
+    Note over API: InstitutionName = request.institutionNameRequestAPI <br> AppID = request.appIDRequestAPI
+
+    API->>MRS: Consume WS Mastercard - getPointDetails
+    Note right of API: Header: InstitutionName, AppID <br> Body: vacío
+
+    MRS->>API: Response WS Mastercard - getPointDetailsResponse
+    Note left of MRS: AvailablePoints
+
+    API->>API: Construye response API
+    Note over API: AvailablePointsResponseAPI = AvailablePoints
+
+    API->>Consumidor: Response Exitoso
+    Note left of API: HTTP 200: AvailablePointsResponseAPI 
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

@@ -1,0 +1,57 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente
+    participant ProxyGT as ConsultaPuntosLealtadGT
+    participant SPBD as consultaPuntosLealtad_db
+    participant MasterData as conDatoCuenta_db<br/>(MasterDataGT)
+    participant Param as ObtenerParametrizacion
+    participant ProgLealtad as consultaProgramaLealtad_db
+    participant MRS as Mastercard<br/>(getRTRPreferences)
+    participant VisionPlus as Vision Plus
+    participant Conversion as canjearPuntosEfectivo_db<br/>(ABKGT)
+    participant Registro as registraPuntosLealtad_db
+
+    Note over Client, Registro: Flujo Guatemala (GT01)
+
+    Client->>ProxyGT: SOAP Request<br/>SourceBank=GT01<br/>CARD_NUMBER=5041234567890456
+    ProxyGT->>ProxyGT: Validar XSD
+    ProxyGT->>SPBD: consultaPuntosLealtad<br/>XQuery: consultaPuntosLealtadIn.xq
+    SPBD-->>ProxyGT: PV_CODIGO_ERROR='ERROR'<br/>PT_PUNTOS_LEALTAD=NULL
+
+    alt Datos no en BD
+        ProxyGT->>ProxyGT: Convertir País<br/>GT01→GTM
+        ProxyGT->>MasterData: conDatoCuenta<br/>XQuery: conDatoCuentaGTIn.xq<br/>Validar XSD
+        MasterData-->>ProxyGT: RowSet[TipoOrg='BASE']<br/>CUST_NBR, nombre_cliente<br/>legal_id, logo, NIT<br/>ORG, LMS_ACC, LMS_Scheme
+        
+        ProxyGT->>ProxyGT: Extraer Variables<br/>$customerId, $customerName<br/>$legalId, $logo, $nit<br/>$org, $accountNumber, $scheme
+
+        alt Logo no vacío
+            ProxyGT->>Param: obtenerParametrizacion<br/>FICBCO0229.MRS.INSTITUTION.NAME
+            Param-->>ProxyGT: VALUE='FICOHSA'
+            
+            ProxyGT->>ProgLealtad: consultaProgramaLealtad<br/>XQuery: consultaProgramaLealtadIn.xq<br/>logo=$logo, codigoPais='GT01'
+            ProgLealtad-->>ProxyGT: PV_CODIGOLEALTAD='1'
+            
+            alt Programa 1 - Mastercard
+                ProxyGT->>MRS: getRTRPreferences<br/>XQuery: getPointDetailsInGT.xq<br/>Header: InstitutionName='FICOHSA'<br/>AppID=$nit (NIT)
+                MRS-->>ProxyGT: AvailablePoints=25000
+            else Programa 2 - Vision Plus
+                ProxyGT->>VisionPlus: PointsAdjustmentInquiry<br/>XQuery: pointsAdjustmentInquiryIn.xq<br/>Validar XSD<br/>accountNumber, scheme, org
+                VisionPlus-->>ProxyGT: GPXAIO-OPEN-TO-RED-ON-SCR
+            end
+            
+            alt RETURN_CASH_EQUIVALENT=YES
+                ProxyGT->>Conversion: canjearPuntosEfectivo<br/>XQuery: canjearPuntosEfectivoGTIn.xq<br/>logo, tipoConversion=1<br/>montoConversion, cashRedemptionType
+                Conversion-->>ProxyGT: PN_VALORSALIDA=1562.50<br/>Moneda: GTQ
+            end
+            
+            ProxyGT->>Registro: registraPuntosLealtad<br/>XQuery: registraPuntosLealtadIn.xq
+            Registro-->>ProxyGT: PV_CODIGO_ERROR='SUCCESS'
+        else Logo vacío
+            ProxyGT->>ProxyGT: Error: No se encontró logo
+        end
+    end
+
+    ProxyGT->>ProxyGT: Construir Response<br/>XQuery: consultaPuntosLealtadGTOut.xq
+    ProxyGT-->>Client: SOAP Response<br/>successIndicator=Success<br/>AVAILABLE_POINTS=25000<br/>CASH_EQUIVALENT=1562.50<br/>CASH_CURRENCY=GTQ
+```

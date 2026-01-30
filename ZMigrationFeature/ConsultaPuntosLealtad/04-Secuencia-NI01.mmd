@@ -1,0 +1,71 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente
+    participant ProxyNI as ConsultaPuntosLealtadNI
+    participant SPBD as consultaPuntosLealtad_db
+    participant JavaSvc as sjConsultaTipoTarjetaNI<br/>(Java Service)
+    participant Param as ObtenerParametrizacion
+    participant TipoProg as obtenerTipoProgramaLealtad_db<br/>(Solo Débito)
+    participant ProgLealtad as consultaProgramaLealtad_db<br/>(Solo Crédito)
+    participant MRS as Mastercard<br/>(getPointDetails)
+    participant VisionPlus as Vision Plus
+    participant Conversion as canjearPuntosEfectivo_db<br/>(PXYNIC)
+    participant Registro as registraPuntosLealtad_db
+
+    Note over Client, Registro: Flujo Nicaragua (NI01)
+
+    Client->>ProxyNI: SOAP Request<br/>SourceBank=NI01<br/>CARD_NUMBER=5041234567890789
+    ProxyNI->>ProxyNI: Validar XSD
+    ProxyNI->>SPBD: consultaPuntosLealtad<br/>XQuery: consultaPuntosLealtadIn.xq
+    SPBD-->>ProxyNI: PV_CODIGO_ERROR='ERROR'<br/>PT_PUNTOS_LEALTAD=NULL
+
+    alt Datos no en BD
+        alt CUSTOMER_ID_TYPE=CARD_NUMBER
+            ProxyNI->>JavaSvc: ConsultaTipoTarjeta<br/>XQuery: consultaTipoTarjetaNIIn.xq<br/>cardNumber=5041234567890789
+            JavaSvc-->>ProxyNI: SUCCESS_INDICATOR='Success'<br/>CUSTOMER_ID, CUSTOMER_NAME<br/>LEGAL_ID, LOGO, CARD_TYPE<br/>CARD_STATUS, ORG, ACCOUNT_NUMBER, SCHEME
+            
+            ProxyNI->>ProxyNI: Extraer Variables<br/>$customerId, $customerName<br/>$legalId, $logo<br/>$cardType, $cardStatus<br/>$org, $accountNumber, $scheme
+            
+            ProxyNI->>Param: obtenerParametrizacion<br/>FICBCO0229.MRS.INSTITUTION.NAME
+            Param-->>ProxyNI: VALUE='FICOHSA'
+            
+            alt cardType=DEBIT
+                alt cardStatus=ACTIVE
+                    ProxyNI->>ProxyNI: Extraer BIN<br/>$binNumber=substring(1,6)='504123'
+                    ProxyNI->>TipoProg: obtenerTipoProgramaLealtad<br/>XQuery: obtenerTipoProgramaLealtadIn.xq<br/>producto='TD0000'<br/>grupoAfinidad='000'<br/>bin='504123'
+                    TipoProg-->>ProxyNI: PN_PROGRAMA_LEALTAD='1'
+                else cardStatus≠ACTIVE
+                    ProxyNI->>ProxyNI: Error: Tarjeta débito<br/>no está activa
+                end
+            else cardType=CREDIT
+                alt logo≠''
+                    ProxyNI->>ProgLealtad: consultaProgramaLealtad<br/>XQuery: consultaProgramaLealtadIn.xq<br/>logo=$logo, codigoPais='NI01'
+                    ProgLealtad-->>ProxyNI: PV_CODIGOLEALTAD='1' o '2'
+                else logo=''
+                    ProxyNI->>ProxyNI: Error: No se encontró logo
+                end
+            end
+            
+            alt Programa 1 - Mastercard
+                ProxyNI->>MRS: getPointDetails<br/>XQuery: getPointDetailsIn.xq<br/>Header: InstitutionName='FICOHSA'<br/>AppID=pad-left($customerId,19,'0')
+                MRS-->>ProxyNI: AvailablePoints=18500
+            else Programa 2 - Vision Plus
+                ProxyNI->>VisionPlus: PointsAdjustmentInquiry<br/>XQuery: pointsAdjustmentInquiryIn.xq<br/>Validar XSD<br/>accountNumber, scheme, org
+                VisionPlus-->>ProxyNI: GPXAIO-OPEN-TO-RED-ON-SCR
+            end
+            
+            alt RETURN_CASH_EQUIVALENT=YES
+                ProxyNI->>Conversion: canjearPuntosEfectivo<br/>XQuery: conversionPuntosNIIn.xq<br/>logo=(logo o BIN)<br/>tipoConversion=1<br/>montoConversion, cashRedemptionType
+                Conversion-->>ProxyNI: PN_VALORSALIDA=462.50<br/>Moneda: USD
+            end
+            
+            ProxyNI->>Registro: registraPuntosLealtad<br/>XQuery: registraPuntosLealtadIn.xq
+            Registro-->>ProxyNI: PV_CODIGO_ERROR='SUCCESS'
+        else CUSTOMER_ID_TYPE≠CARD_NUMBER
+            ProxyNI->>ProxyNI: Error: CUSTOMER_ID_TYPE<br/>no soportado
+        end
+    end
+
+    ProxyNI->>ProxyNI: Construir Response<br/>XQuery: consultaPuntosLealtadNIOut.xq
+    ProxyNI-->>Client: SOAP Response<br/>successIndicator=Success<br/>AVAILABLE_POINTS=18500<br/>CASH_EQUIVALENT=462.50<br/>CASH_CURRENCY=USD
+```

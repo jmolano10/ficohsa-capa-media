@@ -1,0 +1,131 @@
+
+sequenceDiagram
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Apica Redención de Puntos <br> Epica 2398: RedencionPuntosLealtad <br> HU 7395:  POST - /account-management/reward-points-account-admin/v1/initiate-loyalty-points
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant MRS as Mastercard CustomerService <br/> Operación: doItemRedemption <br> URI DEV: https://192.168.55.21:7021/mastercard-webservices/CustomerService
+    participant WVPLUS as Wrapper Vision Plus <br/> Operación: PointsRedeem <br> URI: http://172.28.1.146:7802/VisionPlusService
+    participant SQS as Cola SQS para invalidar caché Redis
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujos Honduras, Panamá y Nicaragua (HN01 | PN01 | NI01) - ConsultaPuntosMastercard
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Request Body: 36 campos según contrato OpenAPI
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: CONFIG
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | PN01 | NI01
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: PARAM
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: ObtenerParametrizacion Parámetros: <br> value.region = {sourceBank} <br> value.param-name
+
+        API->>CL: Consultar parámetros Parameter Store caché local
+        Note right of API: Param Name: value.param-name
+
+        CL->>API: Obtiene parámetros Parameter Store Caché Local
+        Note left of CL: ObtenerParametrizacion: <br> Parámetros de conexión backend
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: PARAM
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: ObtenerParametrizacion Parámetros: <br> value.region = {sourceBank} <br> value.param-name
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+        API->>Parameter: Consultar parámetros Parameter Store
+        Note right of API: Param Name: value.param-name
+
+        Parameter->>API: Obtiene parámetros Parameter Store
+        Note left of Parameter: ObtenerParametrizacion: <br> Parámetros de conexión backend
+
+        API->>CL: Guarda parámetros Parameter Store en caché local
+        Note right of API: Almacena Parametrización: <br>Parámetros de conexión backend
+
+    end
+
+    API->>Lib: Consulta Constantes
+   
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: operatioMasterCard = "doItemRedemption" <br> operationVisa = "PointsRedeem"
+
+    API->>API: Aplica patrón strategy
+    Note over API: Selecciona lógica de negocio según header.sourceBank
+
+    API->>API: Valida campos rewardMatrixItemId y INSTITUTION.NAME (Son parámetros consultados en la Dynamo por la API de Composición y enviados en el body de la petición)
+
+    alt IF (header.sourceBank == "HN01") or (header.sourceBank == "NI01" and rewardMatrixItemId != "" and INSTITUTION.NAME != "" and programCode == 1)
+
+        API->>API: Construye Request WS Mastercard
+        Note over API: confirmationEmailSw = request.confirmationEmailIndicator <br> confirmationEmailAddr = request.confirmationEmailAddress <br> rewardMatrixItemId = request.rewardMatrixItemId <br> quantity = request.quantity <br> newShippingAddressSw = request.isNewShippingAddress <br> poBoxAddressSw = request.postOfficeBoxIndicator <br> landuage = request.languageCode <br> creditCardNumber = request.creditCardId <br> expirationDate = request.expiryDate <br> cvc = request.cardSecurityCode <br> cardBrand = request.cardSchemeName
+
+        API->>MRS: Consume WS Mastercard - doItemRedemption
+        Note right of API: Body : <br> confirmationEmailSw, confirmationEmailAddr, <br> rewardMatrixItemId, quantity, <br> newShippingAddressSw, poBoxAddressSw, <br> landuage, creditCardNumber, <br> expirationDate, cvc, cardBrand
+
+        MRS->>API: Response WS Mastercard - doItemRedemptionResponse
+        Note left of MRS: householdId, pointTotalRemaining, redemptionDate <br> redemptionNumber, redemptionId, orderInformation, <br> voucherId, referenceNumber, redemptionItemDesc <br> sourceItemId, sourceItemCode
+        
+        API->>API: Construye response API
+        Note over API: Mapeo Campos : <br> householdReference = householdId <br> pointTotalRemaining = pointTotalRemaining <br> redemptionDate = redemptionDate <br> redemptionNumber = redemptionNumber <br> redemptionId = redemptionId <br> orderInformation = orderInformation <br> voucherId = voucherId <br> referenceNumber = referenceNumber <br> redemptionItemDescription = redemptionItemDesc <br> sourceItemId = sourceItemId <br> sourceItemCode = sourceItemCode
+
+        API->>SQS: Envía Evento para invalidar caché Redis
+        Note right of API: keyPattern: "Por Definir"
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    else IF (header.sourceBank == "PA01" | "GT01") or (header.sourceBank == "NI01" and rewardItemReference != "" and programCode == 2)
+
+        API->>API: Construye Request Wrapper Vision Plus - PointsRedeemResponse
+        Note over API: Mapeo Campos : <br> operation = param.operationVisa <br> payload.data = { <br> GPXARI-ORG = request.organizationReference (int), <br> GPXRAI-CARD-NBR = request.creditCardId, <br> GPXRAI-ACCT-NBR = request.accountNumber, <br> GPXRAI-SCHEME-ID = request.cardSchemeName, <br> GPXRAI-REWARD-ITEM = request.rewardItemReference <br> GPXRAI-PREPAID-CARD-NBR = request.prepaidCardReference <br> GPXRAI-POINTS = request.loyaltyPointsAmount <br> GPXRAI-REASON-CODE = request.reasonCode <br> GPXRAI-USER-DATA = request.userContextData <br> GPXRAI-COUPON-DENOM = request.couponAmount <br> GPXRAI-COUPON-NBR = request.couponReference <br> GPXRAI-NAME-1 = request.cardholderNameLine1 <br> GPXRAI-NAME-2 = request.cardholderNameLine2 <br> } <br> paramName = value.param-name
+
+        API->>InfoTC: Consume Wrapper Vision Plus - PointsRedeem
+        Note right of API: Body: operation, payload.data, paramName
+
+        InfoTC->>API: Response Wrapper Vision Plus - PointsRedeemResponse
+        Note over InfoTC: Response: <br> SVC-RETURN <br> RC-NBR-OCCUR 
+
+        API->>API: Construye response API
+        Note over API: Mapeo Campos : <br> codigoRetorno = SVC-RETURN <br> descripcionRetorno = RC-NBR-OCCUR 
+
+        API->>SQS: Envía Evento para invalidar caché Redis
+        Note right of API: keyPattern: "Por Definir"
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

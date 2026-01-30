@@ -1,0 +1,158 @@
+flowchart TD
+    Start([Cliente envía Request SOAP]) --> ValidXSD[Validar Esquema XSD]
+    ValidXSD --> ValidRegion[ValidaServicioRegional<br/>FICBCO0229, SourceBank]
+    
+    ValidRegion -->|ERROR| ErrorRegion[Response ERROR:<br/>Servicio no disponible]
+    ValidRegion -->|SUCCESS| ValidMethod[Validar REDEMPTION_METHOD = CASH]
+    
+    ValidMethod -->|NO| ErrorMethod[Response ERROR:<br/>Método no permitido]
+    ValidMethod -->|SI| RouteRegion{Enrutamiento<br/>por SourceBank}
+    
+    RouteRegion -->|HN01| FlowHN[Flujo Honduras]
+    RouteRegion -->|GT01| FlowGT[Flujo Guatemala]
+    RouteRegion -->|PA01| FlowPA[Flujo Panamá]
+    RouteRegion -->|NI01| FlowNI[Flujo Nicaragua]
+    RouteRegion -->|Otro| ErrorNotImpl[Response ERROR:<br/>Región no implementada]
+    
+    %% FLUJO HONDURAS
+    FlowHN --> ValidTypeHN{CUSTOMER_ID_TYPE}
+    ValidTypeHN -->|CARD_NUMBER| ConInfoHN[conInfoLealtad<br/>PROCESOS_HN]
+    ValidTypeHN -->|CUSTOMER_ID| T24CustHN[T24.Consultadecliente]
+    ValidTypeHN -->|LEGAL_ID| T24LegalHN[T24.Consultadecliente<br/>por Legal ID]
+    
+    ConInfoHN --> CheckCardTypeHN{cardType}
+    CheckCardTypeHN -->|DEBIT| ProgHN1[programCode = 1]
+    CheckCardTypeHN -->|CREDIT| ConProgHN[consultaProgramaLealtad<br/>INTFC]
+    ConProgHN --> ProgHN2[programCode = 2]
+    
+    T24CustHN --> ProgHN1
+    T24LegalHN --> ProgHN1
+    
+    ProgHN1 --> CheckRedemptionTypeHN{REDEMPTION_TYPE}
+    ProgHN2 --> CheckRedemptionTypeHN
+    
+    CheckRedemptionTypeHN -->|CASH| CanjeHN[canjearPuntosEfectivo<br/>ABK]
+    CheckRedemptionTypeHN -->|POINTS| UseAmountHN[totalPoints = REDEMPTION_AMOUNT]
+    
+    CanjeHN --> ObtParamHN[ObtenerParametrizacion<br/>matrixId, institutionName, rewardItem]
+    UseAmountHN --> ObtParamHN
+    
+    ObtParamHN --> CheckProgHN{programCode}
+    
+    CheckProgHN -->|1| MRSHN[Mastercard doItemRedemption<br/>Retorna redemptionId y saldo]
+    CheckProgHN -->|2| ConDatoHN[conDatoCuenta<br/>MASTERDATA_HN]
+    
+    ConDatoHN --> InsTransHN[INSTransaccionRedencion<br/>MASTERDATA]
+    InsTransHN --> VPHN[VisionPlus PointsRedeem]
+    VPHN --> VPInqHN[VisionPlus PointsAdjustmentInquiry<br/>Consulta saldo restante]
+    
+    MRSHN --> ResponseHN[Construir Response HN]
+    VPInqHN --> ResponseHN
+    
+    %% FLUJO GUATEMALA
+    FlowGT --> ValidTypeGT{CUSTOMER_ID_TYPE}
+    ValidTypeGT -->|CARD_NUMBER| ConDatoGT[conDatoCuenta<br/>MASTERDATA_GT<br/>Filtro: TipoOrg=BASE]
+    ValidTypeGT -->|Otro| ErrorTypeGT[ERROR: Tipo no soportado]
+    
+    ConDatoGT --> ConProgGT[consultaProgramaLealtad<br/>INTFC]
+    ConProgGT --> CheckRedemptionTypeGT{REDEMPTION_TYPE}
+    
+    CheckRedemptionTypeGT -->|CASH| CanjeGT[canjearPuntosEfectivo<br/>ABKGT]
+    CheckRedemptionTypeGT -->|POINTS| UseAmountGT[totalPoints = REDEMPTION_AMOUNT]
+    
+    CanjeGT --> ObtParamGT[ObtenerParametrizacion]
+    UseAmountGT --> ObtParamGT
+    
+    ObtParamGT --> CheckProgGT{programCode}
+    CheckProgGT -->|1| MRSGT[Mastercard doItemRedemption]
+    CheckProgGT -->|2| InsTransGT[INSTransaccionRedencion<br/>MASTERDATA]
+    
+    InsTransGT --> VPGT[VisionPlus PointsRedeem<br/>Sin consulta de saldo]
+    
+    MRSGT --> ResponseGT[Construir Response GT<br/>REMAINING_BALANCE vacío]
+    VPGT --> ResponseGT
+    
+    %% FLUJO PANAMÁ
+    FlowPA --> ValidTypePA{CUSTOMER_ID_TYPE}
+    ValidTypePA -->|CARD_NUMBER| ConDatoPA[conDatoCuenta<br/>MASTERDATA_PA]
+    ValidTypePA -->|Otro| ErrorTypePA[ERROR: Tipo no soportado]
+    
+    ConDatoPA --> ConProgPA[consultaProgramaLealtad<br/>INTFC]
+    ConProgPA --> CheckRedemptionTypePA{REDEMPTION_TYPE}
+    
+    CheckRedemptionTypePA -->|CASH| CanjePA[canjearPuntosEfectivo<br/>PXYNIC]
+    CheckRedemptionTypePA -->|POINTS| UseAmountPA[totalPoints = REDEMPTION_AMOUNT]
+    
+    CanjePA --> ObtParamPA[ObtenerParametrizacion]
+    UseAmountPA --> ObtParamPA
+    
+    ObtParamPA --> CheckProgPA{programCode}
+    CheckProgPA -->|1| MRSPA[Mastercard doItemRedemption]
+    CheckProgPA -->|2| VPPA[VisionPlus PointsRedeem<br/>Sin registro en BD]
+    
+    VPPA --> GenIDPA[Generar redemptionId<br/>con timestamp]
+    
+    MRSPA --> ResponsePA[Construir Response PA<br/>REMAINING_BALANCE vacío]
+    GenIDPA --> ResponsePA
+    
+    %% FLUJO NICARAGUA
+    FlowNI --> ValidTypeNI{CUSTOMER_ID_TYPE}
+    ValidTypeNI -->|CARD_NUMBER| ConTipoNI[sjConsultaTipoTarjetaNI<br/>SJS]
+    ValidTypeNI -->|Otro| ErrorTypeNI[ERROR: Tipo no soportado]
+    
+    ConTipoNI --> CheckStatusNI{CARD_STATUS}
+    CheckStatusNI -->|ACTIVE| CheckCardTypeNI{CARD_TYPE}
+    CheckStatusNI -->|Otro| ErrorStatusNI[ERROR: Tarjeta no activa]
+    
+    CheckCardTypeNI -->|DEBIT| ObtTipoNI[obtenerTipoProgramaLealtad<br/>INTFC<br/>BIN, TD0000, 000]
+    CheckCardTypeNI -->|CREDIT| ConProgNI[consultaProgramaLealtad<br/>INTFC]
+    
+    ObtTipoNI --> CheckRedemptionTypeNI{REDEMPTION_TYPE}
+    ConProgNI --> CheckRedemptionTypeNI
+    
+    CheckRedemptionTypeNI -->|CASH| CanjeNI[canjearPuntosEfectivo<br/>PXYNIC<br/>usa logo o binNumber]
+    CheckRedemptionTypeNI -->|POINTS| UseAmountNI[totalPoints = REDEMPTION_AMOUNT]
+    
+    CanjeNI --> ObtParamNI[ObtenerParametrizacion]
+    UseAmountNI --> ObtParamNI
+    
+    ObtParamNI --> CheckProgNI{programCode}
+    CheckProgNI -->|1| PadIDNI[Padding customerId<br/>a 19 caracteres]
+    CheckProgNI -->|2| VPNI[VisionPlus PointsRedeem]
+    
+    PadIDNI --> MRSNI[Mastercard doItemRedemption<br/>con customerId padded]
+    VPNI --> GenIDNI[Generar redemptionId<br/>con timestamp]
+    
+    MRSNI --> ResponseNI[Construir Response NI]
+    GenIDNI --> ResponseNI
+    
+    %% RESPUESTAS
+    ResponseHN --> CheckError{successIndicator}
+    ResponseGT --> CheckError
+    ResponsePA --> CheckError
+    ResponseNI --> CheckError
+    ErrorRegion --> End
+    ErrorMethod --> End
+    ErrorNotImpl --> End
+    ErrorTypeGT --> End
+    ErrorTypePA --> End
+    ErrorTypeNI --> End
+    ErrorStatusNI --> End
+    
+    CheckError -->|ERROR| MapError[MapeoErrores<br/>Homologar código]
+    CheckError -->|SUCCESS| End([Response SOAP al Cliente])
+    MapError --> End
+    
+    style Start fill:#e1f5ff
+    style End fill:#e1f5ff
+    style FlowHN fill:#fff4e1
+    style FlowGT fill:#e8f5e1
+    style FlowPA fill:#f5e1f5
+    style FlowNI fill:#ffe1e1
+    style ErrorRegion fill:#ffcccc
+    style ErrorMethod fill:#ffcccc
+    style ErrorNotImpl fill:#ffcccc
+    style ErrorTypeGT fill:#ffcccc
+    style ErrorTypePA fill:#ffcccc
+    style ErrorTypeNI fill:#ffcccc
+    style ErrorStatusNI fill:#ffcccc

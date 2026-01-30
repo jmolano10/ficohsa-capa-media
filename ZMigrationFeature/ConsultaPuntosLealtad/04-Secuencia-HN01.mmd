@@ -1,0 +1,119 @@
+
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Facade as ConsultaPuntosLealtadFacade
+    participant ProxyHN as ConsultaPuntosLealtadHN
+    participant SPBD as consultaPuntosLealtad_db<br/>(CLIENTDATA.CONSULTA_PUNTOS_LEALTAD)
+    participant InfoLealtad as conInfoLealtad_db<br/>(ProcesosHN)
+    participant Param as ObtenerParametrizacion
+    participant ProgLealtad as consultaProgramaLealtad_db<br/>(INTFC)
+    participant MRS as Mastercard CustomerService<br/>(getPointDetails)
+    participant VisionPlus as VisionPlus<br/>(PointsAdjustmentInquiry)
+    participant Conversion as canjearPuntosEfectivo_db<br/>(ABK)
+    participant Registro as registraPuntosLealtad_db<br/>(CLIENTDATA)
+
+    Note over Client, Registro: Flujo Honduras (HN01) - ConsultaPuntosLealtad
+
+    Client->>Facade: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: CUSTOMER_ID_TYPE=CARD_NUMBER<br/>CUSTOMER_ID_VALUE=5041234567890123<br/>RETURN_CASH_EQUIVALENT=YES
+
+    Facade->>Facade: Transformar Request
+    Note right of Facade: XQuery: consultaPuntosLealtadIn.xq<br/>Mapeo: procesaMensajeGenericoT24 → consultaPuntosLealtad
+
+    Facade->>ProxyHN: wsCallout ProgramaLealtad
+    Note right of Facade: Enrutamiento interno a proxy regional
+
+    ProxyHN->>ProxyHN: Validar Esquema XML
+    Note right of ProxyHN: Schema: programaLealtadTypes.xsd<br/>Element: consultaPuntosLealtad
+
+    ProxyHN->>SPBD: consultaPuntosLealtad
+    Note right of ProxyHN: XQuery: consultaPuntosLealtadIn.xq<br/>Mapeo OSB → SP:<br/>- PV_CODIGO_PAIS = 'HN01'<br/>- PV_CUSTOMER_ID_TYPE = 'CARD_NUMBER'<br/>- PV_CUSTOMER_ID_VALUE = '5041234567890123'<br/>- PV_CASH_EQUIVALENT = 'YES'<br/>- PV_CARD_NUMBER = '5041234567890123'
+
+    SPBD-->>ProxyHN: OutputParameters
+    Note left of SPBD: PV_CODIGO_ERROR = 'ERROR'<br/>PV_MENSAJE_ERROR = ''<br/>PT_PUNTOS_LEALTAD = NULL
+
+    alt Datos no encontrados en BD
+        ProxyHN->>ProxyHN: Convertir Código País
+        Note right of ProxyHN: XQuery: convertirCodigoPais.xq<br/>HN01 → HND (ISO3)
+
+        ProxyHN->>InfoLealtad: conInfoLealtad
+        Note right of ProxyHN: XQuery: conInfoLealtadHNIn.xq<br/>Mapeo:<br/>- country = 'HND'<br/>- cardNumber = '5041234567890123'
+
+        InfoLealtad-->>ProxyHN: RowSet
+        Note left of InfoLealtad: Column LEGALID = '0801199012345'<br/>Column CUSTOMERNAME = 'JUAN CARLOS LOPEZ'<br/>Column CARDTYPE = 'CREDIT'<br/>Column LOGO = '100'<br/>CodigoError = '-1'
+
+        ProxyHN->>ProxyHN: Extraer Variables
+        Note right of ProxyHN: $legalId = '0801199012345'<br/>$customerName = 'JUAN CARLOS LOPEZ'<br/>$cardType = 'CREDIT'<br/>$grupoAfinidad = '100'
+
+        ProxyHN->>Param: obtenerParametrizacion
+        Note right of ProxyHN: XQuery: obtenerParametrizacionIn.xq<br/>Parámetro: FICBCO0229.MRS.INSTITUTION.NAME
+
+        Param-->>ProxyHN: CONFIGURACIONES
+        Note left of Param: VALUE = 'FICOHSA'<br/>ERROR_CODE = 'SUCCESS'
+
+        ProxyHN->>ProxyHN: Determinar Programa Lealtad
+        Note right of ProxyHN: Regla: cardType='CREDIT' → Consultar BD
+
+        ProxyHN->>ProgLealtad: consultaProgramaLealtad
+        Note right of ProxyHN: XQuery: consultaProgramaLealtadIn.xq<br/>Mapeo:<br/>- codigoPais = 'HN01'<br/>- logo = '100'
+
+        ProgLealtad-->>ProxyHN: OutputParameters
+        Note left of ProgLealtad: PV_CODIGOMENSAJE = 'SUCCESS'<br/>PV_CODIGOLEALTAD = '1'
+
+        ProxyHN->>ProxyHN: Asignar Programa
+        Note right of ProxyHN: $programaLealtad = '1' (Mastercard)
+
+        alt Programa 1 - Mastercard Rewards
+            ProxyHN->>MRS: getPointDetails
+            Note right of ProxyHN: XQuery Header: MRSIdentity.xq<br/>Header:<br/>- InstitutionName = 'FICOHSA'<br/>- AppID = '0801199012345'<br/><br/>XQuery Body: getPointDetailsIn.xq<br/>Body: vacío
+
+            MRS-->>ProxyHN: getPointDetailsResponse
+            Note left of MRS: AvailablePoints = 15000
+
+            ProxyHN->>ProxyHN: Extraer Puntos
+            Note right of ProxyHN: $availablePoints = 15000
+        end
+
+        alt RETURN_CASH_EQUIVALENT = YES
+            ProxyHN->>Conversion: canjearPuntosEfectivo
+            Note right of ProxyHN: XQuery: canjearPuntosEfectivoHNIn.xq<br/>Mapeo:<br/>- conversionAmount = '15000'<br/>- logo = '100'<br/>- conversionType = '1'<br/>- terminalId = 'TERM001'<br/>- merchantType = 'RETAIL'<br/>- merchantNumber = 'MERCH123'
+
+            Conversion-->>ProxyHN: OutputParameters
+            Note left of Conversion: PN_VALORSALIDA = 3750.00<br/>PV_CODIGOMENSAJE = 'SUCCESS'
+
+            ProxyHN->>ProxyHN: Asignar Equivalencia
+            Note right of ProxyHN: $cashEquivalent = 3750.00<br/>$cashCurrency = 'HNL'
+        end
+
+        ProxyHN->>Registro: registraPuntosLealtad
+        Note right of ProxyHN: XQuery: registraPuntosLealtadIn.xq<br/>Mapeo:<br/>- cashEquivalent = 3750.00<br/>- customerName = 'JUAN CARLOS LOPEZ'<br/>- balance = 15000<br/>- cashCurrency = 'HNL'<br/>- legalId = '0801199012345'
+
+        Registro-->>ProxyHN: OutputParameters
+        Note left of Registro: PV_CODIGO_ERROR = 'SUCCESS'
+    end
+
+    ProxyHN->>ProxyHN: Construir Response
+    Note right of ProxyHN: XQuery: consultaPuntosLealtadHNOut.xq<br/>Mapeo Variables → Response:<br/>- LEGAL_ID = $legalId<br/>- CUSTOMER_NAME = $customerName<br/>- AVAILABLE_POINTS = $availablePoints<br/>- CASH_EQUIVALENT = $cashEquivalent<br/>- CASH_CURRENCY = $cashCurrency
+
+    ProxyHN-->>Facade: consultaPuntosLealtadResponse
+    Note left of ProxyHN: successIndicator = 'Success'<br/>LEGAL_ID = '0801199012345'<br/>AVAILABLE_POINTS = 15000<br/>CASH_EQUIVALENT = 3750.00<br/>CASH_CURRENCY = 'HNL'
+
+    Facade->>Facade: Transformar Response
+    Note right of Facade: XQuery: consultaPuntosLealtadFacadeOut.xq<br/>Mapeo: consultaPuntosLealtadResponse → procesaMensajeGenericoT24
+
+    Facade-->>Client: SOAP Response
+    Note left of Facade: Header: successIndicator=Success<br/>Body: Datos de puntos y equivalencia
+
+    Note over Client, Registro: Flujo Alternativo - Error
+
+    Client->>Facade: SOAP Request (tarjeta inválida)
+    Facade->>ProxyHN: wsCallout
+    ProxyHN->>SPBD: consultaPuntosLealtad
+    SPBD-->>ProxyHN: PV_CODIGO_ERROR='ERROR'<br/>PV_MENSAJE_ERROR='Tarjeta no encontrada'
+    ProxyHN->>InfoLealtad: conInfoLealtad
+    InfoLealtad-->>ProxyHN: CodigoError='ERROR'<br/>MensajeError='Tarjeta inválida'
+    ProxyHN->>ProxyHN: Asignar Error
+    Note right of ProxyHN: $errorCode = 'ERROR'<br/>$validationMessage = 'Tarjeta inválida'
+    ProxyHN-->>Facade: Response con Error
+    Note left of ProxyHN: successIndicator = 'ERROR'<br/>messages = 'Tarjeta inválida'<br/>Body vacío
+    Facade-->>Client: SOAP Response Error

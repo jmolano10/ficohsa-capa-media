@@ -1,0 +1,49 @@
+
+sequenceDiagram
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Conversión Puntos <br> Epica 2382: ConsultaPuntosLealtad <br> HU 54368:  POST - XXXXXX
+    participant BD as AWS Aurora BD 
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujos Honduras, Gutaemala, Panamá y Nicaragua (HN01 | GT01 | PN01 | NI01) - ConsultaPuntosMastercard
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: binLogoRequestAPI, codigoComercioRequestAPI, <br> grupoComercioRequestAPI, codigoTerminalRequestAPI, <br> tipoCOnersiónRequestAPI, valorEntradaRequestAPI
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: XXXXX <br> name: CONFIG
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | GT01 | PN01 | NI01
+
+    API->>BD: Consulta Base de datos
+    Note over API: Consulta tablas : <br> CashPointsRedemption, <br> ComplementaryData <br> Ver Ejemplo SQL
+    
+    BD->>API: Obtiene Valor Efectivo Puntos
+    Note left of BD: cashValue, redemptionFactor
+
+    API->>API: Construye Response API
+    Note over API: valorSalida = PN_VALOR_SALIDA <br> factorCanje = PN_FACTOR_CANJE 
+
+    API->>Consumidor: REST Response Successful
+    Note left of API: HTTP 200: Response Body <br> valorSalida, factorCanje
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

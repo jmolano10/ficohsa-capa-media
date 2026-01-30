@@ -1,0 +1,66 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente
+    participant ProxyPA as ConsultaPuntosLealtadPA
+    participant SPBD as consultaPuntosLealtad_db
+    participant MasterData as conDatoCuenta_db<br/>(MasterDataPA)
+    participant Param as ObtenerParametrizacion
+    participant ProgLealtad as consultaProgramaLealtad_db
+    participant MRS as Mastercard<br/>(getPointDetails)
+    participant VisionPlus as Vision Plus
+    participant Conversion as canjearPuntosEfectivo_db<br/>(PXYNIC)
+    participant Registro as registraPuntosLealtad_db
+
+    Note over Client, Registro: Flujo Panamá (PA01)
+
+    Client->>ProxyPA: SOAP Request<br/>SourceBank=PA01<br/>CARD_NUMBER=5041234567890321
+    ProxyPA->>ProxyPA: Validar XSD
+    ProxyPA->>SPBD: consultaPuntosLealtad<br/>XQuery: consultaPuntosLealtadIn.xq
+    SPBD-->>ProxyPA: PV_CODIGO_ERROR='ERROR'<br/>PT_PUNTOS_LEALTAD=NULL
+
+    alt Datos no en BD
+        ProxyPA->>ProxyPA: Convertir País<br/>PA01→PAN
+        ProxyPA->>MasterData: conDatoCuenta<br/>XQuery: conDatoCuentaPAIn.xq<br/>Validar XSD
+        MasterData-->>ProxyPA: RowSet con registros<br/>TipoOrg='ALT' o 'BASE'
+        
+        ProxyPA->>ProxyPA: Priorizar Registro<br/>if(count(ALT)>0) then ALT else BASE
+        ProxyPA->>ProxyPA: Extraer Variables<br/>$customerId, $customerName<br/>$legalId, $logo<br/>$org, $accountNumber, $scheme
+
+        alt Logo no vacío
+            ProxyPA->>Param: obtenerParametrizacion<br/>FICBCO0229.MRS.INSTITUTION.NAME
+            Param-->>ProxyPA: VALUE='FICOHSA'
+            
+            ProxyPA->>ProgLealtad: consultaProgramaLealtad<br/>XQuery: consultaProgramaLealtadIn.xq<br/>logo=$logo, codigoPais='PA01'
+            ProgLealtad-->>ProxyPA: PV_CODIGOLEALTAD='1' o '2'
+            
+            alt Programa 1 - Mastercard
+                ProxyPA->>MRS: getPointDetails<br/>XQuery: getPointDetailsInPA.xq<br/>Header: InstitutionName='FICOHSA'<br/>AppID=$legalId
+                
+                alt Respuesta Exitosa
+                    MRS-->>ProxyPA: AvailablePoints=32000
+                else Error Mastercard
+                    MRS-->>ProxyPA: SOAP Fault<br/>ReceivedFaultDetail
+                    ProxyPA->>ProxyPA: Error Handler ConsultaPuntos<br/>Extraer código y mensaje<br/>de ReceivedFaultDetail<br/>Resume flujo
+                end
+            else Programa 2 - Vision Plus
+                ProxyPA->>VisionPlus: PointsAdjustmentInquiry<br/>XQuery: pointsAdjustmentInquiryIn.xq<br/>Validar XSD<br/>accountNumber, scheme, org
+                VisionPlus-->>ProxyPA: GPXAIO-OPEN-TO-RED-ON-SCR
+            end
+            
+            alt RETURN_CASH_EQUIVALENT=YES y puntos>0
+                ProxyPA->>Conversion: canjearPuntosEfectivo<br/>XQuery: conversionPuntosNIIn.xq<br/>logo, tipoConversion=1<br/>montoConversion, cashRedemptionType
+                Conversion-->>ProxyPA: PN_VALORSALIDA=800.00<br/>Moneda: USD
+            end
+            
+            ProxyPA->>Registro: registraPuntosLealtad<br/>XQuery: registraPuntosLealtadIn.xq
+            Registro-->>ProxyPA: PV_CODIGO_ERROR='SUCCESS'
+        else Logo vacío
+            ProxyPA->>ProxyPA: Error: No se encontró logo
+        end
+    end
+
+    ProxyPA->>ProxyPA: Construir Response<br/>XQuery: consultaPuntosLealtadPAOut.xq
+    ProxyPA-->>Client: SOAP Response<br/>successIndicator=Success<br/>AVAILABLE_POINTS=32000<br/>CASH_EQUIVALENT=800.00<br/>CASH_CURRENCY=USD
+
+    Note over ProxyPA: Error Handler Especial<br/>para ConsultaPuntos:<br/>Captura errores Mastercard<br/>con estructura ReceivedFaultDetail<br/>Extrae código y mensaje<br/>Resume flujo con variables error
+```

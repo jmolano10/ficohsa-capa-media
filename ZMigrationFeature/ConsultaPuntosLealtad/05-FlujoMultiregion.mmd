@@ -1,0 +1,160 @@
+
+flowchart TD
+    Start([Cliente/Aplicación]) --> Facade[ConsultaPuntosLealtadFacade]
+    
+    Facade --> |Transformación<br/>consultaPuntosLealtadIn.xq| ValidaRegion{Validar<br/>SourceBank}
+    
+    ValidaRegion --> |HN01| ProxyHN[ConsultaPuntosLealtadHN]
+    ValidaRegion --> |GT01| ProxyGT[ConsultaPuntosLealtadGT]
+    ValidaRegion --> |NI01| ProxyNI[ConsultaPuntosLealtadNI]
+    ValidaRegion --> |PA01| ProxyPA[ConsultaPuntosLealtadPA]
+    
+    ProxyHN --> ValidaXSD_HN[Validar XSD<br/>programaLealtadTypes]
+    ProxyGT --> ValidaXSD_GT[Validar XSD<br/>programaLealtadTypes]
+    ProxyNI --> ValidaXSD_NI[Validar XSD<br/>programaLealtadTypes]
+    ProxyPA --> ValidaXSD_PA[Validar XSD<br/>programaLealtadTypes]
+    
+    ValidaXSD_HN --> ConsultaBD_HN[consultaPuntosLealtad_db<br/>CLIENTDATA.CONSULTA_PUNTOS_LEALTAD]
+    ValidaXSD_GT --> ConsultaBD_GT[consultaPuntosLealtad_db<br/>CLIENTDATA.CONSULTA_PUNTOS_LEALTAD]
+    ValidaXSD_NI --> ConsultaBD_NI[consultaPuntosLealtad_db<br/>CLIENTDATA.CONSULTA_PUNTOS_LEALTAD]
+    ValidaXSD_PA --> ConsultaBD_PA[consultaPuntosLealtad_db<br/>CLIENTDATA.CONSULTA_PUNTOS_LEALTAD]
+    
+    ConsultaBD_HN --> ExisteDatos_HN{¿Datos<br/>en BD?}
+    ConsultaBD_GT --> ExisteDatos_GT{¿Datos<br/>en BD?}
+    ConsultaBD_NI --> ExisteDatos_NI{¿Datos<br/>en BD?}
+    ConsultaBD_PA --> ExisteDatos_PA{¿Datos<br/>en BD?}
+    
+    ExisteDatos_HN --> |Sí| RespuestaFinal_HN[Construir Response<br/>consultaPuntosLealtadHNOut.xq]
+    ExisteDatos_GT --> |Sí| RespuestaFinal_GT[Construir Response<br/>consultaPuntosLealtadGTOut.xq]
+    ExisteDatos_NI --> |Sí| RespuestaFinal_NI[Construir Response<br/>consultaPuntosLealtadNIOut.xq]
+    ExisteDatos_PA --> |Sí| RespuestaFinal_PA[Construir Response<br/>consultaPuntosLealtadPAOut.xq]
+    
+    ExisteDatos_HN --> |No| ConvertPais_HN[Convertir Código País<br/>HN01→HND<br/>convertirCodigoPais.xq]
+    ExisteDatos_GT --> |No| ConvertPais_GT[Convertir Código País<br/>GT01→GTM<br/>convertirCodigoPais.xq]
+    ExisteDatos_NI --> |No| ValidaTipo_NI{CUSTOMER_ID_TYPE<br/>= CARD_NUMBER?}
+    ExisteDatos_PA --> |No| ConvertPais_PA[Convertir Código País<br/>PA01→PAN<br/>convertirCodigoPais.xq]
+    
+    ConvertPais_HN --> InfoCliente_HN[conInfoLealtad_db<br/>ProcesosHN<br/>conInfoLealtadHNIn.xq]
+    ConvertPais_GT --> InfoCliente_GT[conDatoCuenta_db<br/>MasterDataGT<br/>conDatoCuentaGTIn.xq]
+    ValidaTipo_NI --> |Sí| InfoCliente_NI[sjConsultaTipoTarjetaNI<br/>SJS Java Service<br/>consultaTipoTarjetaNIIn.xq]
+    ValidaTipo_NI --> |No| Error_NI[Error: CUSTOMER_ID_TYPE<br/>no soportado]
+    ConvertPais_PA --> InfoCliente_PA[conDatoCuenta_db<br/>MasterDataPA<br/>conDatoCuentaPAIn.xq]
+    
+    InfoCliente_HN --> ExtraerDatos_HN[Extraer:<br/>legalId, customerName<br/>cardType, grupoAfinidad]
+    InfoCliente_GT --> ExtraerDatos_GT[Extraer:<br/>customerId, customerName<br/>legalId, logo, NIT<br/>org, accountNumber, scheme]
+    InfoCliente_NI --> ExtraerDatos_NI[Extraer:<br/>customerId, customerName<br/>legalId, logo, cardType<br/>cardStatus, org, accountNumber, scheme]
+    InfoCliente_PA --> ExtraerDatos_PA[Extraer:<br/>customerId, customerName<br/>legalId, logo<br/>org, accountNumber, scheme]
+    
+    ExtraerDatos_HN --> Param_HN[ObtenerParametrizacion<br/>FICBCO0229.MRS.INSTITUTION.NAME]
+    ExtraerDatos_GT --> ValidaLogo_GT{¿Logo<br/>vacío?}
+    ExtraerDatos_NI --> ValidaLogo_NI{¿Logo<br/>vacío?}
+    ExtraerDatos_PA --> ValidaLogo_PA{¿Logo<br/>vacío?}
+    
+    Param_HN --> DeterminarProg_HN{Determinar<br/>Programa}
+    ValidaLogo_GT --> |No| Param_GT[ObtenerParametrizacion<br/>FICBCO0229.MRS.INSTITUTION.NAME]
+    ValidaLogo_GT --> |Sí| Error_GT[Error: No se encontró<br/>logo para la tarjeta]
+    ValidaLogo_NI --> |No| Param_NI[ObtenerParametrizacion<br/>FICBCO0229.MRS.INSTITUTION.NAME]
+    ValidaLogo_NI --> |Sí| Error_NI2[Error: No se encontró<br/>logo para la tarjeta]
+    ValidaLogo_PA --> |No| Param_PA[ObtenerParametrizacion<br/>FICBCO0229.MRS.INSTITUTION.NAME]
+    ValidaLogo_PA --> |Sí| Error_PA[Error: No se encontró<br/>logo para la tarjeta]
+    
+    DeterminarProg_HN --> |cardType=DEBIT| Prog1_HN[Programa 1<br/>Mastercard]
+    DeterminarProg_HN --> |cardType=CREDIT| ConsultaProg_HN[consultaProgramaLealtad_db<br/>INTFC<br/>consultaProgramaLealtadIn.xq]
+    
+    Param_GT --> ConsultaProg_GT[consultaProgramaLealtad_db<br/>INTFC<br/>consultaProgramaLealtadIn.xq]
+    
+    Param_NI --> DeterminarProg_NI{Determinar<br/>Programa}
+    DeterminarProg_NI --> |cardType=DEBIT<br/>cardStatus=ACTIVE| ExtraerBIN_NI[Extraer BIN<br/>primeros 6 dígitos]
+    DeterminarProg_NI --> |cardType=DEBIT<br/>cardStatus≠ACTIVE| Error_NI3[Error: Tarjeta débito<br/>no está activa]
+    DeterminarProg_NI --> |cardType=CREDIT| ConsultaProg_NI[consultaProgramaLealtad_db<br/>INTFC<br/>consultaProgramaLealtadIn.xq]
+    
+    ExtraerBIN_NI --> ObtenerTipoProg_NI[obtenerTipoProgramaLealtad_db<br/>INTFC<br/>producto=TD0000<br/>grupoAfinidad=000<br/>obtenerTipoProgramaLealtadIn.xq]
+    
+    Param_PA --> ConsultaProg_PA[consultaProgramaLealtad_db<br/>INTFC<br/>consultaProgramaLealtadIn.xq]
+    
+    ConsultaProg_HN --> ValidaProg_HN{Programa<br/>Lealtad}
+    ConsultaProg_GT --> ValidaProg_GT{Programa<br/>Lealtad}
+    ConsultaProg_NI --> ValidaProg_NI{Programa<br/>Lealtad}
+    ObtenerTipoProg_NI --> ValidaProg_NI
+    ConsultaProg_PA --> ValidaProg_PA{Programa<br/>Lealtad}
+    
+    Prog1_HN --> MRS_HN
+    ValidaProg_HN --> |1| MRS_HN[Mastercard getPointDetails<br/>AppID=legalId<br/>getPointDetailsIn.xq<br/>MRSIdentity.xq]
+    ValidaProg_HN --> |2| VP_HN[Vision Plus<br/>PointsAdjustmentInquiry<br/>pointsAdjustmentInquiryIn.xq]
+    ValidaProg_HN --> |Otro| Error_HN[Error: Programa de<br/>lealtad no soportado]
+    
+    ValidaProg_GT --> |1| MRS_GT[Mastercard getRTRPreferences<br/>AppID=NIT<br/>getPointDetailsInGT.xq<br/>MRSIdentity.xq]
+    ValidaProg_GT --> |2| VP_GT[Vision Plus<br/>PointsAdjustmentInquiry<br/>pointsAdjustmentInquiryIn.xq]
+    ValidaProg_GT --> |Otro| Error_GT2[Error: Programa de<br/>lealtad no soportado]
+    
+    ValidaProg_NI --> |1| MRS_NI[Mastercard getPointDetails<br/>AppID=customerId 19 dígitos<br/>getPointDetailsIn.xq<br/>MRSIdentity.xq]
+    ValidaProg_NI --> |2| VP_NI[Vision Plus<br/>PointsAdjustmentInquiry<br/>pointsAdjustmentInquiryIn.xq]
+    ValidaProg_NI --> |Otro| Error_NI4[Error: Programa de<br/>lealtad no soportado]
+    
+    ValidaProg_PA --> |1| MRS_PA[Mastercard getPointDetails<br/>AppID=legalId<br/>getPointDetailsInPA.xq<br/>MRSIdentity.xq]
+    ValidaProg_PA --> |2| VP_PA[Vision Plus<br/>PointsAdjustmentInquiry<br/>pointsAdjustmentInquiryIn.xq]
+    ValidaProg_PA --> |Otro| Error_PA2[Error: Programa de<br/>lealtad no soportado]
+    
+    MRS_HN --> AsignarPuntos_HN[Asignar<br/>availablePoints]
+    VP_HN --> AsignarPuntos_HN
+    MRS_GT --> AsignarPuntos_GT[Asignar<br/>availablePoints]
+    VP_GT --> AsignarPuntos_GT
+    MRS_NI --> AsignarPuntos_NI[Asignar<br/>availablePoints]
+    VP_NI --> AsignarPuntos_NI
+    MRS_PA --> AsignarPuntos_PA[Asignar<br/>availablePoints]
+    VP_PA --> AsignarPuntos_PA
+    
+    AsignarPuntos_HN --> ValidaEquiv_HN{RETURN_CASH_EQUIVALENT<br/>= YES<br/>y puntos > 0?}
+    AsignarPuntos_GT --> ValidaEquiv_GT{RETURN_CASH_EQUIVALENT<br/>= YES<br/>y puntos > 0?}
+    AsignarPuntos_NI --> ValidaEquiv_NI{RETURN_CASH_EQUIVALENT<br/>= YES<br/>y puntos > 0?}
+    AsignarPuntos_PA --> ValidaEquiv_PA{RETURN_CASH_EQUIVALENT<br/>= YES<br/>y puntos > 0?}
+    
+    ValidaEquiv_HN --> |Sí| Conversion_HN[canjearPuntosEfectivo_db<br/>ABK<br/>Moneda: HNL<br/>canjearPuntosEfectivoHNIn.xq]
+    ValidaEquiv_HN --> |No| Registro_HN
+    ValidaEquiv_GT --> |Sí| Conversion_GT[canjearPuntosEfectivo_db<br/>ABKGT<br/>Moneda: GTQ<br/>canjearPuntosEfectivoGTIn.xq]
+    ValidaEquiv_GT --> |No| Registro_GT
+    ValidaEquiv_NI --> |Sí| Conversion_NI[canjearPuntosEfectivo_db<br/>PXYNIC<br/>Moneda: USD<br/>conversionPuntosNIIn.xq]
+    ValidaEquiv_NI --> |No| Registro_NI
+    ValidaEquiv_PA --> |Sí| Conversion_PA[canjearPuntosEfectivo_db<br/>PXYNIC<br/>Moneda: USD<br/>conversionPuntosNIIn.xq]
+    ValidaEquiv_PA --> |No| Registro_PA
+    
+    Conversion_HN --> Registro_HN[registraPuntosLealtad_db<br/>CLIENTDATA<br/>registraPuntosLealtadIn.xq]
+    Conversion_GT --> Registro_GT[registraPuntosLealtad_db<br/>CLIENTDATA<br/>registraPuntosLealtadIn.xq]
+    Conversion_NI --> Registro_NI[registraPuntosLealtad_db<br/>CLIENTDATA<br/>registraPuntosLealtadIn.xq]
+    Conversion_PA --> Registro_PA[registraPuntosLealtad_db<br/>CLIENTDATA<br/>registraPuntosLealtadIn.xq]
+    
+    Registro_HN --> RespuestaFinal_HN
+    Registro_GT --> RespuestaFinal_GT
+    Registro_NI --> RespuestaFinal_NI
+    Registro_PA --> RespuestaFinal_PA
+    
+    RespuestaFinal_HN --> TransformFacade_HN[Transformar Response<br/>consultaPuntosLealtadFacadeOut.xq]
+    RespuestaFinal_GT --> TransformFacade_GT[Transformar Response<br/>consultaPuntosLealtadFacadeOut.xq]
+    RespuestaFinal_NI --> TransformFacade_NI[Transformar Response<br/>consultaPuntosLealtadFacadeOut.xq]
+    RespuestaFinal_PA --> TransformFacade_PA[Transformar Response<br/>consultaPuntosLealtadFacadeOut.xq]
+    
+    TransformFacade_HN --> End([Response al Cliente])
+    TransformFacade_GT --> End
+    TransformFacade_NI --> End
+    TransformFacade_PA --> End
+    
+    Error_NI --> ErrorHandler[Error Handler<br/>Construir Response Error]
+    Error_GT --> ErrorHandler
+    Error_GT2 --> ErrorHandler
+    Error_HN --> ErrorHandler
+    Error_NI2 --> ErrorHandler
+    Error_NI3 --> ErrorHandler
+    Error_NI4 --> ErrorHandler
+    Error_PA --> ErrorHandler
+    Error_PA2 --> ErrorHandler
+    
+    ErrorHandler --> End
+    
+    style Start fill:#e1f5e1
+    style End fill:#ffe1e1
+    style Facade fill:#e3f2fd
+    style ProxyHN fill:#fff3e0
+    style ProxyGT fill:#f3e5f5
+    style ProxyNI fill:#e0f2f1
+    style ProxyPA fill:#fce4ec
+    style ErrorHandler fill:#ffcdd2
