@@ -7,59 +7,66 @@ sequenceDiagram
     participant WT24 as Wrapper T24 <br> svcPagoRecaudos/services
     participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
 
-    Note over Consumidor, Errors: Flujo Honduras (HN01) - Reversar Pago Cheque
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Reversar Pago Recaudos
 
-    alt Reverso Exitoso
-        Consumidor->>API: Rest Request
-        Note right of Consumidor: Header: SourceBank=HN01<br/>Body: transactionReference, transactionType, tellerType
+    Consumidor->>API: Rest Request
+    Note right of Consumidor: Header: SourceBank=HN01<br/>Body: transactionReference, transactionType, tellerType
 
-        API->>API: Validar Rquest
-        Note over  API: Validar obligatoriedad campos según contrato OpenAPI <br/> transactionReference != vacío, tellerType = true | false
+    API->>API: Validar Rquest
+    Note over  API: Validar obligatoriedad campos según contrato OpenAPI <br/> transactionReference != vacío, tellerType = true | false
 
-        API->>API: Validación exitosa
+    API->>API: Validación exitosa
 
-        API->>API: Validar Servicio Regional
-        Note over API: key de config: PAYMENT_EXECUTION_ADMIN
+    API->>API: Validar Servicio Regional
+    Note over API: key de config: PAYMENT_EXECUTION_ADMIN
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
+
+    alt Consulta información de operación a consumir en caché local
+
+        API->>CL: Consultar información de operación a consumir
+        Note right of API: domain = "PAYMENT_EXECUTION_ADMIN" <br> name : OPERATIONS_REVERSE_TRANSACTION_PAYMENT <br> country = Header. SourceBank (ISO3) 
+
+        CL->>API: Retorna información de operación a consumir
+        Note left of CL: value.transactionType.operations
+
+    else Consulta información de operación a consumir con Lambda Parámetros
+
+        API->>Lambda: Consultar información de operación a consumir
+        Note right of API: Note right of API: domain = "PAYMENT_EXECUTION_ADMIN" <br> name : OPERATIONS_REVERSE_TRANSACTION_PAYMENT <br> country = Header. SourceBank (ISO3)
+
+        Lambda->>API: Retorna información de operación a consumir
+        Note left of Lambda: value.transactionType.operations
+
+        API->>CL: Guarda información de las operaciones en caché local
+        Note right of API: value.transactionType.operations
+    end
+    
+    API->>API: Evalua información de operación a consumir
+
+    alt No existe combinación para transactionType y trxType2 | trxTyp3 y paymethod
+
+        API->> Errors: Mapear código de error
+        Errors ->> API: Retorna código mapeado
+        API-->> Consumidor: Retorna error
+        Note left of API: 422: Transacción no válida para reversión
         
-        API->>API: Validación Regional Exitosa
-        Note over API: Servicio habilitado para HN01
+    end
 
-        alt Consulta información de operación a consumir en caché local
+    API->>API: Construir Request a WT24
+    Note over API: Trasnsactionid = transactionReference
 
-            API->>CL: Consultar información de operación a consumir
-            Note right of API: country = Header. SourceBank <br> value.operations = tellerType <br> 
+    API->>WT24: CALL Operación T24
+    Note right of API: Trasnsactionid
 
-            CL->>API: Retorna información de operación a consumir
-            Note left of CL: value.operations.operation
+    WT24->>API: Response Reversión Trasnacción
+    Note left of WT24: successIndicator
 
-        else Consulta información de operación a consumir con Lambda Parámetros
+    API->>API: Transformar Response
 
-            API->>Lambda: Consultar información de operación a consumir
-            Note right of API: country = Header. SourceBank <br> value.operations = tellerType
-
-            Lambda->>API: Retorna información de operación a consumir
-            Note left of Lambda: value.operations.operation
-
-            API->>CL: Guarda información de las operaciones en caché local
-            Note right of API: country = Header. SourceBank <br> value.operations = tellerType
-
-        end
-
-        API->>API: Construir Request a WT24
-        Note over API: Trasnsactionid = transactionReference
-
-        API->>WT24: CALL Operación T24
-        Note right of API: Trasnsactionid
-
-        WT24->>API: Response Reversión Trasnacción
-        Note left of WT24: successIndicator
-
-        API->>API: Transformar Response
-
-        API->>Consumidor: REST Response exitoso
-        Note right of Consumidor: body.data <br> transactionReference <br> transactionType <br> transactionDate
-
-    end 
+    API->>Consumidor: REST Response exitoso
+    Note right of Consumidor: body.data <br> transactionReference <br> transactionType <br> transactionDate
 
     activate API
     alt Exception occurs

@@ -10,61 +10,70 @@ sequenceDiagram
     participant WT24 as Wrapper T24 <br> svcResversaTransaccion/services
     participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
 
-    Note over Consumidor, Errors: Flujo Honduras (HN01) - Reversar Pago Cheque
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Autoriza Reverso Transacciones
 
-    alt Reverso Exitoso
-        Consumidor->>API: Rest Request
-        Note right of Consumidor: Header: SourceBank=HN01<br/>Body: transactionReference, transactionType
+    Consumidor->>API: Rest Request
+    Note right of Consumidor: Header: SourceBank=HN01<br/>Body: transactionReference, transactionType
 
-        API->>API: Validar Rquest
-        Note over  API: Validar obligatoriedad campos según contrato OpenAPI <br/> transactionReference != vacío <br> transactionType 
+    API->>API: Validar Rquest
+    Note over  API: Validar obligatoriedad campos según contrato OpenAPI <br/> transactionReference != vacío <br> transactionType 
 
-        API->>API: Validación exitosa
+    API->>API: Validación exitosa
 
-        API->>API: Validar Servicio Regional
-        Note over API: key de config: PAYMENT_EXECUTION_ADMIN
-        
-        API->>API: Validación Regional Exitosa
-        Note over API: Servicio habilitado para HN01
+    API->>API: Validar Servicio Regional
+    Note over API: key de config: PAYMENT_EXECUTION_ADMIN
+    
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01
 
 
-        API->>API: Determinar tipo de transacción
-        Note over API: Substring transactionReference: <br> trxType2: substr(transactionReference 1, 2) <br> trxType3: substr(transactionReference 1, 3)
+    API->>API: Determinar tipo de transacción
+    Note over API: Substring transactionReference: <br> trxType2: substr(transactionReference 1, 2) <br> trxType3: substr(transactionReference 1, 3)
 
-        alt Consulta operación a consumir en caché local
+    alt Consulta información de operación a consumir en caché local
 
-            API->>CL: Consultar operación a consumir
-            Note right of API: country = Header. SourceBank <br> value.transactionType = Body.transactionType <br> 
+        API->>CL: Consultar información de operación a consumir
+        Note right of API: domain = "PAYMENT_EXECUTION_ADMIN" <br> name : OPERATIONS_AUTHORIZE_REVERSE_TRANSACTION <br> country = Header. SourceBank (ISO3) 
 
-            CL->>API: Retorna operación a consumir
-            Note left of CL: value.transactionType.operations
+        CL->>API: Retorna información de operación a consumir
+        Note left of CL: value.transactionType.operations
 
-        else Consulta operación a consumir con Lambda Parámetros
+    else Consulta información de operación a consumir con Lambda Parámetros
 
-            API->>Lambda: Consultar operación a consumir
-            Note right of API: country = Header. SourceBank <br> value.transactionType = Body.transactionType <br> 
+        API->>Lambda: Consultar información de operación a consumir
+        Note right of API: Note right of API: domain = "PAYMENT_EXECUTION_ADMIN" <br> name : OPERATIONS_AUTHORIZE_REVERSE_TRANSACTION <br> country = Header. SourceBank (ISO3)
 
-            Lambda->>API: Retorna operación a consumir
-            Note left of Lambda: value.transactionType.operations
+        Lambda->>API: Retorna información de operación a consumir
+        Note left of Lambda: value.transactionType.operations
 
-            API->>CL: Guarda información de las operaciones en caché local
-            Note right of API: country = Header. SourceBank <br> value.transactionType = Body.transactionType <br> 
-        end
+        API->>CL: Guarda información de las operaciones en caché local
+        Note right of API: value.transactionType.operations
+    end
 
-        API->>API: Construir Request a WT24
-        Note over API: Trasnsactionid = transactionReference
+    API->>API: Evalua información de operación a consumir
 
-        API->>WT24: CALL Operación T24
-        Note right of API: Trasnsactionid
+    alt No existe combinación para transactionType y trxType2 | trxTyp3 y paymethod
 
-        WT24->>API: Response Reversión Trasnacción
-        Note left of WT24: successIndicator
+        API->> Errors: Mapear código de error
+        Errors ->> API: Retorna código mapeado
+        API-->> Consumidor: Retorna error
+        Note left of API: 422: Transacción no válida para reversión
 
-        API->>API: Transformar Response
+    end
 
-        API->>Consumidor: REST Response exitoso
-        Note right of Consumidor: body.data <br> transactionReference <br> transactionType <br> transactionDate
-    end 
+    API->>API: Construir Request a WT24
+    Note over API: Trasnsactionid = transactionReference
+
+    API->>WT24: CALL Operación T24
+    Note right of API: Trasnsactionid
+
+    WT24->>API: Response Reversión Trasnacción
+    Note left of WT24: successIndicator
+
+    API->>API: Transformar Response
+
+    API->>Consumidor: REST Response exitoso
+    Note right of Consumidor: body.data <br> transactionReference <br> transactionType <br> transactionDate
 
     activate API
     alt Exception occurs
