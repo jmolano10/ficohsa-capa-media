@@ -1,18 +1,18 @@
 
 sequenceDiagram
+    autonumber
     participant Consumidor as Consumidore/Aplicación
-    participant API as API Consulta Conversión Puntos <br> Epica 2382: ConsultaPuntosLealtad <br> HU 54368:  POST - XXXXXX
+    participant API as API Consulta Conversión Puntos <br> Epica 2382: ConsultaPuntosLealtad <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-conversion
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
     participant Parameter as Parameter Store
-    participant MDW as BD MiddleWare <br> BIZ: /Middleware/v2/BusinessServices/MDW/canjearPuntosEfectivo/biz/canjearPuntosEfectivo_db.biz <br> SP: PL_P_CANJE_PUNTOS_EFECTIVO
     participant proxyAbanks as Wrapper Proxy Abanks <br> SP: PL_P_CANJE_PUNTOS_EFECTIVO
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
     Note over Consumidor, Errors: Flujos Honduras, Gutaemala, Panamá y Nicaragua (HN01 | GT01 | PN01 | NI01) - ConsultaPuntosMastercard
 
     Consumidor->>API: REST Request
-    Note right of Consumidor: Header, queryParam: binLogoRequestAPI, codigoComercioRequestAPI, <br> grupoComercioRequestAPI, codigoTerminalRequestAPI, <br> tipoCOnersiónRequestAPI, valorEntradaRequestAPI
+    Note right of Consumidor: Header, queryParam: binLogoRequestAPI, merchantReference, <br> merchantCategoryType, terminalReference, <br> conversionType, conversionPointsAmount
 
     API->>API: Validar Request
     Note over API: Valida campos obligatorios según contrato OpenAPI 
@@ -20,7 +20,7 @@ sequenceDiagram
     API->>API: Validación exitosa
 
     API->>API: Validar Servicio Regional
-    Note over API: domain: XXXXX <br> name: CONFIG
+    Note over API: domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: CONFIG
 
     API->>API: Validación Regional Exitosa
     Note over API: Servicio habilitado para HN01 | GT01 | PN01 | NI01
@@ -28,7 +28,7 @@ sequenceDiagram
     alt Consulta parametros en caché local
 
         API->>CL: Consultar parámetros Lambda Parámetros caché local
-        Note right of API: Domain: XXXXXX <br> name: PARAM 
+        Note right of API: Domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: PARAM 
 
         CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
         Note left of CL: ObtenerParametrizacion 2 Parámetros: <br> value.region = {sourceBank} <br> value.param-name = ban-{countryISO3}-XX-canje-puntos-efectivo-param-wsdl-<env>
@@ -37,12 +37,12 @@ sequenceDiagram
         Note right of API: Param Name: ban-{countryISO3}-XX-canje-puntos-efectivo-param-wsdl-<env>
 
         CL->>API: Obtiene parámetros Parameter Store Caché Local
-        Note left of CL: ObtenerParametrizacion 5 o 6 Campos: <br> HN01 : <br> ip, port, connectionType, bd, procedureName <br> GT01 | PA01 | NI01 : <br> connection, connectionType, operationType, catalogueName, procedureName
+        Note left of CL: ObtenerParametrizacion 5 Campos: <br> connection, connectionType, operationType, catalogueName, procedureName
 
     else Consulta  parametros en Lambda Parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
-        Note right of API: Domain: XXXXXX <br> name: PARAM
+        Note right of API: Domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: PARAM
 
         Lambda->>API: Obtiene parámetros Lambda Parámetros
         Note left of Lambda: ObtenerParametrizacion 2 Parámetros: <br> value.region = {sourceBank} <br> value.param-name = ban-{countryISO3}-XX-canje-puntos-efectivo-param-wsdl-<env>
@@ -54,81 +54,43 @@ sequenceDiagram
         Note right of API: Param Name: ban-{countryISO3}-XX-canje-puntos-efectivo-param-wsdl-<env>
 
         Parameter->>API: Obtiene parámetros Parameter Store
-        Note left of Parameter: ObtenerParametrizacion  5 o 6 Campos: <br> HN01 : <br> ip, port, connectionType, bd, procedureName <br> GT01 | PA01 | NI01 : <br> connection, connectionType, operationType, catalogueName, procedureName
+        Note left of Parameter: ObtenerParametrizacion 5 Campos: <br> connection, connectionType, operationType, catalogueName, procedureName
 
         API->>CL: Guarda parámetros Parameter Store en caché local
-        Note right of API: HN01 : <br> ip, port, connectionType, bd, procedureName <br> GT01 | PA01 | NI01 : <br> connection, connectionType, operationType, catalogueName, procedureName
+        Note right of API: connection, connectionType, operationType, catalogueName, procedureName
 
     end
 
     API->>API: Aplica patrón strategy
     Note over API: Selecciona lógica de negocio según header.sourceBank
 
-    alt Flujo HN01
+    API->>API: Construye request Wrapper Proxy Abanks SP: PL_P_CANJE_PUNTOS_EFECTIVO
+    Note over API: PN_LOGO = request.binLogoRequestAPI <br> PV_CODIGOCOMERCIO = request.merchantReference <br> PV_GRUPOCOMERCIO = request.merchantCategoryType <br> PV_CODIGOTERMINAL = request.terminalReference <br> PN_TIPOCONVERSION = request.tipoConversiónRequestAPI <br>  PN_VALORENTRADA = request.conversionPointsAmount
 
-        API->>API: Construye request SP PL_P_CANJE_PUNTOS_EFECTIVO
-        Note over API: PN_NUMERO_BIN = request.binLogoRequestAPI <br> PV_CODIGOCOMERCIO = request.codigoComercioRequestAPI <br> PV_GRUPOCOMERCIO = request.grupoComercioRequestAPI <br> PV_CODIGOTERMINAL = request.codigoTerminalRequestAPI <br> PN_TIPOCONVERSION = request.tipoConversiónRequestAPI <br>  PN_VALORENTRADA = request.valorEntradaRequestAPI
+    API->>proxyAbanks: Consume SP PL_P_CANJE_PUNTOS_EFECTIVO
+    Note right of API: Parámetros Consultados : <br> connection, connectionType, operationType, catalogueName, procedureName <br> Params : <br> PN_LOGO, PV_CODIGOCOMERCIO, PV_GRUPOCOMERCIO, <br> PV_CODIGOTERMINAL, PN_TIPOCONVERSION, PN_VALORENTRADA
+    
+    proxyAbanks->>API: Response SP PL_P_CANJE_PUNTOS_EFECTIVO
+    Note left of proxyAbanks: PN_VALOR_SALIDA, PN_FACTOR_CANJE, PV_CODIGO_ERROR, PV_MENSAJE_ERROR
 
-        API->>MDW: Consume SP PL_P_CANJE_PUNTOS_EFECTIVO
-        Note right of API: Parámetros Consultados : <br> ip, port, connectionType, bd, procedureName <br> Campos : <br> PN_NUMERO_BIN, PV_CODIGOCOMERCIO, PV_GRUPOCOMERCIO, <br> PV_CODIGOTERMINAL, PN_TIPOCONVERSION, PN_VALORENTRADA
-        
-        MDW->>API: Response SP PL_P_CANJE_PUNTOS_EFECTIVO
-        Note left of MDW: PN_VALOR_SALIDA, PN_FACTOR_CANJE, PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+    API->>API: Evalúa response SP PL_P_CANJE_PUNTOS_EFECTIVO
 
-        API->>API: Evalúa response SP PL_P_CANJE_PUNTOS_EFECTIVO
+    alt if PV_MENSAJE_ERROR != "SUCCESS"
 
-        alt if PV_MENSAJE_ERROR != "SUCCESS"
+        API->> Errors: Mapear código de error
 
-            API->> Errors: Mapear código de error
+        Errors ->> API: Retorna código mapeado
 
-            Errors ->> API: Retorna código mapeado
+        API->> Consumidor: REST Response Error
+        Note left of API: HTTP 422: Unprocessable Entity
 
-            API->> Consumidor: REST Response Error
-            Note left of API: HTTP 422: Unprocessable Entity
+    else f PV_MENSAJE_ERROR == "SUCCESS"
 
-        else f PV_MENSAJE_ERROR == "SUCCESS"
+        API->>API: Construye Response API
+        Note over API: pointsConverted = PN_VALOR_SALIDA <br> exchangeFactor = PN_FACTOR_CANJE 
 
-            API->>API: Construye Response API
-            Note over API: valorSalida = PN_VALOR_SALIDA <br> factorCanje = PN_FACTOR_CANJE 
-
-            API->>Consumidor: REST Response Successful
-            Note left of API: HTTP 200: Response Body <br> valorSalida, factorCanje
-
-        end
-
-    end
-
-    alt Flujo GT01 | PN01 | NI01
-
-        API->>API: Construye request Wrapper Proxy Abanks SP: PL_P_CANJE_PUNTOS_EFECTIVO
-        Note over API: PN_LOGO = request.binLogoRequestAPI <br> PV_CODIGOCOMERCIO = request.codigoComercioRequestAPI <br> PV_GRUPOCOMERCIO = request.grupoComercioRequestAPI <br> PV_CODIGOTERMINAL = request.codigoTerminalRequestAPI <br> PN_TIPOCONVERSION = request.tipoConversiónRequestAPI <br>  PN_VALORENTRADA = request.valorEntradaRequestAPI
-
-        API->>MDW: Consume SP PL_P_CANJE_PUNTOS_EFECTIVO
-        Note right of API: Parámetros Consultados : <br> connection, connectionType, operationType, catalogueName, procedureName <br> Campos : <br> PN_LOGO, PV_CODIGOCOMERCIO, PV_GRUPOCOMERCIO, <br> PV_CODIGOTERMINAL, PN_TIPOCONVERSION, PN_VALORENTRADA
-        
-        MDW->>API: Response SP PL_P_CANJE_PUNTOS_EFECTIVO
-        Note left of MDW: PN_VALOR_SALIDA, PN_FACTOR_CANJE, PV_CODIGO_ERROR, PV_MENSAJE_ERROR
-
-        API->>API: Evalúa response SP PL_P_CANJE_PUNTOS_EFECTIVO
-
-        alt if PV_MENSAJE_ERROR != "SUCCESS"
-
-            API->> Errors: Mapear código de error
-
-            Errors ->> API: Retorna código mapeado
-
-            API->> Consumidor: REST Response Error
-            Note left of API: HTTP 422: Unprocessable Entity
-
-        else f PV_MENSAJE_ERROR == "SUCCESS"
-
-            API->>API: Construye Response API
-            Note over API: valorSalida = PN_VALOR_SALIDA <br> factorCanje = PN_FACTOR_CANJE 
-
-            API->>Consumidor: REST Response Successful
-            Note left of API: HTTP 200: Response Body <br> valorSalida, factorCanje
-
-        end
+        API->>Consumidor: REST Response Successful
+        Note left of API: HTTP 200: Response Body <br> pointsConverted, exchangeFactor
 
     end
 

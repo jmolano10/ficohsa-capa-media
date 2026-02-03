@@ -11,19 +11,19 @@
   "value": [
     {
       "region": "HN01",
-      "param-name": "ban-hnd-XX-canje-puntos-efectivo-param-wsdl-<env>"
+      "param-name": "ban-hnd-lc-canje-puntos-efectivo-param-wsdl-<env>"
     },
     {
       "region": "GT01",
-      "param-name": "ban-gtm-XX-canje-puntos-efectivo-param-wsdl-<env>"
+      "param-name": "ban-gtm-lc-canje-puntos-efectivo-param-wsdl-<env>"
     },
     {
       "region": "PA01",
-      "param-name": "ban-pan-XX-canje-puntos-efectivo-param-wsdl-<env>"
+      "param-name": "ban-pan-lc-canje-puntos-efectivo-param-wsdl-<env>"
     },
     {
       "region": "NI01",
-      "param-name": "ban-nic-XX-canje-puntos-efectivo-param-wsdl-<env>"
+      "param-name": "ban-nic-lc-canje-puntos-efectivo-param-wsdl-<env>"
     }
   ],
   "status": "active",
@@ -33,18 +33,18 @@
 ##### AWS Systems Manager Parameter Store
 
 ```json
-"ban-hnd-XX-canje-puntos-efectivo-param-wsdl-<env>"
+"ban-hnd-lc-canje-puntos-efectivo-param-wsdl-<env>"
 {
-  "ip": "172.23.177.185",
-  "port": "1970",
+  "connection": "ConnectionProxyAbanksHN",
   "connectionType": "jdbc",
-  "bd": "mdwdbdev", 
+  "operationType": "update", 
+  "catalogueName": "proxyabankspa",
   "procedureName": "PL_P_CANJE_PUNTOS_EFECTIVO"
 }
 ```
 
 ```json
-"ban-gtm-XX-canje-puntos-efectivo-param-wsdl-<env>"
+"ban-gtm-lc-canje-puntos-efectivo-param-wsdl-<env>"
 {
   "connection": "ConnectionProxyAbanksPA",
   "connectionType": "jdbc",
@@ -55,7 +55,7 @@
 ```
 
 ```json
-"ban-pan-XX-canje-puntos-efectivo-param-wsdl-<env>"
+"ban-pan-lc-canje-puntos-efectivo-param-wsdl-<env>"
 {
   "connection": "ConnectionProxyAbanksPA",
   "connectionType": "jdbc",
@@ -66,7 +66,7 @@
 ```
 
 ```json
-"ban-nic-XX-canje-puntos-efectivo-param-wsdl-<env>"
+"ban-nic-lc-canje-puntos-efectivo-param-wsdl-<env>"
 {
   "connection": "",
   "connectionType": "jdbc",
