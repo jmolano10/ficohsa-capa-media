@@ -1,7 +1,8 @@
 
 sequenceDiagram
+    autonumber
     participant Consumidor as Consumidore/Aplicación
-    participant API as API Consulta Puntos Disponible VISA <br> Epica 2382: ConsultaPuntosLealtad <br> HU 54371:  GET - XXXXXX
+    participant API as API Consulta Puntos Disponible VISA <br> Epica 2382: ConsultaPuntosLealtad <br> HU 54371:  GET - /account-management/reward-points-account-retrieves/v1/retrieve-points
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
     participant Parameter as Parameter Store
@@ -12,15 +13,15 @@ sequenceDiagram
     Note over Consumidor, Errors: Flujos Guatemala, Panamá y Nicaragua (GT01 | PA01 | NI01) - ConsultaPuntosTransaccion Alcance
 
     Consumidor->>API: REST Request
-    Note right of Consumidor: Header, queryParam: org, accountNumber, scheme
+    Note right of Consumidor: Header, queryParam: organizationReference, accountNumber, loyaltyProgramCode
 
     API->>API: Validar Request
-    Note over API: Valida campos obligatorios según contrato OpenAPI <br> noTarjetaCreditoRequestAPI (obligatorio)
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> organizationReference (obligatorio) <br> accountNumber (obligatorio) <br> loyaltyProgramCode (obligatorio)
 
     API->>API: Validación exitosa
 
     API->>API: Validar Servicio Regional
-    Note over API: domain: XXXXX <br> name: CONFIG
+    Note over API: domain: REWARD_POINTS_ACCOUNT_RETRIEVES <br> name: CONFIG
 
     API->>API: Validación Regional Exitosa
     Note over API: Servicio habilitado para GT01 | PA01 | NI01
@@ -28,7 +29,7 @@ sequenceDiagram
     alt Consulta parametros en caché local
 
         API->>CL: Consultar parámetros Lambda Parámetros caché local
-        Note right of API: Domain: XXXXX <br> name: PARAM  
+        Note right of API: Domain: REWARD_POINTS_ACCOUNT_RETRIEVES <br> name: PARAM <br> value.methods: retreive-points  
 
         CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
         Note left of CL: ObtenerParametrizacion 1 Parámetro: <br> value.param-name = ban-xrs-ic-parm-vision-plus-service-wsdl-<env>
@@ -42,7 +43,7 @@ sequenceDiagram
     else Consulta  parametros en Lambda Parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
-        Note right of API: Domain: XXXXX <br> name: PARAM
+        Note right of API: Domain: REWARD_POINTS_ACCOUNT_RETRIEVES <br> name: PARAM <br> value.methods: retreive-points
 
         Lambda->>API: Obtiene parámetros Lambda Parámetros
         Note left of Lambda: ObtenerParametrizacion 1 Parámetro: <br> value.param-name = ban-xrs-ic-parm-vision-plus-service-wsdl-<env> 
@@ -57,7 +58,7 @@ sequenceDiagram
         Note left of Parameter: ObtenerParametrizacion 3 Campos: <br> ip = “htts://172.28.1.146” <br> port: "7802" <br> basePath = VisionPlusService” 
 
         API->>CL: Guarda parámetros Parameter Store en caché local
-        Note right of API: ip, basePath
+        Note right of API: ip, port, basePath
 
     end
 
@@ -76,7 +77,7 @@ sequenceDiagram
     Note over WVPLUS: Response: <br> GPXAIO-OPEN-TO-RED-ON-SCR <br> 72 campos adicionales
 
     API->>API: Construye response API
-    Note over API: Mapeo Campos : <br> availablePoints = GPXAIO-OPEN-TO-RED-ON-SCR <br> 72 campos adicionales según contrato OpenAPI
+    Note over API: Mapeo Campos : <br> availableRewardPointsBalance = GPXAIO-OPEN-TO-RED-ON-SCR <br> 72 campos adicionales según contrato OpenAPI
 
     API->>Consumidor: Response Exitoso
     Note left of API: HTTP 200: Response Body 
