@@ -1,14 +1,15 @@
 
 sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
-    participant API as API Consulta Conversión Puntos <br> Epica 2382: ConsultaPuntosLealtad <br> HU 54368:  POST - XXXXXX
+    participant API as API Consulta Conversión Puntos <br> Epica 2382: ConsultaPuntosLealtad <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-conversion
+    participant SP as SP cashPointsRedemption
     participant BD as AWS Aurora BD 
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
-    Note over Consumidor, Errors: Flujos Honduras, Gutaemala, Panamá y Nicaragua (HN01 | GT01 | PN01 | NI01) - ConsultaPuntosMastercard
+    Note over Consumidor, Errors: Flujos Honduras, Gutaemala, Panamá y Nicaragua (HN01 | GT01 | PA01 | NI01) - ConsultaPuntosMastercard
 
     Consumidor->>API: REST Request
-    Note right of Consumidor: Header, queryParam: binLogoRequestAPI, codigoComercioRequestAPI, <br> grupoComercioRequestAPI, codigoTerminalRequestAPI, <br> tipoCOnersiónRequestAPI, valorEntradaRequestAPI
+    Note right of Consumidor: Body: cardIdentificationNumber, merchantReference, <br> merchantCategoryType, terminalReference, <br> conversionType, conversionPointsAmount
 
     API->>API: Validar Request
     Note over API: Valida campos obligatorios según contrato OpenAPI 
@@ -16,22 +17,31 @@ sequenceDiagram
     API->>API: Validación exitosa
 
     API->>API: Validar Servicio Regional
-    Note over API: domain: XXXXX <br> name: CONFIG
+    Note over API: domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: CONFIG
 
     API->>API: Validación Regional Exitosa
-    Note over API: Servicio habilitado para HN01 | GT01 | PN01 | NI01
+    Note over API: Servicio habilitado para HN01 | GT01 | PA01 | NI01
 
-    API->>BD: Consulta Base de datos
-    Note over API: Consulta tablas : <br> CashPointsRedemption, <br> ComplementaryData <br> Ver Ejemplo SQL
+    API->>API: Aplica patrón strategy
+    Note over API: Selecciona lógica de negocio según país : <br> sourcebank = HN01 consume SP_cashPointsRedemptionHN <br> sourcebank = GT01 consume SP_cashPointsRedemptionGT <br> sourcebank = PA01 consume SP_cashPointsRedemptionPN <br> sourcebank = NI01 consume SP_cashPointsRedemptionNI
+
+    API->>API: Construye Input SP
+    Note over API: Mapeo HN01 : <br> SP_CARDBIN = cardIdentificationNumber + Campos generales <br> Mapeo GT01 | PA01 | NI01 : <br> SP_CARDLOGO = cardIdentificationNumber + Campos generales  <br> Mapeo Campos Generales : <br> SP_MERCHANTREFERENCE = merchantReference <br> SP_MERCHANTCATEGORYTYPE = merchantCategoryType <br> SP_TERMINALREFERENCE = terminalReference <br> SP_CONVERSIONTYPE = conversionType <br> SP_CONVERSIONPOINTSAMOUNT = conversionPointsAmount
+
+    API->>SP: Consume SP cashPointsRedemption
+    Note over API: Envía Input SP según país: <br> HN01 : <br> SP_CARDBIN, SP_MERCHANTREFERENCE, <br> SP_MERCHANTCATEGORYTYPE, SP_TERMINALREFERENCE, <br> SP_CONVERSIONTYPE, SP_CONVERSIONPOINTSAMOUNT <br> GT01 | PA01 | NI01 : <br> SP_CARDLOGO, SP_MERCHANTREFERENCE, <br> SP_MERCHANTCATEGORYTYPE, SP_TERMINALREFERENCE, <br> SP_CONVERSIONTYPE, SP_CONVERSIONPOINTSAMOUNT
+
+    SP->>BD: Consulta tablas en BD
+    Note right of SP: Ver ejemplo AS-IS "SP-canje-puntos.sql"
     
-    BD->>API: Obtiene Valor Efectivo Puntos
-    Note left of BD: cashValue, redemptionFactor
+    SP->>API: Obtiene Valor Efectivo Puntos
+    Note left of SP: SP_POINTS_CONVERTED, SP_REDEMPTION_FACTOR
 
     API->>API: Construye Response API
-    Note over API: valorSalida = PN_VALOR_SALIDA <br> factorCanje = PN_FACTOR_CANJE 
+    Note over API: pointsConverted = SP_POINTS_CONVERTED <br> exchangeFactor = SP_REDEMPTION_FACTOR
 
     API->>Consumidor: REST Response Successful
-    Note left of API: HTTP 200: Response Body <br> valorSalida, factorCanje
+    Note left of API: HTTP 200: Response Body <br> pointsConverted, exchangeFactor
 
     Note over Consumidor, Errors: Flujo Alternativo - Error
     activate API
