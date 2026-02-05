@@ -1,0 +1,135 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Redención de Puntos <br> Epica 7419: RedencionPuntosLealtad <br> HU 7395:  POST - /redeem-loyalty-points/v1/initiate
+    participant customer as API Retrieve Customer <br> HU 6945: GET - /customer-management/customer-profile-retrieves/v1/retrieve-customer
+    participant binDeb as API Consulta BIN Tarjeta Débito <br> HU 54332: POST - /operational-services/issued-dev-admin-debit-card-retrieves/v1/retrieve-loyalty-points
+    participant binCred as API Consulta BIN Tarjeta Crédito <br> HU 54334: GET - /cards/credit-card-data-retrieves/v1/retrieve-loyalty-points
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujos Honduras, Panamá y Nicaragua (HN01 | PN01 | NI01) - ConsultaPuntosMastercard
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Request Body: <br> customerType  <br> customerReference <br> rewardRedemptionType <br> rewardRedemptionAmount <br> creditId <br> merchantReference <br> merchantCategoryType <br> terminalReference <br> rewardRedemptionMethodType <br> accountNumber <br> creditCardNumber <br> loyaltyProgramReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    API->>API: Validar Servicio Regional
+    Note over API: domain: REDEEM_LOYALTY_POINTS <br> name: CONFIG
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | GT01 | PN01 | NI01
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: REDEEM_LOYALTY_POINTS <br> name: PARAM <br> country: HND <br> methods: initiate 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: ObtenerParametrizacion Parámetros: <br> method.key = "debit-retrieve-loyalty-points-attributeName", method.value = "BIN" <br> <br> method.key = "debit-retrieve-loyalty-points-comparisonOperator", method.value = "EQ"
+
+        alt Consulta Parámetros de conexión backend en caché local
+
+            API->>CL: Consultar parámetros Parameter Store caché local
+            Note right of API: XXXXXX
+
+            CL->>API: Obtiene parámetros Parameter Store Caché Local
+            Note left of CL: XXXXXX
+
+        end 
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: XXXXXX
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: XXXXXX
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: XXXXXX
+
+        alt Consulta Parámetros de conexión backend en parameter store
+
+            API->>Parameter: Consultar parámetros Parameter Store
+            Note right of API: XXXXXX
+
+            Parameter->>API: Obtiene parámetros Parameter Store
+            Note left of Parameter: XXXXXX
+
+            API->>CL: Guarda parámetros Parameter Store en caché local
+            Note right of API: XXXXXX
+
+        end 
+
+    end
+
+    API-->API: Aplica patrón strategy
+    Note over API: Selecciona lógica de negocio según header.sourceBank
+
+    alt Flujo Honduras HN01
+
+        API->>API: Valida request.rewardRedemptionType
+        Note over API: Solo permite CASH
+
+        alt If request.rewardRedemptionMethodType != "CASH"
+
+            API->> Errors: Mapear código de error
+            
+            Errors ->> API: Retorna código mapeado
+
+            API->>Consumidor: Response ERROR
+            Note left of API: HTTP 422: Método de redención no permitido
+
+        else rewardRedemptionMethodType = "CASH"
+
+            API->>API: Valida request.customerType y request.customerReference
+
+            alt If request.customerType == "CUSTOMER_ID" o "LEGAL_ID"
+
+                API->>API: Construye request API Producto retrieveCustomer
+                Note over API: customerType = request.customerType <br> customerReferenceValue = request.customer
+
+                API->>customer: Consulta información del cliente
+                Note right of API: customerType, customerReferenceValue
+
+                customer->>API: Retorna información del cliente
+                Note left of customer: customerLegalReference, shortName
+
+            else IF request.customerType == "CARD_NUMBER"
+
+                API->>API: Construye request API Consulta BIN Tarjeta Crédito
+                Note over API: Mapeo : <br> attributeValue = param."debit-retrieve-loyalty-points-attributeName" <br> attributeValue = request.customerReference <br> comparisonOperator = param."debit-retrieve-loyalty-points-comparisonOperator"
+
+                API->>binDeb: Consulta BIN Tarjeta Débito
+                Note right of API: creditCardNumber = request.customerReference
+
+            end
+
+        end
+
+    end
+
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
