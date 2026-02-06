@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ReversaEfectivoTC/wsdl/reversaEfectivoTCPS"/>
+            <con:binding>
+                <con:name>reversaEfectivoTCPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/reversaEfectivoTCPS</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-2561959769657561827--49043a32.16c6329fd4f.-7d5c" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="request" name="ReversaEfectivoTCPA_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/reversaTC" prefix="efe"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaEfectivoTCTypes" prefix="rev"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="pais">
+                        <con2:id>_ActionId-5156477346330020946--3bb5a09d.16c67048977.-7f83</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-2561959769657561827--49043a32.16c6329fd4f.-7d08</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/PWS/reversaTC/biz/reversaTC_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>reversaTC</con1:operation>
+                        <con1:request>
+                            <con1:body>REQreversaTC</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPreversaTC</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQreversaTC">
+                                <con2:id>_ActionId-5156477346330020946--3bb5a09d.16c67048977.-7fd9</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ReversaEfectivoTC/xq/reversaTCIn"/>
+                                        <con2:param name="referenceNumber">
+                                            <con2:path>string($body/rev:reversaEfectivoTC/REFERENCE_NUMBER/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="sourceBank">
+                                            <con2:path>$pais</con2:path>
+                                        </con2:param>
+                                        <con2:param name="destinationBank">
+                                            <con2:path>$pais</con2:path>
+                                        </con2:param>
+                                        <con2:param name="transactionID">
+                                            <con2:path>string($body/rev:reversaEfectivoTC/TRANSACTION_ID/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="cardNumber">
+                                            <con2:path>string($body/rev:reversaEfectivoTC/CREDIT_CARD/text())</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:validate>
+                                <con2:id>_ActionId-5156477346330020946--3bb5a09d.16c67048977.-7cca</con2:id>
+                                <con1:schema ref="Middleware/v2/BusinessServices/PWS/reversaTC/xsd/reversaTC_sp"/>
+                                <con1:schemaElement xmlns:rev="http://xmlns.oracle.com/pcbpel/adapter/db/sp/reversaTC">rev:InputParameters</con1:schemaElement>
+                                <con1:varName>REQreversaTC</con1:varName>
+                            </con1:validate>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-5156477346330020946--3bb5a09d.16c67048977.-7fb1</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPreversaTC/efe:PV_CONTROL_ERROR/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-5156477346330020946--3bb5a09d.16c67048977.-7fa2</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPreversaTC/efe:PV_MENSAJE_ERROR/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ReversaEfectivoTCPA_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaEfectivoTCTypes" prefix="rev"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-5156477346330020946--3bb5a09d.16c67048977.-7e91</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace varName="header" contents-only="true">
+                                    <con2:id>_ActionId-5156477346330020946--3bb5a09d.16c67048977.-7e72</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-5156477346330020946--3bb5a09d.16c67048977.-7e61</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $validationMessage }</messages> 
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                    <con1:replace contents-only="true" varName="body">
+                        <con2:id>_ActionId-5156477346330020946--3bb5a09d.16c67048977.-7eb2</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;rev:reversaEfectivoTCResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-2561959769657561827--49043a32.16c6329fd4f.-7d5c">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversaEfectivoTCTypes" prefix="rev"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-2561959769657561827--49043a32.16c6329fd4f.-7d48</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-2561959769657561827--49043a32.16c6329fd4f.-7d34</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;rev:reversaEfectivoTCResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-2561959769657561827--49043a32.16c6329fd4f.-7d21</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ReversaEfectivoTCPA">
+                <con:request>ReversaEfectivoTCPA_request</con:request>
+                <con:response>ReversaEfectivoTCPA_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

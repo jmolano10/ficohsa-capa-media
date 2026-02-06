@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/CompraPaqueteFacade/wsdl/compraPaqueteFacadePS"/>
+            <con:binding>
+                <con:name>compraPaqueteFacadePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/compraPaqueteFacadePS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-7183058010025711257-7ab3093a.16c85e22fb3.-7e19" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+        <con:pipeline type="error" name="_onErrorHandler-7183058010025711257-7ab3093a.16c85e22fb3.-7e19">
+            <con:stage name="ManejoError">
+                <con:context/>
+                <con:actions>
+                    <con1:assign varName="errorCode">
+                        <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7dee</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="errorMessage">
+                        <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7dd5</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7db7</con2:id>
+                        <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>mapeoErrores</con1:operation>
+                        <con1:request>
+                            <con1:body>reqMapeoErrores</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>respMapeoErrores</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="reqMapeoErrores">
+                                <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7d97</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con2:param name="CODIGO_ERROR">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                        <con2:param name="MENSAJE_ERROR">
+                                            <con2:path>fn:concat("FICBCO0067", "$#$", $errorMessage)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7d7e</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con2:param name="mapeoErroresResponse1">
+                                            <con2:path>$respMapeoErrores</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7d42</con2:id>
+                        <con1:location>
+                            <con2:xpathText>.</con2:xpathText>
+                        </con1:location>
+                        <con1:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/CompraPaqueteFacade/xq/compraPaqueteFacadeOut"/>
+                                <con2:param name="procesaMensajeGenericoSwitchFacadeRequest">
+                                    <con2:path>$OriginalBody</con2:path>
+                                </con2:param>
+                                <con2:param name="successIndicator">
+                                    <con2:path>'ERROR'</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7d5b</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:route-node name="ComprasPaquetesFacade">
+                <con:context>
+                    <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchFacadeTypes" prefix="proc"/>
+                </con:context>
+                <con:actions>
+                    <con3:route>
+                        <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7e3a</con2:id>
+                        <con3:service ref="Middleware/v2/ProxyServices/CompraPaquetes" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation passThrough="true"/>
+                        <con3:outboundTransform>
+                            <con1:assign varName="OriginalBody">
+                                <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7e1b</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>$body/proc:procesaMensajeGenericoSwitchFacadeRequest</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="CONTRACTID">
+                                <con2:id>_ActionId-6343112891802553578-7e0af1a7.16c8c5905d4.-7c9e</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>fn:string($RSPObtenerParam/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$contractIDParam]/osb:VALUE/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id>_ActionId-3421387244598298794--78ade011.16cd8a218ee.-7fe2</con2:id>
+                                <con1:location>
+                                    <con2:xpathText>.</con2:xpathText>
+                                </con1:location>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/CompraPaqueteFacade/xq/compraPaqueteFacadeIn"/>
+                                        <con2:param name="procesaMensajeGenericoSwitchFacadeRequest">
+                                            <con2:path>$body/proc:procesaMensajeGenericoSwitchFacadeRequest</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                        </con3:outboundTransform>
+                        <con3:responseTransform>
+                            <con1:ifThenElse>
+                                <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7d22</con2:id>
+                                <con1:case>
+                                    <con1:condition>
+                                        <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"
+and
+count($header/aut:ResponseHeader/messageId) = 0</con2:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:wsCallout>
+                                            <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7d09</con2:id>
+                                            <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                            <con1:operation>mapeoErrores</con1:operation>
+                                            <con1:request>
+                                                <con1:body>REQMapeoErrores</con1:body>
+                                            </con1:request>
+                                            <con1:response>
+                                                <con1:body>RSPMapeoErrores</con1:body>
+                                            </con1:response>
+                                            <con1:requestTransform>
+                                                <con1:assign varName="REQMapeoErrores">
+                                                    <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7cd9</con2:id>
+                                                    <con1:expr>
+                                                        <con2:xqueryTransform>
+                                                            <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                            <con2:param name="CODIGO_ERROR">
+                                                                <con2:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con2:path>
+                                                            </con2:param>
+                                                            <con2:param name="MENSAJE_ERROR">
+                                                                <con2:path>fn:concat("FICBCO0067","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con2:path>
+                                                            </con2:param>
+                                                        </con2:xqueryTransform>
+                                                    </con1:expr>
+                                                </con1:assign>
+                                            </con1:requestTransform>
+                                            <con1:responseTransform>
+                                                <con1:replace contents-only="true" varName="header">
+                                                    <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7cc0</con2:id>
+                                                    <con1:expr>
+                                                        <con2:xqueryTransform>
+                                                            <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                            <con2:param name="mapeoErroresResponse1">
+                                                                <con2:path>$RSPMapeoErrores</con2:path>
+                                                            </con2:param>
+                                                            <con2:param name="successIndicator">
+                                                                <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                            </con2:param>
+                                                        </con2:xqueryTransform>
+                                                    </con1:expr>
+                                                </con1:replace>
+                                            </con1:responseTransform>
+                                        </con1:wsCallout>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default/>
+                            </con1:ifThenElse>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id>_ActionId-7183058010025711257-7ab3093a.16c85e22fb3.-7ca1</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/CompraPaqueteFacade/xq/compraPaqueteFacadeOut"/>
+                                        <con2:param name="procesaMensajeGenericoSwitchFacadeRequest">
+                                            <con2:path>$OriginalBody</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                        </con3:responseTransform>
+                    </con3:route>
+                </con:actions>
+            </con:route-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

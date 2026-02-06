@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaSituacionFinanciera/wsdl/consultaSituacionFinancieraPS"/>
+            <con:binding>
+                <con:name>consultaSituacionFinancieraPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaSituacionFinancieraPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-2356729504899387261-1c228991.16cf2aa06c6.-7fe4" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSituacionFinancieraTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-2356729504899387261-1c228991.16cf2aa06c6.-7fe5</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/ConsultaSituacionFinanciera/xsd/consultaSituacionFinancieraTypes"/>
+                        <con2:schemaElement xmlns:con="http://www.ficohsa.com.hn/middleware.services/consultaSituacionFinancieraTypes">con:consultaSituacionFinanciera</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./con:consultaSituacionFinanciera</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="MapeoError">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-6820459430279537499--6766677e.16cf76c7f1b.-7f9a</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-6820459430279537499--6766677e.16cf76c7f1b.-7f74</con1:id>
+                                    <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>mapeoErrores</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQMapeoErrores</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPMapeoErrores</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQMapeoErrores">
+                                            <con1:id>_ActionId-6820459430279537499--6766677e.16cf76c7f1b.-7f4c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con1:param name="CODIGO_ERROR">
+                                                        <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MENSAJE_ERROR">
+                                                        <con1:path>fn:concat("FICBCO0357","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-6820459430279537499--6766677e.16cf76c7f1b.-7f30</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con1:param name="mapeoErroresResponse1">
+                                                        <con1:path>$RSPMapeoErrores</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="successIndicator">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-2356729504899387261-1c228991.16cf2aa06c6.-7fe4">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSituacionFinancieraTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="errorCode">
+                        <con1:id>_ActionId-2356729504899387261-1c228991.16cf2aa06c6.-7fd8</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessage">
+                        <con1:id>_ActionId-2356729504899387261-1c228991.16cf2aa06c6.-7fbf</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-2356729504899387261-1c228991.16cf2aa06c6.-7fab</con1:id>
+                        <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>mapeoErrores</con2:operation>
+                        <con2:request>
+                            <con2:body>reqMapeoErrores</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respMapeoErrores</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqMapeoErrores">
+                                <con1:id>_ActionId-2356729504899387261-1c228991.16cf2aa06c6.-7f93</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con1:param name="CODIGO_ERROR">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MENSAJE_ERROR">
+                                            <con1:path>fn:concat("FICBCO0357", "$#$", $errorMessage)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-2356729504899387261-1c228991.16cf2aa06c6.-7f80</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con1:param name="mapeoErroresResponse1">
+                                            <con1:path>$respMapeoErrores</con1:path>
+                                        </con1:param>
+                                        <con1:param name="successIndicator">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-2356729504899387261-1c228991.16cf2aa06c6.-7f6b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;con:consultaSituacionFinancieraResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-2356729504899387261-1c228991.16cf2aa06c6.-7f4f</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="ConsultaSituacionFinancieraDefault_Request_request">
+            <con:stage name="FlujoEntrada">
+                <con:context/>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaSituacionFinancieraDefault_Request_response">
+            <con:stage name="FlujoSalida">
+                <con:context/>
+                <con:actions>
+                    <con2:Error>
+                        <con1:id>_ActionId-6820459430279537499--6766677e.16cf76c7f1b.-7fc3</con1:id>
+                        <con2:errCode>MW-0008</con2:errCode>
+                        <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                    </con2:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="ConsultaSituacionFinancieraRegion_Request_request">
+            <con:stage name="GenerarUUID">
+                <con:context/>
+                <con:actions>
+                    <con2:assign varName="uuid">
+                        <con1:id>_ActionId-6820459430279537499--6766677e.16cf76c7f1b.-7e31</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaSituacionFinanciera_Request">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSituacionFinancieraTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-6820459430279537499--6766677e.16cf76c7f1b.-7d43</con1:id>
+                        <con2:service ref="Middleware/v2/BusinessServices/SJS/consultaSituacionFinanciera/flow/sjConsultaSituacionFinanciera" xsi:type="con4:FlowRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con4="http://www.bea.com/alsb/flow/resources/config"/>
+                        <con2:operation>ConsultaSituacionFinanciera</con2:operation>
+                        <con2:request>
+                            <con2:body>REQConsultaSituacionFinanciera</con2:body>
+                            <con2:header>REQHConsultaSituacionFinanciera</con2:header>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPConsultaSituacionFinanciera</con2:body>
+                            <con2:header>RSPHConsultaSituacionFinanciera</con2:header>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQHConsultaSituacionFinanciera">
+                                <con1:id>_ActionId-6820459430279537499--6766677e.16cf76c7f1b.-7d08</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>$header</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="REQConsultaSituacionFinanciera">
+                                <con1:id>_ActionId-6820459430279537499--6766677e.16cf76c7f1b.-7d41</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ConsultaSituacionFinanciera/xq/consultaSituacionFinancieraIn"/>
+                                        <con1:param name="uuid">
+                                            <con1:path>$uuid</con1:path>
+                                        </con1:param>
+                                        <con1:param name="consultaSituacionFinanciera">
+                                            <con1:path>$body/con:consultaSituacionFinanciera</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="Obtener_Situacion_Financiera">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/obtenerSituacionFinanciera" prefix="obt"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-6029556211657070118-659af1cd.16cfdbd0b96.-7ff0</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/INTFC/obtenerSituacionFinanciera/biz/obtenerSituacionFinanciera_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerSituacionFinanciera</con2:operation>
+                        <con2:request>
+                            <con2:body>REQObtenerSituacionFinanciera</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPObtenerSituacionFinanciera</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQObtenerSituacionFinanciera">
+                                <con1:id>_ActionId-6029556211657070118-659af1cd.16cfdbd0b96.-7ff1</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ConsultaSituacionFinanciera/xq/obtenerSituacionFinancieraIn"/>
+                                        <con1:param name="uuid">
+                                            <con1:path>$uuid</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-3682877481300750621-751d9280.16d18074f95.-7fef</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPObtenerSituacionFinanciera/obt:PV_SUCCESS_INDICADOR/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaSituacionFinancieraRegion_Request_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/obtenerSituacionFinanciera" prefix="obt"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSituacionFinancieraTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-10687106711533685--6ea7547b.16cfe09e7c4.-7fbc</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if (upper-case($validationMessage) = 'SUCCESS')then(
+			<successIndicator>Success</successIndicator>
+		)else(
+			<successIndicator>{upper-case($validationMessage)}</successIndicator>,
+			<messages>{fn:string($RSPObtenerSituacionFinanciera/obt:PV_MENSAJE_ERROR/text())}</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-10687106711533685--6ea7547b.16cfe09e7c4.-7fc2</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>upper-case(string($header/aut:ResponseHeader/successIndicator/text()))='SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace contents-only="true" varName="body">
+                                    <con1:id>_ActionId-10687106711533685--6ea7547b.16cfe09e7c4.-7fbe</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaSituacionFinanciera/xq/consultaSituacionFinancieraOut"/>
+                                            <con1:param name="outputParameter">
+                                                <con1:path>$RSPObtenerSituacionFinanciera</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-10687106711533685--6ea7547b.16cfe09e7c4.-7fa3</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con:consultaSituacionFinancieraResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSituacionFinancieraTypes" prefix="con"/>
+                </con:context>
+                <con:branch-table variable="body">
+                    <con:xpath>
+                        <con1:xpathText>./con:consultaSituacionFinanciera/CUSTOMERS/CUSTOMER/REGION</con1:xpathText>
+                    </con:xpath>
+                    <con:branch name="RegionBanco">
+                        <con:operator>equals</con:operator>
+                        <con:value>('HN01','PA01','NI01','GT01')</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="ConsultaSituacionFinancieraRegion_Request">
+                                <con:request>ConsultaSituacionFinancieraRegion_Request_request</con:request>
+                                <con:response>ConsultaSituacionFinancieraRegion_Request_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="ConsultaSituacionFinancieraDefault_Request">
+                                <con:request>ConsultaSituacionFinancieraDefault_Request_request</con:request>
+                                <con:response>ConsultaSituacionFinancieraDefault_Request_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

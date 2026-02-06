@@ -1,0 +1,938 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ProcesaFinanciamientoTC/wsdl/ProcesaFinanciamientoTCPS"/>
+            <con:binding>
+                <con:name>ProcesaFinanciamientoTCPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/ProcesaFinanciamientoTCPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-1531557364826186697-1946b331.15f0303c366.-7b25" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes" prefix="fin"/>
+                </con:context>
+                <con:actions>
+                    <con1:validate>
+                        <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f82</con2:id>
+                        <con1:schema ref="Middleware/v2/Resources/FinanciamientoTC/xsd/financiamientoTCTypes"/>
+                        <con1:schemaElement xmlns:trib="http://www.ficohsa.com.hn/middleware.services/tributosTypes" xmlns:fin="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes">fin:procesaFinanciamiento</con1:schemaElement>
+                        <con1:varName>body</con1:varName>
+                        <con1:location>
+                            <con2:xpathText>./fin:procesaFinanciamiento</con2:xpathText>
+                        </con1:location>
+                    </con1:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegional" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f7b</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>ValidaServicioRegional</con1:operation>
+                        <con1:request>
+                            <con1:body>REQValidaServicioRegional</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPValidaServicioRegional</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQValidaServicioRegional">
+                                <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f81</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con2:param name="serviceId">
+                                            <con2:path>"FICBCO0228"</con2:path>
+                                        </con2:param>
+                                        <con2:param name="requestHeader1">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:ifThenElse>
+                                <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f80</con2:id>
+                                <con1:case>
+                                    <con1:condition>
+                                        <con2:xqueryText>fn:string($RSPValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con2:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:replace varName="header" contents-only="true">
+                                            <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f7f</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($RSPValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:replace varName="body" contents-only="true">
+                                            <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f7e</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>&lt;trib:consultarNroContratoResponse/></con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con2:reply>
+                                            <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f7d</con2:id>
+                                        </con2:reply>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:replace varName="header" contents-only="true">
+                                        <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f7c</con2:id>
+                                        <con1:expr>
+                                            <con2:xqueryTransform>
+                                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con2:param name="requestHeader">
+                                                    <con2:path>$header/aut:RequestHeader</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con1:expr>
+                                    </con1:replace>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="MapeoError" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f7a</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f77</con2:id>
+                                    <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>mapeoErrores</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQMapeoErrores</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPMapeoErrores</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQMapeoErrores">
+                                            <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f79</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con2:param name="MENSAJE_ERROR">
+                                                        <con2:path>fn:concat("FICBCO0228","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="CODIGO_ERROR">
+                                                        <con2:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:replace varName="header" contents-only="true">
+                                            <con2:id>_ActionId-3952460044406205619--777235d2.15eee4763cb.-7f78</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con2:param name="mapeoErroresResponse1">
+                                                        <con2:path>$RSPMapeoErrores</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="successIndicator">
+                                                        <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="HNBanco_ProcesaFinanciamientoTC_request">
+            <con:stage name="ParametrizacionMiddleware">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes" prefix="fin"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="user" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-7297430927402916104-3b708b0b.1602772d7b3.-54df</con5:id>
+                        <con2:expr>
+                            <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:upper-case(fn:string($header/aut:RequestHeader/Authentication/UserName/text()))</con5:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con1:assign varName="Currency">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7e2d</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirMonedaISO"/>
+                                <con2:param name="tipoConversion">
+                                    <con2:path>"alphaToNumeric"</con2:path>
+                                </con2:param>
+                                <con2:param name="codMonedaInicial">
+                                    <con2:path>fn:string($body/fin:procesaFinanciamiento/CURRENCY/text())</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT22">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7eed</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:concat('MDWT004.', $user , '.TXN1001BIT22')</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT25">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7ee4</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'MDWT004.TXN1001BIT25'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT32">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7ee6</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'MDWT004.TXN1001BIT32'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT41">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7ee8</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:concat('MDWT004.', $user , '.TXN1001BIT41')</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT42">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7eea</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:concat('MDWT004.', $user , '.TXN1001BIT42')</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT43">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7edf</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:concat('MDWT004.', $user , '.TXN1001BIT43')</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT60">
+                        <con2:id>_ActionId-3437510619932831460--649800aa.161d252965b.-7a97</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'MDWT004.TXN1001BIT60'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT61">
+                        <con2:id>_ActionId-3437510619932831460--649800aa.161d252965b.-7a5e</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'MDWT004.TXN1001BIT61'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT62">
+                        <con2:id>_ActionId-3437510619932831460--649800aa.161d252965b.-7a41</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'MDWT004.TXN1001BIT62'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT100">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7edc</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:concat('MDWT004.', $user , '.TXN1001BIT100')</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="BIT120">
+                        <con2:id>_ActionId-3437510619932831460--649800aa.161d252965b.-7a24</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'MDWT004.TXN1001BIT120'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="SECURITY_CODE">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7ed5</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:concat('MDWT004.', $user , '.TXN1001REQUIRESCVV')</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="TYPE">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7ed7</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'T24T057.CCDISBURSE.TXNTYPE'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="DEBITACCT">
+                        <con2:id>_ActionId-2792314707829332860-6d1db340.161f732e0dd.-7f71</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:concat('T24T057.CCDISBURSE.DEBITACCT.',
+	string($body/fin:procesaFinanciamiento/CREDIT_LINE/text()),
+	'.',
+	string($body/fin:procesaFinanciamiento/CURRENCY/text())
+)</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="isoHeader">
+                        <con2:id>_ActionId-3437510619932831460--649800aa.161d252965b.-7f6e</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'ISO8583.HEADER'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con2:assign varName="validationMessage" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-7297430927402916104-3b708b0b.1602772d7b3.-5386</con5:id>
+                        <con2:expr>
+                            <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">''</con5:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con1:assign varName="fecha">
+                        <con2:id>_ActionId-8346983296100512811-63ea6a54.162f344a62a.-7e86</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>(adjust-dateTime-to-timezone(fn:current-dateTime(), ()))</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7f5d</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>obtenerParametrizacion</con1:operation>
+                        <con1:request>
+                            <con1:body>REQObtenerParametrizacion</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPObtenerParametrizacion</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQObtenerParametrizacion">
+                                <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7ab2</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con2:param name="nombreParametros">
+                                            <con2:path>fn:concat (
+$BIT22,'||',
+$BIT25,'||',
+$BIT32,'||',
+$BIT41,'||',
+$BIT42,'||',
+$BIT43,'||',
+$BIT60,'||',
+$BIT61,'||',
+$BIT62,'||',
+$BIT100,'||',
+$BIT120,'||',
+$SECURITY_CODE,'||',
+$TYPE,'||',
+$DEBITACCT,'||',
+$isoHeader)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7d4d</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>fn:string($RSPObtenerParametrizacion/osb:ERROR_MESSAGE/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con2:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                                <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-7297430927402916104-3b708b0b.1602772d7b3.-5433</con5:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">$validationMessage = '' and 
+string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $securityCode]/osb:VALUE/text()) ='YES' and 
+string($body/fin:procesaFinanciamiento/SECURITY_CODE/text()) = ''</con5:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:Error>
+                                            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-7297430927402916104-3b708b0b.1602772d7b3.-5432</con5:id>
+                                            <con2:errCode>FIELDS REQUIRED</con2:errCode>
+                                            <con2:message>SECURITY_CODE FIELD IS REQUIRED</con2:message>
+                                        </con2:Error>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="IngresaDatosRelacionDesembolso">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/obtenerSecuencia" prefix="obt"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes" prefix="fin"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ingresaRelDesembolso" prefix="ing"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-8346983296100512811-63ea6a54.162f344a62a.-7de0</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-8346983296100512811-63ea6a54.162f344a62a.-7bc9</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/INTFC/ingresaRelDesembolso/biz/ingresaRelDesembolso_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>ingresaRelDesembolso</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQingresaRelDesembolso</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPingresaRelDesembolso</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQingresaRelDesembolso">
+                                            <con2:id>_ActionId-8346983296100512811-63ea6a54.162f344a62a.-7aee</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/ProcesaFinanciamientoTC/xq/ingresaRelDesembolsoIn"/>
+                                                    <con2:param name="secuencia">
+                                                        <con2:path>substring($body/fin:procesaFinanciamiento/INTERFACE_REFERENCE_NO/text(), 7)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="procesaFinanciamiento">
+                                                        <con2:path>$body/fin:procesaFinanciamiento</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="requestHeader">
+                                                        <con2:path>$header/aut:RequestHeader</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="fecha">
+                                                        <con2:path>$fecha</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id>_ActionId-8346983296100512811-63ea6a54.162f344a62a.-7a85</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPingresaRelDesembolso/ing:PV_DESCRIPCIONMENSAJE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="EnviarTransferencia">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes" prefix="fin"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7f93</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:ifThenElse>
+                                    <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7f8f</con2:id>
+                                    <con1:case>
+                                        <con1:condition>
+                                            <con2:xqueryText>fn:string($body/fin:procesaFinanciamiento/PROCESSING_TYPE/text()) = "IMMEDIATE" 
+and  
+fn:string($body/fin:procesaFinanciamiento/DISBURSEMENT_INFO/TYPE/text()) = "ACCOUNT_CREDIT"</con2:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:wsCallout>
+                                                <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7f8d</con2:id>
+                                                <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/Transferencias/Resources/transferenciasBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con1:operation>Transfmodelbankentrecuentas</con1:operation>
+                                                <con1:request>
+                                                    <con1:body>REQTransfmodelbankentrecuentas</con1:body>
+                                                </con1:request>
+                                                <con1:response>
+                                                    <con1:body>RSPTransfmodelbankentrecuentas</con1:body>
+                                                </con1:response>
+                                                <con1:requestTransform>
+                                                    <con1:assign varName="REQTransfmodelbankentrecuentas">
+                                                        <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7f8e</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryTransform>
+                                                                <con2:resource ref="Middleware/v2/Resources/ProcesaFinanciamientoTC/xq/transfmodelbankentrecuentasIn"/>
+                                                                <con2:param name="DEBITACCT">
+                                                                    <con2:path>fn:string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $DEBITACCT]/osb:VALUE/text())</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="procesaFinanciamiento">
+                                                                    <con2:path>$body/fin:procesaFinanciamiento</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="requestHeader">
+                                                                    <con2:path>$header/aut:RequestHeader</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="transactionType">
+                                                                    <con2:path>fn:string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $TYPE]/osb:VALUE/text())</con2:path>
+                                                                </con2:param>
+                                                            </con2:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con1:requestTransform>
+                                                <con1:responseTransform>
+                                                    <con1:assign varName="transactionID">
+                                                        <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7df5</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>fn:string($RSPTransfmodelbankentrecuentas/Status/transactionId/text())</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="validationMessage">
+                                                        <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7d30</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>fn:string-join($RSPTransfmodelbankentrecuentas/Status/messages, ". ")</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con1:responseTransform>
+                                            </con1:wsCallout>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:default/>
+                                </con1:ifThenElse>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ProcesaFinanciamientoTC">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/obtenerSecuencia" prefix="obt"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes" prefix="fin"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-7297430927402916104-3b708b0b.1602772d7b3.-55e3</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-8031816705291431218-f727b2f.1619f70444e.-7e55</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VASA/extrafinanciamiento/biz/extrafinanciamiento" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>FinanciamientoTC</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQFinanciamientoTC</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPFinanciamientoTC</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con5:assign varName="REQFinanciamientoTC" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                                            <con2:id>_ActionId-394700559989434900-655303ac.161c318a2e4.-7ff8</con2:id>
+                                            <con5:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/ProcesaFinanciamientoTC/xq/wsFinanciamientoTCIn"/>
+                                                    <con2:param name="BIT25">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT25]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="fecha">
+                                                        <con2:path>$fecha</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="isoHeader">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $isoHeader]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT60">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT60]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="procesaFinanciamiento">
+                                                        <con2:path>$body/fin:procesaFinanciamiento</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT32">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT32]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT43">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT43]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT100">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT100]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT22">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT22]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="currency">
+                                                        <con2:path>$Currency</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT61">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT61]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT62">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT62]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT41">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT41]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT120">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT120]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="BIT42">
+                                                        <con2:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $BIT42]/osb:VALUE/text())</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con5:expr>
+                                        </con5:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id>_ActionId-394700559989434900-655303ac.161c318a2e4.-7f89</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPFinanciamientoTC/RESULT_MESSAGE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ActualizaDatosRelacionDesembolso">
+                <con:context xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes" prefix="fin"/>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/actualizaRelDesembolso" prefix="act"/>
+                </con:context>
+                <con:actions xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-8346983296100512811-63ea6a54.162f344a62a.-7c5d</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con5:route xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con2:id>_ActionId-8994037513588442875-229ec4c4.162f8000e7c.-7f92</con2:id>
+                                    <con5:service ref="Middleware/v2/BusinessServices/INTFC/actualizaRelDesembolso/biz/actualizaRelDesembolso_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con5:operation>actualizaRelDesembolso</con5:operation>
+                                    <con5:outboundTransform>
+                                        <con1:replace contents-only="true" varName="body">
+                                            <con2:id>_ActionId-8994037513588442875-229ec4c4.162f8000e7c.-7f20</con2:id>
+                                            <con1:location>
+                                                <con2:xpathText>.</con2:xpathText>
+                                            </con1:location>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/ProcesaFinanciamientoTC/xq/actualizaRelDesembolsoIn"/>
+                                                    <con2:param name="Usuario">
+                                                        <con2:path>string($header/aut:RequestHeader/Authentication/UserName/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="SecuenciaCanal">
+                                                        <con2:path>string($body/fin:procesaFinanciamiento/INTERFACE_REFERENCE_NO/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="SecuenciaConfirmacion">
+                                                        <con2:path>string($RSPFinanciamientoTC/ISO8583_RESPONSE/AuthorizationIdentificationResponse_038/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="TipoProceso">
+                                                        <con2:path>string($body/fin:procesaFinanciamiento/PROCESSING_TYPE/text())</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con5:outboundTransform>
+                                </con5:route>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConfirmarTransferencia">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes" prefix="fin"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-764a</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = ''
+and
+string($RSPFinanciamientoTC/ISO8583_RESPONSE/ResponseCode_039/text()) = '00'
+and
+fn:string($body/fin:procesaFinanciamiento/PROCESSING_TYPE/text()) = "IMMEDIATE" 
+and  
+fn:string($body/fin:procesaFinanciamiento/DISBURSEMENT_INFO/TYPE/text()) = "ACCOUNT_CREDIT"
+and
+$transactionID != ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7648</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>AutorizacionreversionFT</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQAutorizacionreversionFT</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPAutorizacionreversionFT</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQAutorizacionreversionFT">
+                                            <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7e12</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/FinanciamientoTC/xq/autorizarTransfEntreCuentasIn"/>
+                                                    <con2:param name="USER">
+                                                        <con2:path>'SRV-ITAUTH'</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="TRANSACTION_ID">
+                                                        <con2:path>$transactionID</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7cc0</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>fn:string-join($RSPAutorizacionreversionFT/Status/messages, '. ')</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="HNBanco_ProcesaFinanciamientoTC_response">
+            <con:stage name="RespuestaDelServicio">
+                <con:context xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes" prefix="fin"/>
+                </con:context>
+                <con:actions xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7da9</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = '' and string($RSPFinanciamientoTC/ISO8583_RESPONSE/ResponseCode_039/text()) = '00'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="header">
+                                    <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7da8</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if($transactionID != '') then(
+			<transactionId>{ $transactionID }</transactionId>
+		) else()
+	}
+	<successIndicator>Success</successIndicator>
+	<valueDate>{ fn-bea:date-to-string-with-format("yyyyMMdd", current-date())}</valueDate>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7da7</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/ProcesaFinanciamientoTC/xq/procesaFinanciamientoTCOut"/>
+                                            <con2:param name="procesaFinanciamiento">
+                                                <con2:path>$body/fin:procesaFinanciamiento</con2:path>
+                                            </con2:param>
+                                            <con2:param name="bit48">
+                                                <con2:path>string($RSPFinanciamientoTC/ISO8583_RESPONSE/AdditionalDataPrivate_048/text())</con2:path>
+                                            </con2:param>
+                                            <con2:param name="confirmation_id">
+                                                <con2:path>string($RSPFinanciamientoTC/ISO8583_RESPONSE/AuthorizationIdentificationResponse_038/text())</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="header">
+                                <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7da6</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>
+	{
+		let $codError := string($RSPFinanciamientoTC/ISO8583_RESPONSE/ResponseCode_039/text())
+		return
+			if($codError != '') then (
+				concat('SWITCH-', $codError)
+			) else (
+				'ERROR'
+			)
+	}
+	</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7da5</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>&lt;fin:procesaFinanciamientoResponse/></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-1531557364826186697-1946b331.15f0303c366.-7b25">
+            <con:stage name="ManejoError">
+                <con:context xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/financiamientoTCTypes" prefix="fin"/>
+                </con:context>
+                <con:actions xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con1:assign varName="errorCode">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7688</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="errorMessage">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7687</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7684</con2:id>
+                        <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>mapeoErrores</con1:operation>
+                        <con1:request>
+                            <con1:body>reqMapeoErrores</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>respMapeoErrores</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="reqMapeoErrores">
+                                <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7686</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con2:param name="MENSAJE_ERROR">
+                                            <con2:path>fn:concat("FICBCO0236", "$#$",  $errorMessage)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="CODIGO_ERROR">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7685</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con2:param name="mapeoErroresResponse1">
+                                            <con2:path>$respMapeoErrores</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7683</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;fin:procesaFinanciamientoResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-1531557364826186697-1946b331.15f0303c366.-7682</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="Default_ProcesaFinanciamientoTC_request">
+            <con:stage name="FlujoEntrada" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con:context/>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="Default_ProcesaFinanciamientoTC_response">
+            <con:stage name="FlujoSalida" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:Error>
+                        <con2:id>_ActionId-6864156992330393261--439e76d0.15f0b9e4023.-7d6b</con2:id>
+                        <con1:errCode>MW-0008</con1:errCode>
+                        <con1:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con1:message>
+                    </con1:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                    <con:xpath>
+                        <con2:xpathText>./aut:RequestHeader/Region/SourceBank</con2:xpathText>
+                    </con:xpath>
+                    <con:branch name="HN01">
+                        <con:operator>equals</con:operator>
+                        <con:value>"HN01"</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="HNBanco_ProcesaFinanciamientoTC">
+                                <con:request>HNBanco_ProcesaFinanciamientoTC_request</con:request>
+                                <con:response>HNBanco_ProcesaFinanciamientoTC_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_ProcesaFinanciamientoTC">
+                                <con:request>Default_ProcesaFinanciamientoTC_request</con:request>
+                                <con:response>Default_ProcesaFinanciamientoTC_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

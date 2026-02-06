@@ -1,0 +1,135 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Proxy as PagosMasivos.proxy
+    participant Internal as PagosMasivosInterno.proxy
+    participant ValidaRegion as ValidaServicioRegional_db
+    participant BitacoraDB as registraBitacoraPagosMasivos_db
+    participant ValidaAcceso as validaAccesoPMS_db
+    participant SJS as sjPagosMasivosInterno
+    participant MapeoErr as MapeoErrores.proxy
+
+    Note over Client, MapeoErr: Flujo Honduras (HN01) - PagosMasivos
+
+    Client->>Proxy: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Authentication: UserName/Password<br/>Body: pagosMasivos
+
+    Proxy->>Proxy: Validar Autenticación Custom Token
+    Note right of Proxy: Extrae UserName y Password del header<br/>Valida credenciales
+
+    alt Autenticación Fallida
+        Proxy->>Client: SOAP Fault (401 Unauthorized)
+    end
+
+    Proxy->>Proxy: Enrutamiento por Operación
+    Note right of Proxy: Branch: operation = 'pagosMasivos'<br/>Route to: PagosMasivosInterno
+
+    Proxy->>Internal: Forward Request
+    Note right of Proxy: Transport header 'host' = client IP
+
+    Internal->>Internal: Validación XSD
+    Note right of Internal: Schema: pagosMasivosTypes.xsd<br/>Element: pag:pagosMasivos<br/>Valida estructura y campos obligatorios
+
+    alt Validación XSD Fallida
+        Internal->>MapeoErr: Mapear Error
+        MapeoErr-->>Internal: Error Mapeado
+        Internal->>Client: SOAP Response con Error
+    end
+
+    Internal->>ValidaRegion: ValidaServicioRegional
+    Note right of Internal: PV_SERVICE_ID: FICBCO0231<br/>PV_SOURCE_BANK: HN01
+
+    ValidaRegion-->>Internal: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+
+    alt Región No Válida
+        Internal->>Internal: Construir Response Error
+        Note right of Internal: successIndicator: ERROR<br/>messages: PV_MENSAJE_ERROR
+        Internal->>Client: SOAP Response con Error
+    end
+
+    Internal->>Internal: Aplicar Valores Por Defecto Región
+    Note right of Internal: XQuery: aplicarValoresPorDefectoRegion<br/>Actualiza header con valores HN01
+
+    Internal->>Internal: Generar UUID Bitácora Request
+    Note right of Internal: XQuery: obtenerUUID<br/>Variable: uuidBitacoraRequest
+
+    Internal->>Internal: Guardar Request Original
+    Note right of Internal: Variables:<br/>originalRequestHeader<br/>originalRequestBody
+
+    Internal->>BitacoraDB: registraBitacoraPagosMasivos (REQ)
+    Note right of Internal: PV_ID: uuidBitacoraRequest<br/>PV_RECORD_TYPE: REQ<br/>PV_OPERATION: PagosMasivos<br/>PV_CUSTOMER_ID: del body<br/>PV_USERNAME: del body<br/>PV_AUTH_USERNAME: del header<br/>PV_REQUEST_HOST: header HTTP 'host'<br/>PV_SOAP_CONTENT: body completo<br/>PV_GLOBAL_ID: del body
+
+    BitacoraDB-->>Internal: Registro Insertado
+
+    Internal->>ValidaAcceso: validaAccesoPMS
+    Note right of Internal: PV_CUSTOMER_ID: del body<br/>PV_USER_NAME: del header Authentication
+
+    ValidaAcceso-->>Internal: PV_ERROR_MESSAGE
+
+    alt Cliente Sin Acceso
+        Internal->>Internal: Construir Response Error
+        Note right of Internal: successIndicator: Error<br/>messages: PV_ERROR_MESSAGE<br/>body: pagosMasivosResponse vacío
+        Internal->>Internal: Registrar en Bitácora (RSP)
+        Internal->>Client: SOAP Response con Error
+    end
+
+    Internal->>Internal: Transformar Request para SJS
+    Note right of Internal: XQuery: sjPagosMasivosInternoIn.xq<br/>Mapea pagosMasivos → estructura Java<br/>Incluye requestHeader
+
+    Internal->>SJS: PagosMasivosInterno
+    Note right of Internal: Servicio Java local<br/>Operación: PagosMasivosInterno
+
+    Note over SJS: Procesamiento Interno Java
+    Note right of SJS: - Valida estructura de lote<br/>- Consulta saldo de cuentas<br/>- Consulta detalle de cuentas<br/>- Procesa lote de pagos<br/>- Genera respuesta batch
+
+    SJS-->>Internal: Response Java
+
+    Internal->>Internal: Transformar Response de SJS
+    Note right of Internal: XQuery: pagosMasivosInternoOut.xq<br/>Mapea response Java → pagosMasivosResponse
+
+    Internal->>Internal: Construir Response Header
+    Note right of Internal: successIndicator: Success<br/>messages: (vacío si ok)
+
+    Internal->>Internal: Generar UUID Bitácora Response
+    Note right of Internal: XQuery: obtenerUUID<br/>Variable: uuidBitacoraResponse
+
+    Internal->>BitacoraDB: registraBitacoraPagosMasivos (RSP)
+    Note right of Internal: PV_ID: uuidBitacoraResponse<br/>PV_REQUEST_ID: uuidBitacoraRequest<br/>PV_RECORD_TYPE: RSP<br/>PV_RESPONSE_CODE: successIndicator<br/>PV_RESPONSE_MESSAGE: messages (max 4000 chars)<br/>PV_SOAP_CONTENT: pagosMasivosResponse
+
+    BitacoraDB-->>Internal: Registro Insertado
+
+    Internal->>Internal: Mapeo de Errores (si aplica)
+    Note right of Internal: if successIndicator != SUCCESS<br/>Invocar MapeoErrores con FICBCO0231
+
+    alt Error en Response
+        Internal->>MapeoErr: mapeoErrores
+        Note right of Internal: CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0231$#$messages
+        MapeoErr-->>Internal: Error Mapeado
+        Internal->>Internal: Actualizar Header con Error Mapeado
+    end
+
+    Internal->>Proxy: Response
+    Proxy->>Client: SOAP Response
+    Note right of Proxy: Header: ResponseHeader<br/>Body: pagosMasivosResponse
+
+    Note over Client, MapeoErr: Flujo de Error
+
+    alt Error en Cualquier Punto
+        Internal->>Internal: Error Handler Activado
+        Note right of Internal: Captura errorCode y errorMessage<br/>del fault context
+
+        Internal->>MapeoErr: mapeoErrores
+        Note right of Internal: CODIGO_ERROR: errorCode<br/>MENSAJE_ERROR: FICBCO0231$#$errorMessage
+        MapeoErr-->>Internal: Error Mapeado
+
+        Internal->>Internal: Construir Response Error
+        Note right of Internal: Header: successIndicator=ERROR<br/>Body: pagosMasivosResponse vacío
+
+        alt UUID Bitácora Existe
+            Internal->>Internal: Generar UUID Bitácora Error
+            Internal->>BitacoraDB: registraBitacoraPagosMasivos (RSP)
+            Note right of Internal: PV_ID: uuidBitacoraError<br/>PV_REQUEST_ID: uuidBitacoraRequest<br/>PV_RECORD_TYPE: RSP<br/>PV_RESPONSE_CODE: ERROR<br/>PV_RESPONSE_MESSAGE: error message
+            BitacoraDB-->>Internal: Registro Insertado
+        end
+
+        Internal->>Client: SOAP Response con Error
+    end

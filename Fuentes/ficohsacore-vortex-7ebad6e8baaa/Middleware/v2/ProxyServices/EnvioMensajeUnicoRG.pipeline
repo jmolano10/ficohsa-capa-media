@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/EnvioMensajeUnicoRG/wsdl/envioMensajeUnicoRGPS"/>
+            <con:binding>
+                <con:name>envioMensajeUnicoRGPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/envioMensajeUnicoRGPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-153932736847673590-7799d92a.177c9a818ee.-74fb" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="EnvioMensajeUnicoRG_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/envioCorreoElectronicoTypes" prefix="env"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-3796237800851073029--73bd13ea.177f4303104.-7c1a</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/EnvioCorreoElectronico/xsd/envioCorreoElectronicoTypes"/>
+                        <con2:schemaElement xmlns:env1="http://www.ficohsa.com.hn/middleware.services/envioCorreoElectronicoTypes">env1:envioMensajeUnico</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./env:envioMensajeUnico</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/uniquemail/uniquemail/BPELuniquemail" prefix="bpel"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/envioCorreoElectronicoTypes" prefix="env"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-1772569599221755484--6355222a.177daa2d8d5.-7d58</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/OIC/uniqueEmail/biz/uniqueEmail" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>process</con2:operation>
+                        <con2:request>
+                            <con2:body>REQProcess</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPProcess</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQProcess">
+                                <con1:id>_ActionId-1772569599221755484--6355222a.177daa2d8d5.-7d20</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/EnvioMensajeUnicoRG/xq/processIn"/>
+                                        <con1:param name="envioMensajeUnico">
+                                            <con1:path>$body/env:envioMensajeUnico</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-1772569599221755484--6355222a.177daa2d8d5.-7ce8</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPProcess/bpel:Status/bpel:Code/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-1772569599221755484--6355222a.177daa2d8d5.-7ccb</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if($errorCode = '200') then(
+	''
+)else(
+	fn:string($RSPProcess/bpel:Status/bpel:Value/text())
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="EnvioMensajeUnicoRG_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/envioCorreoElectronicoTypes" prefix="env"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-153932736847673590-7799d92a.177c9a818ee.-73b2</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if($validationMessage = '') then(
+			<successIndicator>Success</successIndicator>	
+		)else(
+			<successIndicator>{ $errorCode }</successIndicator>,
+			<messages>{ $validationMessage }</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-153932736847673590-7799d92a.177c9a818ee.-73b4</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;env:envioMensajeUnicoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-153932736847673590-7799d92a.177c9a818ee.-74fb">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/envioCorreoElectronicoTypes" prefix="env"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-153932736847673590-7799d92a.177c9a818ee.-74e2</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ fn:string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ fn:string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-153932736847673590-7799d92a.177c9a818ee.-74cd</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;env:envioMensajeUnicoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-153932736847673590-7799d92a.177c9a818ee.-74b4</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="EnvioMensajeUnicoRG">
+                <con:request>EnvioMensajeUnicoRG_request</con:request>
+                <con:response>EnvioMensajeUnicoRG_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

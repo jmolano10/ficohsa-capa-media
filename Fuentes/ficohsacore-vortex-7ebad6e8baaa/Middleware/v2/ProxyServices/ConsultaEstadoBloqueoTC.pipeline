@@ -1,0 +1,1207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/wsdl/consultaEstadoBloqueoTCPS"/>
+            <con:binding>
+                <con:name>consultaEstadoBloqueoTCPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCPS</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con1:router xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+        <con1:pipeline type="request" name="ValidacionesGenerales_request">
+            <con1:stage name="ValidacionXSD">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientePruebaTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con1"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:validate>
+                        <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7d6b</con2:id>
+                        <con3:schema ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/xsd/consultaEstadoBloqueoTCTypes"/>
+                        <con3:schemaElement xmlns:con="http://www.ficohsa.com.hn/middleware.services/consultaClientePruebaTypes" xmlns:con4="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes">con4:consultaEstadoBloqueoTCRequest</con3:schemaElement>
+                        <con3:varName>body</con3:varName>
+                        <con3:location>
+                            <con2:xpathText>./con1:consultaEstadoBloqueoTCRequest</con2:xpathText>
+                        </con3:location>
+                    </con3:validate>
+                </con1:actions>
+            </con1:stage>
+            <con1:stage name="ValidacionServicioRegional">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientePruebaTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7c9f</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>ValidaServicioRegional</con3:operation>
+                        <con3:request>
+                            <con3:body>REQValidaServicioRegional</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPValidaServicioRegional</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQValidaServicioRegional">
+                                <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ca5</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con2:param name="serviceId">
+                                            <con2:path>"FICBCO0531"</con2:path>
+                                        </con2:param>
+                                        <con2:param name="requestHeader1">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:ifThenElse>
+                                <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ca4</con2:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con2:xqueryText>fn:string($RSPValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con2:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con3:replace contents-only="true" varName="header">
+                                            <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ca3</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($RSPValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                            </con3:expr>
+                                        </con3:replace>
+                                        <con3:replace contents-only="true" varName="body">
+                                            <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ca2</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryText>&lt;con:consultaClientePruebaResponse/></con2:xqueryText>
+                                            </con3:expr>
+                                        </con3:replace>
+                                        <con2:reply>
+                                            <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ca1</con2:id>
+                                        </con2:reply>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default>
+                                    <con3:replace contents-only="true" varName="header">
+                                        <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ca0</con2:id>
+                                        <con3:expr>
+                                            <con2:xqueryTransform>
+                                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con2:param name="requestHeader">
+                                                    <con2:path>$header/aut:RequestHeader</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con3:expr>
+                                    </con3:replace>
+                                </con3:default>
+                            </con3:ifThenElse>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="ValidacionesGenerales_response">
+            <con1:stage name="MapeoError">
+                <con1:context xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7b52</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:wsCallout>
+                                    <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7b4f</con2:id>
+                                    <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>mapeoErrores</con3:operation>
+                                    <con3:request>
+                                        <con3:body>REQMapeoErrores</con3:body>
+                                    </con3:request>
+                                    <con3:response>
+                                        <con3:body>RSPMapeoErrores</con3:body>
+                                    </con3:response>
+                                    <con3:requestTransform>
+                                        <con3:assign varName="REQMapeoErrores">
+                                            <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7b51</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con2:param name="CODIGO_ERROR">
+                                                        <con2:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="MENSAJE_ERROR">
+                                                        <con2:path>fn:concat("FICBCO0531","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:assign>
+                                    </con3:requestTransform>
+                                    <con3:responseTransform>
+                                        <con3:replace varName="header" contents-only="true">
+                                            <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7b50</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con2:param name="mapeoErroresResponse1">
+                                                        <con2:path>$RSPMapeoErrores</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="successIndicator">
+                                                        <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:replace>
+                                    </con3:responseTransform>
+                                </con3:wsCallout>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default/>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="PipelinePairNode1_request"/>
+        <con1:pipeline type="response" name="PipelinePairNode1_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context/>
+                <con1:actions>
+                    <con3:Error>
+                        <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7dda</con2:id>
+                        <con3:errCode>MW-0008</con3:errCode>
+                        <con3:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con3:message>
+                    </con3:Error>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="HN01_ConsultaEstadoBloqueoTC_request">
+            <con1:stage name="ConDatoTarjeta_v3">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta_v3" prefix="con1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con1:assign varName="pais" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7f57</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con2:param name="sentidoConversion">
+                                    <con2:path>'OSB-ISO3'</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoPais">
+                                    <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-79a6</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoTarjeta_v3/biz/conDatoTarjeta_v3_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>conDatoTarjeta</con3:operation>
+                        <con3:request>
+                            <con3:body>REQConDatoTarjeta</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPConDatoTarjeta</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQConDatoTarjeta">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7fc8</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/xq/consultaEstadoBloqueoTCHNIn"/>
+                                        <con2:param name="card">
+                                            <con2:path>data($body/con:consultaEstadoBloqueoTCRequest/con:CARD_NUMBER)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="pais">
+                                            <con2:path>$pais</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con1:assign varName="errorCode" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7ee6</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConDatoTarjeta/con1:CodigoError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7d55</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConDatoTarjeta/con1:MensajeError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con3:ifThenElse>
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7dcc</con2:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con1:assign varName="org" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7d57</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'ORG'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="tipoBloqueo" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7d19</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'CODBLOQUE'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="estadoTC" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7dca</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'ESTATUSTARJETA'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default/>
+                            </con3:ifThenElse>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+            <con1:stage name="EmbosserInquiry">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta_v3" prefix="con1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7965</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>$validationMessage = '' 
+and
+$estadoTC = '0'</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:wsCallout>
+                                    <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7963</con2:id>
+                                    <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlusHN/vmx/biz/vmx" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>EmbosserInquiry</con3:operation>
+                                    <con3:request>
+                                        <con3:body>REQEmbosserInquiry</con3:body>
+                                    </con3:request>
+                                    <con3:response>
+                                        <con3:body>RSPEmbosserInquiry</con3:body>
+                                    </con3:response>
+                                    <con3:requestTransform>
+                                        <con3:assign varName="REQEmbosserInquiry">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7ed3</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/VisionPlusHN/xq/embosserInquiryIn"/>
+                                                    <con2:param name="cardNumber">
+                                                        <con2:path>data($body/con:consultaEstadoBloqueoTCRequest/con:CARD_NUMBER)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="org">
+                                                        <con2:path>$org</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:assign>
+                                    </con3:requestTransform>
+                                    <con3:responseTransform>
+                                        <con1:assign varName="errorCode" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7df0</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-RETURN-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7def</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-RETURN-DESC/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="tipoBloqueo" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7ce0</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-BLK-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="estadoTC" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7260</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-STATUS-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con3:responseTransform>
+                                </con3:wsCallout>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default/>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="HN01_ConsultaEstadoBloqueoTC_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:ifThenElse xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                        <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ad8</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>count($validationMessage) &lt;= 1</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:replace varName="header" contents-only="true">
+                                    <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-79dc</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryText>&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                                    </con3:expr>
+                                </con3:replace>
+                                <con3:replace varName="body" contents-only="true">
+                                    <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ad6</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/xq/consultaEstadoBloqueoTCHNOut"/>
+                                            <con2:param name="estadoTC">
+                                                <con2:path>$estadoTC</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoBloqueo">
+                                                <con2:path>$tipoBloqueo</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default>
+                            <con3:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ad5</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{ $errorCode }</successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                            <con3:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-4080813755942315148--687482a1.192af62307f.-7ad4</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>&lt;con:consultaEstadoBloqueoTCResponse/></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:default>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="GT01_ConsultaEstadoBloqueoTC_request">
+            <con1:stage name="ConDatoTarjeta_v3">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta_v3" prefix="con1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con1:assign varName="pais" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-795f</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con2:param name="sentidoConversion">
+                                    <con2:path>'OSB-ISO3'</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoPais">
+                                    <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7957</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataGT/conDatoTarjeta_v3/biz/conDatoTarjeta_v3_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>conDatoTarjeta</con3:operation>
+                        <con3:request>
+                            <con3:body>REQConDatoTarjeta</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPConDatoTarjeta</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQConDatoTarjeta">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-795e</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/xq/consultaEstadoBloqueoTCGTIn"/>
+                                        <con2:param name="card">
+                                            <con2:path>data($body/con:consultaEstadoBloqueoTCRequest/con:CARD_NUMBER)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="pais">
+                                            <con2:path>$pais</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con1:assign varName="errorCode" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-795d</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConDatoTarjeta/con1:CodigoError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-795c</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConDatoTarjeta/con1:MensajeError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con3:ifThenElse>
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-795b</con2:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con1:assign varName="org" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-795a</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'ORG'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="tipoBloqueo" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7959</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'CODBLOQUE'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="estadoTC" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7958</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'ESTATUSTARJETA'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default/>
+                            </con3:ifThenElse>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+            <con1:stage name="EmbosserInquiry">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta_v3" prefix="con1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-781e</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>$validationMessage = '' 
+and
+$estadoTC = '0'</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:wsCallout>
+                                    <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7819</con2:id>
+                                    <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlusGT/vmx/biz/vmx" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>EmbosserInquiry</con3:operation>
+                                    <con3:request>
+                                        <con3:body>REQEmbosserInquiry</con3:body>
+                                    </con3:request>
+                                    <con3:response>
+                                        <con3:body>RSPEmbosserInquiry</con3:body>
+                                    </con3:response>
+                                    <con3:requestTransform>
+                                        <con3:assign varName="REQEmbosserInquiry">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-781d</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/VisionPlusGT/xq/embosserInquiryIn"/>
+                                                    <con2:param name="cardNumber">
+                                                        <con2:path>data($body/con:consultaEstadoBloqueoTCRequest/con:CARD_NUMBER)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="org">
+                                                        <con2:path>$org</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:assign>
+                                    </con3:requestTransform>
+                                    <con3:responseTransform>
+                                        <con1:assign varName="errorCode" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-781c</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-RETURN-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-781b</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-RETURN-DESC/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="tipoBloqueo" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-781a</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-BLK-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="estadoTC" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-720a</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-STATUS-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con3:responseTransform>
+                                </con3:wsCallout>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default/>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="GT01_ConsultaEstadoBloqueoTC_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:ifThenElse xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-769a</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>count($validationMessage) &lt;= 1</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:replace varName="header" contents-only="true">
+                                    <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7699</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryText>&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                                    </con3:expr>
+                                </con3:replace>
+                                <con3:replace varName="body" contents-only="true">
+                                    <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7698</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/xq/consultaEstadoBloqueoTCGTOut"/>
+                                            <con2:param name="estadoTC">
+                                                <con2:path>$estadoTC</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoBloqueo">
+                                                <con2:path>$tipoBloqueo</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default>
+                            <con3:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7697</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{ $errorCode }</successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                            <con3:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7696</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>&lt;con:consultaEstadoBloqueoTCResponse/></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:default>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="NI01_ConsultaEstadoBloqueoTC_request">
+            <con1:stage name="ConDatoTarjeta_v3">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta_v3" prefix="con1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con1:assign varName="pais" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7ab5</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con2:param name="sentidoConversion">
+                                    <con2:path>'OSB-ISO3'</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoPais">
+                                    <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7aad</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterData/conDatoTarjeta_v3/biz/conDatoTarjeta_v3_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>conDatoTarjeta</con3:operation>
+                        <con3:request>
+                            <con3:body>REQConDatoTarjeta</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPConDatoTarjeta</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQConDatoTarjeta">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7ab4</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/xq/consultaEstadoBloqueoTCNIIn"/>
+                                        <con2:param name="card">
+                                            <con2:path>data($body/con:consultaEstadoBloqueoTCRequest/con:CARD_NUMBER)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="pais">
+                                            <con2:path>$pais</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con1:assign varName="errorCode" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7ab3</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConDatoTarjeta/con1:CodigoError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7ab2</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConDatoTarjeta/con1:MensajeError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con3:ifThenElse>
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7ab1</con2:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con1:assign varName="org" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7ab0</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'ORG'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="tipoBloqueo" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7aaf</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'CODBLOQUE'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="estadoTC" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7aae</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'ESTATUSTARJETA'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default/>
+                            </con3:ifThenElse>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+            <con1:stage name="EmbosserInquiry">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta_v3" prefix="con1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-77d0</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>$validationMessage = '' 
+and
+$estadoTC = '0'</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:wsCallout>
+                                    <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-77cb</con2:id>
+                                    <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/vmx/biz/vmx" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>EmbosserInquiry</con3:operation>
+                                    <con3:request>
+                                        <con3:body>REQEmbosserInquiry</con3:body>
+                                    </con3:request>
+                                    <con3:response>
+                                        <con3:body>RSPEmbosserInquiry</con3:body>
+                                    </con3:response>
+                                    <con3:requestTransform>
+                                        <con3:assign varName="REQEmbosserInquiry">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-77cf</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/VisionPlus/xq/embosserInquiryIn"/>
+                                                    <con2:param name="cardNumber">
+                                                        <con2:path>data($body/con:consultaEstadoBloqueoTCRequest/con:CARD_NUMBER)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="org">
+                                                        <con2:path>$org</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:assign>
+                                    </con3:requestTransform>
+                                    <con3:responseTransform>
+                                        <con1:assign varName="errorCode" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-77ce</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-RETURN-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-77cd</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-RETURN-DESC/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="tipoBloqueo" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-77cc</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-BLK-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="estadoTC" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-71d0</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-STATUS-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con3:responseTransform>
+                                </con3:wsCallout>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default/>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="NI01_ConsultaEstadoBloqueoTC_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:ifThenElse xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-765a</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>count($validationMessage) &lt;= 1</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:replace varName="header" contents-only="true">
+                                    <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7659</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryText>&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                                    </con3:expr>
+                                </con3:replace>
+                                <con3:replace varName="body" contents-only="true">
+                                    <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7658</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/xq/consultaEstadoBloqueoTCNIOut"/>
+                                            <con2:param name="estadoTC">
+                                                <con2:path>$estadoTC</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoBloqueo">
+                                                <con2:path>$tipoBloqueo</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default>
+                            <con3:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7657</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{ $errorCode }</successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                            <con3:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7656</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>&lt;con:consultaEstadoBloqueoTCResponse/></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:default>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="PA01_ConsultaEstadoBloqueoTC_request">
+            <con1:stage name="ConDatoTarjeta_v3">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta_v3" prefix="con1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con1:assign varName="pais" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-78ab</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con2:param name="sentidoConversion">
+                                    <con2:path>'OSB-ISO3'</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoPais">
+                                    <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-78a3</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataPA/conDatoTarjeta_v3/biz/conDatoTarjeta_v3_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>conDatoTarjeta</con3:operation>
+                        <con3:request>
+                            <con3:body>REQConDatoTarjeta</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPConDatoTarjeta</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQConDatoTarjeta">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-78aa</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/xq/consultaEstadoBloqueoTCPAIn"/>
+                                        <con2:param name="card">
+                                            <con2:path>data($body/con:consultaEstadoBloqueoTCRequest/con:CARD_NUMBER)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="pais">
+                                            <con2:path>$pais</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con1:assign varName="errorCode" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-78a9</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConDatoTarjeta/con1:CodigoError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-78a8</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConDatoTarjeta/con1:MensajeError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con3:ifThenElse>
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-78a7</con2:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con1:assign varName="org" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-78a6</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'ORG'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="tipoBloqueo" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-78a5</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'CODBLOQUE'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="estadoTC" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-78a4</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>for $row in $RSPConDatoTarjeta/con1:RowSet/con1:Row
+where $row/con1:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+	data($row/con1:Column[upper-case(@name) = 'ESTATUSTARJETA'])</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default/>
+                            </con3:ifThenElse>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+            <con1:stage name="EmbosserInquiry1">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta_v3" prefix="con1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-774c</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>$validationMessage = '' 
+and
+$estadoTC = '0'</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:wsCallout>
+                                    <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7747</con2:id>
+                                    <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlusPA/vmx/biz/vmx" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>EmbosserInquiry</con3:operation>
+                                    <con3:request>
+                                        <con3:body>REQEmbosserInquiry</con3:body>
+                                    </con3:request>
+                                    <con3:response>
+                                        <con3:body>RSPEmbosserInquiry</con3:body>
+                                    </con3:response>
+                                    <con3:requestTransform>
+                                        <con3:assign varName="REQEmbosserInquiry">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-774b</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/VisionPlusPA/xq/embosserInquiryIn"/>
+                                                    <con2:param name="cardNumber">
+                                                        <con2:path>data($body/con:consultaEstadoBloqueoTCRequest/con:CARD_NUMBER)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="org">
+                                                        <con2:path>$org</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:assign>
+                                    </con3:requestTransform>
+                                    <con3:responseTransform>
+                                        <con1:assign varName="errorCode" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-774a</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-RETURN-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7749</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-RETURN-DESC/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="tipoBloqueo" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7748</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-BLK-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="estadoTC" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-7196</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPEmbosserInquiry/ARXCIO-STATUS-CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con3:responseTransform>
+                                </con3:wsCallout>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default/>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="PA01_ConsultaEstadoBloqueoTC_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoBloqueoTCTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:ifThenElse xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                        <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-75ae</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>count($validationMessage) &lt;= 1</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:replace varName="header" contents-only="true">
+                                    <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-75ad</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryText>&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                                    </con3:expr>
+                                </con3:replace>
+                                <con3:replace varName="body" contents-only="true">
+                                    <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-75ac</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/ConsultaEstadoBloqueoTC/xq/consultaEstadoBloqueoTCPAOut"/>
+                                            <con2:param name="estadoTC">
+                                                <con2:path>$estadoTC</con2:path>
+                                            </con2:param>
+                                            <con2:param name="tipoBloqueo">
+                                                <con2:path>$tipoBloqueo</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default>
+                            <con3:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-75ab</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{ $errorCode }</successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                            <con3:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-637685522732683119-6205123b.192bf4ecffa.-75aa</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>&lt;con:consultaEstadoBloqueoTCResponse/></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:default>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:flow>
+            <con1:pipeline-node name="ValidacionesGenerales">
+                <con1:request>ValidacionesGenerales_request</con1:request>
+                <con1:response>ValidacionesGenerales_response</con1:response>
+            </con1:pipeline-node>
+            <con1:branch-node type="condition" name="RegionalizacionPais">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:branch-table variable="header">
+                    <con1:xpath>
+                        <con2:xpathText>./aut:RequestHeader/Region/SourceBank</con2:xpathText>
+                    </con1:xpath>
+                    <con1:branch name="HN01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>'HN01'</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="HN01_ConsultaEstadoBloqueoTC">
+                                <con1:request>HN01_ConsultaEstadoBloqueoTC_request</con1:request>
+                                <con1:response>HN01_ConsultaEstadoBloqueoTC_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="GT01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>'GT01'</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="GT01_ConsultaEstadoBloqueoTC">
+                                <con1:request>GT01_ConsultaEstadoBloqueoTC_request</con1:request>
+                                <con1:response>GT01_ConsultaEstadoBloqueoTC_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="NI01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>'NI01'</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="NI01_ConsultaEstadoBloqueoTC">
+                                <con1:request>NI01_ConsultaEstadoBloqueoTC_request</con1:request>
+                                <con1:response>NI01_ConsultaEstadoBloqueoTC_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="PA01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>'PA01'</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="PA01_ConsultaEstadoBloqueoTC">
+                                <con1:request>PA01_ConsultaEstadoBloqueoTC_request</con1:request>
+                                <con1:response>PA01_ConsultaEstadoBloqueoTC_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:default-branch>
+                        <con1:flow>
+                            <con1:pipeline-node name="PipelinePairNode1">
+                                <con1:request>PipelinePairNode1_request</con1:request>
+                                <con1:response>PipelinePairNode1_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:default-branch>
+                </con1:branch-table>
+            </con1:branch-node>
+        </con1:flow>
+    </con1:router>
+</con:pipelineEntry>

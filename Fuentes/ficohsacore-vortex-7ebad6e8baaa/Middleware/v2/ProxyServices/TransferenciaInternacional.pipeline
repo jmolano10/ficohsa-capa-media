@@ -1,0 +1,888 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/TransferenciaInternacional/wsdl/transferenciaInternacionalPS"/>
+            <con:binding>
+                <con:name>transferenciaInternacionalPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>true</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con1:router errorHandler="_onErrorHandler-8848777042473091319--23eafd38.13c2a05c9f3.-6d61" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+        <con1:pipeline type="error" name="_onErrorHandler-8848777042473091319--23eafd38.13c2a05c9f3.-6d61">
+            <con1:stage name="ManejoError">
+                <con4:context xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                </con4:context>
+                <con4:actions xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+                    <con2:assign varName="errorCode">
+                        <con1:id>_ActionId-3774536583435774163-7d4ba8fc.15d3c964dd1.-7fbe</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessage">
+                        <con1:id>_ActionId-3774536583435774163-7d4ba8fc.15d3c964dd1.-7fbd</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-3774536583435774163-7d4ba8fc.15d3c964dd1.-7fba</con1:id>
+                        <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>mapeoErrores</con2:operation>
+                        <con2:request>
+                            <con2:body>reqMapeoErrores</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respMapeoErrores</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqMapeoErrores">
+                                <con1:id>_ActionId-3774536583435774163-7d4ba8fc.15d3c964dd1.-7fbc</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con1:param name="CODIGO_ERROR">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MENSAJE_ERROR">
+                                            <con1:path>fn:concat("FICBCO0078", "$#$", $errorMessage)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:replace contents-only="true" varName="header">
+                                <con1:id>_ActionId-3774536583435774163-7d4ba8fc.15d3c964dd1.-7fbb</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con1:param name="mapeoErroresResponse1">
+                                            <con1:path>$respMapeoErrores</con1:path>
+                                        </con1:param>
+                                        <con1:param name="successIndicator">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-3774536583435774163-7d4ba8fc.15d3c964dd1.-7fb9</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;tran:transferenciaInternacionalResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-3774536583435774163-7d4ba8fc.15d3c964dd1.-7fb8</con1:id>
+                    </con1:reply>
+                </con4:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="ValidacionesGenerales_request">
+            <con1:stage name="ValidacionXSD">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:validate>
+                        <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-7ab9</con2:id>
+                        <con3:schema ref="Middleware/v2/Resources/TransferenciaInternacional/xsd/transferenciaInternacionalType"/>
+                        <con3:schemaElement xmlns:tran1="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType">tran1:transferenciaInternacionalRequest</con3:schemaElement>
+                        <con3:varName>body</con3:varName>
+                        <con3:location>
+                            <con2:xpathText>./tran:transferenciaInternacionalRequest</con2:xpathText>
+                        </con3:location>
+                    </con3:validate>
+                </con1:actions>
+            </con1:stage>
+            <con1:stage name="ValidacionServicioRegional">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-799f</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>ValidaServicioRegional</con3:operation>
+                        <con3:request>
+                            <con3:body>reqValidaServicioRegional</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>respValidaServicioRegional</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="reqValidaServicioRegional">
+                                <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-795d</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con2:param name="requestHeader1">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                        <con2:param name="serviceId">
+                                            <con2:path>"FICBCO0078"</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:ifThenElse>
+                                <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-7999</con2:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con2:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con2:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con3:replace contents-only="true" varName="header">
+                                            <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-7998</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                            </con3:expr>
+                                        </con3:replace>
+                                        <con3:replace contents-only="true" varName="body">
+                                            <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-7997</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryText>&lt;tran:transferenciaInternacionalResponse/></con2:xqueryText>
+                                            </con3:expr>
+                                        </con3:replace>
+                                        <con2:reply>
+                                            <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-7996</con2:id>
+                                        </con2:reply>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default>
+                                    <con3:replace contents-only="true" varName="header">
+                                        <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-7995</con2:id>
+                                        <con3:expr>
+                                            <con2:xqueryTransform>
+                                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con2:param name="requestHeader">
+                                                    <con2:path>$header/aut:RequestHeader</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con3:expr>
+                                    </con3:replace>
+                                </con3:default>
+                            </con3:ifThenElse>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="ValidacionesGenerales_response">
+            <con1:stage name="MapeoError">
+                <con1:context xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config">
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-391164036272569892--1c32a11e.158c14bf430.-7f93</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:ifThenElse>
+                                    <con2:id>_ActionId-6093783881321708149-33e062a.18b86d4d7ff.-7f60</con2:id>
+                                    <con3:case>
+                                        <con3:condition>
+                                            <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "PENDING"</con2:xqueryText>
+                                        </con3:condition>
+                                        <con3:actions>
+                                            <con3:wsCallout>
+                                                <con2:id>_ActionId-6093783881321708149-33e062a.18b86d4d7ff.-7f5a</con2:id>
+                                                <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con3:operation>mapeoErrores</con3:operation>
+                                                <con3:request>
+                                                    <con3:body>REQMapeoErrores</con3:body>
+                                                </con3:request>
+                                                <con3:response>
+                                                    <con3:body>RSPMapeoErrores</con3:body>
+                                                </con3:response>
+                                                <con3:requestTransform>
+                                                    <con3:assign varName="REQMapeoErrores">
+                                                        <con2:id>_ActionId-6093783881321708149-33e062a.18b86d4d7ff.-7f5c</con2:id>
+                                                        <con3:expr>
+                                                            <con6:xqueryTransform xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/services/security/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config" xmlns:con6="http://www.bea.com/wli/sb/stages/config">
+                                                                <con6:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                                <con6:param name="CODIGO_ERROR">
+                                                                    <con6:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con6:path>
+                                                                </con6:param>
+                                                                <con6:param name="MENSAJE_ERROR">
+                                                                    <con6:path>fn:concat("FICBCO0078","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con6:path>
+                                                                </con6:param>
+                                                            </con6:xqueryTransform>
+                                                        </con3:expr>
+                                                    </con3:assign>
+                                                </con3:requestTransform>
+                                                <con3:responseTransform>
+                                                    <con3:replace varName="header" contents-only="true">
+                                                        <con2:id>_ActionId-6093783881321708149-33e062a.18b86d4d7ff.-7f5b</con2:id>
+                                                        <con3:expr>
+                                                            <con2:xqueryTransform>
+                                                                <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                                <con2:param name="mapeoErroresResponse1">
+                                                                    <con2:path>$RSPMapeoErrores</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="successIndicator">
+                                                                    <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                                </con2:param>
+                                                            </con2:xqueryTransform>
+                                                        </con3:expr>
+                                                    </con3:replace>
+                                                </con3:responseTransform>
+                                            </con3:wsCallout>
+                                        </con3:actions>
+                                    </con3:case>
+                                    <con3:default/>
+                                </con3:ifThenElse>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default/>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="HN01_TransferenciaInternacional_request">
+            <con1:stage name="FlujoEntrada">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:assign varName="currencyDebit">
+                        <con2:id>_ActionId-1990565552479685374-4c650e7a.16ff38367ed.-7777</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>$body/tran:transferenciaInternacionalRequest/DEBIT_CURRENCY</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="currencyCredit">
+                        <con2:id>_ActionId-1990565552479685374-4c650e7a.16ff38367ed.-7987</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>$body/tran:transferenciaInternacionalRequest/DESTINATION_CURRENCY</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con4:wsCallout xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76dd</con2:id>
+                        <con4:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con4:operation>obtenerParametrizacion</con4:operation>
+                        <con4:request>
+                            <con4:body>RESQUESTobtenerParametrizacion</con4:body>
+                        </con4:request>
+                        <con4:response>
+                            <con4:body>RESPONSEobtenerParametrizacion</con4:body>
+                        </con4:response>
+                        <con4:requestTransform>
+                            <con4:assign varName="creditAccountDetail">
+                                <con2:id>_ActionId-1990565552479685374-4c650e7a.16ff38367ed.-77b1</con2:id>
+                                <con4:expr>
+                                    <con2:xqueryText>concat("T24T058.CREDITACCOUNT.",$currencyDebit,".", $currencyCredit)</con2:xqueryText>
+                                </con4:expr>
+                            </con4:assign>
+                            <con4:assign varName="creditCurrencyDetail">
+                                <con2:id>_ActionId-1990565552479685374-4c650e7a.16ff38367ed.-77af</con2:id>
+                                <con4:expr>
+                                    <con2:xqueryText>concat("T24T058.CREDITACURRENCY.",$currencyDebit,".", $currencyCredit)</con2:xqueryText>
+                                </con4:expr>
+                            </con4:assign>
+                            <con4:assign varName="RESQUESTobtenerParametrizacion">
+                                <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76df</con2:id>
+                                <con4:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con2:param name="nombreParametros">
+                                            <con2:path>concat($creditAccountDetail,"||",$creditCurrencyDetail)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con4:expr>
+                            </con4:assign>
+                        </con4:requestTransform>
+                        <con4:responseTransform>
+                            <con4:assign varName="statusParametrizacion">
+                                <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76de</con2:id>
+                                <con4:expr>
+                                    <con2:xqueryText>fn:string($RESPONSEobtenerParametrizacion/osb:ERROR_CODE/text())</con2:xqueryText>
+                                </con4:expr>
+                            </con4:assign>
+                        </con4:responseTransform>
+                    </con4:wsCallout>
+                    <con1:ifThenElse xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76dc</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$statusParametrizacion = "SUCCESS"</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="creditAccount">
+                                    <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76db</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText>fn:string($RESPONSEobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$creditAccountDetail]/osb:VALUE/text())</con2:xqueryText>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:assign varName="creditCurrency">
+                                    <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76da</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText>fn:string($RESPONSEobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$creditCurrencyDetail]/osb:VALUE/text())</con2:xqueryText>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con4:assign varName="uuid" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/services/security/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                                    <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d9</con5:id>
+                                    <con4:expr>
+                                        <con4:xqueryTransform xmlns:con4="http://www.bea.com/wli/sb/stages/config">
+                                            <con4:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                                        </con4:xqueryTransform>
+                                    </con4:expr>
+                                </con4:assign>
+                                <con3:wsCallout xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+                                    <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d7</con2:id>
+                                    <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/Transferencias/Resources/transferenciasBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>TransferenciaInternacional</con3:operation>
+                                    <con3:request>
+                                        <con3:body>REQUEST</con3:body>
+                                    </con3:request>
+                                    <con3:response>
+                                        <con3:body>RESPONSE</con3:body>
+                                    </con3:response>
+                                    <con3:requestTransform>
+                                        <con3:assign varName="REQUEST">
+                                            <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d8</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaInternacionalIn"/>
+                                                    <con2:param name="uuid">
+                                                        <con2:path>fn:string($uuid)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="requestHeader">
+                                                        <con2:path>$header/aut:RequestHeader</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="creditAccount">
+                                                        <con2:path>$creditAccount</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="creditCurrency">
+                                                        <con2:path>$creditCurrency</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="transferenciaInternacionalRequest">
+                                                        <con2:path>$body/tran:transferenciaInternacionalRequest</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:assign>
+                                    </con3:requestTransform>
+                                    <con3:responseTransform/>
+                                </con3:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:assign varName="errorMessage">
+                                <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d6</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>fn:string($RESPONSEobtenerParametrizacion/osb:ERROR_MESSAGE/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con2:skip>
+                                <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d5</con2:id>
+                            </con2:skip>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="HN01_TransferenciaInternacional_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d4</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>$statusParametrizacion = "SUCCESS"</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:replace contents-only="true" varName="header">
+                                    <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d3</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/Business_Resources/Transferencias/TransferenciaInternacional/transferenciaInternacionalHeaderOut"/>
+                                            <con2:param name="transferenciaInternacionalResponse">
+                                                <con2:path>$RESPONSE</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                                <con3:replace varName="body" contents-only="true">
+                                    <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d2</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/Business_Resources/Transferencias/TransferenciaInternacional/transferenciaInternacionalOut"/>
+                                            <con2:param name="transferenciaInternacionalResponse">
+                                                <con2:path>$RESPONSE</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default>
+                            <con1:replace contents-only="true" varName="header" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d1</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ fn:string($errorMessage) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                            <con3:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-4097820237566366414-3065a44c.14d9ff048d1.-76d0</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>&lt;tran:transferenciaInternacionalResponse/></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:default>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="Default_TransferenciaInternacional_request">
+            <con1:stage name="FlujoEntrada">
+                <con1:context/>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="Default_TransferenciaInternacional_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                </con1:context>
+                <con1:actions>
+                    <con4:Error xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2681369310853666711--5bcd27aa.14daf0d55d0.-756b</con5:id>
+                        <con4:errCode>MW-0008</con4:errCode>
+                        <con4:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con4:message>
+                    </con4:Error>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="GT01_TransferenciaInternacional_request">
+            <con1:stage name="FlujoEntrada">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-654e</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKGT/transferenciaInternacional/biz/TransferenciaInternacional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>TransferenciaInternacional</con3:operation>
+                        <con3:request>
+                            <con3:body>rq</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>rp</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="rq">
+                                <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-654f</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntlGTIn"/>
+                                        <con2:param name="transferenciaInternacionalRequest1">
+                                            <con2:path>$body/tran:transferenciaInternacionalRequest</con2:path>
+                                        </con2:param>
+                                        <con2:param name="usuarioInternacionalRequest1">
+                                            <con2:path>fn:string($header/aut:RequestHeader/Authentication/UserName)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform/>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="GT01_TransferenciaInternacional_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/TransferenciaInternacional" prefix="trx2"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:assign varName="errorCode">
+                        <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-654d</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>$rp/trx2:ERROR_CODE/text()</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-654c</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>fn:string($errorCode) = "SUCCESS"</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:replace contents-only="true" varName="header">
+                                    <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-654b</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntlGTHeaderOut"/>
+                                            <con2:param name="outputParameters1">
+                                                <con2:path>$rp</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                                <con3:replace contents-only="true" varName="body">
+                                    <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-654a</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntlGTOut"/>
+                                            <con2:param name="outputParameters1">
+                                                <con2:path>$rp</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default>
+                            <con1:replace contents-only="true" varName="header" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-6549</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntlGTHeaderOut"/>
+                                        <con2:param name="outputParameters1">
+                                            <con2:path>$rp</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                            <con3:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-6548</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>&lt;tran:transferenciaInternacionalResponse/></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:default>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="PA01_TransferenciaInternacional_request">
+            <con1:stage name="FlujoEntrada">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-4802033721260275482-2c245580.18a1e0ae16c.-7fa7</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/transferenciaInternacional/biz/transferenciaInternacional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>transferenciaInternacional</con3:operation>
+                        <con3:request>
+                            <con3:body>rq</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>rp</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:ifThenElse>
+                                <con2:id>_ActionId-4802033721260275482-2c245580.18a1e0ae16c.-7faa</con2:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con2:xqueryText>count($body/tran:transferenciaInternacionalRequest/CHANNEL/text())=0 or 
+ $body/tran:transferenciaInternacionalRequest/CHANNEL/text()=""</con2:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con3:replace contents-only="true" varName="body">
+                                            <con2:id>_ActionId-4802033721260275482-2c245580.18a1e0ae16c.-7fa9</con2:id>
+                                            <con3:location>
+                                                <con2:xpathText>./tran:transferenciaInternacionalRequest/CHANNEL</con2:xpathText>
+                                            </con3:location>
+                                            <con3:expr>
+                                                <con2:xqueryText>"BBE"</con2:xqueryText>
+                                            </con3:expr>
+                                        </con3:replace>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default/>
+                            </con3:ifThenElse>
+                            <con3:assign varName="rq">
+                                <con2:id>_ActionId-4802033721260275482-2c245580.18a1e0ae16c.-7fa8</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntlPAIn"/>
+                                        <con2:param name="transferenciaInternacionalRequest1">
+                                            <con2:path>$body/tran:transferenciaInternacionalRequest</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform/>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="PA01_TransferenciaInternacional_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/transferenciaInternacional" prefix="trx3"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:assign varName="errorCode">
+                        <con2:id>_ActionId-4802033721260275482-2c245580.18a1e0ae16c.-7fe5</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>$rp/trx3:ERROR_CODE/text()</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-64c8</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryConditionExpr>
+                                    <con2:boolExpr operator="or">
+                                        <con2:compExpr operator="=">
+                                            <con2:leftPath>fn:string($errorCode)</con2:leftPath>
+                                            <con2:rightPath>'SUCCESS'</con2:rightPath>
+                                        </con2:compExpr>
+                                        <con2:compExpr operator="=">
+                                            <con2:leftPath>fn:string($errorCode)</con2:leftPath>
+                                            <con2:rightPath>'PENDING'</con2:rightPath>
+                                        </con2:compExpr>
+                                    </con2:boolExpr>
+                                </con2:xqueryConditionExpr>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:replace contents-only="true" varName="body">
+                                    <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-64c7</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntlPAOut"/>
+                                            <con2:param name="outputParameters1">
+                                                <con2:path>$rp</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                                <con3:replace contents-only="true" varName="header">
+                                    <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-64c6</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntlPAHeaderOut"/>
+                                            <con2:param name="outputParameters1">
+                                                <con2:path>$rp</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default>
+                            <con1:replace contents-only="true" varName="header" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-64c5</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntlPAHeaderOut"/>
+                                        <con2:param name="outputParameters1">
+                                            <con2:path>$rp</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                            <con3:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-3180483239834717332--14db50d2.153852e2314.-64c4</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>&lt;tran:transferenciaInternacionalResponse/></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:default>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="NI01_TransferenciaInternacional_request">
+            <con1:stage name="FlujoEntrada">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-4566278033792620179-47f3dff3.15c9caf3756.-7b08</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/CTS/transferencia/biz/transferencia" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>OpTransferenciaInternacional</con3:operation>
+                        <con3:request>
+                            <con3:body>REQTransferencia</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPTransferencia</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQTransferencia">
+                                <con2:id>_ActionId-4566278033792620179-47f3dff3.15c9caf3756.-7ad2</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntNIIn"/>
+                                        <con2:param name="transferenciaInternacionalRequest">
+                                            <con2:path>$body/tran:transferenciaInternacionalRequest</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                            <con3:validate>
+                                <con2:id>_ActionId-2112113176119020215-aa64e43.15d2d4f33d0.-7c77</con2:id>
+                                <con3:schema ref="Middleware/v2/BusinessServices/CTS/transferencia/xsd/services"/>
+                                <con3:schemaElement xmlns:ser1="http://service.srvaplcobistransferencia.ecobis.cobiscorp">ser1:opTransferenciaInternacionalSolicitud</con3:schemaElement>
+                                <con3:varName>REQTransferencia</con3:varName>
+                                <con3:location>
+                                    <con2:xpathText>.</con2:xpathText>
+                                </con3:location>
+                            </con3:validate>
+                        </con3:requestTransform>
+                        <con3:responseTransform/>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="NI01_TransferenciaInternacional_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaInternacionalType" prefix="tran"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-4566278033792620179-47f3dff3.15c9caf3756.-7872</con2:id>
+                        <con3:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntNIHeaderOut"/>
+                                <con2:param name="opTransferenciaInternacionalRespuesta">
+                                    <con2:path>$RSPTransferencia</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con3:expr>
+                    </con3:replace>
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-4566278033792620179-47f3dff3.15c9caf3756.-79fe</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))="SUCCESS"</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:replace contents-only="true" varName="body">
+                                    <con2:id>_ActionId-4566278033792620179-47f3dff3.15c9caf3756.-79b7</con2:id>
+                                    <con3:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/TransferenciaInternacional/xq/transferenciaIntNIOut"/>
+                                            <con2:param name="opTransferenciaInternacionalRespuesta">
+                                                <con2:path>$RSPTransferencia</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con3:expr>
+                                </con3:replace>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default>
+                            <con3:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-4566278033792620179-47f3dff3.15c9caf3756.-79d2</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>&lt;tran:transferenciaInternacionalResponse/></con2:xqueryText>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:default>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:flow>
+            <con1:pipeline-node name="ValidacionesGenerales">
+                <con1:request>ValidacionesGenerales_request</con1:request>
+                <con1:response>ValidacionesGenerales_response</con1:response>
+            </con1:pipeline-node>
+            <con1:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:branch-table variable="header">
+                    <con1:xpath>
+                        <con2:xpathText>./aut:RequestHeader/Region/SourceBank</con2:xpathText>
+                    </con1:xpath>
+                    <con1:branch name="HN01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>'HN01'</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="HN01_TransferenciaInternacional">
+                                <con1:request>HN01_TransferenciaInternacional_request</con1:request>
+                                <con1:response>HN01_TransferenciaInternacional_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="GT01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>'GT01'</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="GT01_TransferenciaInternacional">
+                                <con1:request>GT01_TransferenciaInternacional_request</con1:request>
+                                <con1:response>GT01_TransferenciaInternacional_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="PA01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>'PA01'</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="PA01_TransferenciaInternacional">
+                                <con1:request>PA01_TransferenciaInternacional_request</con1:request>
+                                <con1:response>PA01_TransferenciaInternacional_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="NI01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>'NI01'</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="NI01_TransferenciaInternacional">
+                                <con1:request>NI01_TransferenciaInternacional_request</con1:request>
+                                <con1:response>NI01_TransferenciaInternacional_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:default-branch>
+                        <con1:flow>
+                            <con1:pipeline-node name="Default_TransferenciaInternacional">
+                                <con1:request>Default_TransferenciaInternacional_request</con1:request>
+                                <con1:response>Default_TransferenciaInternacional_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:default-branch>
+                </con1:branch-table>
+            </con1:branch-node>
+        </con1:flow>
+    </con1:router>
+</con:pipelineEntry>

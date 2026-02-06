@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConfirmacionSolicitudPrestamoTarjetaCredito/wsdl/confirmacionSolicitudPrestamoTarjetaCreditoPS"/>
+            <con:binding>
+                <con:name>confirmacionSolicitudPrestamoTarjetaCreditoPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/confirmacionSolicitudPrestamoTarjetaCreditoPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8207549878500703128--58a0dd74.180dc6850ae.-7282" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http">
+        <con:pipeline type="request" name="ConfirmacionSolicitudPrestamoTarjetaCreditoNI_request">
+            <con:stage name="ConsultaCredencialesSalesforce" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaCredencialesSalesforce" prefix="cre"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72dc</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/consultaCredencialesSalesforce/biz/consultaCredencialesSalesforce_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>consultaCredencialesSalesforce</con2:operation>
+                        <con2:request>
+                            <con2:body>REQconsultaCredencialesSalesforce</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPconsultaCredencialesSalesforce</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQconsultaCredencialesSalesforce">
+                                <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72df</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/GestionesSolicitudCredito/xq/consultaCredencialesSalesforceIn"/>
+                                        <con1:param name="codigoPais">
+                                            <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72de</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSPconsultaCredencialesSalesforce/cre:PV_CODIGOMENSAJE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72dd</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if($errorCode = 'SUCCESS') then(
+	''
+)
+else(
+	string($RSPconsultaCredencialesSalesforce/cre:PV_DESCRIPCIONMENSAJE/text())
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConfirmacionSolicitudPrestamoTarjetaCredito" errorHandler="_onErrorHandler-8207549878500703128--58a0dd74.180dc6850ae.-72d2" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaCredencialesSalesforce" prefix="cre"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://soap.sforce.com/schemas/class/WS_NIC_Recepcion_Eval_Creditos" prefix="pre"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesSolicitudCreditoTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72db</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$errorCode = 'EMPTY_SESSION'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:Error>
+                                    <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72da</con1:id>
+                                    <con2:errCode>EMPTY_SESSION</con2:errCode>
+                                    <con2:message>No existe id de sesión para la región.</con2:message>
+                                </con2:Error>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$errorCode = 'SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72d3</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/SALESFORCE/recepEvalCreditos/biz/recepEvalCreditos" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>LoanRequestResult</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQloanRequestResult</con2:body>
+                                        <con2:header>REQHloanRequestResult</con2:header>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPloanRequestResult</con2:body>
+                                        <con2:header>RSPHloanRequestResult</con2:header>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQloanRequestResult">
+                                            <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72d9</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConfirmacionSolicitudPrestamoTarjetaCredito/xq/loanRequestResultIn"/>
+                                                    <con1:param name="confirmacionSolicitudPrestamoTarjetaCredito">
+                                                        <con1:path>$body/ges:confirmacionSolicitudPrestamoTarjetaCredito</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="REQHloanRequestResult">
+                                            <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72d8</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$header</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:replace varName="REQHloanRequestResult" contents-only="true">
+                                            <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72d7</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/GestionesSolicitudCredito/xq/recepEvalCreditosHeaderIn"/>
+                                                    <con1:param name="sessionId">
+                                                        <con1:path>fn:string($RSPconsultaCredencialesSalesforce/cre:PV_SESION/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:validate>
+                                            <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72d6</con1:id>
+                                            <con2:wsdl ref="Middleware/v2/BusinessServices/SALESFORCE/recepEvalCreditos/wsdl/WS_NIC_Recepcion_Eval_Creditos"/>
+                                            <con2:schemaElement xmlns:ws="http://soap.sforce.com/schemas/class/WS_NIC_Recepcion_Eval_Creditos">ws:LoanRequestResult</con2:schemaElement>
+                                            <con2:varName>REQloanRequestResult</con2:varName>
+                                            <con2:location>
+                                                <con1:xpathText>.</con1:xpathText>
+                                            </con2:location>
+                                        </con2:validate>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72d5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPloanRequestResult/pre:result/pre:exitoso/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72d4</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPloanRequestResult/pre:result/pre:descripcion/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConfirmacionSolicitudPrestamoTarjetaCreditoNI_response">
+            <con:stage name="flujoDeSalida" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesSolicitudCreditoTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72bf</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case($errorCode) = "TRUE"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72be</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>      
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72bd</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{$errorCode}</successIndicator>
+      <messages>{$validationMessage}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72bc</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ges:confirmacionSolicitudPrestamoTarjetaCreditoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-8207549878500703128--58a0dd74.180dc6850ae.-72d2">
+            <con:stage name="errorHandlerConfirmacionSolicitudPrestamoTarjetaCredito" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="urn:enterprise.soap.sforce.com" prefix="urn"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesSolicitudCreditoTypes" prefix="ges"/>
+                    <con1:userNsDecl namespace="http://soap.sforce.com/schemas/class/WS_NIC_Recepcion_Eval_Creditos" prefix="eval"/>
+                    <con1:userNsDecl namespace="http://www.bea.com/wli/sb/stages/transform/config" prefix="con"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaCredencialesSalesforce" prefix="cre"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="errorCode">
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72d1</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>let $faultCode := string($fault/ctx:details/con:ReceivedFaultDetail/con:faultcode/text())
+return
+	if($faultCode != "") then (
+		$faultCode
+	) else (
+		string($fault/ctx:errorCode/text())
+	)</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="validationMessage">
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72d0</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>let $faultString := string($fault/ctx:details/con:ReceivedFaultDetail/con:faultstring/text())
+return
+	if($faultString != "") then (
+		$faultString
+	) else (
+		string($fault/ctx:reason/text())
+	)</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72cf</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$errorCode = 'EMPTY_SESSION' or contains(string($errorCode), "INVALID_SESSION_ID")</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72cb</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/SALESFORCE/enterprise/biz/enterprise" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>login</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQlogin</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPlogin</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQlogin">
+                                            <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72ce</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/GestionesSolicitudCredito/xq/loginIn"/>
+                                                    <con1:param name="password">
+                                                        <con1:path>fn:string($RSPconsultaCredencialesSalesforce/cre:PV_PASSWORD/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="userName">
+                                                        <con1:path>fn:string($RSPconsultaCredencialesSalesforce/cre:PV_USUARIO/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:validate>
+                                            <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72cd</con1:id>
+                                            <con2:wsdl ref="Middleware/v2/BusinessServices/SALESFORCE/enterprise/wsdl/ENTERPRISE"/>
+                                            <con2:schemaElement xmlns:urn="urn:enterprise.soap.sforce.com">urn:login</con2:schemaElement>
+                                            <con2:varName>REQlogin</con2:varName>
+                                            <con2:location>
+                                                <con1:xpathText>.</con1:xpathText>
+                                            </con2:location>
+                                        </con2:validate>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="sessionId">
+                                            <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72cc</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPlogin/urn:result/urn:sessionId/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72ca</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$sessionId != ''</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con3:route>
+                                                <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c9</con1:id>
+                                                <con3:service ref="Middleware/v2/BusinessServices/MDW/actualizaCredencialesSalesforce/biz/actualizaCredencialesSalesforce_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con3:operation>actualizaCredencialesSalesforce</con3:operation>
+                                                <con3:outboundTransform>
+                                                    <con2:replace contents-only="true" varName="body">
+                                                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c8</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/GestionesSolicitudCredito/xq/actualizaCredencialesSalesforceIn"/>
+                                                                <con1:param name="SourceBank">
+                                                                    <con1:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="Sesion">
+                                                                    <con1:path>$sessionId</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:replace>
+                                                </con3:outboundTransform>
+                                            </con3:route>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c1</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/SALESFORCE/recepEvalCreditos/biz/recepEvalCreditos" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>LoanRequestResult</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQloanRequestResult</con2:body>
+                                                    <con2:header>REQHloanRequestResult</con2:header>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPloanRequestResult</con2:body>
+                                                    <con2:header>RSPHloanRequestResult</con2:header>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQloanRequestResult">
+                                                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c7</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ConfirmacionSolicitudPrestamoTarjetaCredito/xq/loanRequestResultIn"/>
+                                                                <con1:param name="confirmacionSolicitudPrestamoTarjetaCredito">
+                                                                    <con1:path>$body/ges:confirmacionSolicitudPrestamoTarjetaCredito</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="REQHloanRequestResult">
+                                                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c6</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>$header</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:replace varName="REQHloanRequestResult" contents-only="true">
+                                                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c5</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/GestionesSolicitudCredito/xq/recepEvalCreditosHeaderIn"/>
+                                                                <con1:param name="sessionId">
+                                                                    <con1:path>$sessionId</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:replace>
+                                                    <con2:validate>
+                                                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c4</con1:id>
+                                                        <con2:wsdl ref="Middleware/v2/BusinessServices/SALESFORCE/recepEvalCreditos/wsdl/WS_NIC_Recepcion_Eval_Creditos"/>
+                                                        <con2:schemaElement xmlns:ws="http://soap.sforce.com/schemas/class/WS_NIC_Recepcion_Eval_Creditos">ws:LoanRequestResult</con2:schemaElement>
+                                                        <con2:varName>REQloanRequestResult</con2:varName>
+                                                        <con2:location>
+                                                            <con1:xpathText>.</con1:xpathText>
+                                                        </con2:location>
+                                                    </con2:validate>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con2:assign varName="errorCode">
+                                                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c3</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>fn:string($RSPloanRequestResult/eval:result/eval:exitoso/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="validationMessage">
+                                                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c2</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($RSPloanRequestResult/eval:result/eval:descripcion/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default/>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                    <con1:resume>
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-72c0</con1:id>
+                    </con1:resume>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-8207549878500703128--58a0dd74.180dc6850ae.-7282">
+            <con:stage name="MensajeError">
+                <con:context xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesSolicitudCreditoTypes" prefix="ges"/>
+                </con:context>
+                <con:actions xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-7248</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+    <successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+    <messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-7247</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ges:confirmacionSolicitudPrestamoTarjetaCreditoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-8207549878500703128--58a0dd74.180dc6850ae.-7246</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ConfirmacionSolicitudPrestamoTarjetaCreditoNI">
+                <con:request>ConfirmacionSolicitudPrestamoTarjetaCreditoNI_request</con:request>
+                <con:response>ConfirmacionSolicitudPrestamoTarjetaCreditoNI_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

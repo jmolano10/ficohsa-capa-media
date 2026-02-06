@@ -1,0 +1,59 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Proxy as PagosMasivos.proxy
+    participant Internal as PagosMasivosInterno.proxy
+    participant InternalPA as PagosMasivosInternoPA.proxy
+    participant BitacoraDB as registraBitacoraPagosMasivosRG_db
+    participant ValidaAccesoMTR as validaAccesoPMS (MTR)
+    participant CargadorMTR as cargadorArchivoLote (MTR)
+    participant MapeoErr as MapeoErrores.proxy
+
+    Note over Client, MapeoErr: Flujo Panamá (PA01) - PagosMasivos<br/>IDÉNTICO A GT01 excepto: SourceBank=PA01, countryCode=PA01, XQuery con sufijo PA
+
+    Client->>Proxy: SOAP Request
+    Note right of Client: Header: SourceBank=PA01
+
+    Proxy->>Proxy: Validar Autenticación
+    Proxy->>Internal: Forward Request
+
+    Internal->>Internal: Validación XSD
+    Internal->>Internal: Validación Servicio Regional (FICBCO0231, PA01)
+
+    Internal->>Internal: Enrutamiento Regional
+    Note right of Internal: Branch: SourceBank = 'PA01'<br/>Route to: PagosMasivosInternoPA
+
+    Internal->>InternalPA: Forward Request
+
+    InternalPA->>InternalPA: Generar UUID Bitácora Request
+    InternalPA->>BitacoraDB: registraBitacoraPagosMasivosRG (REQ)
+    Note right of InternalPA: PV_COUNTRY_CODE: PA01
+
+    InternalPA->>ValidaAccesoMTR: validaAccesoPMS
+    ValidaAccesoMTR-->>InternalPA: status, message
+
+    alt Cliente Sin Acceso
+        InternalPA->>Client: SOAP Response con Error
+    end
+
+    InternalPA->>InternalPA: Transformar Request
+    Note right of InternalPA: XQuery: pagosMasivosInternoPAIn.xq<br/>pais: PA, empresa: 01
+
+    InternalPA->>InternalPA: Validar WSDL
+    InternalPA->>CargadorMTR: cargarLotes
+
+    CargadorMTR-->>InternalPA: cargarLotesResponse
+
+    InternalPA->>InternalPA: Construir Response Header
+    Note right of InternalPA: XQuery: pagosMasivosInternoPAHeaderOut.xq
+
+    InternalPA->>InternalPA: Transformar Response Body
+    Note right of InternalPA: XQuery: pagosMasivosInternoPAOut.xq
+
+    InternalPA->>BitacoraDB: registraBitacoraPagosMasivosRG (RSP)
+    Note right of InternalPA: PV_COUNTRY_CODE: PA01
+
+    InternalPA->>Internal: Response
+    Internal->>Proxy: Response
+    Proxy->>Client: SOAP Response
+
+    Note over Client, MapeoErr: Flujo de Error (idéntico a GT01)

@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/SolicitudPinTC/wsdl/solicitudPinTCPS"/>
+            <con:binding>
+                <con:name>solicitudPinTCPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/solicitudPinTCPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-3670986622144406015-1ffe1c7a.16bdd34a73f.-74d7" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="error" name="_onErrorHandler-3670986622144406015-1ffe1c7a.16bdd34a73f.-74d7">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="errorCode">
+                        <con1:id>_ActionId-3670986622144406015-1ffe1c7a.16bdd34a73f.-73c3</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessage">
+                        <con1:id>_ActionId-3670986622144406015-1ffe1c7a.16bdd34a73f.-73a6</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-3670986622144406015-1ffe1c7a.16bdd34a73f.-736c</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $errorMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-3670986622144406015-1ffe1c7a.16bdd34a73f.-734f</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ges:solicitudPinTCResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-3670986622144406015-1ffe1c7a.16bdd34a73f.-7332</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="SolicitudPinTC_PA_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="cond"/>
+                    <con1:userNsDecl namespace="http://www.procesa.com/fdcs" prefix="vis"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="codPais">
+                        <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7f7b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                </con1:param>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>'OSB-ISO3'</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7f6a</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataPA/conDatoTarjeta/biz/conDatoTarjeta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>conDatoTarjeta</con2:operation>
+                        <con2:request>
+                            <con2:body>REQconDatoTarjeta</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPconDatoTarjeta</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQconDatoTarjeta">
+                                <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7f54</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MasterDataPA/xq/conDatoTarjetaIn"/>
+                                        <con1:param name="codigoPais">
+                                            <con1:path>$codPais</con1:path>
+                                        </con1:param>
+                                        <con1:param name="cardNumber">
+                                            <con1:path>string($body/ges:solicitudPinTC/CARD_NUMBER/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="org">
+                                            <con1:path>""</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:validate>
+                                <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7f27</con1:id>
+                                <con2:schema ref="Middleware/v2/BusinessServices/MasterDataPA/conDatoTarjeta/xsd/conDatoTarjeta_sp"/>
+                                <con2:schemaElement xmlns:con3="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta">con3:InputParameters</con2:schemaElement>
+                                <con2:varName>REQconDatoTarjeta</con2:varName>
+                            </con2:validate>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7f10</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if(string($RSPconDatoTarjeta/cond:CodigoError/text()) != '-1')then(
+	string($RSPconDatoTarjeta/cond:CodigoError/text())
+)else(
+	'Success'
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7ef7</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if($errorCode != 'Success')then(
+	string($RSPconDatoTarjeta/cond:MensajeError/text())
+)else(
+	''
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="org">
+                                <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7e61</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSPconDatoTarjeta/cond:RowSet/cond:Row[1]/cond:Column[upper-case(@name) = 'ORG']/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="seqCard">
+                                <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7e42</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSPconDatoTarjeta/cond:RowSet/cond:Row[1]/cond:Column[upper-case(@name) = 'SEQCARD']/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7edb</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7ea5</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>PINSuppressionUpdate</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQPINSuppressionUpdate</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPPINSuppressionUpdate</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQPINSuppressionUpdate">
+                                            <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7e7f</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/VisionPlus/xq/PINSuppressionUpdateIn"/>
+                                                    <con1:param name="pinSuppression">
+                                                        <con1:path>'0'</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="numTarjeta">
+                                                        <con1:path>string($body/ges:solicitudPinTC/CARD_NUMBER/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="seqCard">
+                                                        <con1:path>$seqCard</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="org">
+                                                        <con1:path>$org</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:validate>
+                                            <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7de6</con1:id>
+                                            <con2:schema ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/xsd/XMLSchema_769155616"/>
+                                            <con2:schemaElement xmlns:fdcs="http://www.procesa.com/fdcs">fdcs:PINSuppressionUpdateRequest</con2:schemaElement>
+                                            <con2:varName>REQPINSuppressionUpdate</con2:varName>
+                                        </con2:validate>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7e2b</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if(string($RSPPINSuppressionUpdate/ServiceReturnCode/text()) != 'P')then(
+	string($RSPPINSuppressionUpdate/ServiceReturnCode/text())
+)else(
+	'Success'
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7e12</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != 'Success')then(
+	string($RSPPINSuppressionUpdate/vis:ReturnCodes/RC[1]/Desc[1]/text()) 
+)else(
+	''
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7dcf</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7db2</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>CardActionUpdate</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQcardActionUpdate</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPcardActionUpdate</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQcardActionUpdate">
+                                            <con1:id>_ActionId-6596682465500893916--719578be.16c0547521d.-7e99</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/VisionPlus/xq/cardActionUpdateIn"/>
+                                                    <con1:param name="pinSupression">
+                                                        <con1:path>"0"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="sequenceCard">
+                                                        <con1:path>$seqCard</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="cardNumber">
+                                                        <con1:path>string($body/ges:solicitudPinTC/CARD_NUMBER/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="action">
+                                                        <con1:path>"5"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="org">
+                                                        <con1:path>$org</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7d8a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if(string($RSPcardActionUpdate/ServiceReturnCode/text()) != 'P')then(
+	string($RSPcardActionUpdate/ServiceReturnCode/text())
+)else(
+	'Success'
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-9178103901758687729--7d87593e.16be6233f0f.-7d75</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != 'Success')then(
+	string($RSPcardActionUpdate/vis:ReturnCodes/RC[1]/Desc[1]/text()) 
+)else(
+	''
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="SolicitudPinTC_PA_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-3670986622144406015-1ffe1c7a.16bdd34a73f.-744e</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+{
+	if($validationMessage = '')then(
+		<successIndicator>Success</successIndicator>
+	)else(
+		<successIndicator>ERROR</successIndicator>,
+		<messages>{ $validationMessage }</messages>
+	)
+}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-3670986622144406015-1ffe1c7a.16bdd34a73f.-7431</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ges:solicitudPinTCResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="SolicitudPinTC_PA">
+                <con:request>SolicitudPinTC_PA_request</con:request>
+                <con:response>SolicitudPinTC_PA_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

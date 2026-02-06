@@ -1,0 +1,248 @@
+<bpel:process name="sjConsultaProductos" targetNamespace="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/consultaProductos/flow/sjConsultaProductos" bea:name="sjConsultaProductos" xmlns:tns="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/consultaProductos/flow/sjConsultaProductos" xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable" xmlns:rescon="http://www.bea.com/alsb/flow/resources/config" xmlns:bea="http://www.bea.com/bpel/ui/extensions" xmlns:ext="http://www.bea.com/bpel/extensions" xmlns:expr="http://www.bea.com/wli/sb/stages/config" xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config" xmlns:bind="http://www.ficohsa.com.hn/middleware.services/sjConsultaProductos" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ns1="T24WebServicesImpl" xmlns:ns0="http://xmlns.oracle.com/pcbpel/adapter/db/InterbancaSOAApplication/ConsultaGeneralPrestamo/consultaGeneralPrestamo">
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjConsultaProductos" partnerLinkType="tns:sjConsultaProductos" myRole="sjConsultaProductos">
+	       </bpel:partnerLink>
+	   <bpel:partnerLink name="consultaCuentasBS" partnerLinkType="tns:consultaCuentasBS_plnkType" partnerRole="consultaCuentasBS_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="consultaGeneralPrestamoBS" partnerLinkType="tns:consultaGeneralPrestamoBS_plnkType" partnerRole="consultaGeneralPrestamoBS_PartnerRole">
+	   </bpel:partnerLink></bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request" messageType="bind:sjConsultaProductosRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response" messageType="bind:sjConsultaProductosResponse">
+	       </bpel:variable>
+    <bpel:variable name="accountCount" type="xsd:integer"/>
+    <bpel:variable name="loanCount" type="xsd:integer"/>
+    <bpel:variable name="accountList" type="xsd:string">
+    </bpel:variable>
+    <bpel:variable name="loanList" type="xsd:string"/></bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjConsultaProductos" operation="consultaProductos" variable="request" createInstance="yes">
+	           <rescon:receiveInfo>
+                
+            <rescon:wsdl ref="Middleware/v2/BusinessServices/SJS/consultaProductos/wsdl/sjConsultaProductos" binding="bind:sjConsultaProductosPSSOAP"/></rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:assign>
+        	<bpel:extensionAssignOperation>
+        		<trf:assign varName="response.outputParameters">
+        			<trf:expr>
+        				<expr:xqueryText>&lt;bind:sjConsultaProductosResponse>
+	&lt;bind:PRODUCTS/>
+&lt;/bind:sjConsultaProductosResponse></expr:xqueryText></trf:expr></trf:assign>
+        	</bpel:extensionAssignOperation>
+        
+	
+	
+	<bpel:extensionAssignOperation>
+		<bpel:documentation/>
+		<trf:assign varName="accountCount">
+			<trf:expr>
+				<expr:xqueryText>fn:count($request.inputParameters/bind:PRODUCTS/bind:PRODUCT[bind:TYPE="CTA"])</expr:xqueryText></trf:expr></trf:assign>
+	</bpel:extensionAssignOperation>
+	<bpel:extensionAssignOperation>
+		<bpel:documentation/>
+		<trf:assign varName="loanCount">
+			<trf:expr>
+				<expr:xqueryText>fn:count($request.inputParameters/bind:PRODUCTS/bind:PRODUCT[bind:TYPE="PTM"])</expr:xqueryText></trf:expr></trf:assign>
+	</bpel:extensionAssignOperation></bpel:assign>
+        
+        
+        
+        <bpel:flow>
+        	<bpel:scope bea:name="Cuentas">
+        		
+        		<bpel:sequence>
+        			<bpel:if>
+        				<bpel:condition>$accountCount > 0</bpel:condition>
+        				<bpel:sequence>
+        					<bpel:empty/>
+        				<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<bpel:documentation/>
+			<trf:assign varName="accountList">
+				<trf:expr>
+					<expr:xqueryText>fn:string-join($request.inputParameters/bind:PRODUCTS/bind:PRODUCT[bind:TYPE="CTA"]/bind:ID/text(),",")</expr:xqueryText></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+        				</bpel:assign>
+	<bpel:forEach parallel="yes" counterName="accountCounter">
+		<bpel:startCounterValue>number(1)</bpel:startCounterValue>
+		<bpel:finalCounterValue>number($accountCount)</bpel:finalCounterValue>
+		<bpel:scope>
+			<bpel:variables>
+				<bpel:variable name="accountNumber" type="xsd:string"/>
+				<bpel:variable name="REQConsCuenta" messageType="ns1:Consultadedetallesdelacuenta">
+				</bpel:variable>
+				<bpel:variable name="RSPConsCuenta" messageType="ns1:ConsultadedetallesdelacuentaResponse">
+				</bpel:variable></bpel:variables>
+			<bpel:faultHandlers>
+				
+				<bpel:catchAll>
+					<bpel:sequence>
+						<bpel:empty/>
+					<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./bind:PRODUCTS</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText><![CDATA[<bind:PRODUCT>
+	<bind:TYPE>CTA</bind:TYPE>
+	<bind:TYPE>{ $accountNumber }</bind:TYPE>
+	<bind:SUCCESS_INDICATOR>ERROR</bind:SUCCESS_INDICATOR>
+	<bind:MESSAGE>Error obteniendo informacion de cuenta</bind:MESSAGE>
+</bind:PRODUCT>]]></expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+				</bpel:catchAll></bpel:faultHandlers>
+			<bpel:sequence>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:assign varName="accountNumber">
+							<trf:expr>
+								<expr:xqueryText>fn:tokenize($accountList,",")[xs:int($accountCounter)]</expr:xqueryText></trf:expr></trf:assign>
+					</bpel:extensionAssignOperation>
+					<bpel:extensionAssignOperation>
+						<trf:assign varName="REQConsCuenta.parameters">
+							<trf:expr>
+								<expr:xqueryTransform>
+									<expr:resource ref="Middleware/v2/Resources/Genericos/consultaDetalleCuentaHNIn"/>
+									
+									
+									
+									
+									
+									
+									
+									
+									<expr:param name="password">
+										<expr:path>fn:string($request.inputParameters/bind:LDAP_PASSWORD/text())</expr:path></expr:param>
+									<expr:param name="username">
+										<expr:path>fn:string($request.inputParameters/bind:LDAP_USERNAME/text())</expr:path></expr:param>
+									<expr:param name="accountNumber">
+										<expr:path>$accountNumber</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+					</bpel:extensionAssignOperation>
+				</bpel:assign>
+				<bpel:invoke operation="Consultadedetallesdelacuenta" outputVariable="RSPConsCuenta" partnerLink="consultaCuentasBS" inputVariable="REQConsCuenta">
+					<rescon:invokeInfo><rescon:service ref="Middleware/Business_Resources/ConsultasCuenta/Resources/consultaCuentasBS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/></rescon:invokeInfo></bpel:invoke>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:insert varName="response.outputParameters">
+							<trf:location>
+								<expr:xpathText>./bind:PRODUCTS</expr:xpathText></trf:location>
+							<trf:where>last-child</trf:where>
+							<trf:expr>
+								<expr:xqueryTransform>
+									<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaProductos/xq/sjConsultaCuentasOut"/>
+									
+									
+									
+									
+									<expr:param name="accountNumber">
+										<expr:path>$accountNumber</expr:path></expr:param>
+									<expr:param name="consultadedetallesdelacuentaResponse1">
+										<expr:path>$RSPConsCuenta.parameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+		</bpel:scope>
+        				</bpel:forEach>
+	
+        				
+        				
+        				</bpel:sequence>
+        				<bpel:else>
+        					<bpel:sequence>
+        						<bpel:empty/>
+        					</bpel:sequence>
+        				</bpel:else>
+        			</bpel:if></bpel:sequence>
+        	</bpel:scope>
+        	<bpel:scope bea:name="Prestamos">
+        		
+        		<bpel:sequence>
+        			<bpel:if>
+        				<bpel:condition>$loanCount > 0</bpel:condition>
+        				<bpel:sequence>
+        					<bpel:empty/>
+        				<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<bpel:documentation/>
+			<trf:assign varName="loanList">
+				<trf:expr>
+					<expr:xqueryText>fn:string-join($request.inputParameters/bind:PRODUCTS/bind:PRODUCT[bind:TYPE="PTM"]/bind:ID/text(),",")</expr:xqueryText></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+        				</bpel:assign>
+	<bpel:forEach parallel="yes" counterName="loanCounter">
+		<bpel:startCounterValue>number(1)</bpel:startCounterValue>
+		<bpel:finalCounterValue>number($loanCount)</bpel:finalCounterValue>
+		<bpel:scope>
+			<bpel:variables>
+				<bpel:variable name="loanNumber" type="xsd:string"/>
+				<bpel:variable name="RSPConsPtmo" messageType="ns0:args_out_msg">
+				</bpel:variable>
+				<bpel:variable name="REQConsPtmo" messageType="ns0:args_in_msg">
+				</bpel:variable></bpel:variables>
+			<bpel:faultHandlers>
+				<bpel:catchAll>
+					<bpel:sequence>
+						<bpel:empty/>
+					<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./bind:PRODUCTS</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText><![CDATA[<bind:PRODUCT>
+	<bind:TYPE>PTM</bind:TYPE>
+	<bind:TYPE>{ $loanNumber }</bind:TYPE>
+	<bind:SUCCESS_INDICATOR>ERROR</bind:SUCCESS_INDICATOR>
+	<bind:MESSAGE>Error obteniendo informacion de prestamo</bind:MESSAGE>
+</bind:PRODUCT>]]></expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+				</bpel:catchAll></bpel:faultHandlers>
+			<bpel:sequence>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:assign varName="loanNumber">
+							<trf:expr>
+								<expr:xqueryText>fn:tokenize($loanList,",")[xs:int($loanCounter)]</expr:xqueryText></trf:expr></trf:assign>
+					</bpel:extensionAssignOperation>
+					<bpel:extensionAssignOperation>
+						<trf:assign varName="REQConsPtmo.InputParameters">
+							<trf:expr>
+								<expr:xqueryTransform>
+									<expr:resource ref="Middleware/v2/Resources/Genericos/consultaPtmoAbanksHNIn"/>
+									
+									<expr:param name="loanNumber">
+	<expr:path>$loanNumber</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+				<bpel:invoke operation="consultaGeneralPrestamo" outputVariable="RSPConsPtmo" partnerLink="consultaGeneralPrestamoBS" inputVariable="REQConsPtmo">
+					<rescon:invokeInfo><rescon:service ref="Middleware/Business_Resources/consultaGeneralPrestamo/Resources/consultaGeneralPrestamoBS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/></rescon:invokeInfo></bpel:invoke>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:insert varName="response.outputParameters">
+							<trf:location>
+								<expr:xpathText>./bind:PRODUCTS</expr:xpathText></trf:location>
+							<trf:where>last-child</trf:where>
+							<trf:expr>
+								<expr:xqueryTransform>
+									<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaProductos/xq/sjConsultaPtmoOut"/>
+									
+									
+									<expr:param name="loanNumber">
+										<expr:path>$loanNumber</expr:path></expr:param>
+									<expr:param name="outputParameters1">
+										<expr:path>$RSPConsPtmo.OutputParameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+		</bpel:scope>
+        				</bpel:forEach>
+	
+	
+	</bpel:sequence>
+        				<bpel:else>
+        					<bpel:sequence>
+        						<bpel:empty/>
+        					</bpel:sequence>
+        				</bpel:else>
+        			</bpel:if></bpel:sequence>
+        	</bpel:scope>
+        </bpel:flow>
+        <bpel:reply partnerLink="sjConsultaProductos" operation="consultaProductos" variable="response"/>
+    </bpel:sequence>
+</bpel:process>

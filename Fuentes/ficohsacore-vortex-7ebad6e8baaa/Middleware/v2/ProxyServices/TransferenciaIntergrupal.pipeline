@@ -1,0 +1,2106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/TransferenciaCuentas/wsdl/transferenciaCuentasPS"/>
+            <con:binding>
+                <con:name>transferenciaCuentasPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/transferenciaCuentasPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-845924723285002581-53bc0aac.1733ed99b00.-7e5e" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+        <con:pipeline type="error" name="_onErrorHandler-845924723285002581-53bc0aac.1733ed99b00.-7e5e">
+            <con:stage name="ReplyAction">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7a6f</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7a56</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;tran:transferenciaCuentasResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply isError="true">
+                        <con1:id>_ActionId-845924723285002581-53bc0aac.1733ed99b00.-7e5c</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="TransferenciaIntergrupal_request">
+            <con:stage name="Variables">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="ServiceID">
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-41a7</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>"FICL00054"</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="SourceAndDestination">
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-41a5</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>concat(data($header/aut:RequestHeader/Region/SourceBank),data($header/aut:RequestHeader/Region/DestinationBank))</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="TransactionType">
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-41a4</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE/KV_PAIR[$body/tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE/KV_PAIR/KEY/text() = "TRANSACTION_TYPE"]/VALUE</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="ParamList">
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-41a3</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>(: CredAcctSrcBank; DebAcctCorrBank; CredAcctCorrBank; DebAcctDestBank :)
+let $sourceBank := fn:string($header/aut:RequestHeader/Region/SourceBank/text())
+let $destinationBank := fn:string($header/aut:RequestHeader/Region/DestinationBank/text())
+return(
+	if($sourceBank = "HN01" and $destinationBank = "NI01" or $sourceBank = "NI01" and $destinationBank = "HN01")then(
+		fn:concat(
+			$ServiceID,".",$SourceAndDestination,".",$TransactionType,".USD.ACCT.CREDIT", "||", 
+			$ServiceID,".",$sourceBank,".",$TransactionType,".USD.ACCT.CORR", "||",
+			$ServiceID,".",$destinationBank,".",$TransactionType,".USD.ACCT.CORR", "||", 
+			$ServiceID,".",$SourceAndDestination,".",$TransactionType,".USD.ACCT.DEBIT"
+		)		
+	)else if($sourceBank = "GT01" and $destinationBank = "NI01" or $sourceBank = "NI01" and $destinationBank = "GT01")then(
+		fn:concat(
+			$ServiceID,".",$sourceBank,".",$TransactionType,".USD.ACCT.CORR", "||",
+			$ServiceID,".",$destinationBank,".",$TransactionType,".USD.ACCT.CORR"
+		)		
+	)else if($sourceBank = "PA01")then(		
+		fn:concat($ServiceID,".",$destinationBank,".",$TransactionType,".USD.ACCT.CORR")
+	)else(
+		fn:concat($ServiceID,".",$sourceBank,".",$TransactionType,".USD.ACCT.CORR")
+	)
+)</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="TempHeader">
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-41a2</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$header</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="TempBody">
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-41a1</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/tran:transferenciaCuentasRequest</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="uuid">
+                        <con1:id>_ActionId-7187677305286757771--379b663e.17ce6d8e131.-7db9</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-419b</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerParametrizacion</con2:operation>
+                        <con2:request>
+                            <con2:body>ParamNameList</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>ParamValueList</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="ParamNameList">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-41a0</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con1:param name="nombreParametros">
+                                            <con1:path>$ParamList</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="SuccessIndicator">
+                                <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-405d</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($ParamValueList/osb:ERROR_CODE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="ErrorDescription">
+                                <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-4040</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($ParamValueList/osb:ERROR_MESSAGE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="CuentaDestinoBcoOrigen">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-419f</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($ParamValueList/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM
+[
+	osb:NAME = concat($ServiceID,".",$SourceAndDestination,".",$TransactionType,".USD.ACCT.CREDIT")
+]/osb:VALUE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="CuentaOrigenBcoCorresponsal">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-419e</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($ParamValueList/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM
+[
+	osb:NAME = concat($ServiceID,".",data($header/aut:RequestHeader/Region/SourceBank),".",$TransactionType,".USD.ACCT.CORR")
+]/osb:VALUE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="CuentaDestinoBcoCorresponsal">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-419d</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($ParamValueList/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM
+[
+	osb:NAME = concat($ServiceID,".",data($header/aut:RequestHeader/Region/DestinationBank),".",$TransactionType,".USD.ACCT.CORR")
+]/osb:VALUE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="CuentaOrigenBcoDestino">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-419c</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($ParamValueList/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM
+[
+	osb:NAME = concat($ServiceID,".",$SourceAndDestination,".",$TransactionType,".USD.ACCT.DEBIT")
+]/osb:VALUE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-419a</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>(: REGIONAL_DETAILS/DESTINATION !Exists:)
+string(data($body/tran:transferenciaCuentasRequest/REGIONAL_DETAILS/DESTINATION))</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions/>
+                        </con2:case>
+                        <con2:default>
+                            <con2:insert varName="body">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4199</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./tran:transferenciaCuentasRequest/REGIONAL_DETAILS</con1:xpathText>
+                                </con2:location>
+                                <con2:where>last-child</con2:where>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;DESTINATION/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:insert>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaDetallesCuentas">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-4008</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>upper-case($SuccessIndicator) = "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="TempHeader" contents-only="true">
+                                    <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-4006</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./aut:RequestHeader/Region/DestinationBank</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:wsCallout>
+                                    <con1:comment>ConsultaCuentaOrigen</con1:comment>
+                                    <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ff6</con1:id>
+                                    <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/ConsultaDetallesCuenta" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaDetallesCuenta</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQBodySourceAccount</con2:body>
+                                        <con2:header>REQHeaderSourceAccount</con2:header>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RESBodySourceAccount</con2:body>
+                                        <con2:header>RSPHeaderSourceAccount</con2:header>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQHeaderSourceAccount">
+                                            <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ffd</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$TempHeader</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="REQBodySourceAccount">
+                                            <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ffc</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetallesCuentaIn_Generic"/>
+                                                    <con1:param name="accountNumber">
+                                                        <con1:path>data($body/tran:transferenciaCuentasRequest/DEBIT_ACCOUNT)</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="SourceAccountCategory">
+                                            <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ffb</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RESBodySourceAccount/con:consultaDetallesCuentaResponseType/con:consultaDetallesCuentaResponseRecordType/CATEGORY/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="SourceAccountCurrency">
+                                            <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ffa</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RESBodySourceAccount/con:consultaDetallesCuentaResponseType/con:consultaDetallesCuentaResponseRecordType/CURRENCY/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="SourceAccountOwner">
+                                            <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ff9</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RESBodySourceAccount/con:consultaDetallesCuentaResponseType/con:consultaDetallesCuentaResponseRecordType/ACCOUNT_NAME/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="SuccessIndicator">
+                                            <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ff8</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPHeaderSourceAccount/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="ErrorDescription">
+                                            <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ff7</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPHeaderSourceAccount/aut:ResponseHeader/messages/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7dc7</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case($SuccessIndicator) = "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="TempHeader" contents-only="true">
+                                    <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ff2</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$header/aut:RequestHeader/Region/DestinationBank/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="TempHeader" contents-only="true">
+                                    <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-3ff4</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./aut:RequestHeader/Region/DestinationBank</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$header/aut:RequestHeader/Region/DestinationBank/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:wsCallout>
+                                    <con1:comment>ConsultaCuentaOrigen</con1:comment>
+                                    <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7dbb</con1:id>
+                                    <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/ConsultaDetallesCuenta" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaDetallesCuenta</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQBodyTargetAccount</con2:body>
+                                        <con2:header>REQHeaderTargetAccount</con2:header>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RESBodyTargetAccount</con2:body>
+                                        <con2:header>RSPHeaderTargetAccount</con2:header>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQHeaderTargetAccount">
+                                            <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7dc0</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$TempHeader</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="REQBodyTargetAccount">
+                                            <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7dbf</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaDetallesCuenta/xq/consultaDetallesCuentaIn_Generic"/>
+                                                    <con1:param name="accountNumber">
+                                                        <con1:path>data($body/tran:transferenciaCuentasRequest/CREDIT_ACCOUNT)</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="TargetAccountCategory">
+                                            <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7dbe</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RESBodyTargetAccount/con:consultaDetallesCuentaResponseType/con:consultaDetallesCuentaResponseRecordType/CATEGORY/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="TargetAccountCurrency">
+                                            <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7dbd</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RESBodyTargetAccount/con:consultaDetallesCuentaResponseType/con:consultaDetallesCuentaResponseRecordType/CURRENCY/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="TargetAccountOwner">
+                                            <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7dbc</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RESBodyTargetAccount/con:consultaDetallesCuentaResponseType/con:consultaDetallesCuentaResponseRecordType/ACCOUNT_NAME/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="SuccessIndicator">
+                                            <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d9f</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPHeaderTargetAccount/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="ErrorDescription">
+                                            <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d7d</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPHeaderTargetAccount/aut:ResponseHeader/messages/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="CalculoMontos">
+                <con:comment/>
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ConvertidorMonedaTypes" prefix="con"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaTasaCambioTypes" prefix="ctc"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d5d</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case($SuccessIndicator) = "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="transferType">
+                                    <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d5b</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>fn:string($body/tran:transferenciaCuentasRequest/DEBIT_CREDIT/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="TempHeader">
+                                    <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d59</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>$header</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="ConsultaTasaHeader">
+                                    <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d57</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>$header</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="AmountAtSource">
+                                    <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d55</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>string($body/tran:transferenciaCuentasRequest/TRANSFER_AMOUNT/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="UsdAmount">
+                                    <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d53</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>string($body/tran:transferenciaCuentasRequest/TRANSFER_AMOUNT/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="AmountAtDestination">
+                                    <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d51</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>string($body/tran:transferenciaCuentasRequest/TRANSFER_AMOUNT/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d3e</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$transferType = "CREDIT" and $TargetAccountCurrency != "USD"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:assign varName="Path">
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d3d</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryText>2</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:assign>
+                                            <con2:replace varName="ConsultaTasaHeader" contents-only="true">
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d3c</con1:id>
+                                                <con2:location>
+                                                    <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                                                </con2:location>
+                                                <con2:expr>
+                                                    <con1:xqueryText>$header/aut:RequestHeader/Region/DestinationBank/text()</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:replace>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d37</con1:id>
+                                                <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/ConsultaTasaCambio" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>consultaTasaCambio</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQconsultaTasaCambio</con2:body>
+                                                    <con2:header>REQHconsultaTasaCambio</con2:header>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPconsultaTasaCambio</con2:body>
+                                                    <con2:header>RSPHconsultaTasaCambio</con2:header>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con1:assign varName="REQHconsultaTasaCambio" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d3b</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$ConsultaTasaHeader</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="REQconsultaTasaCambio" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d3a</con3:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                                <con2:resource ref="Middleware/v2/Resources/ConsultaTasaCambio/xq/ConsultaTasaCambioIn_StringParams"/>
+                                                                <con2:param name="SOURCE_CURRENCY">
+                                                                    <con2:path>$TargetAccountCurrency</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="TARGET_CURRENCY">
+                                                                    <con2:path>'USD'</con2:path>
+                                                                </con2:param>
+                                                            </con2:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con1:assign varName="SellRate" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d39</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">xs:double($RSPconsultaTasaCambio/ctc:consultaTasaCambioResponseType/ctc:consultaTasaCambioResponseRecordType/SELL_RATE/text())</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="BuyRate" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d38</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">xs:double($RSPconsultaTasaCambio/ctc:consultaTasaCambioResponseType/ctc:consultaTasaCambioResponseRecordType/BUY_RATE/text())</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con2:assign varName="SuccessIndicator">
+                                                        <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-759a</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($RSPHconsultaTasaCambio/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="ErrorDescription">
+                                                        <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-757b</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($RSPHconsultaTasaCambio/aut:ResponseHeader/messages/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                            <con2:assign varName="AmountAtSource">
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d36</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryText>fn:round-half-to-even((xs:double($body/tran:transferenciaCuentasRequest/TRANSFER_AMOUNT/text()) div xs:double($BuyRate)), 4)</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:assign>
+                                            <con2:assign varName="UsdAmount">
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d35</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryText>fn:round-half-to-even((xs:double($body/tran:transferenciaCuentasRequest/TRANSFER_AMOUNT/text()) div xs:double($BuyRate)), 4)</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:assign>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$transferType = "DEBIT" and $SourceAccountCurrency != "USD"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:replace varName="ConsultaTasaHeader" contents-only="true">
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d34</con1:id>
+                                                <con2:location>
+                                                    <con1:xpathText>./aut:RequestHeader/Region/DestinationBank</con1:xpathText>
+                                                </con2:location>
+                                                <con2:expr>
+                                                    <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text()</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:replace>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d2f</con1:id>
+                                                <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/ConsultaTasaCambio" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>consultaTasaCambio</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQconsultaTasaCambio</con2:body>
+                                                    <con2:header>REQHconsultaTasaCambio</con2:header>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPconsultaTasaCambio</con2:body>
+                                                    <con2:header>RSPHconsultaTasaCambio</con2:header>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con1:assign varName="REQHconsultaTasaCambio" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d33</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$ConsultaTasaHeader</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="REQconsultaTasaCambio" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d32</con3:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                                <con2:resource ref="Middleware/v2/Resources/ConsultaTasaCambio/xq/ConsultaTasaCambioIn_StringParams"/>
+                                                                <con2:param name="SOURCE_CURRENCY">
+                                                                    <con2:path>$SourceAccountCurrency</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="TARGET_CURRENCY">
+                                                                    <con2:path>'USD'</con2:path>
+                                                                </con2:param>
+                                                            </con2:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con1:assign varName="SellRate" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d31</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">xs:double($RSPconsultaTasaCambio/ctc:consultaTasaCambioResponseType/ctc:consultaTasaCambioResponseRecordType/SELL_RATE/text())</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="BuyRate" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d30</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">xs:double($RSPconsultaTasaCambio/ctc:consultaTasaCambioResponseType/ctc:consultaTasaCambioResponseRecordType/BUY_RATE/text())</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con2:assign varName="SuccessIndicator">
+                                                        <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-755a</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($RSPHconsultaTasaCambio/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="ErrorDescription">
+                                                        <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7548</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($RSPHconsultaTasaCambio/aut:ResponseHeader/messages/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                            <con2:assign varName="UsdAmount">
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d2e</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryText>fn:round-half-to-even((xs:double($body/tran:transferenciaCuentasRequest/TRANSFER_AMOUNT/text()) div xs:double($SellRate)),4)</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:assign>
+                                            <con2:assign varName="AmountAtDestination">
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7d2d</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryText>fn:round-half-to-even((xs:double($body/tran:transferenciaCuentasRequest/TRANSFER_AMOUNT/text()) div xs:double($SellRate)),4)</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:assign>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$transferType = "CREDIT" and $SourceAccountCurrency != "USD"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:replace varName="ConsultaTasaHeader" contents-only="true">
+                                                <con1:id>_ActionId-5788967740533372580-5375d3c4.17d0bd2c780.-7f7d</con1:id>
+                                                <con2:location>
+                                                    <con1:xpathText>./aut:RequestHeader/Region/DestinationBank</con1:xpathText>
+                                                </con2:location>
+                                                <con2:expr>
+                                                    <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text()</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:replace>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-5788967740533372580-5375d3c4.17d0bd2c780.-7ff1</con1:id>
+                                                <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/ConsultaTasaCambio" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>consultaTasaCambio</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQconsultaTasaCambio</con2:body>
+                                                    <con2:header>REQHconsultaTasaCambio</con2:header>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPconsultaTasaCambio</con2:body>
+                                                    <con2:header>RSPHconsultaTasaCambio</con2:header>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQHconsultaTasaCambio">
+                                                        <con1:id>_ActionId-5788967740533372580-5375d3c4.17d0bd2c780.-7fc8</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>$ConsultaTasaHeader</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="REQconsultaTasaCambio">
+                                                        <con1:id>_ActionId-5788967740533372580-5375d3c4.17d0bd2c780.-7fa4</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ConsultaTasaCambio/xq/ConsultaTasaCambioIn_StringParams"/>
+                                                                <con1:param name="SOURCE_CURRENCY">
+                                                                    <con1:path>$SourceAccountCurrency</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="TARGET_CURRENCY">
+                                                                    <con1:path>'USD'</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con2:assign varName="SellRate">
+                                                        <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-78da</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>xs:double($RSPconsultaTasaCambio/ctc:consultaTasaCambioResponseType/ctc:consultaTasaCambioResponseRecordType/SELL_RATE/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="BuyRate">
+                                                        <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-788d</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>xs:double($RSPconsultaTasaCambio/ctc:consultaTasaCambioResponseType/ctc:consultaTasaCambioResponseRecordType/BUY_RATE/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="SuccessIndicator">
+                                                        <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7851</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($RSPHconsultaTasaCambio/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="ErrorDescription">
+                                                        <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7816</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($RSPHconsultaTasaCambio/aut:ResponseHeader/messages/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                            <con2:assign varName="AmountAtSource">
+                                                <con1:id>_ActionId-5788967740533372580-5375d3c4.17d0bd2c780.-7efd</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryText>fn:round-half-to-even((xs:double($body/tran:transferenciaCuentasRequest/TRANSFER_AMOUNT/text()) * xs:double($SellRate)), 4)</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:assign>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$transferType = "DEBIT" and $TargetAccountCurrency != "USD"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:replace varName="ConsultaTasaHeader" contents-only="true">
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7975</con1:id>
+                                                <con2:location>
+                                                    <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                                                </con2:location>
+                                                <con2:expr>
+                                                    <con1:xqueryText>$header/aut:RequestHeader/Region/DestinationBank/text()</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:replace>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7861</con1:id>
+                                                <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/ConsultaTasaCambio" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>consultaTasaCambio</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQconsultaTasaCambio</con2:body>
+                                                    <con2:header>REQHconsultaTasaCambio</con2:header>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPconsultaTasaCambio</con2:body>
+                                                    <con2:header>RSPHconsultaTasaCambio</con2:header>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQHconsultaTasaCambio">
+                                                        <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-783f</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>$ConsultaTasaHeader</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con1:assign varName="REQconsultaTasaCambio" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-77bc</con3:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                                <con2:resource ref="Middleware/v2/Resources/ConsultaTasaCambio/xq/ConsultaTasaCambioIn_StringParams"/>
+                                                                <con2:param name="SOURCE_CURRENCY">
+                                                                    <con2:path>$TargetAccountCurrency</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="TARGET_CURRENCY">
+                                                                    <con2:path>'USD'</con2:path>
+                                                                </con2:param>
+                                                            </con2:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con1:assign varName="BuyRate" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-76f9</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">xs:double($RSPconsultaTasaCambio/ctc:consultaTasaCambioResponseType/ctc:consultaTasaCambioResponseRecordType/BUY_RATE/text())</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="SellRate" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-4777068883117261359-281dec5e.17d051041d7.-7768</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">xs:double($RSPconsultaTasaCambio/ctc:consultaTasaCambioResponseType/ctc:consultaTasaCambioResponseRecordType/SELL_RATE/text())</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con2:assign varName="SuccessIndicator">
+                                                        <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-7535</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($RSPHconsultaTasaCambio/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="ErrorDescription">
+                                                        <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-751f</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($RSPHconsultaTasaCambio/aut:ResponseHeader/messages/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                            <con2:assign varName="AmountAtDestination">
+                                                <con1:id>_ActionId-4777068883117261359-281dec5e.17d051041d7.-761b</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryText>fn:round-half-to-even((xs:double($body/tran:transferenciaCuentasRequest/TRANSFER_AMOUNT/text()) * xs:double($BuyRate)),4)</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:assign>
+                                        </con2:actions>
+                                    </con2:case>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BodyEnrichment">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="body">
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-415f</con1:id>
+                        <con2:location>
+                            <con1:xpathText>./tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE</con1:xpathText>
+                        </con2:location>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<SOURCE>
+	<KV_PAIR>
+		<KEY>TRANSACTION_TYPE</KEY>
+		<VALUE>{data($body/tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE/KV_PAIR[$body/tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE/KV_PAIR/KEY/text() = 'TRANSACTION_TYPE']/VALUE)}</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>ACCOUNT_OWNER</KEY>
+		<VALUE>{$SourceAccountOwner}</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>PRODUCT_TYPE</KEY>
+		<VALUE>{$SourceAccountCategory}</VALUE>
+	</KV_PAIR>	
+	<KV_PAIR>
+		<KEY>DEBIT_ACCOUNT</KEY>
+		<VALUE>{data($body/tran:transferenciaCuentasRequest/DEBIT_ACCOUNT)}</VALUE>
+	</KV_PAIR>	
+	<KV_PAIR>
+		<KEY>DEBIT_ACCOUNT_CURRENCY</KEY>
+		<VALUE>{$SourceAccountCurrency}</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>DEBIT_AMOUNT</KEY>
+		<VALUE>{$AmountAtSource}</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>USD_AMOUNT</KEY>
+		<VALUE>{$UsdAmount}</VALUE>
+	</KV_PAIR>	
+	<KV_PAIR>
+		<KEY>BANK</KEY>
+		<VALUE>{$header/aut:RequestHeader/Region/SourceBank/text()}</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>MODE</KEY>
+		<VALUE>1</VALUE>
+	</KV_PAIR>		
+	<KV_PAIR>
+		<KEY>UID</KEY>
+		<VALUE>{ $uuid }</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>COMMISSION</KEY>
+		<VALUE/>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>TRANSACTION_ID</KEY>
+		<VALUE/>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>EXCHANGE_RATE</KEY>
+		<VALUE/>
+	</KV_PAIR>	
+</SOURCE>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body">
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-415e</con1:id>
+                        <con2:location>
+                            <con1:xpathText>./tran:transferenciaCuentasRequest/REGIONAL_DETAILS/DESTINATION</con1:xpathText>
+                        </con2:location>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<DESTINATION>
+	<KV_PAIR>
+		<KEY>TRANSACTION_TYPE</KEY>
+		<VALUE>FT</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>ACCOUNT_OWNER</KEY>
+		<VALUE>{$TargetAccountOwner}</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>PRODUCT_TYPE</KEY>
+		<VALUE>{$TargetAccountCategory}</VALUE>
+	</KV_PAIR>	
+	<KV_PAIR>
+		<KEY>CREDIT_ACCOUNT</KEY>
+		<VALUE>{data($body/tran:transferenciaCuentasRequest/CREDIT_ACCOUNT)}</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>CREDIT_CURRENCY</KEY>
+		<VALUE>{$TargetAccountCurrency}</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>CREDIT_AMOUNT</KEY>
+		<VALUE>{$AmountAtDestination}</VALUE>
+	</KV_PAIR>	
+	<KV_PAIR>
+		<KEY>BANK</KEY>
+		<VALUE>{$header/aut:RequestHeader/Region/DestinationBank/text()}</VALUE>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>EXCHANGE_RATE</KEY>
+		<VALUE/>
+	</KV_PAIR>
+	<KV_PAIR>
+		<KEY>TRANSACTION_ID</KEY>
+		<VALUE/>
+	</KV_PAIR>			
+</DESTINATION>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:insert varName="body">
+                        <con1:id>_ActionId-2872727990505630667--2d543e58.17676f488b4.-7fe0</con1:id>
+                        <con2:location>
+                            <con1:xpathText>./tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE</con1:xpathText>
+                        </con2:location>
+                        <con2:where>last-child</con2:where>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[if ($header/aut:RequestHeader/Region/SourceBank/text() = "HN01" or $header/aut:RequestHeader/Region/DestinationBank/text() = "HN01") then
+(
+	if ($header/aut:RequestHeader/Region/SourceBank/text() = "HN01") then
+	<KV_PAIR>
+		<KEY>T24_IN_OUT</KEY>
+		<VALUE>ENV</VALUE>
+	</KV_PAIR>
+	else
+	<KV_PAIR>
+		<KEY>T24_IN_OUT</KEY>
+		<VALUE>REC</VALUE>
+	</KV_PAIR>
+)
+else
+(
+)]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:insert>
+                </con:actions>
+            </con:stage>
+            <con:stage name="TransferenciaPaisOrigen">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-415a</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>(: Si hay error :)
+fn:upper-case($SuccessIndicator) = "ERROR"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="SourceBankTransferStatus">
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4159</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>'Skipped'</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con1:skip>
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4158</con1:id>
+                                </con1:skip>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace contents-only="true" varName="TempHeader">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4157</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text()</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="TempHeader" contents-only="true">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4156</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./aut:RequestHeader/Region/DestinationBank</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text()</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:assign varName="SourceTempBody">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4155</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>$body/tran:transferenciaCuentasRequest</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:replace varName="SourceTempBody" contents-only="true">
+                                <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-78eb</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./CREDIT_ACCOUNT</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>if(string($TempHeader/aut:RequestHeader/Region/SourceBank/text()) = "HN01")then(
+	$CuentaDestinoBcoOrigen
+)else(
+	string($body/tran:transferenciaCuentasRequest/CREDIT_ACCOUNT/text())	
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace contents-only="true" varName="SourceTempBody">
+                                <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-78e9</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./DEBIT_CREDIT</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>if(string($TempHeader/aut:RequestHeader/Region/SourceBank/text()) = "HN01")then(
+	string($body/tran:transferenciaCuentasRequest/DEBIT_CREDIT/text())	
+)else(
+	"DEBIT"
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-2872727990505630667--2d543e58.17676f488b4.-7fa6</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$body/tran:transferenciaCuentasRequest/DEBIT_CREDIT/text() = "CREDIT"
+and
+$body/tran:transferenciaCuentasRequest/CURRENCY/text() != "USD"</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace varName="SourceTempBody" contents-only="true">
+                                            <con1:id>_ActionId-2872727990505630667--2d543e58.17676f488b4.-7f6e</con1:id>
+                                            <con2:location>
+                                                <con1:xpathText>./CURRENCY</con1:xpathText>
+                                            </con2:location>
+                                            <con2:expr>
+                                                <con1:xqueryText>"USD"</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:replace varName="SourceTempBody" contents-only="true">
+                                            <con1:id>_ActionId-2872727990505630667--2d543e58.17676f488b4.-7f51</con1:id>
+                                            <con2:location>
+                                                <con1:xpathText>./TRANSFER_AMOUNT</con1:xpathText>
+                                            </con2:location>
+                                            <con2:expr>
+                                                <con1:xqueryText>$UsdAmount</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:wsCallout>
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-414d</con1:id>
+                                <con2:service ref="Middleware/v2/ProxyServices/TransferenciaCuentasRouter" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                <con2:operation>transferenciaCuentas</con2:operation>
+                                <con2:request>
+                                    <con2:body>REQTransferenciaPaisOrigen</con2:body>
+                                    <con2:header>REQHeaderTransferenciaPaisOrigen</con2:header>
+                                </con2:request>
+                                <con2:response>
+                                    <con2:body>RSPTransferenciaPaisOrigen</con2:body>
+                                    <con2:header>RESHeaderTransferenciaPaisOrigen</con2:header>
+                                </con2:response>
+                                <con2:requestTransform>
+                                    <con2:assign varName="REQHeaderTransferenciaPaisOrigen">
+                                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4153</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>$TempHeader</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="REQTransferenciaPaisOrigen">
+                                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4152</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>$SourceTempBody</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:requestTransform>
+                                <con2:responseTransform>
+                                    <con2:assign varName="SuccessIndicator">
+                                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4151</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RESHeaderTransferenciaPaisOrigen/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="ErrorDescription">
+                                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4150</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RESHeaderTransferenciaPaisOrigen/aut:ResponseHeader/messages[1]/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="SourceTransactionID">
+                                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-414f</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>$RESHeaderTransferenciaPaisOrigen/aut:ResponseHeader/transactionId/text()</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="commision">
+                                        <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-6e37</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RSPTransferenciaPaisOrigen/COMMISSION/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="SourceExchangeRate">
+                                        <con1:id>_ActionId-1754812418546491339--baab15a.18048007f07.-7b8a</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RSPTransferenciaPaisOrigen/EXCHANGE_RATE/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:responseTransform>
+                            </con2:wsCallout>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="TransferenciaPaisDestino" errorHandler="_onErrorHandler-4370473854592400506-6651cf6e.17d0b054fe3.-7ebf">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7df3</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>(: if ERROR then :)
+upper-case($SuccessIndicator) != 'SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="DestinationBankTransferStatus">
+                                    <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7df2</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>'Skipped'</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con1:skip>
+                                    <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7df1</con1:id>
+                                </con1:skip>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:insert varName="body">
+                                <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7b31</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE</con1:xpathText>
+                                </con2:location>
+                                <con2:where>last-child</con2:where>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<KV_PAIR>
+	<KEY>DEBIT_CURRENCY</KEY>
+	<VALUE>{$RSPTransferenciaPaisOrigen/DEBIT_CURRENCY/text()}</VALUE>
+</KV_PAIR>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:insert>
+                            <con2:insert varName="body">
+                                <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7b33</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE</con1:xpathText>
+                                </con2:location>
+                                <con2:where>last-child</con2:where>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<KV_PAIR>
+	<KEY>CREDIT_AMOUNT</KEY>
+	<VALUE>{$RSPTransferenciaPaisOrigen/CREDIT_AMOUNT/text()}</VALUE>
+</KV_PAIR>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:insert>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-6f60</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY="DEBIT_AMOUNT"]/VALUE</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$RSPTransferenciaPaisOrigen/DEBIT_AMOUNT/text()</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-6f5e</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY="USD_AMOUNT"]/VALUE</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$RSPTransferenciaPaisOrigen/CREDIT_AMOUNT/text()</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:ifThenElse>
+                                <con1:comment>Este IF se hace porque *todos los paises* responden en su transferencia local con el monto acreditado en $ y la tasa de cambio, es por ello que podemos reemplazar el UsdAmount con lo que responde el servicio... EXCEPTO PARA NICARAGUA.
+
+NI responde con lo que se transfirió al la cuenta destino en moneda destino. Esto nos obliga a meter un IF que solo actualiza si el origen no es Nicaragua, caso contrario dejka la variable con el valor calculado en la etapa previa.</con1:comment>
+                                <con1:id>_ActionId-4857831329841060576-65ab13c6.18173acbec5.-56f1</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text() = 'NI01'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions/>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:assign varName="UsdAmount">
+                                        <con1:id>_ActionId-4857831329841060576-65ab13c6.18173acbec5.-56b9</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>$RSPTransferenciaPaisOrigen/CREDIT_AMOUNT/text()</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:default>
+                            </con2:ifThenElse>
+                            <con2:replace varName="TempHeader" contents-only="true">
+                                <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7df0</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$header/aut:RequestHeader/Region/DestinationBank/text()</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="TempHeader" contents-only="true">
+                                <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7def</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./aut:RequestHeader/Region/DestinationBank</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$header/aut:RequestHeader/Region/DestinationBank/text()</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:assign varName="DestinationTempBody">
+                                <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7dee</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>$body/tran:transferenciaCuentasRequest</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:replace varName="DestinationTempBody" contents-only="true">
+                                <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7ded</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./DEBIT_ACCOUNT</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>if(string($TempHeader/aut:RequestHeader/Region/DestinationBank/text()) = "HN01")then(
+		$CuentaOrigenBcoDestino
+)else(
+	string($body/tran:transferenciaCuentasRequest/DEBIT_ACCOUNT/text())
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace contents-only="true" varName="DestinationTempBody">
+                                <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-78cc</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./DEBIT_CREDIT</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>if(string($TempHeader/aut:RequestHeader/Region/DestinationBank/text()) = "HN01")then(
+	string($body/tran:transferenciaCuentasRequest/DEBIT_CREDIT/text())	
+)else(
+	"CREDIT"
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7dec</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$body/tran:transferenciaCuentasRequest/DEBIT_CREDIT/text() = "DEBIT"
+and
+$body/tran:transferenciaCuentasRequest/CURRENCY/text() != "USD"</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace varName="DestinationTempBody" contents-only="true">
+                                            <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7deb</con1:id>
+                                            <con2:location>
+                                                <con1:xpathText>./CURRENCY</con1:xpathText>
+                                            </con2:location>
+                                            <con2:expr>
+                                                <con1:xqueryText>"USD"</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:replace varName="DestinationTempBody" contents-only="true">
+                                            <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7dea</con1:id>
+                                            <con2:location>
+                                                <con1:xpathText>./TRANSFER_AMOUNT</con1:xpathText>
+                                            </con2:location>
+                                            <con2:expr>
+                                                <con1:xqueryText>$UsdAmount</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:wsCallout>
+                                <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7de2</con1:id>
+                                <con2:service ref="Middleware/v2/ProxyServices/TransferenciaCuentasRouter" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                <con2:operation>transferenciaCuentas</con2:operation>
+                                <con2:request>
+                                    <con2:body>REQTransferenciaPaisDestino</con2:body>
+                                    <con2:header>REQHeaderTransferenciaPaisDestino</con2:header>
+                                </con2:request>
+                                <con2:response>
+                                    <con2:body>RSPTransferenciaPaisDestino</con2:body>
+                                    <con2:header>RESHeaderTransferenciaPaisDestino</con2:header>
+                                </con2:response>
+                                <con2:requestTransform>
+                                    <con2:assign varName="REQHeaderTransferenciaPaisDestino">
+                                        <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7de9</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>$TempHeader</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="REQTransferenciaPaisDestino">
+                                        <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7de8</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>$DestinationTempBody</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:requestTransform>
+                                <con2:responseTransform>
+                                    <con2:assign varName="SuccessIndicator">
+                                        <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7de7</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RESHeaderTransferenciaPaisDestino/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="ErrorDescription">
+                                        <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7de6</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RESHeaderTransferenciaPaisDestino/aut:ResponseHeader/messages[1]/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="DestinationTransactionID">
+                                        <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7de5</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RESHeaderTransferenciaPaisDestino/aut:ResponseHeader/transactionId/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="DestinationBankTransferStatus">
+                                        <con1:id>_ActionId-3265798989640472891-220b2947.17cc78868f9.-7de4</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>$SuccessIndicator</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="DestinationExchangeRate">
+                                        <con1:id>_ActionId-1754812418546491339--baab15a.18048007f07.-7b6d</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RSPTransferenciaPaisDestino/EXCHANGE_RATE/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:responseTransform>
+                            </con2:wsCallout>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="TransferenciaBancoCorresponsal" errorHandler="_onErrorHandler-4370473854592400506-6651cf6e.17d0b054fe3.-7e8b">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/crearTransfCorresponsal" prefix="cre"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7d2e</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>upper-case($SuccessIndicator) != "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="CorresponsalBankTransferStatus">
+                                    <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7d2d</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>'Skipped'</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con1:skip>
+                                    <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7d2c</con1:id>
+                                </con1:skip>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:assign varName="CorresponsalTempBody">
+                                <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-79aa</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>$body/tran:transferenciaCuentasRequest</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:replace contents-only="true" varName="CorresponsalTempBody">
+                                <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-7936</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY="MODE"]/VALUE</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>(: Indicar si es un cargo a cuenta (Participa Pa como origen o destino) o Transferencia Entre Cuentas(PA no Participa):)
+let $sourceBank := string($header/aut:RequestHeader/Region/SourceBank/text())
+let $destinationBank := string($header/aut:RequestHeader/Region/DestinationBank/text())
+return
+	if($sourceBank = "PA01" or $destinationBank = "PA01")then(
+		"1"
+	)else(
+		"2"
+	)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace contents-only="true" varName="CorresponsalTempBody">
+                                <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-7955</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./DEBIT_CREDIT</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>(:Si es una Transferencia Entre Cuentas o el destino de la Transferencia es PA se hara un debito :)
+let $typeTrans := string($CorresponsalTempBody/REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY="MODE"]/VALUE/text())
+let $destinationBank := string($header/aut:RequestHeader/Region/DestinationBank/text())
+return
+	if($typeTrans = "2" or $destinationBank = "PA01")then(
+		"DEBIT"
+	)else(
+		"CREDIT"
+	)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="CorresponsalTempBody" contents-only="true">
+                                <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7d28</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./DEBIT_ACCOUNT</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$CuentaOrigenBcoCorresponsal</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="CorresponsalTempBody" contents-only="true">
+                                <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7d27</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./CREDIT_ACCOUNT</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$CuentaDestinoBcoCorresponsal</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="CorresponsalTempBody" contents-only="true">
+                                <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7d26</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./CURRENCY</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>'USD'</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="CorresponsalTempBody" contents-only="true">
+                                <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7d25</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./TRANSFER_AMOUNT</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$UsdAmount</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="CorresponsalTempBody" contents-only="true">
+                                <con1:id>_ActionId-1754812418546491339--baab15a.18048007f07.-7b35</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY="EXCHANGE_RATE"]/VALUE</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$SourceExchangeRate</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="CorresponsalTempBody" contents-only="true">
+                                <con1:id>_ActionId-1754812418546491339--baab15a.18048007f07.-7b18</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./REGIONAL_DETAILS/DESTINATION/KV_PAIR[KEY="EXCHANGE_RATE"]/VALUE</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$DestinationExchangeRate</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="CorresponsalTempBody" contents-only="true">
+                                <con1:id>_ActionId-1754812418546491339--baab15a.18048007f07.-7afb</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY="TRANSACTION_ID"]/VALUE</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$SourceTransactionID</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="CorresponsalTempBody" contents-only="true">
+                                <con1:id>_ActionId-1754812418546491339--baab15a.18048007f07.-7ade</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>./REGIONAL_DETAILS/DESTINATION/KV_PAIR[KEY="TRANSACTION_ID"]/VALUE</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>$DestinationTransactionID</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con7:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con6="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/services/security/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config" xmlns:con7="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7d20</con:id>
+                                <con7:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/crearTransfCorresponsal/biz/crearTransfCorresponsal_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                <con7:operation>crearTransfCorresponsal</con7:operation>
+                                <con7:request>
+                                    <con7:body>REQcrearTransfCorresponsal</con7:body>
+                                </con7:request>
+                                <con7:response>
+                                    <con7:body>RSPcrearTransfCorresponsal</con7:body>
+                                </con7:response>
+                                <con7:requestTransform>
+                                    <con7:assign varName="REQcrearTransfCorresponsal">
+                                        <con:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7d24</con:id>
+                                        <con7:expr>
+                                            <con:xqueryTransform>
+                                                <con:resource ref="Middleware/v2/Resources/TransferenciaCuentas/xq/crearTransfCorresponsalIn"/>
+                                                <con:param name="uuid">
+                                                    <con:path>$uuid</con:path>
+                                                </con:param>
+                                                <con:param name="transferenciaCuentasRequest1">
+                                                    <con:path>$CorresponsalTempBody</con:path>
+                                                </con:param>
+                                            </con:xqueryTransform>
+                                        </con7:expr>
+                                    </con7:assign>
+                                </con7:requestTransform>
+                                <con7:responseTransform/>
+                            </con7:wsCallout>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ReversionTransferenciaIntergrupal" errorHandler="_onErrorHandler-4370473854592400506-6651cf6e.17d0b054fe3.-7e39">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7ebe</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>upper-case($DestinationBankTransferStatus) != 'SUCCESS' and
+$DestinationBankTransferStatus != 'Skipped'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="TempHeader" contents-only="true">
+                                    <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7b71</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="TempHeader" contents-only="true">
+                                    <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7b73</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./aut:RequestHeader/Region/DestinationBank</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace contents-only="true" varName="SourceTempBody">
+                                    <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7bfe</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY="MODE"]/VALUE</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>let $sourceBank := string($header/aut:RequestHeader/Region/SourceBank/text())
+return
+	if($sourceBank = 'GT01' or $sourceBank = 'PA01')then(
+		0
+	)else(
+		2
+	)</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace contents-only="true" varName="SourceTempBody">
+                                    <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-6e8c</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY="TRANSACTION_ID"]/VALUE</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$SourceTransactionID</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="SourceTempBody" contents-only="true">
+                                    <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7ad8</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY="COMMISSION"]/VALUE</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$commision</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace contents-only="true" varName="SourceTempBody">
+                                    <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-78af</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./DEBIT_CREDIT</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>"CREDIT"</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace contents-only="true" varName="SourceTempBody">
+                                    <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-7875</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./CREDIT_ACCOUNT</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>string($body/tran:transferenciaCuentasRequest/DEBIT_ACCOUNT/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7cc4</con1:id>
+                                    <con2:service ref="Middleware/v2/ProxyServices/ReversionTransferenciaIntergrupalRouter" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>transferenciaCuentas</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQtransferenciaCuentas</con2:body>
+                                        <con2:header>REQHtransferenciaCuentas</con2:header>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPtransferenciaCuentas</con2:body>
+                                        <con2:header>RSPHtransferenciaCuentas</con2:header>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQHtransferenciaCuentas">
+                                            <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7c9e</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$TempHeader</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="REQtransferenciaCuentas">
+                                            <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7c82</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$SourceTempBody</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="reversionTransferenciaStatus">
+                                            <con1:id>_ActionId-3176861084779505213-42d9585c.17cf08b0795.-7dd5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPHtransferenciaCuentas/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="errorMessage">
+                                            <con1:id>_ActionId-8587031953037475025--7e4f0f59.17ceb1337b3.-7c5c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPHtransferenciaCuentas/aut:ResponseHeader/messages[1]/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:assign varName="reversionTransferenciaStatus">
+                                <con1:id>_ActionId-3834289954694229813--62dfa5fb.17d4d82a4b0.-7b8b</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>"SUCCESS"</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BitacoraRequest">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3834289954694229813--62dfa5fb.17d4d82a4b0.-7b48</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>upper-case($reversionTransferenciaStatus) != "SUCCESS" or $CorresponsalBankTransferStatus = "ERROR"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="primaryKey">
+                                    <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-70bf</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>string($body/tran:transferenciaCuentasRequest/DEBIT_ACCOUNT/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con3:route>
+                                    <con1:id>_ActionId-3834289954694229813--62dfa5fb.17d4d82a4b0.-7b41</con1:id>
+                                    <con3:service ref="Middleware/v2/BusinessServices/OSB/RegistrarBitacoraOSB_v2/biz/RegistrarBitacoraOSB_v2" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>registrarBitacoraOSB</con3:operation>
+                                    <con3:outboundTransform>
+                                        <con2:replace varName="body" contents-only="true">
+                                            <con1:id>_ActionId-3834289954694229813--62dfa5fb.17d4d82a4b0.-7b40</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/registrarBitacoraOSBv2In"/>
+                                                    <con1:param name="resultado">
+                                                        <con1:path>""</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="uuid">
+                                                        <con1:path>$uuid</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="idTxn">
+                                                        <con1:path>""</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="bancoOrigen">
+                                                        <con1:path>if(upper-case($reversionTransferenciaStatus) != 'SUCCESS')then(
+	string($TempHeader/aut:RequestHeader/Region/SourceBank/text())	
+)else(
+	"PA01"
+)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="fechaTxn">
+                                                        <con1:path>fn:current-dateTime()</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="mensajeError">
+                                                        <con1:path>""</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="uuidReq">
+                                                        <con1:path>""</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="clavePrimaria">
+                                                        <con1:path>$primaryKey</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="idOsb">
+                                                        <con1:path>fn:string($inbound/ctx:transport/ctx:request/tp:headers/tp:user-header[@name='Host']/@value)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="idServicio">
+                                                        <con1:path>"FICBCO0077"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="bancoDestino">
+                                                        <con1:path>if(upper-case($reversionTransferenciaStatus) != 'SUCCESS')then(
+	string($TempHeader/aut:RequestHeader/Region/DestinationBank/text())	
+)else(
+	"PA01"
+)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="tipoMensaje">
+                                                        <con1:path>"REQ"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="idOperacion">
+                                                        <con1:path>fn:string($operation)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="usuario">
+                                                        <con1:path>string($header/aut:RequestHeader/Authentication/UserName/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="contenido">
+                                                        <con1:path>if(upper-case($CorresponsalBankTransferStatus) = "ERROR")then(
+	$REQcrearTransfCorresponsal
+)else(
+	$REQtransferenciaCuentas
+)</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con3:outboundTransform>
+                                </con3:route>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="TransferenciaIntergrupal_response">
+            <con:stage name="ActualizacionRespuesta">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4103</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>(: SUCCESS:)
+upper-case($SuccessIndicator) = 'SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="RSPTransferenciaPaisDestino" contents-only="true">
+                                    <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-7087</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./DEBIT_CUSTOMER</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$RSPTransferenciaPaisOrigen/DEBIT_CUSTOMER/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="RSPTransferenciaPaisDestino" contents-only="true">
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4102</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./DEBIT_ACCOUNT</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$RSPTransferenciaPaisOrigen/DEBIT_ACCOUNT/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="RSPTransferenciaPaisDestino" contents-only="true">
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4101</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./DEBIT_AMOUNT</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$RSPTransferenciaPaisOrigen/DEBIT_AMOUNT/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace contents-only="true" varName="RSPTransferenciaPaisDestino">
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-4100</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./DEBIT_CURRENCY</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$RSPTransferenciaPaisOrigen/DEBIT_CURRENCY/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="RSPTransferenciaPaisDestino" contents-only="true">
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-40ff</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./EXCHANGE_RATE</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>if ($body/tran:transferenciaCuentasRequest/REGIONAL_DETAILS/SOURCE/KV_PAIR[KEY = "DEBIT_ACCOUNT_CURRENCY"]/VALUE/text() = "USD" ) then 
+	$RSPTransferenciaPaisDestino/EXCHANGE_RATE/text()
+else 
+	$RSPTransferenciaPaisOrigen/EXCHANGE_RATE/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="RSPTransferenciaPaisDestino" contents-only="true">
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-40fe</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./CREDIT_AMOUNT</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$RSPTransferenciaPaisDestino/CREDIT_AMOUNT/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="RSPTransferenciaPaisDestino" contents-only="true">
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-40fd</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./CREDIT_CURRENCY</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>$RSPTransferenciaPaisDestino/CREDIT_CURRENCY/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace contents-only="true" varName="RSPTransferenciaPaisDestino">
+                                    <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-70f7</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>./COMMISSION</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText>if($RSPTransferenciaPaisOrigen/COMMISSION/text() > 0)then(
+	string($RSPTransferenciaPaisOrigen/COMMISSION/text())
+)else()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-40fc</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>(: SUCCESS:)
+upper-case($SuccessIndicator) = 'SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="header">
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-40fb</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>$RESHeaderTransferenciaPaisOrigen</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-40fa</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>$RSPTransferenciaPaisDestino</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-40f9</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{$ErrorDescription}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-6803241656760641167--3a42efac.17643ccced5.-40f8</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;tran:transferenciaCuentasResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BitacoreResponse">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-7213</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>upper-case($reversionTransferenciaStatus) != "SUCCESS" or $CorresponsalBankTransferStatus = "ERROR"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="uuidBitacoraResponse">
+                                    <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-71db</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con3:route>
+                                    <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-71bf</con1:id>
+                                    <con3:service ref="Middleware/v2/BusinessServices/OSB/RegistrarBitacoraOSB_v2/biz/RegistrarBitacoraOSB_v2" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>registrarBitacoraOSB</con3:operation>
+                                    <con3:outboundTransform>
+                                        <con2:replace contents-only="true" varName="body">
+                                            <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-7187</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/registrarBitacoraOSBv2In"/>
+                                                    <con1:param name="idServicio">
+                                                        <con1:path>"FICBCO0077"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="uuidReq">
+                                                        <con1:path>$uuid</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="fechaTxn">
+                                                        <con1:path>current-dateTime()</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="tipoMensaje">
+                                                        <con1:path>"RSP"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="resultado">
+                                                        <con1:path>if(upper-case($CorresponsalBankTransferStatus)  = "ERROR")then(
+	$CorresponsalBankTransferStatus
+)else(
+	$reversionTransferenciaStatus
+)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="usuario">
+                                                        <con1:path>string($TempHeader/aut:RequestHeader/Authentication/UserName/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="idOperacion">
+                                                        <con1:path>fn:string($operation)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="idTxn">
+                                                        <con1:path>""</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="uuid">
+                                                        <con1:path>$uuidBitacoraResponse</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="bancoDestino">
+                                                        <con1:path>if(upper-case($reversionTransferenciaStatus) != 'SUCCESS')then(
+	string($TempHeader/aut:RequestHeader/Region/DestinationBank/text())	
+)else(
+	"PA01"
+)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="contenido">
+                                                        <con1:path>if(upper-case($CorresponsalBankTransferStatus)  = "ERROR")then(
+	$errorMessage
+)else(
+	$RSPtransferenciaCuentas
+)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="bancoOrigen">
+                                                        <con1:path>if(upper-case($reversionTransferenciaStatus) != 'SUCCESS')then(
+	string($TempHeader/aut:RequestHeader/Region/SourceBank/text())	
+)else(
+	"PA01"
+)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="mensajeError">
+                                                        <con1:path>$errorMessage</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="idOsb">
+                                                        <con1:path>fn:string($inbound/ctx:transport/ctx:request/tp:headers/tp:user-header[@name='Host']/@value)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="clavePrimaria">
+                                                        <con1:path>$primaryKey</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con3:outboundTransform>
+                                </con3:route>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-4370473854592400506-6651cf6e.17d0b054fe3.-7ebf">
+            <con:stage name="Error">
+                <con:context/>
+                <con:actions>
+                    <con2:assign varName="SuccessIndicator">
+                        <con1:id>_ActionId-4370473854592400506-6651cf6e.17d0b054fe3.-7e93</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'ERROR'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="DestinationBankTransferStatus">
+                        <con1:id>_ActionId-4370473854592400506-6651cf6e.17d0b054fe3.-7ea5</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'ERROR'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="ErrorDescription">
+                        <con1:id>_ActionId-4370473854592400506-6651cf6e.17d0b054fe3.-7e8c</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'No fue posible realizar la transferencia.'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con1:resume>
+                        <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-7353</con1:id>
+                    </con1:resume>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-4370473854592400506-6651cf6e.17d0b054fe3.-7e8b">
+            <con:stage name="Error">
+                <con:context/>
+                <con:actions>
+                    <con2:assign varName="CorresponsalBankTransferStatus">
+                        <con1:id>_ActionId-4370473854592400506-6651cf6e.17d0b054fe3.-7e77</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'ERROR'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessage">
+                        <con1:id>_ActionId-4370473854592400506-6651cf6e.17d0b054fe3.-7e61</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'No es posible realizar la transferencia corresponsal.'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con1:resume>
+                        <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-7336</con1:id>
+                    </con1:resume>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-4370473854592400506-6651cf6e.17d0b054fe3.-7e39">
+            <con:stage name="Error">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="reversionTransferenciaStatus">
+                        <con1:id>_ActionId-4370473854592400506-6651cf6e.17d0b054fe3.-7e1d</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'ERROR'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessages">
+                        <con1:id>_ActionId-4370473854592400506-6651cf6e.17d0b054fe3.-7df9</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'No fue posible reversar la transferencia'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="RSPtransferenciaCuentas">
+                        <con1:id>_ActionId-6010276445029089047-37fe3fe4.17d72572e4b.-7e9e</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;tran:transferenciaCuentasResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con1:resume>
+                        <con1:id>_ActionId-6724319405972431811--640cbda9.17d2b8073fd.-72fc</con1:id>
+                    </con1:resume>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="TransferenciaIntergrupal">
+                <con:request>TransferenciaIntergrupal_request</con:request>
+                <con:response>TransferenciaIntergrupal_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

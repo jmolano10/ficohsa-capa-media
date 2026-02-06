@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaBIN/wsdl/consultaBINPS"/>
+            <con:binding>
+                <con:name>consultaBINPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaBINPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-739158793676150874-58c42606.172ccc2e52a.-7881" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="request" name="ConsultaBINPA_request">
+            <con:stage name="ValidacionXML">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTarjetaDebitoTypes" prefix="oper"/>
+                </con:context>
+                <con:actions>
+                    <con1:validate>
+                        <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-789d</con2:id>
+                        <con1:schema ref="Middleware/v2/Resources/OperacionesTarjetaDebito/xsd/operacionesTarjetaDebitoTypes"/>
+                        <con1:schemaElement xmlns:oper="http://www.ficohsa.com.hn/middleware.services/operacionesTarjetaDebitoTypes">oper:consultaBIN</con1:schemaElement>
+                        <con1:varName>body</con1:varName>
+                        <con1:location>
+                            <con2:xpathText>./oper:consultaBIN</con2:xpathText>
+                        </con1:location>
+                    </con1:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaBIN">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTarjetaDebitoTypes" prefix="oper"/>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaBin" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-7a91</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/consultaBin/biz/consultaBin_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>consultaBin</con1:operation>
+                        <con1:request>
+                            <con1:body wrapped="false">REQConsultaBin</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body wrapped="false">RSPConsultaBin</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQConsultaBin">
+                                <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-79ed</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaBIN/xq/consultaBinPAIn"/>
+                                        <con2:param name="consultaBIN">
+                                            <con2:path>$body/oper:consultaBIN</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-79b5</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>fn:upper-case(fn:string($RSPConsultaBin/con:PV_RETURN_CODE/text()))</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-7998</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if($errorCode != 'SUCCESS') then(
+	fn:string($RSPConsultaBin/con:PV_RETURN_MESSAGE/text())
+)else('')</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaBINPA_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTarjetaDebitoTypes" prefix="oper"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-3595129577211582246-79102fac.172dc80615d.-7fef</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	{
+		if($validationMessage != '')then(
+			<messages>{ $validationMessage }</messages>
+		)else()
+	}		
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-7960</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-790b</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/ConsultaBIN/xq/consultaBinPAOut"/>
+                                            <con2:param name="outputParameters">
+                                                <con2:path>$RSPConsultaBin</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-78b6</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>&lt;oper:consultaBINResponse/></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-739158793676150874-58c42606.172ccc2e52a.-7881">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTarjetaDebitoTypes" prefix="oper"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-7813</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-77f6</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;oper:consultaBINResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-739158793676150874-58c42606.172ccc2e52a.-77d9</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ConsultaBINPA">
+                <con:request>ConsultaBINPA_request</con:request>
+                <con:response>ConsultaBINPA_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

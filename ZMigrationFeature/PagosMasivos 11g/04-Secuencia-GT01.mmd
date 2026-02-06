@@ -1,0 +1,127 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Proxy as PagosMasivos.proxy
+    participant Internal as PagosMasivosInterno.proxy
+    participant InternalGT as PagosMasivosInternoGT.proxy
+    participant BitacoraDB as registraBitacoraPagosMasivosRG_db
+    participant ValidaAccesoMTR as validaAccesoPMS (MTR)
+    participant CargadorMTR as cargadorArchivoLote (MTR)
+    participant MapeoErr as MapeoErrores.proxy
+
+    Note over Client, MapeoErr: Flujo Guatemala (GT01) - PagosMasivos
+
+    Client->>Proxy: SOAP Request
+    Note right of Client: Header: SourceBank=GT01<br/>Authentication: UserName/Password
+
+    Proxy->>Proxy: Validar Autenticación Custom Token
+
+    Proxy->>Proxy: Enrutamiento por Operación
+    Note right of Proxy: operation = 'pagosMasivos'
+
+    Proxy->>Internal: Forward Request
+    Note right of Proxy: Transport header 'host' = client IP
+
+    Internal->>Internal: Validación XSD
+    Internal->>Internal: Validación Servicio Regional
+    Note right of Internal: PV_SERVICE_ID: FICBCO0231<br/>PV_SOURCE_BANK: GT01
+
+    Internal->>Internal: Enrutamiento Regional
+    Note right of Internal: Branch: SourceBank = 'GT01'<br/>Route to: PagosMasivosInternoGT
+
+    Internal->>InternalGT: Forward Request
+    Note right of Internal: Transport headers: copy-all
+
+    InternalGT->>InternalGT: Generar UUID Bitácora Request
+
+    InternalGT->>InternalGT: Guardar Request Original
+
+    InternalGT->>BitacoraDB: registraBitacoraPagosMasivosRG (REQ)
+    Note right of InternalGT: PV_ID: uuidBitacoraRequest<br/>PV_RECORD_TYPE: REQ<br/>PV_COUNTRY_CODE: GT01<br/>PV_OPERATION: PagosMasivos<br/>PV_CUSTOMER_ID: del body<br/>PV_USERNAME: del body<br/>PV_AUTH_USERNAME: del header<br/>PV_SOAP_CONTENT: body completo
+
+    BitacoraDB-->>InternalGT: Registro Insertado
+
+    InternalGT->>ValidaAccesoMTR: validaAccesoPMS
+    Note right of InternalGT: Request MTR:<br/>customerId: del body<br/>userName: del header
+
+    ValidaAccesoMTR-->>InternalGT: Response MTR
+    Note right of ValidaAccesoMTR: status: '00000' (éxito) o código error<br/>message: mensaje descriptivo
+
+    InternalGT->>InternalGT: Evaluar Response Validación
+    Note right of InternalGT: errorCode = if(status='00000') 'SUCCESS' else 'ERROR'<br/>validationMessage = message
+
+    alt Cliente Sin Acceso (status != '00000')
+        InternalGT->>InternalGT: Construir Response Error
+        Note right of InternalGT: Header: successIndicator=ERROR<br/>messages=validationMessage<br/>Body: pagosMasivosResponse vacío
+        InternalGT->>BitacoraDB: registraBitacoraPagosMasivosRG (RSP)
+        InternalGT->>Client: SOAP Response con Error
+    end
+
+    InternalGT->>InternalGT: Transformar Request para MTR
+    Note right of InternalGT: XQuery: pagosMasivosInternoGTIn.xq<br/>Mapea OSB → estructura MTR<br/>peticionHostToHost:<br/>  cabeceraPeticion:<br/>    pais: GT (substring 1,2)<br/>    empresa: 01 (substring 3,2)<br/>    usuario: del header<br/>    idCliente: del body<br/>  cuerpoLote:<br/>    idLoteCliente, tipoLote, etc.
+
+    InternalGT->>InternalGT: Validar Request MTR contra WSDL
+    Note right of InternalGT: Schema: cargadorArchivoLoteEndpoint<br/>Element: ser1:cargarLotes
+
+    alt Validación WSDL Fallida
+        InternalGT->>MapeoErr: Mapear Error
+        InternalGT->>Client: SOAP Response con Error
+    end
+
+    InternalGT->>CargadorMTR: cargarLotes
+    Note right of InternalGT: Web Service SOAP<br/>Namespace: http://servicio.cargararchivolotews.mtrpmsv.cidenet.com.co/<br/>Operación: cargarLotes
+
+    Note over CargadorMTR: Procesamiento MTR
+    Note right of CargadorMTR: - Valida estructura<br/>- Procesa lote<br/>- Asigna ID banco<br/>- Retorna estado
+
+    CargadorMTR-->>InternalGT: cargarLotesResponse
+    Note right of CargadorMTR: respuestaHostToHost:<br/>  cabeceraRespuesta:<br/>    codigo: SUCCESS/ERROR<br/>    mensaje: descripción<br/>  cuerpoRespuesta:<br/>    idLoteBanco<br/>    idLoteCliente<br/>    estado
+
+    InternalGT->>InternalGT: Extraer Código y Mensaje
+    Note right of InternalGT: errorCode = codigo<br/>validationMessage = mensaje
+
+    InternalGT->>InternalGT: Construir Response Header
+    Note right of InternalGT: XQuery: pagosMasivosInternoGTHeaderOut.xq<br/>successIndicator: errorCode<br/>messages: validationMessage
+
+    alt Procesamiento Exitoso (errorCode = SUCCESS)
+        InternalGT->>InternalGT: Transformar Response Body
+        Note right of InternalGT: XQuery: pagosMasivosInternoGTOut.xq<br/>Mapea MTR → pagosMasivosResponse<br/>BANK_BATCH_ID: idLoteBanco<br/>CUSTOMER_BATCH_ID: idLoteCliente<br/>STATUS: estado<br/>GLOBAL_ID: del request original<br/>CUSTOMER_ID: del request original
+    else Error en Procesamiento
+        InternalGT->>InternalGT: Response Body Vacío
+        Note right of InternalGT: pagosMasivosResponse vacío
+    end
+
+    InternalGT->>InternalGT: Generar UUID Bitácora Response
+
+    InternalGT->>BitacoraDB: registraBitacoraPagosMasivosRG (RSP)
+    Note right of InternalGT: PV_ID: uuidBitacoraResponse<br/>PV_REQUEST_ID: uuidBitacoraRequest<br/>PV_RECORD_TYPE: RSP<br/>PV_COUNTRY_CODE: GT01<br/>PV_RESPONSE_CODE: errorCode<br/>PV_RESPONSE_MESSAGE: validationMessage (max 4000)<br/>PV_SOAP_CONTENT: pagosMasivosResponse
+
+    BitacoraDB-->>InternalGT: Registro Insertado
+
+    InternalGT->>Internal: Response
+    Internal->>Internal: Mapeo de Errores (si aplica)
+    Note right of Internal: if successIndicator != SUCCESS<br/>Invocar MapeoErrores
+
+    Internal->>Proxy: Response
+    Proxy->>Client: SOAP Response
+
+    Note over Client, MapeoErr: Flujo de Error
+
+    alt Error en Cualquier Punto
+        InternalGT->>InternalGT: Error Handler Activado
+        Note right of InternalGT: Captura errorCode y errorMessage
+
+        InternalGT->>MapeoErr: mapeoErrores
+        Note right of InternalGT: CODIGO_ERROR: errorCode<br/>MENSAJE_ERROR: FICBCO0231$#$errorMessage
+        MapeoErr-->>InternalGT: Error Mapeado
+
+        InternalGT->>InternalGT: Construir Response Error
+
+        alt UUID Bitácora Existe
+            InternalGT->>InternalGT: Generar UUID Bitácora Error
+            InternalGT->>BitacoraDB: registraBitacoraPagosMasivosRG (RSP)
+            Note right of InternalGT: PV_COUNTRY_CODE: GT01<br/>PV_RESPONSE_CODE: ERROR
+            BitacoraDB-->>InternalGT: Registro Insertado
+        end
+
+        InternalGT->>Client: SOAP Response con Error
+    end

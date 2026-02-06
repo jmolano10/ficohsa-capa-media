@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v3/Resources/ValidacionOverlimit/wsdl/ValidacionOverlimitPS"/>
+            <con:binding>
+                <con:name>ValidacionOverlimitPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8148923313453924523-2bc38f2c.17261f6fd14.-75b5" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="error" name="_onErrorHandler-8148923313453924523-2bc38f2c.17261f6fd14.-75b5">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitTypes" prefix="val"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-757d</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7560</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;val:validacionOverlimitResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7543</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="GT01_ValidacionOverlimit_request">
+            <con:stage name="ConsultaDatosTarjeta">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitTypes" prefix="val"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="codigoPais">
+                        <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7370</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>'OSB-ISO3'</con1:path>
+                                </con1:param>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($body/val:validacionOverlimitRequest/CARD_BANK/text())</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7300</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataGT/conDatoTarjeta/biz/conDatoTarjeta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>conDatoTarjeta</con2:operation>
+                        <con2:request>
+                            <con2:body>REQconDatoTarjeta</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPconDatoTarjeta</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQconDatoTarjeta">
+                                <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-72c8</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MasterDataGT/xq/conDatoTarjetaIn"/>
+                                        <con1:param name="cardNumber">
+                                            <con1:path>string($body/val:validacionOverlimitRequest/CARD_NUMBER/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="codigoPais">
+                                            <con1:path>$codigoPais</con1:path>
+                                        </con1:param>
+                                        <con1:param name="org">
+                                            <con1:path>''</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7290</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSPconDatoTarjeta/con:CodigoError/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7273</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if($errorCode != '-1') then (
+	string($RSPconDatoTarjeta/con:MensajeError/text())
+) else('')</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="accountNumber">
+                                <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7256</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>(: $RSPconDatoTarjeta/Rowset/Row[x]/Column[NumCuenta] - Donde x == Row con moneda del pago :)
+$RSPconDatoTarjeta/con:RowSet
+/con:Row[$RSPconDatoTarjeta/con:RowSet/con:Row/con:Column[upper-case(@name) = 'CODMONEDA']/text() = $body/val:validacionOverlimitRequest/PAYMENT_CURRENCY/text()]
+/con:Column[upper-case(@name) = 'NUMCUENTA']/text()</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="org">
+                                <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-721e</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>for $row in $RSPconDatoTarjeta/con:RowSet/con:Row
+        where $row/con:Column[upper-case(@name) = 'CODMONEDA' and  text() = fn:string($body/val:validacionOverlimitRequest/PAYMENT_CURRENCY/text())]
+        return
+        	data($row/con:Column[upper-case(@name) = 'ORG'])</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaVisionPlus">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.procesa.com/fdcs" prefix="fdcs"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-71e6</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-71ae</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlusGT/vmx/biz/vmx" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>AccountInquiryVA</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQAccountInquiryVA</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPAccountInquiryVA</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQAccountInquiryVA">
+                                            <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7176</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/VisionPlusGT/xq/accountInquiryVAIn"/>
+                                                    <con1:param name="accountNumber">
+                                                        <con1:path>$accountNumber</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="org">
+                                                        <con1:path>$org</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-713e</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPAccountInquiryVA/ARXAIO-SVC-RETURN/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7121</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if ($errorCode != 'P') then(
+	fn-bea:trim(string($RSPAccountInquiryVA/fdcs:ReturnCodes/RC/Desc[1]/text()))
+) else (
+	''
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionOverlimitBS">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidacionOverlimit" prefix="val1"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitTypes" prefix="val"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-70b3</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="ARXAIO-CURR-BAL">
+                                    <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-707b</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>string($RSPAccountInquiryVA/ARXAIO-CURR-BAL/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="ARXAIO-AMT-MEMO-DB">
+                                    <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-705e</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>string($RSPAccountInquiryVA/ARXAIO-AMT-MEMO-DB/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="ARXAIO-AMT-MEMO-CR">
+                                    <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-7041</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>string($RSPAccountInquiryVA/ARXAIO-AMT-MEMO-CR/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-6fec</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v3/BusinessServices/ValidacionOverlimit/biz/ValidacionOverlimit_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>ValidacionOverlimit</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQValidacionOverlimit</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPValidacionOverlimit</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQValidacionOverlimit">
+                                            <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-6fb4</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v3/BusinessServices/ValidacionOverlimit/xq/ValidacionOverlimit"/>
+                                                    <con1:param name="Debitos">
+                                                        <con1:path>$ARXAIO-AMT-MEMO-DB</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Pais">
+                                                        <con1:path>string($body/val:validacionOverlimitRequest/CARD_BANK/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Creditos">
+                                                        <con1:path>$ARXAIO-AMT-MEMO-CR</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Monto">
+                                                        <con1:path>number($body/val:validacionOverlimitRequest/PAYMENT_AMOUNT/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Saldo">
+                                                        <con1:path>$ARXAIO-CURR-BAL</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Moneda">
+                                                        <con1:path>string($body/val:validacionOverlimitRequest/PAYMENT_CURRENCY/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-6f7c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPValidacionOverlimit/val1:ERROR_CODE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-6f5f</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn-bea:trim($RSPValidacionOverlimit/val1:ERROR_MESSAGE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GT01_ValidacionOverlimit_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/ValidacionOverlimitTypes" prefix="val"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-6ef1</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if($validationMessage = '') then (
+			<successIndicator>Success</successIndicator>
+		)else (
+			<successIndicator>{ $errorCode }</successIndicator>,
+			<messages>{ $validationMessage }</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-6ed4</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>upper-case($header/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace contents-only="true" varName="body">
+                                    <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-6e64</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;val:validacionOverlimitResponse>
+	&lt;ORG>{ $org }&lt;/ORG>
+&lt;/val:validacionOverlimitResponse></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-8148923313453924523-2bc38f2c.17261f6fd14.-6e9c</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;val:validacionOverlimitResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="GT01_ValidacionOverlimit">
+                <con:request>GT01_ValidacionOverlimit_request</con:request>
+                <con:response>GT01_ValidacionOverlimit_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

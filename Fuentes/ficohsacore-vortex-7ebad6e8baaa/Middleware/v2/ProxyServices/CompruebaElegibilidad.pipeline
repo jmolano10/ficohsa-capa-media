@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/CompruebaElegibilidad/wsdl/compruebaElegibilidadPS"/>
+            <con:binding>
+                <con:name>compruebaElegibilidadPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/compruebaElegibilidad/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="pipeline"/>
+            <oper:tracingEnabled>true</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-5816504262559251258--71f56ce4.1752265ba02.-7fd3" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="error" name="_onErrorHandler-5816504262559251258--71f56ce4.1752265ba02.-7fd3">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/digitalizacionTarjetasTypes" prefix="dig"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-5816504262559251258--71f56ce4.1752265ba02.-7fba</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ fn:string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ fn:string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-5816504262559251258--71f56ce4.1752265ba02.-7fa1</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<dig:compruebaElegibilidadResponse>
+{
+	if(fn:string($fault/ctx:reason/text()) = 'Cryptography Error') then(
+         <RETURN_CODE>95</RETURN_CODE>,
+         <ERROR_DESCRIPTION>Cryptography Error</ERROR_DESCRIPTION>
+	)else(
+         <RETURN_CODE>99</RETURN_CODE>,
+         <ERROR_DESCRIPTION>System Error</ERROR_DESCRIPTION>	
+	)         
+}
+</dig:compruebaElegibilidadResponse>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-5816504262559251258--71f56ce4.1752265ba02.-7f8e</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="CompruebaElegibilidad_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/digitalizacionTarjetasTypes" prefix="dig"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-7589160121310322725--3d215a49.1752720ea1d.-7ef7</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/DigitalizacionTarjetas/xsd/digitalizacionTarjetasTypes"/>
+                        <con2:schemaElement xmlns:dig="http://www.ficohsa.com.hn/middleware.services/digitalizacionTarjetasTypes">dig:compruebaElegibilidad</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./dig:compruebaElegibilidad</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="EncryterData">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/schema/encripterDataTypes" prefix="enc"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/digitalizacionTarjetasTypes" prefix="dig"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7fe6</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/encripterData/biz/encripterData" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>encripterData</con2:operation>
+                        <con2:request>
+                            <con2:body>REQencripterData</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPencripterData</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQencripterData">
+                                <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7fc1</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/CompruebaElegibilidad/xq/encripterDataIn"/>
+                                        <con1:param name="compruebaElegibilidad">
+                                            <con1:path>$body/dig:compruebaElegibilidad</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7fa4</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>data($RSPencripterData/status/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="encryptData">
+                                <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7f8d</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>data($RSPencripterData/result/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/digitalizacionTarjetasTypes" prefix="dig"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/compruebaElegibilidad" prefix="com1"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7f40</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$errorCode = 'Success'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7f38</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/CompruebaElegibilidad/biz/compruebaElegibilidad_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>compruebaElegibilidad</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQcompruebaElegibilidad</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPcompruebaElegibilidad</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQcompruebaElegibilidad">
+                                            <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7f3b</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/CompruebaElegibilidad/xq/compruebaElegibilidadIn"/>
+                                                    <con1:param name="decryptData">
+                                                        <con1:path>$encryptData</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="compruebaElegibilidad">
+                                                        <con1:path>$body/dig:compruebaElegibilidad</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7f3a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPcompruebaElegibilidad/com1:PV_RETURNCODE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7f39</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPcompruebaElegibilidad/com1:PV_ERRORDESCRIPTION/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:Error>
+                                <con1:id>_ActionId-8421446076136186041--2720ccae.186ce01a9ec.-7f1d</con1:id>
+                                <con2:errCode>Decrypt error</con2:errCode>
+                                <con2:message>Cryptography Error</con2:message>
+                            </con2:Error>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="CompruebaElegibilidad_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/digitalizacionTarjetasTypes" prefix="dig"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-7195710400166838867-18c5c6d7.175460fc5be.-7fc0</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if($errorCode = '00') then(
+			<successIndicator>Success</successIndicator>
+		)else if($errorCode = '85') then(
+			<successIndicator>Success</successIndicator>,
+			<messages>{ $validationMessage }</messages>
+		) else (
+			<successIndicator>ERROR</successIndicator>,
+			<messages>{ $validationMessage }</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7195710400166838867-18c5c6d7.175460fc5be.-7f8d</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$errorCode = '00' or $errorCode = '85'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-7768349403253598537--20324527.1754b33edae.-7f85</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/CompruebaElegibilidad/xq/compruebaElegibilidadOut"/>
+                                            <con1:param name="outputParameters">
+                                                <con1:path>$RSPcompruebaElegibilidad</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>(($errorCode != '00' or $errorCode != '85')) and  not(empty($RSPcompruebaElegibilidad))</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-673881572557255464-7daeb72e.1871c7c2af8.-7f3f</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/CompruebaElegibilidad/xq/compruebaElegibilidadErrorOut"/>
+                                            <con1:param name="outputParameters">
+                                                <con1:path>$RSPcompruebaElegibilidad</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-7195710400166838867-18c5c6d7.175460fc5be.-7f6c</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<dig:compruebaElegibilidadResponse>
+         <RETURN_CODE>99</RETURN_CODE>
+         <ERROR_DESCRIPTION>System Error</ERROR_DESCRIPTION>
+</dig:compruebaElegibilidadResponse>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="CompruebaElegibilidad">
+                <con:request>CompruebaElegibilidad_request</con:request>
+                <con:response>CompruebaElegibilidad_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

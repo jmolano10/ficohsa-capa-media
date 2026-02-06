@@ -1,0 +1,19 @@
+xquery version "2004-draft";
+(:: pragma bea:global-element-parameter parameter="$sjConsultaConsolidadaRiesgoClienteGT" element="ns1:sjConsultaConsolidadaRiesgoClienteGT" location="../xsd/sjConsultaConsolidadaRiesgoClienteGTTypes.xsd" ::)
+(:: pragma bea:global-element-return element="ns0:InputParameters" location="../../../DataWarehouse/integracionConsultaTRXPasivos/xsd/integracionConsultaTRXPasivos_sp.xsd" ::)
+
+declare namespace ns1 = "http://www.ficohsa.com.hn/middleware.services/sjConsultaConsolidadaRiesgoClienteGTTypes";
+declare namespace ns0 = "http://xmlns.oracle.com/pcbpel/adapter/db/sp/integracionConsultaTRXPasivos";
+declare namespace xf = "http://tempuri.org/Middleware/v2/BusinessServices/SJS/consultaConsolidadaRiesgoClienteGT/xq/integracionConsultaTrxPasivosIn/";
+
+declare function xf:integracionConsultaTrxPasivosIn($sjConsultaConsolidadaRiesgoClienteGT as element(ns1:sjConsultaConsolidadaRiesgoClienteGT))
+    as element(ns0:InputParameters) {
+        <ns0:InputParameters>
+            <ns0:PAIS>{ data($sjConsultaConsolidadaRiesgoClienteGT/ns1:COUNTRY) }</ns0:PAIS>
+            <ns0:IDENTIDAD>{ data($sjConsultaConsolidadaRiesgoClienteGT/ns1:IDENTIFICATION) }</ns0:IDENTIDAD>
+        </ns0:InputParameters>
+};
+
+declare variable $sjConsultaConsolidadaRiesgoClienteGT as element(ns1:sjConsultaConsolidadaRiesgoClienteGT) external;
+
+xf:integracionConsultaTrxPasivosIn($sjConsultaConsolidadaRiesgoClienteGT)

@@ -1,0 +1,225 @@
+<bpel:process name="sjConsultaMultipleProductos" targetNamespace="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/flow/sjConsultaMultipleProductos" bea:name="sjConsultaMultipleProductos" xmlns:tns="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/flow/sjConsultaMultipleProductos" xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable" xmlns:rescon="http://www.bea.com/alsb/flow/resources/config" xmlns:bea="http://www.bea.com/bpel/ui/extensions" xmlns:ext="http://www.bea.com/bpel/extensions" xmlns:expr="http://www.bea.com/wli/sb/stages/config" xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config" xmlns:bind="http://www.ficohsa.com.hn/middleware.services/sjConsultaMultipleProductos" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ns1="http://xmlns.oracle.com/pcbpel/adapter/db/DB_ADAPTER/ValidaServicioRegional/ValidaServicioRegional" xmlns:val="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" xmlns:ns0="http://www.ficohsa.com.hn/middleware.services/consultaMultipleProductosInternoPS/">
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjConsultaMultipleProductos" partnerLinkType="tns:sjConsultaMultipleProductos" myRole="sjConsultaMultipleProductos">
+	       </bpel:partnerLink>
+	   <bpel:partnerLink name="ValidaServicioRegional_db" partnerLinkType="tns:ValidaServicioRegional_db_plnkType" partnerRole="ValidaServicioRegional_db_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="ConsultaMultipleProductosInterno" partnerLinkType="tns:ConsultaMultipleProductosInterno_plnkType" partnerRole="ConsultaMultipleProductosInterno_PartnerRole">
+	   </bpel:partnerLink></bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request" messageType="bind:sjConsultaMultipleProductosRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response" messageType="bind:sjConsultaMultipleProductosResponse">
+	       </bpel:variable>
+    <bpel:variable name="productosXPais" type="xsd:anyType"/>
+    <bpel:variable name="totalProductosXPais" type="xsd:int"/></bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjConsultaMultipleProductos" operation="consultaProductos" createInstance="yes" variable="request">
+	           <rescon:receiveInfo>
+                
+            <rescon:wsdl ref="Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/wsdl/sjConsultaMultipleProductos" binding="bind:sjConsultaMultipleProductosPSSOAP"/></rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:assign>
+        	<bpel:extensionAssignOperation>
+        		<trf:assign varName="response.outputParameters">
+        			<trf:expr>
+        				<expr:xqueryText>&lt;outputParameters>
+	&lt;bind:ASSETS/>
+	&lt;bind:LIABILITIES/>
+&lt;/outputParameters></expr:xqueryText></trf:expr></trf:assign>
+        	</bpel:extensionAssignOperation>
+        	<bpel:extensionAssignOperation>
+        		<trf:assign varName="productosXPais">
+        			<trf:expr>
+        				<expr:xqueryTransform>
+        					<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/xq/agruparPaises"/>
+        					<expr:param name="sjConsultaMultipleProductos">
+        						<expr:path>$request.inputParameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+        	</bpel:extensionAssignOperation>
+        <bpel:extensionAssignOperation>
+		<trf:assign varName="totalProductosXPais">
+			<trf:expr>
+				<expr:xqueryText>count($productosXPais/PAIS)</expr:xqueryText></trf:expr></trf:assign>
+        </bpel:extensionAssignOperation></bpel:assign>
+        <bpel:forEach parallel="yes" counterName="posicionPais">
+        	<bpel:startCounterValue>1</bpel:startCounterValue>
+        	<bpel:finalCounterValue>$totalProductosXPais</bpel:finalCounterValue>
+        	<bpel:scope>
+        		<bpel:variables>
+        			<bpel:variable name="REQValidaServicioRegional" messageType="ns1:args_in_msg">
+        			</bpel:variable>
+        			<bpel:variable name="RSPValidaServicioRegional" messageType="ns1:args_out_msg">
+        			</bpel:variable>
+        			<bpel:variable name="REQconsultaMultipleProductosInterno" messageType="ns0:consultaMultipleProductosInternoRequest">
+        			</bpel:variable>
+        			<bpel:variable name="RSPconsultaMultipleProductosInterno" messageType="ns0:consultaMultipleProductosInternoResponse">
+        			</bpel:variable>
+        			<bpel:variable name="type" type="xsd:string"/>
+        			<bpel:variable name="AssetsWithError" type="xsd:anyType">
+        			</bpel:variable>
+        			<bpel:variable name="LiabilitiesWithError" type="xsd:anyType">
+        			</bpel:variable></bpel:variables>
+        		<bpel:sequence>
+        			<bpel:assign>
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="REQValidaServicioRegional.InputParameters">
+        						<trf:expr>
+        							<expr:xqueryTransform>
+        								<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/xq/servicioRegionalIn"/>
+        								
+        								
+        								
+        								
+        								<expr:param name="pais">
+        									<expr:path>string($productosXPais/PAIS[xs:int($posicionPais)]/CODIGO/text())</expr:path></expr:param>
+        								<expr:param name="serviceId">
+        									<expr:path>"FICBCO0238"</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        			</bpel:assign>
+        			<bpel:invoke operation="ValidaServicioRegional" partnerLink="ValidaServicioRegional_db" inputVariable="REQValidaServicioRegional" outputVariable="RSPValidaServicioRegional">
+        				<rescon:invokeInfo><rescon:service ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/></rescon:invokeInfo></bpel:invoke>
+        			<bpel:if>
+        				<bpel:condition>string($RSPValidaServicioRegional.OutputParameters/val:PV_CODIGO_ERROR/text()) != "SUCCESS"</bpel:condition>
+        				<bpel:sequence>
+        					<bpel:empty/>
+        				
+	
+	
+	
+	<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="AssetsWithError">
+				<trf:expr>
+					<expr:xqueryTransform>
+						<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/xq/consultaMultipleProductosErrorAssetsOut"/>
+						<expr:param name="productosXPais">
+							<expr:path>$productosXPais/PAIS[xs:int($posicionPais)]</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+	</bpel:assign>
+	<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./bind:ASSETS</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+			<trf:expr>
+				<expr:xqueryText>$AssetsWithError/bind:ASSET</expr:xqueryText></trf:expr></trf:insert>
+		</bpel:extensionAssignOperation>
+	</bpel:assign>
+	<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="LiabilitiesWithError">
+				<trf:expr>
+					<expr:xqueryTransform>
+						<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/xq/consultaMultipleProductosErrorLiabilitiesOut"/>
+						<expr:param name="productosXPais">
+							<expr:path>$productosXPais/PAIS[xs:int($posicionPais)]</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+	</bpel:assign>
+	<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./bind:LIABILITIES</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+			<trf:expr>
+				<expr:xqueryText>$LiabilitiesWithError/bind:LIABILITY</expr:xqueryText></trf:expr></trf:insert>
+		</bpel:extensionAssignOperation>
+	</bpel:assign>
+	
+	
+	</bpel:sequence>
+        				<bpel:else>
+        					<bpel:sequence>
+        						<bpel:empty/>
+        					<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="REQconsultaMultipleProductosInterno.RequestHeader">
+				<trf:expr>
+					<expr:xqueryTransform>
+						<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/xq/consultaMultiplesProductosInternoHeaderIn"/>
+						
+						
+						
+						<expr:param name="pais">
+							<expr:path>string($productosXPais/PAIS[xs:int($posicionPais)]/CODIGO/text())</expr:path></expr:param>
+						<expr:param name="sjConsultaMultipleProductos">
+							<expr:path>$request.inputParameters</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="REQconsultaMultipleProductosInterno.parameters">
+				<trf:expr>
+					<expr:xqueryTransform>
+						<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/xq/consultaMultiplesProductosInternoIn"/>
+						
+						
+						
+						<expr:param name="productosxPais">
+							<expr:path>$productosXPais</expr:path></expr:param>
+						<expr:param name="posicionPais">
+							<expr:path>$posicionPais</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+	<bpel:invoke partnerLink="ConsultaMultipleProductosInterno" operation="consultaMultipleProductosInterno" outputVariable="RSPconsultaMultipleProductosInterno" inputVariable="REQconsultaMultipleProductosInterno">
+		<rescon:invokeInfo><rescon:service ref="Middleware/v2/ProxyServices/ConsultaMultipleProductosInterno" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/></rescon:invokeInfo></bpel:invoke>
+	<bpel:flow>
+		<bpel:scope>
+			<bpel:variables>
+				<bpel:variable name="Assets" type="xsd:anyType"/></bpel:variables>
+			<bpel:sequence>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:assign varName="Assets">
+							<trf:expr>
+								<expr:xqueryTransform>
+									<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/xq/consultaMultipleProductosInternoOutAssets"/>
+									<expr:param name="ASSETS">
+										<expr:path>$RSPconsultaMultipleProductosInterno.result/ASSETS</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+					</bpel:extensionAssignOperation>
+					<bpel:extensionAssignOperation>
+						<bpel:documentation/>
+						<trf:insert varName="response.outputParameters">
+							<trf:location>
+								<expr:xpathText>./bind:ASSETS</expr:xpathText></trf:location>
+							<trf:where>last-child</trf:where>
+							<trf:expr>
+								
+								<expr:xqueryText>$Assets/bind:ASSET</expr:xqueryText></trf:expr></trf:insert>
+					</bpel:extensionAssignOperation>
+				</bpel:assign></bpel:sequence>
+		</bpel:scope>
+		<bpel:scope>
+			<bpel:variables>
+				<bpel:variable name="Liabilities" type="xsd:anyType"/></bpel:variables>
+			<bpel:sequence>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:assign varName="Liabilities">
+							<trf:expr>
+								<expr:xqueryTransform>
+									<expr:resource ref="Middleware/v2/BusinessServices/SJS/consultaMultiplesProductos/xq/consultaMultipleProductosInternoOutLiabilities"/>
+									<expr:param name="LIABILITIES">
+										<expr:path>$RSPconsultaMultipleProductosInterno.result/LIABILITIES</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+					</bpel:extensionAssignOperation>
+					<bpel:extensionAssignOperation>
+						<bpel:documentation/>
+						<trf:insert varName="response.outputParameters">
+							<trf:location>
+								<expr:xpathText>./bind:LIABILITIES</expr:xpathText></trf:location>
+							<trf:where>last-child</trf:where>
+							<trf:expr>
+								
+								<expr:xqueryText>$Liabilities/bind:LIABILITY</expr:xqueryText></trf:expr></trf:insert>
+					</bpel:extensionAssignOperation>
+				</bpel:assign></bpel:sequence>
+		</bpel:scope>
+	</bpel:flow>
+	
+	
+	</bpel:sequence>
+        				</bpel:else>
+        			</bpel:if></bpel:sequence>
+        	</bpel:scope>
+        </bpel:forEach>
+        <bpel:reply partnerLink="sjConsultaMultipleProductos" operation="consultaProductos" variable="response"/>
+    </bpel:sequence>
+</bpel:process>

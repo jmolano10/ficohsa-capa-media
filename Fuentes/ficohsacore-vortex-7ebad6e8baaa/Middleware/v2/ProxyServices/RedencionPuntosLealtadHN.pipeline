@@ -1,0 +1,1097 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/RedencionPuntosLealtad/wsdl/redencionPuntosLealtadPS"/>
+            <con:binding>
+                <con:name>programaLealtadPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/programaLealtad/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con2:router errorHandler="_onErrorHandler-7433994146534924661--32927034.17960f2b8eb.-7e52" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+        <con:pipeline type="request" name="HN01_RedencionPuntosLealtad_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes" prefix="prog" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:validate>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7433994146534924661--32927034.17960f2b8eb.-7eb5</con3:id>
+                        <con1:schema ref="Middleware/v2/Resources/ProgramaLealtad/xsd/programaLealtadTypes"/>
+                        <con1:schemaElement xmlns:prog="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes">prog:redencionPuntosLealtad</con1:schemaElement>
+                        <con1:varName>body</con1:varName>
+                        <con1:location>
+                            <con3:xpathText xmlns:con3="http://www.bea.com/wli/sb/stages/config">./prog:redencionPuntosLealtad</con3:xpathText>
+                        </con1:location>
+                    </con1:validate>
+                    <con1:assign varName="validationMessage">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6009701837921435658--21822386.1798102bacd.-7fde</con3:id>
+                        <con1:expr>
+                            <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                <con3:resource ref="Middleware/v2/Resources/RedencionPuntosLealtad/xq/redencionPuntosLealtadValidate"/>
+                                <con3:param name="redencionPuntosLealtad">
+                                    <con3:path>$body/prog:redencionPuntosLealtad</con3:path>
+                                </con3:param>
+                            </con3:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="validationMessage">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6525996045319557580-375c92dd.17ca94b713d.-7cb5</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">let $customerIdType := string($body/prog:redencionPuntosLealtad/CUSTOMER_ID_TYPE/text())
+return
+	if($validationMessage != '') then(
+        
+        $validationMessage
+    ) else if($customerIdType != 'CARD_NUMBER') then(
+        
+        'CUSTOMER_ID_TYPE no soportado'
+    )else ('')</con3:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaInformacionCliente">
+                <con:context>
+                    <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conInfoLealtad" prefix="inf" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes" prefix="prog" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaTipoTarjeta" prefix="sjc" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conInfoLealtad" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="T24WebServicesImpl" prefix="t24" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="customerIdType">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2521375909032843976--55fdb751.1795b9c1719.-7ec1</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($body/prog:redencionPuntosLealtad/CUSTOMER_ID_TYPE/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="customerIdValue">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2521375909032843976--55fdb751.1795b9c1719.-7e91</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($body/prog:redencionPuntosLealtad/CUSTOMER_ID_VALUE/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:ifThenElse>
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2521375909032843976--55fdb751.1795b9c1719.-7e68</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:string($validationMessage) = ""</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="codigoPais">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7e8e</con3:id>
+                                    <con1:expr>
+                                        <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                            <con3:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                            <con3:param name="codigoPais">
+                                                <con3:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con3:path>
+                                            </con3:param>
+                                            <con3:param name="sentidoConversion">
+                                                <con3:path>"OSB-ISO3"</con3:path>
+                                            </con3:param>
+                                        </con3:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:wsCallout>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7e12</con3:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ProcesosHN/conInfoLealtad/biz/conInfoLealtad_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>conInfoLealtad</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQConInfoLealtad</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPConInfoLealtad</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQConInfoLealtad">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7e19</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/ProgramaLealtad/xq/conInfoLealtadHNIn"/>
+                                                    <con3:param name="country">
+                                                        <con3:path>$codigoPais</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="cardNumber">
+                                                        <con3:path>$customerIdValue</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7e18</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPConInfoLealtad/con:CodigoError/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="legalId">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7e17</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn-bea:trim(string($RSPConInfoLealtad/inf:RowSet/inf:Row/inf:Column[@name = 'legalId']/text()))</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="customerName">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7e16</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPConInfoLealtad/inf:RowSet/inf:Row/inf:Column[@name = 'customerName']/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="cardType">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7e15</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPConInfoLealtad/inf:RowSet/inf:Row/inf:Column[@name = 'cardType']/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="logo">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7e14</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPConInfoLealtad/inf:RowSet/inf:Row/inf:Column[@name = 'logo']/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7e13</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPConInfoLealtad/con:MensajeError/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultarDatosCuenta">
+                <con:context>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes" prefix="prog" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7d2c</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$cardType != "DEBIT" and $validationMessage = ''</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7dcc</con3:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoCuenta/biz/conDatoCuenta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>conDatoCuenta</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQconDatoCuenta</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPconDatoCuenta</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQconDatoCuenta">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7dd3</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/MasterDataHN/xq/conDatoCuentaHNIn"/>
+                                                    <con3:param name="accountNumber">
+                                                        <con3:path>string($body/prog:redencionPuntosLealtad/CUSTOMER_ID_VALUE/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="countryCode">
+                                                        <con3:path>$codigoPais</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="org">
+                                                        <con3:path>''</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:validate>
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7dd2</con3:id>
+                                            <con1:schema ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoCuenta/xsd/conDatoCuenta_sp"/>
+                                            <con1:schemaElement xmlns:con="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta">con:InputParameters</con1:schemaElement>
+                                            <con1:varName>REQconDatoCuenta</con1:varName>
+                                        </con1:validate>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7dd1</con3:id>
+                                            <con1:expr>
+                                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">string($RSPconDatoCuenta/con:CodigoError/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7dd0</con3:id>
+                                            <con1:expr>
+                                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode != '-1') then (
+	fn:string($RSPconDatoCuenta/con:MensajeError/text())
+) else ('')</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="registroDatoCuenta">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7dcf</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$RSPconDatoCuenta/con:RowSet[1]/con:Row[con:Column/@name='TipoOrg' and con:Column/text() = 'ALT']</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="customerId">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7dce</con3:id>
+                                            <con1:expr>
+                                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">string($registroDatoCuenta/con:Column[@name = 'CUST_NBR']/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="nRowsBase">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7dcd</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:count($RSPconDatoCuenta/con:RowSet/con:Row/con:Column[upper-case(@name) = 'TIPOORG']/text() = "ALT")</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="org">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6835064179981542154--7636fdf2.17cc7cede2a.-7f21</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($registroDatoCuenta/con:Column[upper-case(@name) = 'ORG']/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="scheme">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6835064179981542154--7636fdf2.17cc7cede2a.-7f04</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($registroDatoCuenta/con:Column[upper-case(@name) = 'LMS_SCHEME']/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="accountNumber">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6835064179981542154--7636fdf2.17cc7cede2a.-7ee7</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($registroDatoCuenta/con:Column[upper-case(@name) = 'LMS_ACC']/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaProgramaLealtad">
+                <con:context>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes" prefix="prog" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/obtenerTipoProgramaLealtad" prefix="obt" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaProgramaLealtad" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7e0a</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:ifThenElse>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7df9</con3:id>
+                                    <con1:case>
+                                        <con1:condition>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$cardType = "DEBIT"</con3:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:assign varName="binNumber">
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7df8</con3:id>
+                                                <con1:expr>
+                                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:substring(fn:string($body/prog:redencionPuntosLealtad/CUSTOMER_ID_VALUE/text()), 1, 6)</con3:xqueryText>
+                                                </con1:expr>
+                                            </con1:assign>
+                                            <con1:assign varName="programCode">
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7d16</con3:id>
+                                                <con1:expr>
+                                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">'1'</con3:xqueryText>
+                                                </con1:expr>
+                                            </con1:assign>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:case>
+                                        <con1:condition>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$cardType = "CREDIT"</con3:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:ifThenElse>
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7df2</con3:id>
+                                                <con1:case>
+                                                    <con1:condition>
+                                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$logo != ""</con3:xqueryText>
+                                                    </con1:condition>
+                                                    <con1:actions>
+                                                        <con1:wsCallout>
+                                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7ded</con3:id>
+                                                            <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/INTFC/consultaProgramaLealtad/biz/consultaProgramaLealtad_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                            <con1:operation>consultaProgramaLealtad</con1:operation>
+                                                            <con1:request>
+                                                                <con1:body>REQconsultaProgramaLealtad</con1:body>
+                                                            </con1:request>
+                                                            <con1:response>
+                                                                <con1:body>RSPconsultaProgramaLealtad</con1:body>
+                                                            </con1:response>
+                                                            <con1:requestTransform>
+                                                                <con1:assign varName="REQconsultaProgramaLealtad">
+                                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7df1</con3:id>
+                                                                    <con1:expr>
+                                                                        <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                                            <con3:resource ref="Middleware/v2/Resources/ProgramaLealtad/xq/consultaProgramaLealtadIn"/>
+                                                                            <con3:param name="logo">
+                                                                                <con3:path>$logo</con3:path>
+                                                                            </con3:param>
+                                                                            <con3:param name="codigoPais">
+                                                                                <con3:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con3:path>
+                                                                            </con3:param>
+                                                                        </con3:xqueryTransform>
+                                                                    </con1:expr>
+                                                                </con1:assign>
+                                                            </con1:requestTransform>
+                                                            <con1:responseTransform>
+                                                                <con1:assign varName="errorCode">
+                                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7df0</con3:id>
+                                                                    <con1:expr>
+                                                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPconsultaProgramaLealtad/con:PV_CODIGOMENSAJE/text())</con3:xqueryText>
+                                                                    </con1:expr>
+                                                                </con1:assign>
+                                                                <con1:assign varName="validationMessage">
+                                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7def</con3:id>
+                                                                    <con1:expr>
+                                                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPconsultaProgramaLealtad/con:PV_DESCRIPCIONMENSAJE/text())</con3:xqueryText>
+                                                                    </con1:expr>
+                                                                </con1:assign>
+                                                                <con1:assign varName="logoInfinite">
+                                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8829602200032484330-773c0adc.191e19910fc.-7fd9</con3:id>
+                                                                    <con1:expr>
+                                                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">'625'</con3:xqueryText>
+                                                                    </con1:expr>
+                                                                </con1:assign>
+                                                                <con1:assign varName="programCode">
+                                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7dee</con3:id>
+                                                                    <con1:expr>
+                                                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if($logo = $logoInfinite and exists($body/prog:redencionPuntosLealtad/PROGRAM_ID/text())) then (
+	$body/prog:redencionPuntosLealtad/PROGRAM_ID/text()
+) else (
+	string($RSPconsultaProgramaLealtad/con:PV_CODIGOLEALTAD/text())
+)</con3:xqueryText>
+                                                                    </con1:expr>
+                                                                </con1:assign>
+                                                            </con1:responseTransform>
+                                                        </con1:wsCallout>
+                                                    </con1:actions>
+                                                </con1:case>
+                                                <con1:default>
+                                                    <con1:assign varName="errorCode">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7dec</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">"ERROR"</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="validationMessage">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7deb</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">"No se encontró logo para la tarjeta."</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con1:default>
+                                            </con1:ifThenElse>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:default>
+                                        <con3:skip xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                            <con3:id>_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7dea</con3:id>
+                                        </con3:skip>
+                                    </con1:default>
+                                </con1:ifThenElse>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ObtenerPuntos">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes" prefix="prog" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/canjearPuntosEfectivo" prefix="can" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7f4e</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($validationMessage) != ""</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con2:skip xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                    <con2:id>_ActionId-6101332147239424633-39933655.1795cd6c586.-7f20</con2:id>
+                                </con2:skip>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($body/prog:redencionPuntosLealtad/REDEMPTION_TYPE/text()) = "CASH"</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7efc</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABK/canjearPuntosEfectivo/biz/canjearPuntosEfectivo_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>canjearPuntosEfectivo</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQcanjearPuntosEfectivo</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPcanjearPuntosEfectivo</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQcanjearPuntosEfectivo">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7ed7</con2:id>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/ProgramaLealtad/xq/canjearPuntosEfectivoHNIn"/>
+                                                    <con3:param name="conversionAmount">
+                                                        <con3:path>string($body/prog:redencionPuntosLealtad/REDEMPTION_AMOUNT/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="logo">
+                                                        <con3:path>$logo</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="conversionType">
+                                                        <con3:path>'2'</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="terminalId">
+                                                        <con3:path>string($body/prog:redencionPuntosLealtad/CASH_REDEMPTION/TERMINAL_ID/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="merchantType">
+                                                        <con3:path>string($body/prog:redencionPuntosLealtad/CASH_REDEMPTION/MERCHANT_TYPE/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="merchantNumber">
+                                                        <con3:path>string($body/prog:redencionPuntosLealtad/CASH_REDEMPTION/MERCHANT_ID/text())</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-3233598181007937927--7e0e25df.1796b1c0169.-7eb1</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPcanjearPuntosEfectivo/can:PV_CODIGOMENSAJE/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="totalPoints">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7ec5</con2:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">data($RSPcanjearPuntosEfectivo/can:PN_VALORSALIDA)</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7eab</con2:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if (fn:upper-case($errorCode) = "SUCCESS") then (
+	""
+) else (
+	fn:string($RSPcanjearPuntosEfectivo/can:PV_DESCRIPCIONMENSAJE/text())
+)</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:assign varName="totalPoints">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7e8e</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">data($body/prog:redencionPuntosLealtad/REDEMPTION_AMOUNT)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ObtenerParametrizacion">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d99</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:ifThenElse>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d8f</con3:id>
+                                    <con1:case>
+                                        <con1:condition>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$programCode = '1' or $programCode = '2'</con3:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:wsCallout>
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d87</con3:id>
+                                                <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con1:operation>obtenerParametrizacion</con1:operation>
+                                                <con1:request>
+                                                    <con1:body>REQobtenerParametrizacion</con1:body>
+                                                </con1:request>
+                                                <con1:response>
+                                                    <con1:body>RSPobtenerParametrizacion</con1:body>
+                                                </con1:response>
+                                                <con1:requestTransform>
+                                                    <con1:assign varName="matrixIdParameter">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d8e</con3:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">concat('FICBCO0229.MRS.MATRIXID.', 
+	string($header/aut:RequestHeader/Region/SourceBank/text()))</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="institutionNameParameter">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d8d</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">'FICBCO0229.MRS.INSTITUTION.NAME'</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="rewardItemParameter">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7fea</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">concat('FICBCO0229.', 
+	upper-case(string($header/aut:RequestHeader/Authentication/UserName/text())), '.REWARDITEM')</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="REQobtenerParametrizacion">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d8c</con3:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                                <con2:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                                                <con2:param name="nombreParametros">
+                                                                    <con2:path>concat($matrixIdParameter, '||',
+$institutionNameParameter, '||', $rewardItemParameter)</con2:path>
+                                                                </con2:param>
+                                                            </con2:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con1:requestTransform>
+                                                <con1:responseTransform>
+                                                    <con1:assign varName="errorCode">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d8b</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPobtenerParametrizacion/osb:ERROR_CODE/text())</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="matrixId">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d8a</con3:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[ osb:NAME = $matrixIdParameter ]/osb:VALUE/text())</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="institutionName">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d89</con3:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[ osb:NAME = $institutionNameParameter ]/osb:VALUE/text())</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="rewardItem">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7fd0</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">let $reward := fn:string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[ osb:NAME = $rewardItemParameter ]/osb:VALUE/text())
+return
+(
+	if ($reward = '') then
+		(  
+			'CANJE POR SALESFORC'
+		)else ($reward)
+)</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="validationMessage">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d88</con3:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">string($RSPobtenerParametrizacion/osb:ERROR_MESSAGE/text())</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con1:responseTransform>
+                                            </con1:wsCallout>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:default>
+                                        <con1:assign varName="errorCode">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d72</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">'ERROR'</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5555547049861967279--28663ff3.17c145fa59c.-7d5c</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">'Programa de lealtad no soportado'</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:default>
+                                </con1:ifThenElse>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="Rendencion" errorHandler="_onErrorHandler-8648567434467774691--397f5e75.17cbf412ba3.-7d95">
+                <con:context>
+                    <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/INSTransaccionRedencion" prefix="ins" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://redemption.ws.mcrewards.mastercard.com/" prefix="red" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.procesa.com/fdcs" prefix="fdcs" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes" prefix="prog" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7d8a</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$programCode = '1' and $matrixId != '' and $institutionName != ''</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7d53</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/Mastercard/RedemptionService/biz/RedemptionService" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>doItemRedemption</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQdoItemRedemption</con1:body>
+                                        <con1:header>REQHeaderdoItemRedemption</con1:header>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPdoItemRedemption</con1:body>
+                                        <con1:header>RSPHeaderdoItemRedemption</con1:header>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQHeaderdoItemRedemption">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7d3d</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">&lt;soap-env:Header/></con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:replace varName="REQHeaderdoItemRedemption" contents-only="true">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7d0e</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                    <con2:resource ref="Middleware/v2/Resources/ProgramaLealtad/xq/MRSIdentity"/>
+                                                    <con2:param name="institutionName">
+                                                        <con2:path>$institutionName</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="appID">
+                                                        <con2:path>$legalId</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:assign varName="REQdoItemRedemption">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-6101332147239424633-39933655.1795cd6c586.-7cdf</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                    <con2:resource ref="Middleware/v2/Resources/RedencionPuntosLealtad/xq/doItemRedemptionIn"/>
+                                                    <con2:param name="matrixId">
+                                                        <con2:path>$matrixId</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="cantidad">
+                                                        <con2:path>$totalPoints</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="pointTotalRemaining">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7fb3</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPdoItemRedemption/red:pointTotalRemaining/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="redemptionId">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7f97</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPdoItemRedemption/red:redemptionResults[1]/red:redemptionId/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="pointTotalRemaining">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7a9d</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPdoItemRedemption/red:pointTotalRemaining)</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$programCode = '2' and $rewardItem != '' and xs:integer($nRowsBase) > 0</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="redemptionType">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5324412862513692329--6e2ef130.18005cb31b0.-7fac</con3:id>
+                                    <con1:expr>
+                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($body/prog:redencionPuntosLealtad/REDEMPTION_TYPE/text())</con3:xqueryText>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:wsCallout>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7ca0</con3:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterData/iNSTransaccionRedencion/biz/INSTransaccionRedencion_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>INSTransaccionRedencion</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQINSTransaccionRedencion</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPINSTransaccionRedencion</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQINSTransaccionRedencion">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7c68</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/RedencionPuntosLealtad/xq/insTransaccionRedencionIn"/>
+                                                    <con3:param name="merchant">
+                                                        <con3:path>string($body/prog:redencionPuntosLealtad/CASH_REDEMPTION/TERMINAL_ID/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="channelId">
+                                                        <con3:path>''</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="amount">
+                                                        <con3:path>if($redemptionType = 'CASH')then(
+	$totalPoints
+)else(
+	string($body/prog:redencionPuntosLealtad/REDEMPTION_AMOUNT/text())
+)</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="cardNumber">
+                                                        <con3:path>$customerIdValue</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="description">
+                                                        <con3:path>'DESC 35'</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="serviceId">
+                                                        <con3:path>''</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="countryCode">
+                                                        <con3:path>$codigoPais</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7c30</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPINSTransaccionRedencion/ins:CodigoError/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7c13</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPINSTransaccionRedencion/ins:MensajeError/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="redemptionId">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7bf6</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPINSTransaccionRedencion/ins:IDTransaccion/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                                <con1:ifThenElse>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7bbe</con3:id>
+                                    <con1:case>
+                                        <con1:condition>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con3:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:wsCallout>
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7bb4</con3:id>
+                                                <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con1:operation>PointsRedeem</con1:operation>
+                                                <con1:request>
+                                                    <con1:body>REQPointsRedeem</con1:body>
+                                                </con1:request>
+                                                <con1:response>
+                                                    <con1:body>RSPPointsRedeem</con1:body>
+                                                </con1:response>
+                                                <con1:requestTransform>
+                                                    <con1:assign varName="REQPointsRedeem">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7bb8</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                                <con3:resource ref="Middleware/v2/Resources/RedencionPuntosLealtad/xq/pointsRedeemIn"/>
+                                                                <con3:param name="pointsParameter">
+                                                                    <con3:path>$totalPoints</con3:path>
+                                                                </con3:param>
+                                                                <con3:param name="rewardItemParameter">
+                                                                    <con3:path>$rewardItem</con3:path>
+                                                                </con3:param>
+                                                                <con3:param name="outputParameters1">
+                                                                    <con3:path>$RSPconDatoCuenta</con3:path>
+                                                                </con3:param>
+                                                            </con3:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:validate>
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7bb7</con3:id>
+                                                        <con1:schema ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/xsd/XMLSchema_769155616"/>
+                                                        <con1:schemaElement xmlns:fdcs="http://www.procesa.com/fdcs">fdcs:PointsRedeemRequest</con1:schemaElement>
+                                                        <con1:varName>REQPointsRedeem</con1:varName>
+                                                        <con1:location>
+                                                            <con3:xpathText xmlns:con3="http://www.bea.com/wli/sb/stages/config">.</con3:xpathText>
+                                                        </con1:location>
+                                                    </con1:validate>
+                                                </con1:requestTransform>
+                                                <con1:responseTransform>
+                                                    <con1:assign varName="validationMessage">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7bb6</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if(string($RSPPointsRedeem/SVC-RETURN/text()) = 'P') then
+	(
+		''
+	) else (
+		fn-bea:trim(string($RSPPointsRedeem/fdcs:ReturnCodes/RC[1]/Desc/text()))
+	)</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="errorCode">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7bb5</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPPointsRedeem/fdcs:ReturnCodes/RC[1]/Code/text())</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con1:responseTransform>
+                                            </con1:wsCallout>
+                                            <con1:ifThenElse>
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6835064179981542154--7636fdf2.17cc7cede2a.-7ead</con3:id>
+                                                <con1:case>
+                                                    <con1:condition>
+                                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con3:xqueryText>
+                                                    </con1:condition>
+                                                    <con1:actions>
+                                                        <con1:wsCallout>
+                                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6835064179981542154--7636fdf2.17cc7cede2a.-7ea7</con3:id>
+                                                            <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                            <con1:operation>PointsAdjustmentInquiry</con1:operation>
+                                                            <con1:request>
+                                                                <con1:body>REQPointsAdjustmentInquiry</con1:body>
+                                                            </con1:request>
+                                                            <con1:response>
+                                                                <con1:body>RSPPointsAdjustmentInquiry</con1:body>
+                                                            </con1:response>
+                                                            <con1:requestTransform>
+                                                                <con1:assign varName="REQPointsAdjustmentInquiry">
+                                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6835064179981542154--7636fdf2.17cc7cede2a.-7ea9</con3:id>
+                                                                    <con1:expr>
+                                                                        <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                                            <con3:resource ref="Middleware/v2/Resources/VisionPlus/xq/pointsAdjustmentInquiryIn"/>
+                                                                            <con3:param name="accountNumber">
+                                                                                <con3:path>$accountNumber</con3:path>
+                                                                            </con3:param>
+                                                                            <con3:param name="org">
+                                                                                <con3:path>$org</con3:path>
+                                                                            </con3:param>
+                                                                            <con3:param name="scheme">
+                                                                                <con3:path>$scheme</con3:path>
+                                                                            </con3:param>
+                                                                        </con3:xqueryTransform>
+                                                                    </con1:expr>
+                                                                </con1:assign>
+                                                            </con1:requestTransform>
+                                                            <con1:responseTransform>
+                                                                <con1:assign varName="pointTotalRemaining">
+                                                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6835064179981542154--7636fdf2.17cc7cede2a.-7ea8</con3:id>
+                                                                    <con1:expr>
+                                                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">let $available := fn-bea:trim(string($RSPPointsAdjustmentInquiry/GPXAIO-OPEN-TO-RED-ON-SCR/text()))
+return
+if($available != "")then(
+	xs:decimal($available) div 1000
+)else(
+	''
+)</con3:xqueryText>
+                                                                    </con1:expr>
+                                                                </con1:assign>
+                                                            </con1:responseTransform>
+                                                        </con1:wsCallout>
+                                                    </con1:actions>
+                                                </con1:case>
+                                                <con1:default/>
+                                            </con1:ifThenElse>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:default/>
+                                </con1:ifThenElse>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con2:skip xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:id>_ActionId-6101332147239424633-39933655.1795cd6c586.-7d71</con2:id>
+                            </con2:skip>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="HN01_RedencionPuntosLealtad_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes" prefix="prog" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conInfoLealtad" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace contents-only="true" varName="header">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5065599615476409446--3d859a3d.17cc20b320c.-7b0b</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+{
+	if($validationMessage = '') then (
+		<successIndicator>Success</successIndicator>
+	) else (
+		<successIndicator>{ $errorCode }</successIndicator>,
+		<messages>{ $validationMessage }</messages>
+	)
+}
+</aut:ResponseHeader>]]></con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7dcd</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7d8d</con3:id>
+                                    <con1:expr>
+                                        <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                            <con3:resource ref="Middleware/v2/Resources/RedencionPuntosLealtad/xq/redencionPuntosLealtadHNOut"/>
+                                            <con3:param name="pointTotalRemaining">
+                                                <con3:path>$pointTotalRemaining</con3:path>
+                                            </con3:param>
+                                            <con3:param name="points">
+                                                <con3:path>$totalPoints</con3:path>
+                                            </con3:param>
+                                            <con3:param name="customerName">
+                                                <con3:path>$customerName</con3:path>
+                                            </con3:param>
+                                            <con3:param name="legalId">
+                                                <con3:path>$legalId</con3:path>
+                                            </con3:param>
+                                            <con3:param name="redemptionId">
+                                                <con3:path>$redemptionId</con3:path>
+                                            </con3:param>
+                                        </con3:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="body">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8046814074407326517--31e9bde9.17c188efaa4.-7d5d</con3:id>
+                                <con1:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;prog:redencionPuntosLealtadResponse/></con3:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con2:pipeline type="error" name="_onErrorHandler-7433994146534924661--32927034.17960f2b8eb.-7e52">
+            <con2:stage name="ManejoError">
+                <con2:context>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes" prefix="prog"/>
+                </con2:context>
+                <con2:actions>
+                    <con1:replace varName="header" contents-only="true">
+                        <con:id>_ActionId-7433994146534924661--32927034.17960f2b8eb.-7e39</con:id>
+                        <con1:expr>
+                            <con:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{string($fault/ctx:reason/text())}</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con:id>_ActionId-7433994146534924661--32927034.17960f2b8eb.-7e1a</con:id>
+                        <con1:expr>
+                            <con:xqueryText>&lt;prog:redencionPuntosLealtadResponse/></con:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con:reply>
+                        <con:id>_ActionId-7433994146534924661--32927034.17960f2b8eb.-7df7</con:id>
+                    </con:reply>
+                </con2:actions>
+            </con2:stage>
+        </con2:pipeline>
+        <con2:pipeline type="error" name="_onErrorHandler-8648567434467774691--397f5e75.17cbf412ba3.-7d95">
+            <con2:stage name="ManejoErrorRedencion">
+                <con2:context>
+                    <con:userNsDecl namespace="http://www.bea.com/wli/sb/stages/transform/config" prefix="con1"/>
+                    <con:userNsDecl namespace="http://common.ws.mcrewards.mastercard.com/" prefix="con2"/>
+                </con2:context>
+                <con2:actions>
+                    <con1:ifThenElse>
+                        <con:id>_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7d27</con:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con:xqueryText>$programCode = '1'</con:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="errorCode">
+                                    <con:id>_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7c64</con:id>
+                                    <con1:expr>
+                                        <con:xqueryText>string($fault/ctx:details/con1:ReceivedFaultDetail/con1:detail/con2:ErrorResp/con2:code/text())</con:xqueryText>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:assign varName="validationMessage">
+                                    <con:id>_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7c47</con:id>
+                                    <con1:expr>
+                                        <con:xqueryText>string($fault/ctx:details/con1:ReceivedFaultDetail/con1:detail/con2:ErrorResp/con2:description/text())</con:xqueryText>
+                                    </con1:expr>
+                                </con1:assign>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:assign varName="errorCode">
+                                <con:id>_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7cb9</con:id>
+                                <con1:expr>
+                                    <con:xqueryText>string($fault/ctx:errorCode/text())</con:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con:id>_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7c9c</con:id>
+                                <con1:expr>
+                                    <con:xqueryText>string($fault/ctx:reason/text())</con:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:default>
+                    </con1:ifThenElse>
+                    <con:resume>
+                        <con:id>_ActionId-8648567434467774691--397f5e75.17cbf412ba3.-7c0f</con:id>
+                    </con:resume>
+                </con2:actions>
+            </con2:stage>
+        </con2:pipeline>
+        <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:pipeline-node name="HN01_RedencionPuntosLealtad">
+                <con:request>HN01_RedencionPuntosLealtad_request</con:request>
+                <con:response>HN01_RedencionPuntosLealtad_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con2:router>
+</con:pipelineEntry>

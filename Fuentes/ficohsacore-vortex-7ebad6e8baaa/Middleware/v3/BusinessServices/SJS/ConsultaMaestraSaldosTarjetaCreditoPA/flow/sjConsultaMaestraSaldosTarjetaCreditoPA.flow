@@ -1,0 +1,202 @@
+<bpel:process name="sjConsultaMaestraSaldosTarjetaCredito" targetNamespace="http://www.example.com/flow/Middleware/v3/BusinessServices/SJS/ConsultaMaestraSaldosTarjetaCredito/flow/sjConsultaMaestraSaldosTarjetaCredito" bea:name="sjConsultaMaestraSaldosTarjetaCredito" xmlns:tns="http://www.example.com/flow/Middleware/v3/BusinessServices/SJS/ConsultaMaestraSaldosTarjetaCredito/flow/sjConsultaMaestraSaldosTarjetaCredito" xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable" xmlns:rescon="http://www.bea.com/alsb/flow/resources/config" xmlns:bea="http://www.bea.com/bpel/ui/extensions" xmlns:ext="http://www.bea.com/bpel/extensions" xmlns:expr="http://www.bea.com/wli/sb/stages/config" xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config" xmlns:bind="http://www.ficohsa.com.hn/middleware.services/sjConsultaMaestraSaldosTarjetaCreditoPS/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ns1="http://tempuri.org/Procesa" xmlns:ns0="http://tempuri.org/" xmlns:fdcs="http://www.procesa.com/fdcs" xmlns:con="http://www.ficohsa.com.hn/middleware.services/sjConsultaMaestraSaldosTarjetaCreditoTypes">
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjConsultaMaestraSaldosTarjetaCredito" partnerLinkType="tns:sjConsultaMaestraSaldosTarjetaCredito" myRole="sjConsultaMaestraSaldosTarjetaCredito">
+	       </bpel:partnerLink>
+	   <bpel:partnerLink name="vmx" partnerLinkType="tns:vmx_plnkType" partnerRole="vmx_PartnerRole">
+	   </bpel:partnerLink>
+	   </bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request" messageType="bind:sjConsultaMaestraSaldosTarjetaCredito">
+	       </bpel:variable>
+	       <bpel:variable name="response" messageType="bind:sjConsultaMaestraSaldosTarjetaCreditoResponse">
+	       </bpel:variable>
+    <bpel:variable name="countryCode" type="xsd:string"/>
+    <bpel:variable name="cardNumber" type="xsd:string"/>
+    <bpel:variable name="resultGroup" type="xsd:anyType"/>
+    <bpel:variable name="orgCount" type="xsd:int"/>
+    <bpel:variable name="accountNumber" type="xsd:string"/>
+    <bpel:variable name="org" type="xsd:string"/></bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjConsultaMaestraSaldosTarjetaCredito" operation="sjConsultaMaestraSaldosTarjetaCredito" variable="request" createInstance="yes">
+	           <rescon:receiveInfo>
+                
+            <rescon:wsdl ref="Middleware/v3/BusinessServices/SJS/ConsultaMaestraSaldosTarjetaCredito/wsdl/sjConsultaMaestraSaldosTarjetaCreditoPS" binding="bind:sjConsultaMaestraSaldosTarjetaCreditoPSSOAP"/></rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:assign>
+        	<bpel:extensionAssignOperation>
+        		<trf:assign varName="countryCode">
+        			<trf:expr>
+        				<expr:xqueryTransform>
+        					<expr:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+        					
+        					
+        					<expr:param name="codigoPais">
+        						<expr:path>string($request.parameters/COUNTRY_CODE/text())</expr:path></expr:param>
+        					<expr:param name="sentidoConversion">
+        						<expr:path>'OSB-ISO3'</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+        	</bpel:extensionAssignOperation>
+        <bpel:extensionAssignOperation>
+		<bpel:documentation/>
+		<trf:assign varName="cardNumber">
+			<trf:expr>
+				<expr:xqueryText>string($request.parameters/CARD_NUMBER/text())</expr:xqueryText></trf:expr></trf:assign>
+        </bpel:extensionAssignOperation>
+	<bpel:extensionAssignOperation>
+		<trf:assign varName="resultGroup">
+			<trf:expr>
+				<expr:xqueryText>&lt;RESULT_GROUP>
+	&lt;ACCOUNT_INQUIRY_RESPONSES/>
+	&lt;BALANCE_INQUIRY_RESPONSES/>		
+&lt;/RESULT_GROUP></expr:xqueryText></trf:expr></trf:assign>
+        </bpel:extensionAssignOperation>
+        <bpel:extensionAssignOperation>
+		<trf:assign varName="orgCount">
+			<trf:expr>
+				<expr:xqueryText>count($request.parameters/CARD_INFORMATION)</expr:xqueryText></trf:expr></trf:assign>
+        </bpel:extensionAssignOperation></bpel:assign>
+        <bpel:forEach parallel="no" counterName="orgPosition">
+        	<bpel:startCounterValue>1</bpel:startCounterValue>
+        	<bpel:finalCounterValue>$orgCount</bpel:finalCounterValue>
+        	<bpel:scope>
+        		<bpel:sequence>
+        			<bpel:assign>
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="accountNumber">
+        						<trf:expr>
+        							<expr:xqueryText>string($request.parameters/CARD_INFORMATION[xs:int($orgPosition)]/ACCOUNT_NUMBER/text())</expr:xqueryText></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        			<bpel:extensionAssignOperation>
+		<trf:assign varName="org">
+			<trf:expr>
+				<expr:xqueryText>string($request.parameters/CARD_INFORMATION[xs:int($orgPosition)]/ORG/text())</expr:xqueryText></trf:expr></trf:assign>
+        			</bpel:extensionAssignOperation></bpel:assign>
+        			<bpel:if>
+        				<bpel:condition>$accountNumber != '' and $org != ''</bpel:condition>
+        				<bpel:sequence>
+        					<bpel:empty/>
+        				<bpel:flow>
+		<bpel:scope>
+			<bpel:variables>
+				
+				
+				<bpel:variable name="REQAccountInquiryL8VL" messageType="ns1:AccountInquiryL8VL_in">
+				</bpel:variable>
+				<bpel:variable name="RSPAccountInquiryL8VL" messageType="ns1:AccountInquiryL8VL_out">
+				</bpel:variable></bpel:variables>
+			<bpel:faultHandlers>
+				<bpel:catchAll>
+					<bpel:sequence>
+						<bpel:empty/>
+					<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="response.result">
+				<trf:expr>
+					<expr:xqueryText><![CDATA[<con:sjConsultaMaestraSaldosTarjetaCreditoResponse>
+	<ERROR_CODE>ERROR</ERROR_CODE>
+	<MENSAJE_ERROR>Error al realizar la consulta en Vision plus: AccountInquiryVA</MENSAJE_ERROR>
+</con:sjConsultaMaestraSaldosTarjetaCreditoResponse>]]></expr:xqueryText></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+					</bpel:assign></bpel:sequence>
+				</bpel:catchAll></bpel:faultHandlers>
+			<bpel:sequence>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:assign varName="REQAccountInquiryL8VL.AccountInquiryL8VLRequest">
+							<trf:expr>
+								<expr:xqueryTransform>
+									<expr:resource ref="Middleware/v2/Resources/VisionPlusPA/xq/accountInquiryL8VLIn"/>
+									
+									
+									<expr:param name="accountNumber">
+										<expr:path>$accountNumber</expr:path></expr:param>
+									<expr:param name="org">
+										<expr:path>$org</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+					</bpel:extensionAssignOperation>
+				</bpel:assign>
+				<bpel:invoke operation="AccountInquiryL8VL" partnerLink="vmx" inputVariable="REQAccountInquiryL8VL" outputVariable="RSPAccountInquiryL8VL">
+					<rescon:invokeInfo><rescon:service ref="Middleware/v2/BusinessServices/VisionPlusPA/vmx/biz/vmx" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/></rescon:invokeInfo></bpel:invoke>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:insert varName="resultGroup">
+							<trf:location>
+								<expr:xpathText>./ACCOUNT_INQUIRY_RESPONSES</expr:xpathText></trf:location>
+							<trf:where>last-child</trf:where>
+						<trf:expr>
+							<expr:xqueryText>$RSPAccountInquiryL8VL.AccountInquiryL8VLResponse</expr:xqueryText></trf:expr></trf:insert>
+					</bpel:extensionAssignOperation>
+				</bpel:assign></bpel:sequence></bpel:scope>
+		<bpel:scope>
+			<bpel:variables>
+				<bpel:variable name="REQBalanceInquiry" messageType="ns1:BalanceInquiry_in">
+				</bpel:variable>
+				<bpel:variable name="RSPBalanceInquiry" messageType="ns1:BalanceInquiry_out">
+				</bpel:variable></bpel:variables>
+			<bpel:faultHandlers>
+				<bpel:catchAll>
+					<bpel:sequence>
+						<bpel:empty/>
+					<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="response.result">
+				<trf:expr>
+					<expr:xqueryText><![CDATA[<con:sjConsultaMaestraSaldosTarjetaCreditoResponse>
+	<ERROR_CODE>ERROR</ERROR_CODE>
+	<MENSAJE_ERROR>Error al realizar la consulta en Vision plus: BalanceInquiry</MENSAJE_ERROR>
+</con:sjConsultaMaestraSaldosTarjetaCreditoResponse>]]></expr:xqueryText></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+					</bpel:assign></bpel:sequence>
+				</bpel:catchAll></bpel:faultHandlers>
+			<bpel:sequence>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:assign varName="REQBalanceInquiry.BalanceInquiryRequest">
+							<trf:expr>
+								<expr:xqueryTransform>
+									<expr:resource ref="Middleware/v2/Resources/VisionPlusPA/xq/balanceInquiryIn"/>
+									
+									<expr:param name="accountNumber">
+										<expr:path>$accountNumber</expr:path></expr:param>
+									<expr:param name="org">
+										<expr:path>$org</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+					</bpel:extensionAssignOperation>
+				</bpel:assign>
+				<bpel:invoke operation="BalanceInquiry" partnerLink="vmx" inputVariable="REQBalanceInquiry" outputVariable="RSPBalanceInquiry">
+					<rescon:invokeInfo><rescon:service ref="Middleware/v2/BusinessServices/VisionPlusPA/vmx/biz/vmx" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/></rescon:invokeInfo></bpel:invoke>
+				<bpel:assign>
+					<bpel:extensionAssignOperation>
+						<trf:insert varName="resultGroup">
+							<trf:location>
+								<expr:xpathText>./BALANCE_INQUIRY_RESPONSES</expr:xpathText></trf:location>
+							<trf:where>last-child</trf:where>
+						<trf:expr>
+							<expr:xqueryText>$RSPBalanceInquiry.BalanceInquiryResponse</expr:xqueryText></trf:expr></trf:insert>
+					</bpel:extensionAssignOperation>
+				</bpel:assign></bpel:sequence></bpel:scope>
+		</bpel:flow></bpel:sequence>
+        				<bpel:else>
+        					<bpel:sequence>
+        						<bpel:empty/>
+        					</bpel:sequence>
+        				</bpel:else>
+        			</bpel:if>
+        			</bpel:sequence>
+        	</bpel:scope>
+        </bpel:forEach>
+        <bpel:assign>
+        	<bpel:extensionAssignOperation>
+        		<trf:assign varName="response.result">
+        			<trf:expr>
+        				<expr:xqueryTransform>
+        					<expr:resource ref="Middleware/v3/BusinessServices/SJS/ConsultaMaestraSaldosTarjetaCreditoPA/xq/sjConsultaMaestraSaldosTarjetaCreditoPAOut"/>
+        					
+        					<expr:param name="sjConsultaMaestraSaldosTarjetaCredito">
+        						<expr:path>$request.parameters</expr:path></expr:param>
+        					<expr:param name="resultGroup">
+        						<expr:path>$resultGroup</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+        	</bpel:extensionAssignOperation>
+        </bpel:assign>
+        <bpel:reply partnerLink="sjConsultaMaestraSaldosTarjetaCredito" operation="sjConsultaMaestraSaldosTarjetaCredito" variable="response"/>
+    </bpel:sequence>
+</bpel:process>

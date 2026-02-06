@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/MarcadoPredictivo/wsdl/marcadoPredictivoPS"/>
+            <con:binding>
+                <con:name>marcadoPredictivoPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/marcadoPredictivoPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-2811595381240927931-7f602c16.17111e5ce50.-8000" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="MarcadoPredictivoRG_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/uadIntegration" prefix="ns3"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/marcadoPredictivoTypes" prefix="mar"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-2811595381240927931-7f602c16.17111e5ce50.-7f97</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ASPECT/biz/uadIntegration" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>getInteraction</con2:operation>
+                        <con2:request>
+                            <con2:body>REQGetInteractionIn</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPGetInteractionOut</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQGetInteractionIn">
+                                <con1:id>_ActionId-2811595381240927931-7f602c16.17111e5ce50.-7f32</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MarcadoPredictivo/xq/getInteractionRGIn"/>
+                                        <con1:param name="marcadoPredictivo">
+                                            <con1:path>$body/mar:marcadoPredictivo</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:validate>
+                                <con1:id>_ActionId-2811595381240927931-7f602c16.17111e5ce50.-7f4c</con1:id>
+                                <con2:wsdl ref="Middleware/v2/BusinessServices/ASPECT/wsdl/uadIntegration"/>
+                                <con2:schemaElement xmlns:uad="http://www.ficohsa.com.hn/uadIntegration">uad:getInteractionRequest</con2:schemaElement>
+                                <con2:varName>REQGetInteractionIn</con2:varName>
+                            </con2:validate>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-8831964617469678645-3f9c9ccb.1711739f875.-7dfb</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPGetInteractionOut/responseData/Message/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="MarcadoPredictivoRG_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/marcadoPredictivoTypes" prefix="mar"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-2811595381240927931-7f602c16.17111e5ce50.-7f84</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if ($validationMessage = '')then(
+			<successIndicator>Success</successIndicator>
+		)else(
+			<successIndicator>ERROR</successIndicator>,
+			<messages>{ $validationMessage }</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-2811595381240927931-7f602c16.17111e5ce50.-7f77</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;mar:marcadoPredictivoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-2811595381240927931-7f602c16.17111e5ce50.-8000">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/marcadoPredictivoTypes" prefix="mar"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-2811595381240927931-7f602c16.17111e5ce50.-7feb</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ fn:string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-2811595381240927931-7f602c16.17111e5ce50.-7fce</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;mar:marcadoPredictivoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-2811595381240927931-7f602c16.17111e5ce50.-7fb3</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="MarcadoPredictivoRG">
+                <con:request>MarcadoPredictivoRG_request</con:request>
+                <con:response>MarcadoPredictivoRG_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

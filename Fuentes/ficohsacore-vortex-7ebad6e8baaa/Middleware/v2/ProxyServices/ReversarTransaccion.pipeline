@@ -1,0 +1,1170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ReversarTransaccion/wsdl/ReversarTransaccionPS"/>
+            <con:binding>
+                <con:name>reversarTransaccionPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/reversarTransaccionPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8848777042473091319--23eafd38.13c2a05c9f3.-6ddb" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="response" name="Default_ReversarTransaccion_response">
+            <con:stage name="FlujoSalida" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultasType" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con5:Error xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7b33</con1:id>
+                        <con5:errCode>MW-0008</con5:errCode>
+                        <con5:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con5:message>
+                    </con5:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="HNBanco_ReversarTransaccion_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversarTransaccionTypes" prefix="rev"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be9</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$transactionType = "CHEQUE_PAYMENT" and fn:string($trxId) != ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace contents-only="true" varName="header">
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be8</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/Business_Resources/ReversarTransaccion/ReversarTransaccion/reversarTransaccionPagoChequeHeaderOut"/>
+                                            <con1:param name="reversiondePagodeChequesResponse">
+                                                <con1:path>$RESPONSE</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$transactionType = "CREDIT_CARD_TFS" and fn:string($tipo2Trx) = "TFS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e8d</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con:xqueryText xmlns:con="http://www.bea.com/wli/sb/stages/config">upper-case($statusReversion) = "SUCCESS"</con:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:replace varName="header" contents-only="true">
+                                                <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e8b</con1:id>
+                                                <con2:expr>
+                                                    <con:xqueryTransform xmlns:con="http://www.bea.com/wli/sb/stages/config">
+                                                        <con:resource ref="Middleware/Business_Resources/ReversarTransaccion/ReversarTransaccion/reversarTransaccionPagooRetiroTCHeaderOut"/>
+                                                        <con:param name="autorizareversapagooretiroTCResponse">
+                                                            <con:path>$RSPautorizaReversaPagoORetiroTC</con:path>
+                                                        </con:param>
+                                                    </con:xqueryTransform>
+                                                </con2:expr>
+                                            </con2:replace>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default>
+                                        <con2:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e8c</con1:id>
+                                            <con2:expr>
+                                                <con:xqueryText xmlns:con="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{$statusReversion}</successIndicator>
+      <messages>{$messageReversion}</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:default>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$transactionType = "CREDIT_CARD_PAYMENT" and fn:string($trxId) != ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be7</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>upper-case($statusReversion) = "SUCCESS"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:replace contents-only="true" varName="header">
+                                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be6</con1:id>
+                                                <con2:expr>
+                                                    <con:xqueryTransform xmlns:con="http://www.bea.com/wli/sb/stages/config">
+                                                        <con:resource ref="Middleware/Business_Resources/ReversarTransaccion/ReversarTransaccion/reversarTransaccionPagooRetiroTCHeaderOut"/>
+                                                        <con:param name="autorizareversapagooretiroTCResponse">
+                                                            <con:path>$respAutorizacionReversion</con:path>
+                                                        </con:param>
+                                                    </con:xqueryTransform>
+                                                </con2:expr>
+                                            </con2:replace>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{$statusReversion}</successIndicator>
+      <messages>{$messageReversion}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:default>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$transactionType = "REF_COLLECTION" and fn:string($trxId) != ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be4</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>upper-case($statusReversion) = "SUCCESS"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:replace contents-only="true" varName="header">
+                                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be3</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryTransform>
+                                                        <con1:resource ref="Middleware/Business_Resources/ReversarTransaccion/ReversarTransaccion/reversarTransaccionPagoRecaudoHeaderOut"/>
+                                                        <con1:param name="authrevpagorecaudorefdbctaResponse">
+                                                            <con1:path>$RESPONSEAuthrevpagorecaudorefdbcta</con1:path>
+                                                        </con1:param>
+                                                    </con1:xqueryTransform>
+                                                </con2:expr>
+                                            </con2:replace>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be2</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{$statusReversion}</successIndicator>
+      <messages>{$messageReversion}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:default>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryConditionExpr>
+                                    <con1:boolExpr operator="and">
+                                        <con1:boolExpr operator="or">
+                                            <con1:compExpr operator="=">
+                                                <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                <con1:rightPath>"FT"</con1:rightPath>
+                                            </con1:compExpr>
+                                            <con1:compExpr operator="=">
+                                                <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                <con1:rightPath>"TT"</con1:rightPath>
+                                            </con1:compExpr>
+                                        </con1:boolExpr>
+                                        <con1:compExpr operator="!=">
+                                            <con1:leftPath>fn:string($trxId)</con1:leftPath>
+                                            <con1:rightPath>""</con1:rightPath>
+                                        </con1:compExpr>
+                                        <con1:compExpr operator="=">
+                                            <con1:leftPath>$transactionType</con1:leftPath>
+                                            <con1:rightPath>""</con1:rightPath>
+                                        </con1:compExpr>
+                                    </con1:boolExpr>
+                                </con1:xqueryConditionExpr>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be1</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>upper-case($statusReversion) = "SUCCESS"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:ifThenElse>
+                                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7be0</con1:id>
+                                                <con2:case>
+                                                    <con2:condition>
+                                                        <con1:xqueryConditionExpr>
+                                                            <con1:compExpr operator="=">
+                                                                <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                                <con1:rightPath>"FT"</con1:rightPath>
+                                                            </con1:compExpr>
+                                                        </con1:xqueryConditionExpr>
+                                                    </con2:condition>
+                                                    <con2:actions>
+                                                        <con2:replace contents-only="true" varName="header">
+                                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bdf</con1:id>
+                                                            <con2:expr>
+                                                                <con1:xqueryTransform>
+                                                                    <con1:resource ref="Middleware/Business_Resources/ReversarTransaccion/ReversarTransaccion/reversarTransaccionFTHeaderOut"/>
+                                                                    <con1:param name="autorizacionreversionFTResponse">
+                                                                        <con1:path>$respAutorizacionReversion</con1:path>
+                                                                    </con1:param>
+                                                                </con1:xqueryTransform>
+                                                            </con2:expr>
+                                                        </con2:replace>
+                                                    </con2:actions>
+                                                </con2:case>
+                                                <con2:case>
+                                                    <con2:condition>
+                                                        <con1:xqueryConditionExpr>
+                                                            <con1:compExpr operator="=">
+                                                                <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                                <con1:rightPath>"TT"</con1:rightPath>
+                                                            </con1:compExpr>
+                                                        </con1:xqueryConditionExpr>
+                                                    </con2:condition>
+                                                    <con2:actions>
+                                                        <con2:replace contents-only="true" varName="header">
+                                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bde</con1:id>
+                                                            <con2:expr>
+                                                                <con1:xqueryTransform>
+                                                                    <con1:resource ref="Middleware/Business_Resources/ReversarTransaccion/ReversarTransaccion/reversarTransaccionTTHeaderOut"/>
+                                                                    <con1:param name="autorizacionreversionTTResponse">
+                                                                        <con1:path>$respAutorizacionReversion</con1:path>
+                                                                    </con1:param>
+                                                                </con1:xqueryTransform>
+                                                            </con2:expr>
+                                                        </con2:replace>
+                                                    </con2:actions>
+                                                </con2:case>
+                                            </con2:ifThenElse>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bdd</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{$statusReversion}</successIndicator>
+      <messages>{$messageReversion}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:default>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bdc</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$transactionType != "CHEQUE_PAYMENT" and 
+$transactionType != "CREDIT_CARD_PAYMENT"</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bdb</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>UNSUPPORTED TRANSACTION_TYPE</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryConditionExpr>
+                                            <con1:boolExpr operator="or">
+                                                <con1:compExpr operator="!=">
+                                                    <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                    <con1:rightPath>"FT"</con1:rightPath>
+                                                </con1:compExpr>
+                                                <con1:compExpr operator="!=">
+                                                    <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                    <con1:rightPath>"TT"</con1:rightPath>
+                                                </con1:compExpr>
+                                            </con1:boolExpr>
+                                        </con1:xqueryConditionExpr>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bda</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>TRANSACTION_ID MUST TO BEGIN WITH "FT" OR "FT"</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:replace contents-only="true" varName="header">
+                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bd9</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>REQUIRED FIELDS NOT SUPPLIED</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:replace>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bd8</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;rev:reversarTransaccionResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="HNBanco_ReversarTransaccion_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/registrarReversionTCCB" prefix="reg"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversarTransaccionTypes" prefix="rev"/>
+                    <con1:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="trxId">
+                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c0c</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/rev:reversarTransaccion/TRANSACTION_ID/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="tipoTrx">
+                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c0b</con1:id>
+                        <con2:expr>
+                            <con:xqueryText xmlns:con="http://www.bea.com/wli/sb/stages/config">fn:substring(fn:string($trxId), 1, 2)</con:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="tipo2Trx">
+                        <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e8a</con1:id>
+                        <con2:expr>
+                            <con:xqueryText xmlns:con="http://www.bea.com/wli/sb/stages/config">fn:substring(fn:string($trxId), 1, 3)</con:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="transactionType">
+                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c0a</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($body/rev:reversarTransaccion/TRANSACTION_TYPE/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c09</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$transactionType = "CHEQUE_PAYMENT" and fn:string($trxId) != ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c07</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>ReversiondePagodeCheques</con2:operation>
+                                    <con2:request>
+                                        <con2:body wrapped="false">REQUEST</con2:body>
+                                        <con2:header/>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body wrapped="false">RESPONSE</con2:body>
+                                        <con2:header/>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQUEST">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c08</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/reversarTransaccionPagoChequeIn"/>
+                                                    <con1:param name="requestHeader">
+                                                        <con1:path>$header/aut:RequestHeader</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="reversarTransaccion">
+                                                        <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform/>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$transactionType = "CREDIT_CARD_TFS" and fn:string($tipo2Trx) = "TFS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e94</con1:id>
+                                    <con2:service ref="Middleware/Business_Resources/ReversaTransaccion/Resources/ReversaTransaccion" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>ReversionpagoTC</con2:operation>
+                                    <con2:request>
+                                        <con2:body wrapped="false">REQreversionpagoTC</con2:body>
+                                        <con2:header/>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body wrapped="false">RSPreversionpagoTC</con2:body>
+                                        <con2:header/>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQreversionpagoTC">
+                                            <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e93</con1:id>
+                                            <con2:expr>
+                                                <con:xqueryTransform xmlns:con="http://www.bea.com/wli/sb/stages/config">
+                                                    <con:resource ref="Middleware/v2/Resources/ReversaTransaccion/xq/ReversarTransaccionPagooRetiroTCIn"/>
+                                                    <con:param name="uuid">
+                                                        <con:path>fn-bea:uuid()</con:path>
+                                                    </con:param>
+                                                    <con:param name="requestHeader">
+                                                        <con:path>$header/aut:RequestHeader</con:path>
+                                                    </con:param>
+                                                    <con:param name="reversarTransaccion">
+                                                        <con:path>$body/rev:reversarTransaccion</con:path>
+                                                    </con:param>
+                                                </con:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="statusReversion">
+                                            <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e92</con1:id>
+                                            <con2:expr>
+                                                <con:xqueryText xmlns:con="http://www.bea.com/wli/sb/stages/config">fn:string($RSPreversionpagoTC/Status/successIndicator/text())</con:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e91</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con:xqueryText xmlns:con="http://www.bea.com/wli/sb/stages/config">upper-case($statusReversion) = "SUCCESS"</con:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e8f</con1:id>
+                                                <con2:service ref="Middleware/Business_Resources/ReversaTransaccion/Resources/ReversaTransaccion" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>AutorizareversapagooretiroTC</con2:operation>
+                                                <con2:request>
+                                                    <con2:body wrapped="false">REQautorizaReversaPagoORetiroTC</con2:body>
+                                                    <con2:header/>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body wrapped="false">RSPautorizaReversaPagoORetiroTC</con2:body>
+                                                    <con2:header/>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQautorizaReversaPagoORetiroTC">
+                                                        <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e8e</con1:id>
+                                                        <con2:expr>
+                                                            <con:xqueryTransform xmlns:con="http://www.bea.com/wli/sb/stages/config">
+                                                                <con:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/AutorizarReversionPagooRetiroTCIn"/>
+                                                                <con:param name="requestHeader">
+                                                                    <con:path>$header/aut:RequestHeader</con:path>
+                                                                </con:param>
+                                                                <con:param name="reversarTransaccion">
+                                                                    <con:path>$body/rev:reversarTransaccion</con:path>
+                                                                </con:param>
+                                                            </con:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform/>
+                                            </con2:wsCallout>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-3878984973998156059--2b441011.183f79cad3d.-2fd3</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v3/BusinessServices/PAGOSWSTC/registrarReversionTCCB/biz/registrarReversionTCCB_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>registrarReversionTCCB</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQregistrarReversionTCCB</con2:body>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPregistrarReversionTCCB</con2:body>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQregistrarReversionTCCB">
+                                                        <con1:id>_ActionId-3878984973998156059--2b441011.183f79cad3d.-2fd6</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ReversaTransaccion/xq/registrarReversionTCCB"/>
+                                                                <con1:param name="reversarTransaccion1">
+                                                                    <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con2:assign varName="errorCode" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                                                        <con1:id>_ActionId-3878984973998156059--2b441011.183f79cad3d.-2fd5</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>fn:string($RSPregistraPagoTC/reg:PV_ERRORCODE/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="validationMessage" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                                                        <con1:id>_ActionId-3878984973998156059--2b441011.183f79cad3d.-2fd4</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>if (upper-case($errorCode) = "SUCCESS") then(
+	""
+) else (
+	fn:string($RSPregistrarReversionTCCB/reg:PV_ERRORMESSAGE/text())
+)</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                            <con5:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+                                                <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-347703530702843796-7f2a6e19.18ba33eec22.-7e3e</con6:id>
+                                                <con5:case>
+                                                    <con5:condition>
+                                                        <con6:xqueryText xmlns:con6="http://www.bea.com/wli/sb/stages/config">upper-case($errorCode) = "SUCCESS"</con6:xqueryText>
+                                                    </con5:condition>
+                                                    <con5:actions>
+                                                        <con6:route xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con6="http://www.bea.com/wli/sb/stages/publish/config">
+                                                            <con1:id>_ActionId-347703530702843796-7f2a6e19.18ba33eec22.-7e3d</con1:id>
+                                                            <con6:service ref="Middleware/v3/BusinessServices/MasterData/HN/conReversionPagoTCRG/biz/conReversarPagoTCRG_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                            <con6:operation>conReversarPagoTCRG</con6:operation>
+                                                            <con6:outboundTransform>
+                                                                <con7:replace contents-only="true" varName="body" xmlns:con7="http://www.bea.com/wli/sb/stages/transform/config">
+                                                                    <con1:id>_ActionId-347703530702843796-7f2a6e19.18ba33eec22.-7e3c</con1:id>
+                                                                    <con7:location>
+                                                                        <con1:xpathText>.</con1:xpathText>
+                                                                    </con7:location>
+                                                                    <con7:expr>
+                                                                        <con1:xqueryTransform>
+                                                                            <con1:resource ref="Middleware/v2/Resources/ReversaTransaccion/xq/registrarReversionTCMDIDIn"/>
+                                                                            <con1:param name="transaccionId">
+                                                                                <con1:path>$body/rev:reversarTransaccion/TRANSACTION_ID/text()</con1:path>
+                                                                            </con1:param>
+                                                                        </con1:xqueryTransform>
+                                                                    </con7:expr>
+                                                                </con7:replace>
+                                                            </con6:outboundTransform>
+                                                        </con6:route>
+                                                    </con5:actions>
+                                                </con5:case>
+                                                <con5:default/>
+                                            </con5:ifThenElse>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default>
+                                        <con2:assign varName="messageReversion">
+                                            <con1:id>_ActionId-4056470011600821782-df2f2aa.16750eeb177.-7e90</con1:id>
+                                            <con2:expr>
+                                                <con:xqueryText xmlns:con="http://www.bea.com/wli/sb/stages/config">fn:string($RSPreversionpagoTC/Status/messages/text())</con:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:default>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$transactionType = "CREDIT_CARD_PAYMENT" and fn:string($trxId) != ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c04</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>ReversionpagooretiroTC</con2:operation>
+                                    <con2:request>
+                                        <con2:body wrapped="false">reqReversarTransaccion</con2:body>
+                                        <con2:header/>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body wrapped="false">respReversarTransaccion</con2:body>
+                                        <con2:header/>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="reqReversarTransaccion">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c06</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/reversarTransaccionPagooRetiroTCIn"/>
+                                                    <con1:param name="requestHeader">
+                                                        <con1:path>$header/aut:RequestHeader</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="reversarTransaccion">
+                                                        <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="statusReversion">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c05</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($respReversarTransaccion/Status/successIndicator/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c03</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>upper-case($statusReversion) = "SUCCESS"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c01</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>AutorizareversapagooretiroTC</con2:operation>
+                                                <con2:request>
+                                                    <con2:body wrapped="false">reqAutorizacionReversion</con2:body>
+                                                    <con2:header/>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body wrapped="false">respAutorizacionReversion</con2:body>
+                                                    <con2:header/>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="reqAutorizacionReversion">
+                                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c02</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/AutorizarReversionPagooRetiroTCIn"/>
+                                                                <con1:param name="requestHeader">
+                                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="reversarTransaccion">
+                                                                    <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform/>
+                                            </con2:wsCallout>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default>
+                                        <con2:assign varName="messageReversion">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7c00</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($respReversarTransaccion/Status/messages/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:default>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$transactionType = "REF_COLLECTION" and fn:string($trxId) != ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bfd</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>Reversionpagorecaudorefdbcta</con2:operation>
+                                    <con2:request>
+                                        <con2:body wrapped="false">REQUESTReversionpagorecaudorefdbcta</con2:body>
+                                        <con2:header/>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body wrapped="false">RESPONSEReversionpagorecaudorefdbcta</con2:body>
+                                        <con2:header/>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQUESTReversionpagorecaudorefdbcta">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bff</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/reversarTransaccionPagoRecaudoIn"/>
+                                                    <con1:param name="requestHeader">
+                                                        <con1:path>$header/aut:RequestHeader</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="reversarTransaccion">
+                                                        <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="statusReversion">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bfe</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RESPONSEReversionpagorecaudorefdbcta/Status/successIndicator/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bfc</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>upper-case($statusReversion) = "SUCCESS"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bfa</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>Authrevpagorecaudorefdbcta</con2:operation>
+                                                <con2:request>
+                                                    <con2:body wrapped="false">REQUESTAuthrevpagorecaudorefdbcta</con2:body>
+                                                    <con2:header/>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body wrapped="false">RESPONSEAuthrevpagorecaudorefdbcta</con2:body>
+                                                    <con2:header/>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQUESTAuthrevpagorecaudorefdbcta">
+                                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bfb</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/AutorizarReversionPagoRecaudoIn"/>
+                                                                <con1:param name="requestHeader">
+                                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="reversarTransaccion">
+                                                                    <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform/>
+                                            </con2:wsCallout>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default>
+                                        <con2:assign varName="messageReversion">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf9</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string-join($RESPONSEReversionpagorecaudorefdbcta/Status/messages/text()," ")</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:default>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryConditionExpr>
+                                    <con1:boolExpr operator="and">
+                                        <con1:boolExpr operator="or">
+                                            <con1:compExpr operator="=">
+                                                <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                <con1:rightPath>"FT"</con1:rightPath>
+                                            </con1:compExpr>
+                                            <con1:compExpr operator="=">
+                                                <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                <con1:rightPath>"TT"</con1:rightPath>
+                                            </con1:compExpr>
+                                        </con1:boolExpr>
+                                        <con1:compExpr operator="!=">
+                                            <con1:leftPath>fn:string($trxId)</con1:leftPath>
+                                            <con1:rightPath>""</con1:rightPath>
+                                        </con1:compExpr>
+                                        <con1:compExpr operator="=">
+                                            <con1:leftPath>$transactionType</con1:leftPath>
+                                            <con1:rightPath>""</con1:rightPath>
+                                        </con1:compExpr>
+                                    </con1:boolExpr>
+                                </con1:xqueryConditionExpr>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf8</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryConditionExpr>
+                                                <con1:compExpr operator="=">
+                                                    <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                    <con1:rightPath>"FT"</con1:rightPath>
+                                                </con1:compExpr>
+                                            </con1:xqueryConditionExpr>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf5</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>ReversiondetransaccionFT</con2:operation>
+                                                <con2:request>
+                                                    <con2:body wrapped="false">reqReversarTransaccion</con2:body>
+                                                    <con2:header/>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body wrapped="false">respReversarTransaccion</con2:body>
+                                                    <con2:header/>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="reqReversarTransaccion">
+                                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf7</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/reversarTransaccionFTIn"/>
+                                                                <con1:param name="requestHeader">
+                                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="reversarTransaccion">
+                                                                    <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con2:assign varName="statusReversion">
+                                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf6</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>fn:string($respReversarTransaccion/Status/successIndicator/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                            <con2:ifThenElse>
+                                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf4</con1:id>
+                                                <con2:case>
+                                                    <con2:condition>
+                                                        <con1:xqueryText>upper-case($statusReversion) = "SUCCESS"</con1:xqueryText>
+                                                    </con2:condition>
+                                                    <con2:actions>
+                                                        <con2:wsCallout>
+                                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf2</con1:id>
+                                                            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                            <con2:operation>AutorizacionreversionFT</con2:operation>
+                                                            <con2:request>
+                                                                <con2:body wrapped="false">reqAutorizacionReversion</con2:body>
+                                                                <con2:header/>
+                                                            </con2:request>
+                                                            <con2:response>
+                                                                <con2:body wrapped="false">respAutorizacionReversion</con2:body>
+                                                                <con2:header/>
+                                                            </con2:response>
+                                                            <con2:requestTransform>
+                                                                <con2:assign varName="reqAutorizacionReversion">
+                                                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf3</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryTransform>
+                                                                            <con1:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/AutorizarReversionFTIn"/>
+                                                                            <con1:param name="requestHeader">
+                                                                                <con1:path>$header/aut:RequestHeader</con1:path>
+                                                                            </con1:param>
+                                                                            <con1:param name="reversarTransaccion">
+                                                                                <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                                            </con1:param>
+                                                                        </con1:xqueryTransform>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                            </con2:requestTransform>
+                                                            <con2:responseTransform/>
+                                                        </con2:wsCallout>
+                                                    </con2:actions>
+                                                </con2:case>
+                                                <con2:default>
+                                                    <con2:assign varName="messageReversion">
+                                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf1</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>fn:string($respReversarTransaccion/Status/messages[1]/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:default>
+                                            </con2:ifThenElse>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryConditionExpr>
+                                                <con1:compExpr operator="=">
+                                                    <con1:leftPath>fn:string($tipoTrx)</con1:leftPath>
+                                                    <con1:rightPath>"TT"</con1:rightPath>
+                                                </con1:compExpr>
+                                            </con1:xqueryConditionExpr>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bee</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>ReversiondetransaccionTT</con2:operation>
+                                                <con2:request>
+                                                    <con2:body wrapped="false">reqReversarTransaccion</con2:body>
+                                                    <con2:header/>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body wrapped="false">respReversarTransaccion</con2:body>
+                                                    <con2:header/>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="reqReversarTransaccion">
+                                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bf0</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/reversarTransaccionTTIn"/>
+                                                                <con1:param name="requestHeader">
+                                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="reversarTransaccion">
+                                                                    <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con2:assign varName="statusReversion">
+                                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bef</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>fn:string($respReversarTransaccion/Status/successIndicator/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                            <con2:ifThenElse>
+                                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bed</con1:id>
+                                                <con2:case>
+                                                    <con2:condition>
+                                                        <con1:xqueryText>upper-case($statusReversion) = "SUCCESS"</con1:xqueryText>
+                                                    </con2:condition>
+                                                    <con2:actions>
+                                                        <con2:wsCallout>
+                                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7beb</con1:id>
+                                                            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/ReversarTransaccion/Resources/ReverseTransaccionBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                            <con2:operation>AutorizacionreversionTT</con2:operation>
+                                                            <con2:request>
+                                                                <con2:body wrapped="false">reqAutorizacionReversion</con2:body>
+                                                                <con2:header/>
+                                                            </con2:request>
+                                                            <con2:response>
+                                                                <con2:body wrapped="false">respAutorizacionReversion</con2:body>
+                                                                <con2:header/>
+                                                            </con2:response>
+                                                            <con2:requestTransform>
+                                                                <con2:assign varName="reqAutorizacionReversion">
+                                                                    <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bec</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryTransform>
+                                                                            <con1:resource ref="Middleware/v2/Resources/ReversarTransaccion/xq/AutorizarReversionTTIn"/>
+                                                                            <con1:param name="requestHeader">
+                                                                                <con1:path>$header/aut:RequestHeader</con1:path>
+                                                                            </con1:param>
+                                                                            <con1:param name="reversarTransaccion">
+                                                                                <con1:path>$body/rev:reversarTransaccion</con1:path>
+                                                                            </con1:param>
+                                                                        </con1:xqueryTransform>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                            </con2:requestTransform>
+                                                            <con2:responseTransform/>
+                                                        </con2:wsCallout>
+                                                    </con2:actions>
+                                                </con2:case>
+                                                <con2:default>
+                                                    <con2:assign varName="messageReversion">
+                                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7bea</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>fn:string($respReversarTransaccion/Status/messages[1]/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:default>
+                                            </con2:ifThenElse>
+                                        </con2:actions>
+                                    </con2:case>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversarTransaccionTypes" prefix="rev"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7e6a</con1:id>
+                        <con2:schema ref="Middleware/Business_Resources/ReversarTransaccion/ReversarTransaccion/reversarTransaccionTypes"/>
+                        <con2:schemaElement xmlns:rev="http://www.ficohsa.com.hn/middleware.services/reversarTransaccionTypes">rev:reversarTransaccion</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./rev:reversarTransaccion</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegional">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversarTransaccionTypes" prefix="rev"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7e32</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>ValidaServicioRegional</con2:operation>
+                        <con2:request>
+                            <con2:body>reqValidaServicioRegional</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respValidaServicioRegional</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqValidaServicioRegional">
+                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7dfa</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con1:param name="requestHeader1">
+                                            <con1:path>$header/aut:RequestHeader</con1:path>
+                                        </con1:param>
+                                        <con1:param name="serviceId">
+                                            <con1:path>"FICBCO0084"</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7dc2</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7d8a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:replace contents-only="true" varName="body">
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7d6d</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>&lt;rev:reversarTransaccionResponse/></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con1:reply>
+                                            <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7d50</con1:id>
+                                        </con1:reply>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:replace contents-only="true" varName="header">
+                                        <con1:id>_ActionId-7492333320493517365--2a4eb32a.14db9eff48c.-7d18</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con1:param name="requestHeader">
+                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:replace>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response"/>
+        <con:pipeline type="request" name="Default_ReversarTransaccion_request">
+            <con:stage name="FlujoEntrada" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+                <con:context/>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-8848777042473091319--23eafd38.13c2a05c9f3.-6ddb">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaFICOPENTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/reversarTransaccionTypes" prefix="rev"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-8848777042473091319--23eafd38.13c2a05c9f3.-6da1</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-8848777042473091319--23eafd38.13c2a05c9f3.-6da0</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;rev:reversarTransaccionResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-8848777042473091319--23eafd38.13c2a05c9f3.-6d9f</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                    <con:xpath>
+                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                    </con:xpath>
+                    <con:branch name="HNBanco">
+                        <con:operator>equals</con:operator>
+                        <con:value>'HN01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="HNBanco_ReversarTransaccion">
+                                <con:request>HNBanco_ReversarTransaccion_request</con:request>
+                                <con:response>HNBanco_ReversarTransaccion_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_ReversarTransaccion">
+                                <con:request>Default_ReversarTransaccion_request</con:request>
+                                <con:response>Default_ReversarTransaccion_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

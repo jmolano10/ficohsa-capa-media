@@ -1,0 +1,652 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaReciboDEI/wsdl/consultaReciboDEI"/>
+            <con:binding>
+                <con:name>consultarReciboPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaReciboDEIPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-4090785805828207408--1893cab4.15d55db1d21.-7e49" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con1:validate>
+                        <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7fc0</con2:id>
+                        <con1:schema ref="Middleware/v2/Resources/TributosDEI/xsd/tributosTypes"/>
+                        <con1:schemaElement xmlns:trib="http://www.ficohsa.com.hn/middleware.services/tributosTypes">trib:consultaRecibo</con1:schemaElement>
+                        <con1:varName>body</con1:varName>
+                        <con1:location>
+                            <con2:xpathText>./trib:consultaRecibo</con2:xpathText>
+                        </con1:location>
+                    </con1:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegional">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7fa2</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>ValidaServicioRegional</con1:operation>
+                        <con1:request>
+                            <con1:body>REQValidaServicioRegional</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPValidaServicioRegional</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQValidaServicioRegional">
+                                <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7f86</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con2:param name="serviceId">
+                                            <con2:path>"FICBCO0236"</con2:path>
+                                        </con2:param>
+                                        <con2:param name="requestHeader1">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:ifThenElse>
+                                <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7f67</con2:id>
+                                <con1:case>
+                                    <con1:condition>
+                                        <con2:xqueryText>fn:string($RSPValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con2:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:replace varName="header" contents-only="true">
+                                            <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7f38</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($RSPValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:replace varName="body" contents-only="true">
+                                            <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7eef</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>&lt;trib:consultaReciboResponse/></con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con2:reply>
+                                            <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7ed7</con2:id>
+                                        </con2:reply>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:replace varName="header" contents-only="true">
+                                        <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7f22</con2:id>
+                                        <con1:expr>
+                                            <con2:xqueryTransform>
+                                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con2:param name="requestHeader">
+                                                    <con2:path>$header/aut:RequestHeader</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con1:expr>
+                                    </con1:replace>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ObtenerParametrizacion">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-2629915067925851141-3dae9c36.16adb654c67.-7c99</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>obtenerParametrizacion</con1:operation>
+                        <con1:request>
+                            <con1:body>REQobtenerParametrizacion</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPobtenerParametrizacion</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="parametroTipoImpuesto">
+                                <con2:id>_ActionId-2629915067925851141-3dae9c36.16adb654c67.-7c53</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>fn:concat("FICBCO0236.CONRECIBOTIPO.",$body/trib:consultaRecibo/TAX_TYPE)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="REQobtenerParametrizacion">
+                                <con2:id>_ActionId-2629915067925851141-3dae9c36.16adb654c67.-7c22</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con2:param name="nombreParametros">
+                                            <con2:path>$parametroTipoImpuesto</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="numeroContrato">
+                                <con2:id>_ActionId-2629915067925851141-3dae9c36.16adb654c67.-7c04</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>fn:string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$parametroTipoImpuesto]/osb:VALUE/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="MapeoError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7eb5</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7e88</con2:id>
+                                    <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>mapeoErrores</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQMapeoErrores</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPMapeoErrores</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQMapeoErrores">
+                                            <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7e63</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con2:param name="MENSAJE_ERROR">
+                                                        <con2:path>fn:concat("FICBCO0236","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="CODIGO_ERROR">
+                                                        <con2:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:replace varName="header" contents-only="true">
+                                            <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7e4a</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con2:param name="mapeoErroresResponse1">
+                                                        <con2:path>$RSPMapeoErrores</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="successIndicator">
+                                                        <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-4090785805828207408--1893cab4.15d55db1d21.-7e49">
+            <con:stage name="MapeoError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="errorCode">
+                        <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7e10</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="errorMessage">
+                        <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7dff</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7de9</con2:id>
+                        <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>mapeoErrores</con1:operation>
+                        <con1:request>
+                            <con1:body>reqMapeoErrores</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>respMapeoErrores</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="reqMapeoErrores">
+                                <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7dbd</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con2:param name="MENSAJE_ERROR">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                        <con2:param name="CODIGO_ERROR">
+                                            <con2:path>fn:concat("FICBCO0236", "$#$", $errorMessage)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7d93</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con2:param name="mapeoErroresResponse1">
+                                            <con2:path>$respMapeoErrores</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7d7d</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;trib:consultaReciboResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-4090785805828207408--1893cab4.15d55db1d21.-7d67</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="Default_ConsultaReciboDEI_request">
+            <con:stage name="FlujoEntrada">
+                <con:context/>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="Default_ConsultaReciboDEI_response">
+            <con:stage name="FlujoSalida">
+                <con:context/>
+                <con:actions>
+                    <con1:Error>
+                        <con2:id>_ActionId-8147995832208969960--6b416305.15d804636f3.-7e9a</con2:id>
+                        <con1:errCode>MW-0008</con1:errCode>
+                        <con1:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con1:message>
+                    </con1:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                    <con:xpath>
+                        <con2:xpathText>./aut:RequestHeader/Region/SourceBank</con2:xpathText>
+                    </con:xpath>
+                    <con:branch name="HNBanco">
+                        <con:operator>equals</con:operator>
+                        <con:value>'HN01'</con:value>
+                        <con:flow>
+                            <con:branch-node type="condition" name="Vailidacion_TAX_TYPE">
+                                <con:comment/>
+                                <con:context>
+                                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                                </con:context>
+                                <con:branch-table variable="body">
+                                    <con:xpath>
+                                        <con2:xpathText>./trib:consultaRecibo/TAX_TYPE</con2:xpathText>
+                                    </con:xpath>
+                                    <con:branch name="TaxTypeDua">
+                                        <con:operator>equals</con:operator>
+                                        <con:value>'DUA'</con:value>
+                                        <con:flow>
+                                            <con:route-node name="HNBanco_ConsultaReciboDEI_DUA">
+                                                <con:context>
+                                                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                                                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ConsultaReciboDua" prefix="con"/>
+                                                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                                                </con:context>
+                                                <con:actions>
+                                                    <con3:route>
+                                                        <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7e75</con2:id>
+                                                        <con3:service ref="Middleware/v2/BusinessServices/DEI/consultaReciboDUA/biz/ConsultaReciboDua_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                        <con3:operation>ConsultaReciboDua</con3:operation>
+                                                        <con3:outboundTransform>
+                                                            <con1:assign varName="userId">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7cad</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryText>for $userId in string($body/trib:consultaRecibo/USER_ID/text())
+return
+if($userId != "") then(
+	$userId
+)else("")</con2:xqueryText>
+                                                                </con1:expr>
+                                                            </con1:assign>
+                                                            <con1:assign varName="taxType">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7c71</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryText>for $taxType in string($body/trib:consultaRecibo/TAX_TYPE/text())
+return
+if($taxType != "") then(
+	$taxType
+)else("")</con2:xqueryText>
+                                                                </con1:expr>
+                                                            </con1:assign>
+                                                            <con1:assign varName="customerId">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7c35</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryText>for $customerId in string($body/trib:consultaRecibo/CUSTOMER_ID/text())
+return
+if($customerId != "") then(
+	$customerId
+)else("")</con2:xqueryText>
+                                                                </con1:expr>
+                                                            </con1:assign>
+                                                            <con1:replace varName="body" contents-only="true">
+                                                                <con2:id>_ActionId-3001264483112989520--11384b50.169c4d59d03.-7edc</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryTransform>
+                                                                        <con2:resource ref="Middleware/v2/Resources/ConsultaReciboDEI/xq/consultaReciboDEI_DuaIn"/>
+                                                                        <con2:param name="consultaRecibo">
+                                                                            <con2:path>$body/trib:consultaRecibo</con2:path>
+                                                                        </con2:param>
+                                                                    </con2:xqueryTransform>
+                                                                </con1:expr>
+                                                            </con1:replace>
+                                                        </con3:outboundTransform>
+                                                        <con3:responseTransform>
+                                                            <con1:replace contents-only="true" varName="header">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7d91</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryTransform>
+                                                                        <con2:resource ref="Middleware/v2/Resources/ConsultaReciboDEI/xq/consultaReciboDEI_DuaHeaderOut"/>
+                                                                        <con2:param name="outputParameters">
+                                                                            <con2:path>$body/con:OutputParameters</con2:path>
+                                                                        </con2:param>
+                                                                    </con2:xqueryTransform>
+                                                                </con1:expr>
+                                                            </con1:replace>
+                                                            <con1:ifThenElse>
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7d93</con2:id>
+                                                                <con1:case>
+                                                                    <con1:condition>
+                                                                        <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) = "SUCCESS"</con2:xqueryText>
+                                                                    </con1:condition>
+                                                                    <con1:actions>
+                                                                        <con1:replace contents-only="true" varName="body">
+                                                                            <con2:id>_ActionId-7512634594584685869--753df0a.169c5a60666.-7f0d</con2:id>
+                                                                            <con1:expr>
+                                                                                <con2:xqueryTransform>
+                                                                                    <con2:resource ref="Middleware/v2/Resources/ConsultaReciboDEI/xq/consultaReciboDEI_DuaOut"/>
+                                                                                    <con2:param name="outputParameters">
+                                                                                        <con2:path>$body/con:OutputParameters</con2:path>
+                                                                                    </con2:param>
+                                                                                    <con2:param name="USER_ID">
+                                                                                        <con2:path>$userId</con2:path>
+                                                                                    </con2:param>
+                                                                                    <con2:param name="TAX_TYPE">
+                                                                                        <con2:path>$taxType</con2:path>
+                                                                                    </con2:param>
+                                                                                    <con2:param name="CUSTOMER_ID">
+                                                                                        <con2:path>$customerId</con2:path>
+                                                                                    </con2:param>
+                                                                                </con2:xqueryTransform>
+                                                                            </con1:expr>
+                                                                        </con1:replace>
+                                                                    </con1:actions>
+                                                                </con1:case>
+                                                                <con1:default>
+                                                                    <con1:replace varName="body" contents-only="true">
+                                                                        <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7d1f</con2:id>
+                                                                        <con1:expr>
+                                                                            <con2:xqueryText>&lt;trib:consultaReciboResponse/></con2:xqueryText>
+                                                                        </con1:expr>
+                                                                    </con1:replace>
+                                                                </con1:default>
+                                                            </con1:ifThenElse>
+                                                        </con3:responseTransform>
+                                                    </con3:route>
+                                                </con:actions>
+                                            </con:route-node>
+                                        </con:flow>
+                                    </con:branch>
+                                    <con:branch name="TaxTypeAdu">
+                                        <con:operator>equals</con:operator>
+                                        <con:value>'ADU'</con:value>
+                                        <con:flow>
+                                            <con:route-node name="HNBanco_ConsultaReciboDEI_ADU">
+                                                <con:context>
+                                                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                                                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ConsultaReciboAdu" prefix="con"/>
+                                                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                                                </con:context>
+                                                <con:actions>
+                                                    <con3:route>
+                                                        <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7bc8</con2:id>
+                                                        <con3:service ref="Middleware/v2/BusinessServices/DEI/consultaReciboADU/biz/ConsultaReciboAdu_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                        <con3:operation>ConsultaReciboAdu</con3:operation>
+                                                        <con3:outboundTransform>
+                                                            <con1:assign varName="user_Id">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-79e8</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryText>for $userId in string($body/trib:consultaRecibo/USER_ID/text())
+return
+if($userId != "") then(
+	$userId
+)else("")</con2:xqueryText>
+                                                                </con1:expr>
+                                                            </con1:assign>
+                                                            <con1:assign varName="tax_Type">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-79ea</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryText>$body/trib:consultaRecibo/TAX_TYPE/text()</con2:xqueryText>
+                                                                </con1:expr>
+                                                            </con1:assign>
+                                                            <con1:assign varName="customer_Id">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-79ae</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryText>$body/trib:consultaRecibo/CUSTOMER_ID/text()</con2:xqueryText>
+                                                                </con1:expr>
+                                                            </con1:assign>
+                                                            <con1:replace varName="body" contents-only="true">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7b8f</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryTransform>
+                                                                        <con2:resource ref="Middleware/v2/Resources/ConsultaReciboDEI/xq/consultaReciboDEI_AduIn"/>
+                                                                        <con2:param name="numeroContraro">
+                                                                            <con2:path>$numeroContrato</con2:path>
+                                                                        </con2:param>
+                                                                        <con2:param name="consultaRecibo">
+                                                                            <con2:path>$body/trib:consultaRecibo</con2:path>
+                                                                        </con2:param>
+                                                                    </con2:xqueryTransform>
+                                                                </con1:expr>
+                                                            </con1:replace>
+                                                        </con3:outboundTransform>
+                                                        <con3:responseTransform>
+                                                            <con1:replace varName="header" contents-only="true">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7b1c</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryTransform>
+                                                                        <con2:resource ref="Middleware/v2/Resources/ConsultaReciboDEI/xq/consultaReciboDEI_AduHeaderOut"/>
+                                                                        <con2:param name="outputParameters">
+                                                                            <con2:path>$body/con:OutputParameters</con2:path>
+                                                                        </con2:param>
+                                                                    </con2:xqueryTransform>
+                                                                </con1:expr>
+                                                            </con1:replace>
+                                                            <con1:ifThenElse>
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7b1e</con2:id>
+                                                                <con1:case>
+                                                                    <con1:condition>
+                                                                        <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) = "SUCCESS"</con2:xqueryText>
+                                                                    </con1:condition>
+                                                                    <con1:actions>
+                                                                        <con1:replace varName="body" contents-only="true">
+                                                                            <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7ae4</con2:id>
+                                                                            <con1:expr>
+                                                                                <con2:xqueryTransform>
+                                                                                    <con2:resource ref="Middleware/v2/Resources/ConsultaReciboDEI/xq/consultaReciboDEI_AduOut"/>
+                                                                                    <con2:param name="outputParameters">
+                                                                                        <con2:path>$body/con:OutputParameters</con2:path>
+                                                                                    </con2:param>
+                                                                                    <con2:param name="USER_ID">
+                                                                                        <con2:path>$user_Id</con2:path>
+                                                                                    </con2:param>
+                                                                                    <con2:param name="TAX_TYPE">
+                                                                                        <con2:path>$tax_Type</con2:path>
+                                                                                    </con2:param>
+                                                                                </con2:xqueryTransform>
+                                                                            </con1:expr>
+                                                                        </con1:replace>
+                                                                    </con1:actions>
+                                                                </con1:case>
+                                                                <con1:default>
+                                                                    <con1:replace varName="body" contents-only="true">
+                                                                        <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7976</con2:id>
+                                                                        <con1:expr>
+                                                                            <con2:xqueryText>&lt;trib:consultaReciboResponse/></con2:xqueryText>
+                                                                        </con1:expr>
+                                                                    </con1:replace>
+                                                                </con1:default>
+                                                            </con1:ifThenElse>
+                                                        </con3:responseTransform>
+                                                    </con3:route>
+                                                </con:actions>
+                                            </con:route-node>
+                                        </con:flow>
+                                    </con:branch>
+                                    <con:default-branch>
+                                        <con:flow>
+                                            <con:route-node name="HNBanco_ConsultaReciboDEI">
+                                                <con:context>
+                                                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                                                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                                                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultarRecibo" prefix="con"/>
+                                                </con:context>
+                                                <con:actions>
+                                                    <con3:route>
+                                                        <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7fc0</con2:id>
+                                                        <con3:service ref="Middleware/v2/BusinessServices/DEI/consultarReciboImp/biz/consultarRecibo_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                        <con3:operation>consultarRecibo</con3:operation>
+                                                        <con3:outboundTransform>
+                                                            <con1:replace varName="body" contents-only="true">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7fbf</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryTransform>
+                                                                        <con2:resource ref="Middleware/v2/Resources/ConsultaReciboDEI/xq/consultaReciboDEIIn"/>
+                                                                        <con2:param name="consultaRecibo">
+                                                                            <con2:path>$body/trib:consultaRecibo</con2:path>
+                                                                        </con2:param>
+                                                                    </con2:xqueryTransform>
+                                                                </con1:expr>
+                                                            </con1:replace>
+                                                        </con3:outboundTransform>
+                                                        <con3:responseTransform>
+                                                            <con1:replace varName="header" contents-only="true">
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7fbe</con2:id>
+                                                                <con1:expr>
+                                                                    <con2:xqueryTransform>
+                                                                        <con2:resource ref="Middleware/v2/Resources/ConsultaReciboDEI/xq/consultaReciboDEIHeaderOut"/>
+                                                                        <con2:param name="outputParameters">
+                                                                            <con2:path>$body/con:OutputParameters</con2:path>
+                                                                        </con2:param>
+                                                                    </con2:xqueryTransform>
+                                                                </con1:expr>
+                                                            </con1:replace>
+                                                            <con1:ifThenElse>
+                                                                <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7fbd</con2:id>
+                                                                <con1:case>
+                                                                    <con1:condition>
+                                                                        <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) = "SUCCESS"</con2:xqueryText>
+                                                                    </con1:condition>
+                                                                    <con1:actions>
+                                                                        <con1:replace varName="body" contents-only="true">
+                                                                            <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7fbc</con2:id>
+                                                                            <con1:expr>
+                                                                                <con2:xqueryTransform>
+                                                                                    <con2:resource ref="Middleware/v2/Resources/ConsultaReciboDEI/xq/consultaReciboDEIOut"/>
+                                                                                    <con2:param name="outputParameters">
+                                                                                        <con2:path>$body/con:OutputParameters</con2:path>
+                                                                                    </con2:param>
+                                                                                </con2:xqueryTransform>
+                                                                            </con1:expr>
+                                                                        </con1:replace>
+                                                                    </con1:actions>
+                                                                </con1:case>
+                                                                <con1:default>
+                                                                    <con1:replace varName="body" contents-only="true">
+                                                                        <con2:id>_ActionId-3333162849426684037-6ccc9d21.16996a004f5.-7fbb</con2:id>
+                                                                        <con1:expr>
+                                                                            <con2:xqueryText>&lt;trib:consultaReciboResponse/></con2:xqueryText>
+                                                                        </con1:expr>
+                                                                    </con1:replace>
+                                                                </con1:default>
+                                                            </con1:ifThenElse>
+                                                        </con3:responseTransform>
+                                                    </con3:route>
+                                                </con:actions>
+                                            </con:route-node>
+                                        </con:flow>
+                                    </con:default-branch>
+                                </con:branch-table>
+                            </con:branch-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_ConsultaReciboDEI">
+                                <con:request>Default_ConsultaReciboDEI_request</con:request>
+                                <con:response>Default_ConsultaReciboDEI_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

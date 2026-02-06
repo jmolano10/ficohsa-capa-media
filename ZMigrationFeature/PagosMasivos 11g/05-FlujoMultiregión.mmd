@@ -1,0 +1,152 @@
+flowchart TD
+    Start([Cliente envía Request SOAP]) --> Auth{Autenticación<br/>Custom Token}
+    
+    Auth -->|Válida| OpRoute[Enrutamiento por Operación]
+    Auth -->|Inválida| AuthError[Error 401 Unauthorized]
+    AuthError --> End([Fin])
+    
+    OpRoute --> OpSwitch{Operación?}
+    
+    OpSwitch -->|pagosMasivos| PagosMasivos[PagosMasivosInterno]
+    OpSwitch -->|consultaLotesCliente| ConsultaLotes[ConsultaLotesCliente.proxy]
+    OpSwitch -->|consultaDetalleLote| ConsultaDetalle[ConsultaDetalleLote.proxy]
+    OpSwitch -->|consultaTransaccionLote| ConsultaTxn[ConsultaTransaccionLote.proxy]
+    OpSwitch -->|cargarArchivoLote| CargarArchivo[CargarArchivoLote.proxy]
+    OpSwitch -->|autorizarLote| AutorizarLote[AutorizarLotePagosMasivos.proxy]
+    OpSwitch -->|cancelarLote| CancelarLote[CancelarLote.proxy]
+    OpSwitch -->|editarEstadoRegistroLote| EditarEstado[EditarEstadoRegistroLote.proxy]
+    OpSwitch -->|consultaEstadoLote| ConsultaEstado[ConsultaEstadoLote.proxy]
+    OpSwitch -->|cargarProveedores| CargarProv[CargaProveedores.proxy]
+    OpSwitch -->|consultarProveedores| ConsultaProv[ConsultaProveedores.proxy]
+    OpSwitch -->|autorizarProveedores| AutorizarProv[AutorizarProveedores.proxy]
+    OpSwitch -->|eliminarProveedores| EliminarProv[EliminarProveedores.proxy]
+    
+    ConsultaLotes --> End
+    ConsultaDetalle --> End
+    ConsultaTxn --> End
+    CargarArchivo --> End
+    AutorizarLote --> End
+    CancelarLote --> End
+    EditarEstado --> End
+    ConsultaEstado --> End
+    CargarProv --> End
+    ConsultaProv --> End
+    AutorizarProv --> End
+    EliminarProv --> End
+    
+    PagosMasivos --> ValidXSD[Validación XSD]
+    ValidXSD -->|Error| ErrorXSD[Error Validación]
+    ErrorXSD --> MapError1[MapeoErrores]
+    MapError1 --> End
+    
+    ValidXSD -->|OK| ValidRegion[Validación Servicio Regional<br/>FICBCO0231]
+    ValidRegion -->|Error| ErrorRegion[Región No Habilitada]
+    ErrorRegion --> End
+    
+    ValidRegion -->|OK| ApplyDefaults[Aplicar Valores Por Defecto Región]
+    ApplyDefaults --> RegionSwitch{SourceBank?}
+    
+    RegionSwitch -->|HN01| HN01Flow[Pipeline HN01]
+    RegionSwitch -->|GT01| GT01Flow[PagosMasivosInternoGT.proxy]
+    RegionSwitch -->|PA01| PA01Flow[PagosMasivosInternoPA.proxy]
+    RegionSwitch -->|NI01| NI01Flow[Pipeline NI01]
+    RegionSwitch -->|Otro| DefaultFlow[Error: Not Implemented]
+    DefaultFlow --> End
+    
+    %% HN01 Flow
+    HN01Flow --> HN01_UUID[Generar UUID Request]
+    HN01_UUID --> HN01_BitReq[Bitácora Request<br/>registraBitacoraPagosMasivos]
+    HN01_BitReq --> HN01_ValidAccess[Validar Acceso Cliente<br/>validaAccesoPMS_db]
+    HN01_ValidAccess -->|Sin Acceso| HN01_AccessError[Error Acceso]
+    HN01_AccessError --> HN01_BitErr[Bitácora Error]
+    HN01_BitErr --> End
+    HN01_ValidAccess -->|OK| HN01_Transform[Transformar Request<br/>sjPagosMasivosInternoIn.xq]
+    HN01_Transform --> HN01_SJS[Invocar sjPagosMasivosInterno<br/>Java Service]
+    HN01_SJS --> HN01_TransformResp[Transformar Response<br/>pagosMasivosInternoOut.xq]
+    HN01_TransformResp --> HN01_BitResp[Bitácora Response]
+    HN01_BitResp --> HN01_MapError{Error?}
+    HN01_MapError -->|Sí| HN01_MapErr[MapeoErrores]
+    HN01_MapErr --> End
+    HN01_MapError -->|No| End
+    
+    %% GT01 Flow
+    GT01Flow --> GT01_UUID[Generar UUID Request]
+    GT01_UUID --> GT01_BitReq[Bitácora Request<br/>registraBitacoraPagosMasivosRG<br/>countryCode=GT01]
+    GT01_BitReq --> GT01_ValidAccess[Validar Acceso Cliente<br/>validaAccesoPMS MTR]
+    GT01_ValidAccess -->|status != 00000| GT01_AccessError[Error Acceso]
+    GT01_AccessError --> GT01_BitErr[Bitácora Error]
+    GT01_BitErr --> End
+    GT01_ValidAccess -->|status = 00000| GT01_Transform[Transformar Request<br/>pagosMasivosInternoGTIn.xq<br/>pais=GT, empresa=01]
+    GT01_Transform --> GT01_ValidWSDL[Validar WSDL]
+    GT01_ValidWSDL -->|Error| GT01_WSDLError[Error WSDL]
+    GT01_WSDLError --> End
+    GT01_ValidWSDL -->|OK| GT01_MTR[Invocar cargadorArchivoLote<br/>MTR Web Service]
+    GT01_MTR --> GT01_ExtractCode[Extraer codigo y mensaje]
+    GT01_ExtractCode --> GT01_TransformHeader[Transformar Header<br/>pagosMasivosInternoGTHeaderOut.xq]
+    GT01_TransformHeader --> GT01_CheckSuccess{codigo = SUCCESS?}
+    GT01_CheckSuccess -->|Sí| GT01_TransformBody[Transformar Body<br/>pagosMasivosInternoGTOut.xq]
+    GT01_CheckSuccess -->|No| GT01_EmptyBody[Body Vacío]
+    GT01_TransformBody --> GT01_BitResp[Bitácora Response]
+    GT01_EmptyBody --> GT01_BitResp
+    GT01_BitResp --> End
+    
+    %% PA01 Flow
+    PA01Flow --> PA01_UUID[Generar UUID Request]
+    PA01_UUID --> PA01_BitReq[Bitácora Request<br/>registraBitacoraPagosMasivosRG<br/>countryCode=PA01]
+    PA01_BitReq --> PA01_ValidAccess[Validar Acceso Cliente<br/>validaAccesoPMS MTR]
+    PA01_ValidAccess -->|status != 00000| PA01_AccessError[Error Acceso]
+    PA01_AccessError --> PA01_BitErr[Bitácora Error]
+    PA01_BitErr --> End
+    PA01_ValidAccess -->|status = 00000| PA01_Transform[Transformar Request<br/>pagosMasivosInternoPAIn.xq<br/>pais=PA, empresa=01]
+    PA01_Transform --> PA01_ValidWSDL[Validar WSDL]
+    PA01_ValidWSDL -->|Error| PA01_WSDLError[Error WSDL]
+    PA01_WSDLError --> End
+    PA01_ValidWSDL -->|OK| PA01_MTR[Invocar cargadorArchivoLote<br/>MTR Web Service]
+    PA01_MTR --> PA01_ExtractCode[Extraer codigo y mensaje]
+    PA01_ExtractCode --> PA01_TransformHeader[Transformar Header<br/>pagosMasivosInternoPAHeaderOut.xq]
+    PA01_TransformHeader --> PA01_CheckSuccess{codigo = SUCCESS?}
+    PA01_CheckSuccess -->|Sí| PA01_TransformBody[Transformar Body<br/>pagosMasivosInternoPAOut.xq]
+    PA01_CheckSuccess -->|No| PA01_EmptyBody[Body Vacío]
+    PA01_TransformBody --> PA01_BitResp[Bitácora Response]
+    PA01_EmptyBody --> PA01_BitResp
+    PA01_BitResp --> End
+    
+    %% NI01 Flow
+    NI01Flow --> NI01_NoUUID[⚠️ SIN UUID]
+    NI01_NoUUID --> NI01_NoBitReq[⚠️ SIN Bitácora Request]
+    NI01_NoBitReq --> NI01_NoValidAccess[⚠️ SIN Validación Acceso]
+    NI01_NoValidAccess --> NI01_Transform[Transformar Request<br/>pagosMasivosInternoNIIn.xq<br/>pais=NI, empresa=01]
+    NI01_Transform --> NI01_ValidWSDL[Validar WSDL]
+    NI01_ValidWSDL -->|Error| NI01_WSDLError[Error WSDL]
+    NI01_WSDLError --> End
+    NI01_ValidWSDL -->|OK| NI01_MTR[Invocar cargadorArchivoLote<br/>MTR Web Service]
+    NI01_MTR --> NI01_TransformHeader[Transformar Header<br/>pagosMasivosInternoNIHeaderOut.xq]
+    NI01_TransformHeader --> NI01_CheckSuccess{successIndicator = SUCCESS?}
+    NI01_CheckSuccess -->|Sí| NI01_TransformBody[Transformar Body<br/>pagosMasivosInternoNIOut.xq]
+    NI01_CheckSuccess -->|No| NI01_EmptyBody[Body Vacío]
+    NI01_TransformBody --> NI01_NoBitResp[⚠️ SIN Bitácora Response]
+    NI01_EmptyBody --> NI01_NoBitResp
+    NI01_NoBitResp --> End
+    
+    style HN01Flow fill:#90EE90
+    style GT01Flow fill:#87CEEB
+    style PA01Flow fill:#87CEEB
+    style NI01Flow fill:#FFB6C1
+    style DefaultFlow fill:#FF6B6B
+    
+    style HN01_BitReq fill:#90EE90
+    style HN01_ValidAccess fill:#90EE90
+    style HN01_BitResp fill:#90EE90
+    
+    style GT01_BitReq fill:#87CEEB
+    style GT01_ValidAccess fill:#87CEEB
+    style GT01_BitResp fill:#87CEEB
+    
+    style PA01_BitReq fill:#87CEEB
+    style PA01_ValidAccess fill:#87CEEB
+    style PA01_BitResp fill:#87CEEB
+    
+    style NI01_NoUUID fill:#FFB6C1
+    style NI01_NoBitReq fill:#FFB6C1
+    style NI01_NoValidAccess fill:#FFB6C1
+    style NI01_NoBitResp fill:#FFB6C1

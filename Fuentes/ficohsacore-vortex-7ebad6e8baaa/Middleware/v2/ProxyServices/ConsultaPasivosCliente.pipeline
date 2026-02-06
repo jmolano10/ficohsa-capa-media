@@ -1,0 +1,1662 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaPasivosCliente/wsdl/consultaPasivosClientePS"/>
+            <con:binding>
+                <con:name>consultaPasivosClientePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaPasivosClientePS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8848777042473091319--23eafd38.13c2a05c9f3.-6bf3" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="error" name="_onErrorHandler-8848777042473091319--23eafd38.13c2a05c9f3.-6bf3">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaFICOPENTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con1"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:comment>Condicion para determinar si el error es producido por la validaciÃ³n del request</con1:comment>
+                        <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7fdb</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($fault/ctx:errorCode/text()) = "BEA-382505"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7fb6</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/Genericos/mapeoErrorValidate"/>
+                                            <con1:param name="anyType1">
+                                                <con1:path>$fault</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace contents-only="true" varName="header">
+                                <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7fd9</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ concat(fn:string($fault/ctx:errorCode/text()), ": ", fn:string($fault/ctx:reason/text())) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-718042994700893002-7893c0ca.157243ae2f3.-7d78</con1:id>
+                        <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>mapeoErrores</con2:operation>
+                        <con2:request>
+                            <con2:body>REQMapeoErrores</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPMapeoErrores</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQMapeoErrores">
+                                <con1:id>_ActionId-718042994700893002-7893c0ca.157243ae2f3.-7d7a</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con1:param name="CODIGO_ERROR">
+                                            <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MENSAJE_ERROR">
+                                            <con1:path>fn:concat("FICBCO0044","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-718042994700893002-7893c0ca.157243ae2f3.-7d79</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con1:param name="mapeoErroresResponse1">
+                                            <con1:path>$RSPMapeoErrores</con1:path>
+                                        </con1:param>
+                                        <con1:param name="successIndicator">
+                                            <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-8848777042473091319--23eafd38.13c2a05c9f3.-6bb8</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;con1:consultaPasivosClienteResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-8848777042473091319--23eafd38.13c2a05c9f3.-6bb7</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-6199</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/ConsultaPasivosCliente/xsd/consultaPasivosClienteTypes"/>
+                        <con2:schemaElement xmlns:con4="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes">con4:consultaPasivosClienteRequest</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./con:consultaPasivosClienteRequest</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegional">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-6161</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>ValidaServicioRegional</con2:operation>
+                        <con2:request>
+                            <con2:body>reqValidaServicioRegional</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respValidaServicioRegional</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqValidaServicioRegional">
+                                <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-6129</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con1:param name="requestHeader1">
+                                            <con1:path>$header/aut:RequestHeader</con1:path>
+                                        </con1:param>
+                                        <con1:param name="serviceId">
+                                            <con1:path>"FICBCO0044"</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-60f1</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-60b9</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:replace contents-only="true" varName="body">
+                                            <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-609c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>&lt;con:consultaPasivosClienteResponse/></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con1:reply>
+                                            <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-607f</con1:id>
+                                        </con1:reply>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:replace contents-only="true" varName="header">
+                                        <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-6047</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con1:param name="requestHeader">
+                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:replace>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="MapeoError">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaListaPrestamos" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-1536126636871899014--3803abd8.15872528f23.-7c19</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-1536126636871899014--3803abd8.15872528f23.-7c16</con1:id>
+                                    <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>mapeoErrores</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQMapeoErrores</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPMapeoErrores</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQMapeoErrores">
+                                            <con1:id>_ActionId-1536126636871899014--3803abd8.15872528f23.-7c18</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con1:param name="CODIGO_ERROR">
+                                                        <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MENSAJE_ERROR">
+                                                        <con1:path>fn:concat("FICBCO0044","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-1536126636871899014--3803abd8.15872528f23.-7c17</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con1:param name="mapeoErroresResponse1">
+                                                        <con1:path>$RSPMapeoErrores</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="successIndicator">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="HN01_ConsultaPasivosCliente_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="T24WebServicesImpl" prefix="tns"/>
+                    <con1:userNsDecl namespace="ConsultaPrestamosCliente" prefix="con2"/>
+                    <con1:userNsDecl namespace="ConsultaTarjetaCreditoCliente" prefix="con3"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaFuncionalidadUsuario" prefix="val"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjetaClienteHN" prefix="con5"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/consultaLineasCreditoCliente/consultaLineasCreditoCliente/consultaLineasCreditoCliente" prefix="con4"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_K_CONSULTALISTAPRESTAMOS/TOPLEVEL-24OSB_CON_LISTA_PRESTA/" prefix="top"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaTasaCambioTypes" prefix="con1"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="product">
+                        <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-5f8f</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/con:consultaPasivosClienteRequest/LIABILITY_TYPE/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="customer">
+                        <con1:id>_ActionId-361198551419661290--11dd04c8.14d7ba3ffda.-5f8e</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/con:consultaPasivosClienteRequest/CUSTOMER_ID/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="codigoPais">
+                        <con1:id>_ActionId-7880917910517330765--133a151c.178dbab181f.-450a</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>'OSB-ISO3'</con1:path>
+                                </con1:param>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="sourceBank">
+                        <con1:id>_ActionId-654988213146921210-58b79476.1825f856a5a.-7ecb</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f65</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryConditionExpr>
+                                    <con1:compExpr operator="=">
+                                        <con1:leftPath>$product</con1:leftPath>
+                                        <con1:rightPath>"PTM"</con1:rightPath>
+                                    </con1:compExpr>
+                                </con1:xqueryConditionExpr>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f62</con1:id>
+                                    <con2:service ref="Middleware/Business_Resources/consultasCliente/consultaPasivosCliente/consultaPrestamos/ConsultaPrestamosCliente" xsi:type="con4:FlowRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con4="http://www.bea.com/alsb/flow/resources/config"/>
+                                    <con2:operation>ConsultaPrestamosCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQPrestamosCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPPrestamosCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQPrestamosCliente">
+                                            <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f64</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPrestamosIn"/>
+                                                    <con1:param name="requestHeader">
+                                                        <con1:path>$header/aut:RequestHeader</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="consultaPasivosClienteRequest">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="saldosPrestamos">
+                                            <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f63</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPrestamosOut"/>
+                                                    <con1:param name="PrestamosInput">
+                                                        <con1:path>$RSPPrestamosCliente</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                                <con2:assign varName="RESPONSETarjetaCredito">
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f61</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;con5:OutputParameters>
+	&lt;con5:CodigoError>-2&lt;/con5:CodigoError>
+&lt;/con5:OutputParameters></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="RESPONSEPrestamos">
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f60</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;top:OutputParameters/></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="RSPconDatosTarjetaCliente">
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f5f</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;OutputParameters/></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryConditionExpr>
+                                    <con1:compExpr operator="=">
+                                        <con1:leftPath>fn:string($product)</con1:leftPath>
+                                        <con1:rightPath>"TRC"</con1:rightPath>
+                                    </con1:compExpr>
+                                </con1:xqueryConditionExpr>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-7880917910517330765--133a151c.178dbab181f.-44e3</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conDatosTarjetaCliente/biz/conDatoTarjetaClienteHN_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>conDatoTarjetaClienteHN</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQconDatosTarjetaCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPconDatosTarjetaCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQconDatosTarjetaCliente">
+                                            <con1:id>_ActionId-7880917910517330765--133a151c.178dbab181f.-44c4</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/conDatosTarjetaClienteHNIn"/>
+                                                    <con1:param name="codigoPais">
+                                                        <con1:path>$codigoPais</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="consultaPasivosClienteRequest">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-7880917910517330765--133a151c.178dbab181f.-44a8</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPconDatosTarjetaCliente/con5:CodigoError/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-7880917910517330765--133a151c.178dbab181f.-4497</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != '-1')then (
+
+string($RSPconDatosTarjetaCliente/con5:MensajeError/text())
+
+)else('')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                                <con2:assign varName="RSPPrestamosCliente">
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f57</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;con2:ConsultaPrestamoTypeResponse>
+	&lt;con2:OVERALL_SUCCESS_INDICATOR>NO RECORDS&lt;/con2:OVERALL_SUCCESS_INDICATOR>
+&lt;/con2:ConsultaPrestamoTypeResponse></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="saldosPrestamos">
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f56</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;Prestamos/></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="RESPONSETarjetaCredito">
+                                    <con1:id>_ActionId-3707721193402046187--4b56eb29.179306f41c8.-7e21</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>$RSPconDatosTarjetaCliente</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$product = "ALL"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-8642176626985980467-12de1af0.1582c51e36b.-7f99</con1:id>
+                                    <con2:service ref="Middleware/v2/BusinessServices/SJS/consultaPasivosCliente/flow/sjConsultaPasivosCliente" xsi:type="con4:FlowRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con4="http://www.bea.com/alsb/flow/resources/config"/>
+                                    <con2:operation>consultaPasivosCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsPasivosCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsPasivosCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConsPasivosCliente">
+                                            <con1:id>_ActionId-8642176626985980467-12de1af0.1582c51e36b.-7f82</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteIn"/>
+                                                    <con1:param name="codigoPais">
+                                                        <con1:path>$codigoPais</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="customerId">
+                                                        <con1:path>fn:string($body/con:consultaPasivosClienteRequest/CUSTOMER_ID/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="requestHeader1">
+                                                        <con1:path>$header/aut:RequestHeader</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="legalId">
+                                                        <con1:path>''</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform/>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$product = "LCR"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-654988213146921210-58b79476.1825f856a5a.-7f59</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABK/consultaLineasCreditoCliente/biz/consultaLineasCreditoCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaLineasCreditoCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsultaLineasCreditoCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsultaLineasCreditoCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConsultaLineasCreditoCliente">
+                                            <con1:id>_ActionId-654988213146921210-58b79476.1825f856a5a.-7f5c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaLineasCreditoClienteIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-654988213146921210-58b79476.1825f856a5a.-7f5b</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPConsultaLineasCreditoCliente/con4:P_SUCCESSINDICATOR/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-654988213146921210-58b79476.1825f856a5a.-7f5a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if ($errorCode = 'NO_RECORDS') then(
+	'No se encontraron registros'
+)else if($errorCode = ('-1' , 'ERROR'))then(
+	string($RSPConsultaLineasCreditoCliente/con4:P_MESSAGES/text()))
+else(
+	''
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f42</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaFuncionalidadUsuario/biz/ValidaFuncionalidadUsuario_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>ValidaFuncionalidadUsuario</con2:operation>
+                        <con2:request>
+                            <con2:body>ReqFuncionalidadUsuario</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RspFuncionalidadUsuario</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="ReqFuncionalidadUsuario">
+                                <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f46</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ConsultaActivosCliente/xq/consultaFuncionalidadUsuario"/>
+                                        <con1:param name="requestHeader">
+                                            <con1:path>$header/aut:RequestHeader</con1:path>
+                                        </con1:param>
+                                        <con1:param name="functionality">
+                                            <con1:path>"SALDOS_PASIVOS"</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f45</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>data($RspFuncionalidadUsuario/val:PV_CODIGO_ERROR) = 'SUCCESS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="functionalityIndicator">
+                                            <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f44</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>data($RspFuncionalidadUsuario/val:PV_VALOR)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:assign varName="functionalityIndicator">
+                                        <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7f43</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>"ALL"</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="HN01_ConsultaPasivosCliente_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3244293012273434196-41a11543.1581d060fff.-7489</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($product) = ("PTM", "TRC")</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace contents-only="true" varName="header">
+                                    <con1:id>_ActionId-3244293012273434196-41a11543.1581d060fff.-7488</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteHeaderSPOut"/>
+                                            <con1:param name="outputParameters">
+                                                <con1:path>$RESPONSETarjetaCredito</con1:path>
+                                            </con1:param>
+                                            <con1:param name="consultaPrestamoTypeResponse">
+                                                <con1:path>$RSPPrestamosCliente</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace contents-only="true" varName="body">
+                                    <con1:id>_ActionId-1504327930377892749--69b73f02.17914fc5ba1.-457d</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteSPOut"/>
+                                            <con1:param name="PrestamoAdicResponse">
+                                                <con1:path>$saldosPrestamos</con1:path>
+                                            </con1:param>
+                                            <con1:param name="tarjetaCreditoAdicResponse">
+                                                <con1:path>$RSPconDatosTarjetaCliente</con1:path>
+                                            </con1:param>
+                                            <con1:param name="functionalityDisplayIndicator">
+                                                <con1:path>$functionalityIndicator</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$product = "ALL"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-8642176626985980467-12de1af0.1582c51e36b.-7f52</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteHeaderOut"/>
+                                            <con1:param name="sjConsultaPasivosClienteResponse1">
+                                                <con1:path>$RSPConsPasivosCliente</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-8642176626985980467-12de1af0.1582c51e36b.-7f21</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteOut"/>
+                                            <con1:param name="sjConsultaPasivosClienteResponse1">
+                                                <con1:path>$RSPConsPasivosCliente</con1:path>
+                                            </con1:param>
+                                            <con1:param name="sourceBank">
+                                                <con1:path>$sourceBank</con1:path>
+                                            </con1:param>
+                                            <con1:param name="overallSuccessInd">
+                                                <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$product = "LCR"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace contents-only="true" varName="header">
+                                    <con1:id>_ActionId-654988213146921210-58b79476.1825f856a5a.-7f55</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if ($validationMessage = '')then(
+			<successIndicator>Success</successIndicator>
+		)else(
+			<successIndicator>{ $errorCode }</successIndicator>,
+			<messages>{ $validationMessage }</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-654988213146921210-58b79476.1825f856a5a.-7ef7</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$validationMessage = ""</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:replace varName="body" contents-only="true">
+                                                <con1:id>_ActionId-654988213146921210-58b79476.1825f856a5a.-7ef6</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryTransform>
+                                                        <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteLCROut"/>
+                                                        <con1:param name="sourceBank">
+                                                            <con1:path>$sourceBank</con1:path>
+                                                        </con1:param>
+                                                        <con1:param name="outputParameters">
+                                                            <con1:path>$RSPConsultaLineasCreditoCliente</con1:path>
+                                                        </con1:param>
+                                                    </con1:xqueryTransform>
+                                                </con2:expr>
+                                            </con2:replace>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default>
+                                        <con2:replace contents-only="true" varName="body">
+                                            <con1:id>_ActionId-654988213146921210-58b79476.1825f856a5a.-7ef5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>&lt;con:consultaPasivosClienteResponse/></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:default>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-3244293012273434196-41a11543.1581d060fff.-7486</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>PRODUCT NOT SUPPORTED</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-3244293012273434196-41a11543.1581d060fff.-7485</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con:consultaPasivosClienteResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="Default_ConsultaPasivosCliente_request">
+            <con:stage name="FlujoEntrada">
+                <con:context/>
+                <con:actions>
+                    <con2:assign varName="Test">
+                        <con1:id>_ActionId-7453565716128000541-593ca5eb.154bfaf4ab8.-7efe</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>""</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="Default_ConsultaPasivosCliente_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:Error>
+                        <con1:id>_ActionId-2681369310853666711--5bcd27aa.14daf0d55d0.-779b</con1:id>
+                        <con2:errCode>MW-0008</con2:errCode>
+                        <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                    </con2:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="GT01_ConsultaPasivosCliente_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ConsultaTasaCambio" prefix="con1"/>
+                    <con1:userNsDecl namespace="ConsultaPrestamosCliente" prefix="con2"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaCliente" prefix="congt"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaPasivosCliente" prefix="con3"/>
+                    <con1:userNsDecl namespace="ConsultaTarjetaCreditoCliente" prefix="con4"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatosTarjetaCliente" prefix="con5"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="product">
+                        <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6b59</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>upper-case(string($body/con:consultaPasivosClienteRequest/LIABILITY_TYPE/text()))</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="customer">
+                        <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6b58</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/con:consultaPasivosClienteRequest/CUSTOMER_ID/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="codigoPais">
+                        <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7e11</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>'OSB-ISO3'</con1:path>
+                                </con1:param>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7eb9</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($product) = "PTM"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7eb7</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKGT/consultaPasivosCliente/biz/consultaPasivosCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaPasivosCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsPtmosCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsPtmosCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConsPtmosCliente">
+                                            <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7eb8</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClientePtmoGTIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest1">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform/>
+                                </con2:wsCallout>
+                                <con2:assign varName="RSPconDatosTarjetaCliente">
+                                    <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7d2d</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;con5:OutputParameters>
+	&lt;con5:CodigoError>NO RECORDS&lt;/con5:CodigoError>
+&lt;/con5:OutputParameters></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($product) = "TRC"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7c43</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataGT/conDatosTarjetaCliente/biz/conDatosTarjetaCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>conDatosTarjetaCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body wrapped="false">REQconDatosTarjetaCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body wrapped="false">RSPconDatosTarjetaCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQconDatosTarjetaCliente">
+                                            <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7c46</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/conDatosTarjetaClienteGTIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest1">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="codigoPais">
+                                                        <con1:path>$codigoPais</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7c45</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPconDatosTarjetaCliente/con5:CodigoError/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7c44</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != '-1')then (
+
+string($RSPconDatosTarjetaCliente/con5:MensajeError/text())
+
+)else('')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                                <con2:assign varName="RSPConsPtmosCliente">
+                                    <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7d2b</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;con3:OutputParameters>
+	&lt;con3:ERROR_CODE>NO RECORDS&lt;/con3:ERROR_CODE>
+&lt;/con3:OutputParameters></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($product) = "ALL"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4394643895433828439-11e627aa.15729b9fdf0.-7cfc</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKGT/consultaPasivosCliente/biz/consultaPasivosCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaPasivosCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsPtmosCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsPtmosCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConsPtmosCliente">
+                                            <con1:id>_ActionId-4394643895433828439-11e627aa.15729b9fdf0.-7ce4</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClientePtmoGTIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest1">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform/>
+                                </con2:wsCallout>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7bc3</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataGT/conDatosTarjetaCliente/biz/conDatosTarjetaCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>conDatosTarjetaCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQconDatosTarjetaCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPconDatosTarjetaCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQconDatosTarjetaCliente">
+                                            <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7bc6</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/conDatosTarjetaClienteGTIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest1">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="codigoPais">
+                                                        <con1:path>$codigoPais</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7bc5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPconDatosTarjetaCliente/con5:CodigoError/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7bc4</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != '-1')then (
+
+string($RSPconDatosTarjetaCliente/con5:MensajeError/text())
+
+)else('')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con1:skip>
+                                <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7ea8</con1:id>
+                            </con1:skip>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GT01_ConsultaPasivosCliente_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3355131922104060328--41a6d1e.158260d840b.-7f4d</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($product) = ("PTM","TRC","ALL")</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-3355131922104060328--41a6d1e.158260d840b.-7f4c</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteGTHeaderOut"/>
+                                            <con1:param name="outputParameters2">
+                                                <con1:path>$RSPconDatosTarjetaCliente</con1:path>
+                                            </con1:param>
+                                            <con1:param name="outputParameters1">
+                                                <con1:path>$RSPConsPtmosCliente</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-3355131922104060328--41a6d1e.158260d840b.-7f4b</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteGTOut"/>
+                                            <con1:param name="outputParameters2">
+                                                <con1:path>$RSPconDatosTarjetaCliente</con1:path>
+                                            </con1:param>
+                                            <con1:param name="outputParameters1">
+                                                <con1:path>$RSPConsPtmosCliente</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-3355131922104060328--41a6d1e.158260d840b.-7f4a</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>PRODUCT NOT SUPPORTED</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-3355131922104060328--41a6d1e.158260d840b.-7f49</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con:consultaPasivosClienteResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="PA01_ConsultaPasivosCliente_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="ConsultaPrestamosCliente" prefix="con2"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaCliente" prefix="conpa"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaPasivosCliente" prefix="con4"/>
+                    <con1:userNsDecl namespace="ConsultaTarjetaCreditoCliente" prefix="con5"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaTasaCambio" prefix="ns0"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaListaPrestamos" prefix="con6"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatosTarjetaCliente" prefix="con1"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="product">
+                        <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6abd</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:upper-case(string($body/con:consultaPasivosClienteRequest/LIABILITY_TYPE/text()))</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="customer">
+                        <con1:id>_ActionId-2306136708292399401--177d8f80.1535c5adfaf.-6abc</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/con:consultaPasivosClienteRequest/CUSTOMER_ID/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="codigoPais">
+                        <con1:id>_ActionId-1526000148923462486--9147eca.16c85e6170d.-7d92</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>'OSB-ISO3'</con1:path>
+                                </con1:param>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7e17</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($product) = "PTM"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7e15</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/consultaPasivosCliente/biz/consultaPasivosCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaListaPrestamos</con2:operation>
+                                    <con2:request>
+                                        <con2:body>rq</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>rp</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="rq">
+                                            <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7e16</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClientePtmoPAIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest1">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform/>
+                                </con2:wsCallout>
+                                <con2:assign varName="RSPconDatosTarjetaCliente">
+                                    <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7d31</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;con1:OutputParameters>
+	&lt;con1:CodigoError>NO RECORDS&lt;/con1:CodigoError>
+&lt;/con1:OutputParameters></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($product) = "TRC"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7e11</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataPA/conDatosTarjetaCliente/biz/conDatosTarjetaCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>conDatosTarjetaCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQconDatosTarjetaCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPconDatosTarjetaCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQconDatosTarjetaCliente">
+                                            <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7e13</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/conDatosTarjetaClientePAIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest1">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="codigoPais">
+                                                        <con1:path>$codigoPais</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-1526000148923462486--9147eca.16c85e6170d.-7d56</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPconDatosTarjetaCliente/con1:CodigoError/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessagess">
+                                            <con1:id>_ActionId-1526000148923462486--9147eca.16c85e6170d.-7d3d</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != '-1')then (
+     string($RSPconDatosTarjetaCliente/con1:MensajeError/text())
+)else('')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                                <con2:assign varName="rp">
+                                    <con1:id>_ActionId-3674717929794852339-50898f42.16ff7f81fb3.-7d2f</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;con6:OutputParameters>
+	&lt;con6:ERROR_CODE>NO RECORDS&lt;/con6:ERROR_CODE>
+&lt;/con6:OutputParameters></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($product) = "ALL"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-1521619026405528383--66cd10b3.1573566e462.-7d44</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/consultaPasivosCliente/biz/consultaPasivosCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaListaPrestamos</con2:operation>
+                                    <con2:request>
+                                        <con2:body>rq</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>rp</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="rq">
+                                            <con1:id>_ActionId-1521619026405528383--66cd10b3.1573566e462.-7c62</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClientePtmoPAIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest1">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform/>
+                                </con2:wsCallout>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-1521619026405528383--66cd10b3.1573566e462.-7cec</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataPA/conDatosTarjetaCliente/biz/conDatosTarjetaCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>conDatosTarjetaCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQconDatosTarjetaCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPconDatosTarjetaCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQconDatosTarjetaCliente">
+                                            <con1:id>_ActionId-1521619026405528383--66cd10b3.1573566e462.-7a6a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/conDatosTarjetaClientePAIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest1">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="codigoPais">
+                                                        <con1:path>$codigoPais</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-1526000148923462486--9147eca.16c85e6170d.-7c07</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPconDatosTarjetaCliente/con1:CodigoError/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessagess">
+                                            <con1:id>_ActionId-1526000148923462486--9147eca.16c85e6170d.-7c09</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != '-1')then (
+     string($RSPconDatosTarjetaCliente/con1:MensajeError/text())
+)else('')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con1:skip>
+                                <con1:id>_ActionId-1856205930521909857-4d2ef9f5.1556eee5830.-7e06</con1:id>
+                            </con1:skip>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="PA01_ConsultaPasivosCliente_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3244293012273434196-41a11543.1581d060fff.-7385</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($product) = ("PTM","TRC","ALL")</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace contents-only="true" varName="header">
+                                    <con1:id>_ActionId-3244293012273434196-41a11543.1581d060fff.-7384</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClientePAHeaderOut"/>
+                                            <con1:param name="outputParameters2">
+                                                <con1:path>$RSPconDatosTarjetaCliente</con1:path>
+                                            </con1:param>
+                                            <con1:param name="outputParameters1">
+                                                <con1:path>$rp</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace contents-only="true" varName="body">
+                                    <con1:id>_ActionId-3244293012273434196-41a11543.1581d060fff.-7383</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClientePAOut"/>
+                                            <con1:param name="outputParameters2">
+                                                <con1:path>$rp</con1:path>
+                                            </con1:param>
+                                            <con1:param name="outputParameters1">
+                                                <con1:path>$RSPconDatosTarjetaCliente</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-3244293012273434196-41a11543.1581d060fff.-7382</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ $validationMessagess }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-3244293012273434196-41a11543.1581d060fff.-7381</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con:consultaPasivosClienteResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="NI01_ConsultaPasivosCliente_request">
+            <con:stage name="ObtenerParametro">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb2"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-6205412152222411425--639d2445.16023662ac3.-7dd7</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerParametrizacion</con2:operation>
+                        <con2:request>
+                            <con2:body>REQObtenerParametrizacion</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPObtenerParametrizacion</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="codigosBloqueo">
+                                <con1:id>_ActionId-3924788547418347203-787d17db.16400602035.-7fc6</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>'FICBCO0044.CODIGOSBLOQUEO'</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="bines">
+                                <con1:id>_ActionId-3924788547418347203-787d17db.16400602035.-7fa9</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>'FICBCO0044.BINES.PTC'</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="REQObtenerParametrizacion">
+                                <con1:id>_ActionId-6205412152222411425--639d2445.16023662ac3.-7dd8</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con1:param name="nombreParametros">
+                                            <con1:path>concat($codigosBloqueo,"||", $bines)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-6205412152222411425--639d2445.16023662ac3.-7ca2</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>let $error := string($RSPObtenerParametrizacion/osb2:ERROR_MESSAGE/text())
+return
+	if($error != '') then(
+		for $items in $RSPObtenerParametrizacion/osb2:CONFIGURACIONES
+		return
+			if($items/osb2:CONFIGURACIONES_ITEM[osb2:NAME = $codigosBloqueo]) then (
+				''
+			) else (
+				$error
+			)
+	) else(
+		$error
+	)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb2"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://service.srvaplcobispasivos.ecobis.cobiscorp" prefix="ser"/>
+                    <con1:varNsDecl namespace="http://dto.srvaplcobisentidades.ecobis.cobiscorp" prefix="dto"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3114080590569229992-46db43bc.1602c991176.-7f5d</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-3114080590569229992-46db43bc.1602c991176.-7f57</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/CTS/pasivos/biz/pasivos" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>OpConsultaPasivosCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQOpConsultaPasivosCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPOpConsultaPasivosCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQOpConsultaPasivosCliente">
+                                            <con1:id>_ActionId-3114080590569229992-46db43bc.1602c991176.-7f59</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteNIIn"/>
+                                                    <con1:param name="consultaPasivosClienteRequest1">
+                                                        <con1:path>$body/con:consultaPasivosClienteRequest</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="validIdCliente">
+                                                        <con1:path>fn:string($header/aut:RequestHeader/Authentication/UserName/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:validate>
+                                            <con1:id>_ActionId-3114080590569229992-46db43bc.1602c991176.-7f58</con1:id>
+                                            <con2:schema ref="Middleware/v2/BusinessServices/CTS/pasivos/xsd/services"/>
+                                            <con2:schemaElement xmlns:ser1="http://service.srvaplcobispasivos.ecobis.cobiscorp">ser1:opConsultaPasivosClienteSolicitud</con2:schemaElement>
+                                            <con2:varName>REQOpConsultaPasivosCliente</con2:varName>
+                                            <con2:location>
+                                                <con1:xpathText>.</con1:xpathText>
+                                            </con2:location>
+                                        </con2:validate>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform/>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="NI01_ConsultaPasivosCliente_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3114080590569229992-46db43bc.1602c991176.-7f1f</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-3114080590569229992-46db43bc.1602c991176.-7f1d</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteNIHeaderOut"/>
+                                            <con1:param name="opConsultaPasivosClienteRespuesta1">
+                                                <con1:path>$RSPOpConsultaPasivosCliente</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-3114080590569229992-46db43bc.1602c991176.-7ee5</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3924788547418347203-787d17db.16400602035.-7bc0</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>upper-case(string($header/aut:ResponseHeader/successIndicator/text())) = 'SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-3924788547418347203-787d17db.16400602035.-7bbe</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaPasivosCliente/xq/consultaPasivosClienteNIOut"/>
+                                            <con1:param name="opConsultaPasivosClienteRespuesta1">
+                                                <con1:path>$RSPOpConsultaPasivosCliente</con1:path>
+                                            </con1:param>
+                                            <con1:param name="Bines">
+                                                <con1:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $bines]/osb:VALUE/text())</con1:path>
+                                            </con1:param>
+                                            <con1:param name="ProductoEntrada">
+                                                <con1:path>string($body/con:consultaPasivosClienteRequest/LIABILITY_TYPE/text())</con1:path>
+                                            </con1:param>
+                                            <con1:param name="CodigoBloqueo">
+                                                <con1:path>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $codigosBloqueo]/osb:VALUE/text())</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-3924788547418347203-787d17db.16400602035.-7bbc</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con:consultaPasivosClienteResponse /></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                    <con:xpath>
+                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                    </con:xpath>
+                    <con:branch name="HN01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'HN01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="HN01_ConsultaPasivosCliente">
+                                <con:request>HN01_ConsultaPasivosCliente_request</con:request>
+                                <con:response>HN01_ConsultaPasivosCliente_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="GT01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'GT01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="GT01_ConsultaPasivosCliente">
+                                <con:request>GT01_ConsultaPasivosCliente_request</con:request>
+                                <con:response>GT01_ConsultaPasivosCliente_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="PA01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'PA01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="PA01_ConsultaPasivosCliente">
+                                <con:request>PA01_ConsultaPasivosCliente_request</con:request>
+                                <con:response>PA01_ConsultaPasivosCliente_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="NI01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'NI01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="NI01_ConsultaPasivosCliente">
+                                <con:request>NI01_ConsultaPasivosCliente_request</con:request>
+                                <con:response>NI01_ConsultaPasivosCliente_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_ConsultaPasivosCliente">
+                                <con:request>Default_ConsultaPasivosCliente_request</con:request>
+                                <con:response>Default_ConsultaPasivosCliente_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

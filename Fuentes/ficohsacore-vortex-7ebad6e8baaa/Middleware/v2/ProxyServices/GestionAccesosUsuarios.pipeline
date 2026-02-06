@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/GestionAccesosUsuarios/wsdl/gestionAccesosUsuariosPS"/>
+            <con:binding>
+                <con:name>gestionAccesosUsuariosPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/gestionAccesosUsuariosPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-1411191783313847208-33cb260e.18169a22158.-7c64" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con5="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="request" name="GestionAccesosUsuarios_request">
+            <con:stage name="ConsultaRutaRegional">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaRutaRegional" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="serviceId">
+                        <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7f87</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'FICBCO0501'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7fe8</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/consultaRutaRegional/biz/consultaRutaRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>consultaRutaRegional</con1:operation>
+                        <con1:request>
+                            <con1:body>REQconsultaRutaRegional</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPconsultaRutaRegional</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQconsultaRutaRegional">
+                                <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7f6d</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/consultaRutaRegionalIn"/>
+                                        <con2:param name="idServicio">
+                                            <con2:path>$serviceId</con2:path>
+                                        </con2:param>
+                                        <con2:param name="requestHeader">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                        <con2:param name="operacion">
+                                            <con2:path>$operation</con2:path>
+                                        </con2:param>
+                                        <con2:param name="version">
+                                            <con2:path>'V2'</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:ifThenElse>
+                                <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7fcc</con2:id>
+                                <con1:case>
+                                    <con1:condition>
+                                        <con2:xqueryText>string($RSPconsultaRutaRegional/con:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con2:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:replace varName="header" contents-only="true">
+                                            <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7f1f</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+<successIndicator>ERROR</successIndicator>
+<messages>{ fn:string($RSPconsultaRutaRegional/con:PV_MENSAJE_ERROR/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:assign varName="responseEmpty">
+                                            <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7f58</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>fn:string(concat('&lt;ges:', $operation, 'Response xmlns:ges="http://www.ficohsa.com.hn/middleware.services/gestionAccesosUsuariosTypes"/>'))</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:replace varName="body" contents-only="true">
+                                            <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7ecc</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>fn-bea:inlinedXML($responseEmpty)</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con2:reply>
+                                            <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7ea3</con2:id>
+                                        </con2:reply>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:replace varName="header" contents-only="true">
+                                        <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7eed</con2:id>
+                                        <con1:expr>
+                                            <con2:xqueryTransform>
+                                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con2:param name="requestHeader">
+                                                    <con2:path>$header/aut:RequestHeader</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con1:expr>
+                                    </con1:replace>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BitacoraRequest">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionAccesosUsuariosTypes" prefix="ges"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="uuidBitacoraRequest">
+                        <con2:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7f5b</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="originalBody">
+                        <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7df8</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>$body</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="originalHeader">
+                        <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7df6</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>$header</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con3:route>
+                        <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7e5e</con2:id>
+                        <con3:service ref="Middleware/v2/BusinessServices/OSB/RegistrarBitacoraOSB_v2/biz/RegistrarBitacoraOSB_v2" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>registrarBitacoraOSB</con3:operation>
+                        <con3:outboundTransform>
+                            <con1:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7e5c</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/registrarBitacoraOSBIn"/>
+                                        <con2:param name="Uuid">
+                                            <con2:path>$uuidBitacoraRequest</con2:path>
+                                        </con2:param>
+                                        <con2:param name="IdOperacion">
+                                            <con2:path>fn:string($operation)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="IdOsb">
+                                            <con2:path>fn:string($inbound/ctx:transport/ctx:request/tp:headers/tp:user-header[@name='Host']/@value)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="IdServicio">
+                                            <con2:path>'FICBCO0501'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="IdTxn">
+                                            <con2:path>''</con2:path>
+                                        </con2:param>
+                                        <con2:param name="MensajeError">
+                                            <con2:path>''</con2:path>
+                                        </con2:param>
+                                        <con2:param name="UuidReq">
+                                            <con2:path>''</con2:path>
+                                        </con2:param>
+                                        <con2:param name="Resultado">
+                                            <con2:path>''</con2:path>
+                                        </con2:param>
+                                        <con2:param name="Usuario">
+                                            <con2:path>string($header/aut:RequestHeader/Authentication/UserName/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="BancoOrigen">
+                                            <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="Contenido">
+                                            <con2:path>$body</con2:path>
+                                        </con2:param>
+                                        <con2:param name="BancoDestino">
+                                            <con2:path>string($header/aut:RequestHeader/Region/DestinationBank/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="TipoMensaje">
+                                            <con2:path>'REQ'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="FechaTxn">
+                                            <con2:path>fn:adjust-date-to-timezone(current-date(), ())</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                        </con3:outboundTransform>
+                    </con3:route>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GestionAccesosUsuarios_response">
+            <con:stage name="MapeoError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-783949672889878902--4ff733b1.182fac0440c.-2fc4</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-783949672889878902--4ff733b1.182fac0440c.-2fc1</con2:id>
+                                    <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>mapeoErrores</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQmapeoErrores</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPmapeoErrores</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQmapeoErrores">
+                                            <con2:id>_ActionId-783949672889878902--4ff733b1.182fac0440c.-2fc3</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con2:param name="CODIGO_ERROR">
+                                                        <con2:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="MENSAJE_ERROR">
+                                                        <con2:path>fn:concat($serviceId,"$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:replace varName="header" contents-only="true">
+                                            <con2:id>_ActionId-783949672889878902--4ff733b1.182fac0440c.-2fc2</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con2:param name="mapeoErroresResponse1">
+                                                        <con2:path>$RSPmapeoErrores</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="successIndicator">
+                                                        <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BitacoraResponse">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7dd4</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>fn:string($uuidBitacoraRequest) != ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="uuidBitacoraRequest">
+                                    <con2:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7f57</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con2:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-8589038843075315033--336680ae.1816d655cd8.-7ec7</con5:id>
+                                    <con2:service ref="Middleware/v2/BusinessServices/OSB/RegistrarBitacoraOSB_v2/biz/RegistrarBitacoraOSB_v2" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>registrarBitacoraOSB</con2:operation>
+                                    <con2:outboundTransform>
+                                        <con1:replace varName="body" contents-only="true">
+                                            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-8589038843075315033--336680ae.1816d655cd8.-7ec6</con5:id>
+                                            <con1:location>
+                                                <con3:xpathText xmlns:con3="http://www.bea.com/wli/sb/stages/config">.</con3:xpathText>
+                                            </con1:location>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/Generales/xq/registrarBitacoraOSBIn"/>
+                                                    <con3:param name="Uuid">
+                                                        <con3:path>$uuidBitacoraResponse</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="IdOperacion">
+                                                        <con3:path>fn:string($operation)</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="IdOsb">
+                                                        <con3:path>fn:string($inbound/ctx:transport/ctx:request/tp:headers/tp:user-header[@name='Host']/@value)</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="IdServicio">
+                                                        <con3:path>"FICBCO0501"</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="MensajeError">
+                                                        <con3:path>fn:string($header/aut:ResponseHeader/messages/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="IdTxn">
+                                                        <con3:path>''</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="UuidReq">
+                                                        <con3:path>$uuidBitacoraResponse</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="Resultado">
+                                                        <con3:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="Usuario">
+                                                        <con3:path>string($originalHeader/aut:RequestHeader/Authentication/UserName/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="BancoOrigen">
+                                                        <con3:path>fn:string($originalHeader/aut:RequestHeader/Region/SourceBank/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="Contenido">
+                                                        <con3:path>$body</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="BancoDestino">
+                                                        <con3:path>string($originalHeader/aut:RequestHeader/Region/DestinationBank/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="TipoMensaje">
+                                                        <con3:path>"RSP"</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="FechaTxn">
+                                                        <con3:path>fn:adjust-date-to-timezone(current-date(), ())</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con2:outboundTransform>
+                                </con2:route>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-1411191783313847208-33cb260e.18169a22158.-7c64">
+            <con:stage name="ManejoError">
+                <con6:context xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con6="http://www.bea.com/wli/sb/pipeline/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/digitalizacionTarjetasTypes" prefix="dig"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autenticacionClienteTarjetaTypes" prefix="aut"/>
+                </con6:context>
+                <con6:actions xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con6="http://www.bea.com/wli/sb/pipeline/config">
+                    <con1:assign varName="errorCode" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7e13</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="errorMessage" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7e12</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7e0f</con2:id>
+                        <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>mapeoErrores</con1:operation>
+                        <con1:request>
+                            <con1:body>REQmapeoErrores</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPmapeoErrores</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQmapeoErrores">
+                                <con2:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7e11</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con2:param name="MENSAJE_ERROR">
+                                            <con2:path>fn:concat('FICBCO0501', "$#$", $errorMessage)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="CODIGO_ERROR">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:replace contents-only="true" varName="header">
+                                <con2:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7e10</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con2:param name="mapeoErroresResponse1">
+                                            <con2:path>$RSPmapeoErrores</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con1:assign varName="responseEmpty" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7e0e</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string(concat('&lt;ges:', $operation, 'Response xmlns:ges="http://www.ficohsa.com.hn/middleware.services/gestionAccesosUsuariosTypes"/>'))</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con2:replace varName="body" contents-only="true" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-8589038843075315033--336680ae.1816d655cd8.-7e0d</con7:id>
+                        <con2:expr>
+                            <con7:xqueryText xmlns:con7="http://www.bea.com/wli/sb/stages/config">fn-bea:inlinedXML($responseEmpty)</con7:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7e0c</con1:id>
+                    </con1:reply>
+                </con6:actions>
+            </con:stage>
+            <con:stage name="BitacoraResponseError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7af6</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>fn:string($uuidBitacoraRequest) !=''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="uuidBitacoraRequest" xmlns:con6="http://www.bea.com/wli/sb/pipeline/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con2:id>_ActionId-8589038843075315033--336680ae.1816d655cd8.-7db6</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con5:route xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con6="http://www.bea.com/wli/sb/pipeline/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config">
+                                    <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-8589038843075315033--336680ae.1816d655cd8.-7d41</con7:id>
+                                    <con5:service ref="Middleware/v2/BusinessServices/OSB/RegistrarBitacoraOSB_v2/biz/RegistrarBitacoraOSB_v2" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con5:operation>registrarBitacoraOSB</con5:operation>
+                                    <con5:outboundTransform>
+                                        <con1:replace varName="body" contents-only="true">
+                                            <con7:id xmlns:con7="http://www.bea.com/wli/sb/stages/config">_ActionId-8589038843075315033--336680ae.1816d655cd8.-7d40</con7:id>
+                                            <con1:location>
+                                                <con3:xpathText xmlns:con3="http://www.bea.com/wli/sb/stages/config">.</con3:xpathText>
+                                            </con1:location>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/Generales/xq/registrarBitacoraOSBIn"/>
+                                                    <con3:param name="Uuid">
+                                                        <con3:path>$uuidBitacoraResponse</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="IdOperacion">
+                                                        <con3:path>fn:string($operation)</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="IdOsb">
+                                                        <con3:path>fn:string($inbound/ctx:transport/ctx:request/tp:headers/tp:user-header[@name='Host']/@value)</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="IdServicio">
+                                                        <con3:path>"FICBCO0501"</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="MensajeError">
+                                                        <con3:path>fn:string($header/aut:ResponseHeader/messages/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="IdTxn">
+                                                        <con3:path>''</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="UuidReq">
+                                                        <con3:path>$uuidBitacoraResponse</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="Resultado">
+                                                        <con3:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="Usuario">
+                                                        <con3:path>string($originalHeader/aut:RequestHeader/Authentication/UserName/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="BancoOrigen">
+                                                        <con3:path>fn:string($originalHeader/aut:RequestHeader/Region/SourceBank/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="Contenido">
+                                                        <con3:path>$body</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="BancoDestino">
+                                                        <con3:path>string($originalHeader/aut:RequestHeader/Region/DestinationBank/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="TipoMensaje">
+                                                        <con3:path>"RSP"</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="FechaTxn">
+                                                        <con3:path>fn:adjust-date-to-timezone(current-date(), ())</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con5:outboundTransform>
+                                </con5:route>
+                                <con2:reply>
+                                    <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7a02</con2:id>
+                                </con2:reply>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="GestionAccesosUsuarios">
+                <con:request>GestionAccesosUsuarios_request</con:request>
+                <con:response>GestionAccesosUsuarios_response</con:response>
+            </con:pipeline-node>
+            <con:route-node name="RouterDinamico">
+                <con:context>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaRutaRegional" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con4:dynamic-route>
+                        <con2:id>_ActionId-1411191783313847208-33cb260e.18169a22158.-7c65</con2:id>
+                        <con4:service>
+                            <con2:xqueryText>&lt;ctx:route>
+&lt;ctx:service isProxy='true'>{ fn:string($RSPconsultaRutaRegional/con:PV_UBICACION/text()) }&lt;/ctx:service>
+&lt;/ctx:route></con2:xqueryText>
+                        </con4:service>
+                        <con4:outboundTransform/>
+                        <con4:responseTransform/>
+                    </con4:dynamic-route>
+                </con:actions>
+            </con:route-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

@@ -1,0 +1,50 @@
+xquery version "2004-draft";
+(:: pragma bea:global-element-parameter parameter="$outputParameters1" element="ns1:OutputParameters" location="../../../BusinessServices/ABKGT/consultaPasivosCliente/xsd/consultaPasivosCliente_sp.xsd" ::)
+(:: pragma bea:global-element-return element="ns0:consultaPasivosClienteResponse" location="../../../../Business_Resources/consultasCliente/Resources/consultaClientesTypes.xsd" ::)
+
+declare namespace ns0 = "http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes";
+declare namespace ns1 = "http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaPasivosCliente";
+declare namespace xf = "http://tempuri.org/Middleware/v2/Resources/abanksGT/consultaPasivosCliente/xq/consultaPasivosClientePrestamoOut/";
+
+declare function xf:consultaPasivosClientePrestamoOut($outputParameters1 as element(ns1:OutputParameters))
+    as element(ns0:consultaPasivosClienteResponse) {
+        <ns0:consultaPasivosClienteResponse>
+            <ns0:consultaPasivosClientePrestamosResponseType>
+            {
+	            let $liabilityType := $outputParameters1/ns1:LIABILITY_TYPE
+	        	let $liabilityNumber := $outputParameters1/ns1:LIABILITY_NUMBER/ns1:LIABILITY_NUMBER_ITEM
+	        	let $liabilityCustName := $outputParameters1/ns1:LIABILITY_CUST_NAME/ns1:LIABILITY_CUST_NAME_ITEM
+	        	let $liabilityCurrency1 := $outputParameters1/ns1:LIABILITY_CURRENCY_1/ns1:LIABILITY_NUMBER_ITEM
+	        	let $liabilityPrincipalAmt1 := $outputParameters1/ns1:LIABILITY_PRINCIPAL_AMT_1/ns1:LIABILITY_NUMBER_ITEM
+	        	let $liabilityIntComAmt1 := $outputParameters1/ns1:LIABILITY_INT_COM_AMT_1/ns1:LIABILITY_NUMBER_ITEM
+	        	let $liabilityTotalAmt1 := $outputParameters1/ns1:LIABILITY_TOTAL_AMT_1/ns1:LIABILITY_NUMBER_ITEM
+	        	let $liabilityCurrency2 := $outputParameters1/ns1:LIABILITY_CURRENCY_2/ns1:LIABILITY_NUMBER_ITEM
+	        	let $liabilityPrincipalAmt2 := $outputParameters1/ns1:LIABILITY_PRINCIPAL_AMT_2/ns1:LIABILITY_NUMBER_ITEM
+	 			let $liabilityIntComAmt2 := $outputParameters1/ns1:LIABILITY_INT_COM_AMT_2/ns1:LIABILITY_NUMBER_ITEM
+	 			let $liabilityTotalAmt2 := $outputParameters1/ns1:LIABILITY_TOTAL_AMT_2/ns1:LIABILITY_NUMBER_ITEM
+	 			let $liabilityTotalAmt := $outputParameters1/ns1:LIABILITY_TOTAL_AMT/ns1:LIABILITY_NUMBER_ITEM
+                    for $i in (1 to count($liabilityNumber))
+                    return
+                        <ns0:consultaPasivosClienteResponseRecordType>
+                            <LIABILITY_TYPE>{ data($liabilityType) }</LIABILITY_TYPE>
+                            <LIABILITY_NUMBER>{ data($liabilityNumber[$i]) }</LIABILITY_NUMBER>
+                             <LIABILITY_CUST_NAME>{ data($liabilityCustName[$i]) }</LIABILITY_CUST_NAME>
+                             <LIABILITY_CURRENCY_1>{ data($liabilityCurrency1[$i]) }</LIABILITY_CURRENCY_1>
+                             <LIABILITY_PRINCIPAL_AMT_1>{ data($liabilityPrincipalAmt1[$i]) }</LIABILITY_PRINCIPAL_AMT_1>
+                             <LIABILITY_INT_COM_AMT_1>{ data($liabilityIntComAmt1[$i]) }</LIABILITY_INT_COM_AMT_1>
+                             <LIABILITY_TOTAL_AMT_1>{ data($liabilityTotalAmt1[$i]) }</LIABILITY_TOTAL_AMT_1>
+                             <LIABILITY_CURRENCY_2>{ data($liabilityCurrency2[$i]) }</LIABILITY_CURRENCY_2>
+                             <LIABILITY_PRINCIPAL_AMT_2>{ data($liabilityPrincipalAmt2[$i]) }</LIABILITY_PRINCIPAL_AMT_2>
+                             <LIABILITY_INT_COM_AMT_2>{ data($liabilityIntComAmt2[$i]) }</LIABILITY_INT_COM_AMT_2>
+                             <LIABILITY_TOTAL_AMT_2>{ data($liabilityTotalAmt2[$i]) }</LIABILITY_TOTAL_AMT_2>
+                             <LIABILITY_TOTAL_AMT>{ data($liabilityTotalAmt[$i]) }</LIABILITY_TOTAL_AMT>
+                        </ns0:consultaPasivosClienteResponseRecordType>
+			}
+            </ns0:consultaPasivosClientePrestamosResponseType>
+            <ns0:consultaPasivosClienteTCreditoResponseType/>
+        </ns0:consultaPasivosClienteResponse>
+};
+
+declare variable $outputParameters1 as element(ns1:OutputParameters) external;
+
+xf:consultaPasivosClientePrestamoOut($outputParameters1)

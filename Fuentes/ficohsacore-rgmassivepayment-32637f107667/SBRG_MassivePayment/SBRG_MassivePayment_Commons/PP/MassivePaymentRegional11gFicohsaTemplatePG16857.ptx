@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:templateEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+    <con:coreEntry>
+        <con:binding type="SOAP" xsi:type="con:AnyWsdlSoapBindingType"/>
+    </con:coreEntry>
+    <con:router errorHandler="error-N53e8047d.704934bd.0.189aebad98c.N750c">
+        <con:pipeline type="request" name="request-N53e8047d.704934bd.0.189aebad98c.N7510">
+            <con:stage id="_StageId-a000204.N38efe8e8.0.189b7667745.N7f2c" name="Definitions">
+                <con:context/>
+                <con:actions>
+                    <con2:assign varName="userName">
+                        <con1:id>_ActionId-a000204.N38efe8e8.0.189b7667745.N7f2b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$header//Authentication/UserName/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="sourceBank">
+                        <con1:id>_ActionId-a000204.N38efe8e8.0.189b7667745.N7f2a</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>if (($header//Region/SourceBank/text()) != "") then
+$header//Region/SourceBank/text()
+else 
+"HN01"</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con1:assign varName="destinationBank" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N38efe8e8.0.189b7667745.N7f29</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">let $dest := data($header//Region/DestinationBank)
+let $source := data($header//Region/SourceBank)
+
+return 
+if ($dest != "") then $dest
+else $source</con3:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:replace varName="AuthenticationHeader" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N38efe8e8.0.189b7667745.N7f28</con3:id>
+                        <con1:expr>
+                            <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                <con3:resource ref="SBRG_MassivePayment_Commons/Transformations/VirtualAuthentication"/>
+                                <con3:param name="entrada">
+                                    <con3:path>fn:concat($header//Authentication/UserName/text(),":",$header//Authentication/Password/text())</con3:path>
+                                </con3:param>
+                            </con3:xqueryTransform>
+                        </con1:expr>
+                    </con1:replace>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-a000204.N38efe8e8.0.189b7667745.N7e8e" name="StageTransformInput">
+                <con:context>
+                    <con1:userNsDecl prefix="aut" namespace="http://www.ficohsa.com.hn/middleware.services/autType"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="requestService" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N38efe8e8.0.189b7667745.N7e8d</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">"Virtual11gToRegional"</con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-a000204.N38efe8e8.0.189b7667745.N7e19" name="StageCallOut">
+                <con:context>
+                    <con1:userNsDecl prefix="aut" namespace="http://www.ficohsa.com.hn/middleware.services/autType"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N38efe8e8.0.189b7667745.N7e18</con3:id>
+                        <con1:request/>
+                        <con1:response/>
+                        <con1:requestTransform>
+                            <con1:transport-headers copy-all="false">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N38efe8e8.0.189b7667745.N7e17</con3:id>
+                                <con1:header-set>outbound-request</con1:header-set>
+                                <con1:header value="expression" name="Authorization">
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:concat("Basic ", data($AuthenticationHeader))</con2:xqueryText>
+                                </con1:header>
+                                <con1:header value="expression" name="Accept">
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">"text/xml"</con2:xqueryText>
+                                </con1:header>
+                            </con1:transport-headers>
+                            <con1:routing-options>
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N38efe8e8.0.189b7667745.N7e16</con3:id>
+                                <con1:uriExpr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">data("regional")</con2:xqueryText>
+                                </con1:uriExpr>
+                            </con1:routing-options>
+                        </con1:requestTransform>
+                        <con1:responseTransform/>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="response-N53e8047d.704934bd.0.189aebad98c.N750f">
+            <con:stage id="_StageId-a000204.N38efe8e8.0.189b7667745.N7cea" name="StageTransformOutput">
+                <con:context>
+                    <con1:userNsDecl prefix="aut" namespace="http://www.ficohsa.com.hn/middleware.services/autType"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-a000204.N48d88336.0.189c235a0ea.N7fe9</con1:id>
+                        <con2:case id="_BranchId-a000204.N48d88336.0.189c235a0ea.N7fe8">
+                            <con2:condition>
+                                <con1:xqueryText>fn:contains($sourceBank, "HN")</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-a000204.N48d88336.0.189c235a0ea.N7fd7</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>"RegionHN"</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case id="_BranchId-a000204.N48d88336.0.189c235a0ea.N7fde">
+                            <con2:condition>
+                                <con1:xqueryText>fn:contains($sourceBank, "GT")</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-a000204.N48d88336.0.189c235a0ea.N7fd4</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>"RegionGT"</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case id="_BranchId-a000204.N48d88336.0.189c235a0ea.N7fdc">
+                            <con2:condition>
+                                <con1:xqueryText>fn:contains($sourceBank, "NI")</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-a000204.N48d88336.0.189c235a0ea.N7fd1</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>"RegionNI"</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case id="_BranchId-a000204.N48d88336.0.189c235a0ea.N7fda">
+                            <con2:condition>
+                                <con1:xqueryText>fn:contains($sourceBank, "PA")</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-a000204.N48d88336.0.189c235a0ea.N7fce</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>"RegionPA"</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-N53e804cf.N67557e30.0.18a186d3ce1.N7efc</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>"RegionALL"</con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N38efe8e8.0.189b7667745.N7ce8</con3:id>
+                        <con1:case id="_BranchId-a000204.N38efe8e8.0.189b7667745.N7ce7">
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$header/aut:ResponseHeader/successIndicator="Success" or $header/aut:ResponseHeader/successIndicator="SUCCESS"</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:ifThenElse>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N48d88336.0.189c235a0ea.N7fe1</con3:id>
+                                    <con1:case id="_BranchId-a000204.N48d88336.0.189c235a0ea.N7fe0">
+                                        <con1:condition>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:contains($sourceBank, "HN")</con3:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:replace varName="body" contents-only="true">
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N38efe8e8.0.189b7667745.N7ce6</con3:id>
+                                                <con1:expr>
+                                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">""</con3:xqueryText>
+                                                </con1:expr>
+                                            </con1:replace>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:case id="_BranchId-a000204.N48d88336.0.189c235a0ea.N7fcc">
+                                        <con1:condition>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:contains($sourceBank, "GT")</con3:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:replace varName="body" contents-only="true">
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N48d88336.0.189c235a0ea.N7f92</con3:id>
+                                                <con1:expr>
+                                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">""</con3:xqueryText>
+                                                </con1:expr>
+                                            </con1:replace>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:case id="_BranchId-a000204.N48d88336.0.189c235a0ea.N7fca">
+                                        <con1:condition>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:contains($sourceBank, "NI")</con3:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:replace varName="body" contents-only="true">
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N48d88336.0.189c235a0ea.N7f5e</con3:id>
+                                                <con1:expr>
+                                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">""</con3:xqueryText>
+                                                </con1:expr>
+                                            </con1:replace>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:case id="_BranchId-a000204.N48d88336.0.189c235a0ea.N7fc8">
+                                        <con1:condition>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:contains($sourceBank, "PA")</con3:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:replace varName="body" contents-only="true">
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N48d88336.0.189c235a0ea.N7f2a</con3:id>
+                                                <con1:expr>
+                                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">""</con3:xqueryText>
+                                                </con1:expr>
+                                            </con1:replace>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:default>
+                                        <con1:replace varName="body" contents-only="true">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N48d88336.0.189c235a0ea.N7e45</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">""</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con1:default>
+                                </con1:ifThenElse>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:ifThenElse>
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N48d88336.0.189c235a0ea.N7db5</con3:id>
+                                <con1:case id="_BranchId-a000204.N48d88336.0.189c235a0ea.N7db4">
+                                    <con1:condition>
+                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:contains($sourceBank, "PA") or fn:contains($sourceBank, "GT") 
+or fn:contains($sourceBank, "NI") or fn:contains($sourceBank, "HN")</con3:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:replace varName="body" contents-only="true">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N48d88336.0.189c235a0ea.N7d7e</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">""</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:replace varName="body" contents-only="true">
+                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-a000204.N38efe8e8.0.189b7667745.N7ce5</con3:id>
+                                        <con1:expr>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">""</con3:xqueryText>
+                                        </con1:expr>
+                                    </con1:replace>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="error-N53e8047d.704934bd.0.189aebad98c.N750c">
+            <con:stage id="_StageId-a000204.N38efe8e8.0.189b7667745.N7c48" name="StageIT" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/logging/config">
+                <con:context/>
+                <con:actions>
+                    <con3:report>
+                        <con2:id>_ActionId-a000204.N38efe8e8.0.189b7667745.N7c47</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>$body</con2:xqueryText>
+                        </con3:expr>
+                        <con3:labels>
+                            <con3:key>code</con3:key>
+                            <con3:varName>fault</con3:varName>
+                            <con3:value>
+                                <con2:xpathText>./ctx:errorCode</con2:xpathText>
+                            </con3:value>
+                        </con3:labels>
+                        <con3:labels>
+                            <con3:key>reason</con3:key>
+                            <con3:varName>fault</con3:varName>
+                            <con3:value>
+                                <con2:xpathText>./ctx:reason</con2:xpathText>
+                            </con3:value>
+                        </con3:labels>
+                        <con3:labels>
+                            <con3:key>uuid</con3:key>
+                            <con3:varName>body</con3:varName>
+                            <con3:value>
+                                <con2:xpathText>.//GeneralInfo/GlobalId</con2:xpathText>
+                            </con3:value>
+                        </con3:labels>
+                    </con3:report>
+                    <con3:report>
+                        <con2:id>_ActionId-a000204.N38efe8e8.0.189b7667745.N7c46</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>$fault</con2:xqueryText>
+                        </con3:expr>
+                        <con3:labels>
+                            <con3:key>code</con3:key>
+                            <con3:varName>fault</con3:varName>
+                            <con3:value>
+                                <con2:xpathText>./ctx:errorCode</con2:xpathText>
+                            </con3:value>
+                        </con3:labels>
+                        <con3:labels>
+                            <con3:key>reason</con3:key>
+                            <con3:varName>fault</con3:varName>
+                            <con3:value>
+                                <con2:xpathText>./ctx:reason</con2:xpathText>
+                            </con3:value>
+                        </con3:labels>
+                        <con3:labels>
+                            <con3:key>uuid</con3:key>
+                            <con3:varName>body</con3:varName>
+                            <con3:value>
+                                <con2:xpathText>.//GeneralInfo/GlobalId</con2:xpathText>
+                            </con3:value>
+                        </con3:labels>
+                    </con3:report>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-N53e8b9bd.N415bf377.0.18c6e895745.N7fc3" name="GetCustomError">
+                <con:context>
+                    <con1:userNsDecl prefix="con1" namespace="http://www.bea.com/wli/sb/stages/transform/config"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-N53e8b9bd.N415bf377.0.18c6e895745.N7fc0</con1:id>
+                        <con2:service ref="SBRG_MassivePayment_Commons/BS/GetCustomErrorByStackTraceRegionalRestBS" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>process</con2:operation>
+                        <con2:request>
+                            <con2:body wrapped="false">requestError</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body wrapped="false">responseError</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:replace varName="requestError">
+                                <con1:id>_ActionId-N53e8b9bd.N415bf377.0.18c6e895745.N7fbd</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="SBRG_MassivePayment_Commons/Transformations/ServicesToError"/>
+                                        <con1:param name="systemApplication">
+                                            <con1:path>'OSB'</con1:path>
+                                        </con1:param>
+                                        <con1:param name="service">
+                                            <con1:path>'GENERAL'</con1:path>
+                                        </con1:param>
+                                        <con1:param name="errorMessage">
+                                            <con1:path>data($fault/ctx:reason)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="errorCode">
+                                            <con1:path>if (data($fault/ctx:details/con1:ErrorResponseDetail/con1:http-response-code) = '401') then
+    'UNAUTHORIZED'
+else
+    'ERROR'</con1:path>
+                                        </con1:param>
+                                        <con1:param name="language">
+                                            <con1:path>'es'</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-a000204.N38efe8e8.0.189b7667745.N7b39" name="StageTranform">
+                <con:context>
+                    <con1:userNsDecl prefix="aut" namespace="http://www.ficohsa.com.hn/middleware.services/autType"/>
+                    <con1:userNsDecl prefix="ns1" namespace="https://www.ficohsa.com/regional/constants"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-a000204.N38efe8e8.0.189b7667745.N7b38</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+    <messageId>{fn:data($responseError/ns1:error)}</messageId>
+    <successIndicator>Error</successIndicator>
+    <messages>{fn:data($responseError/ns1:description)}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-a000204.N38efe8e8.0.189b7667745.N7b37</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>""</con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-a000204.N38efe8e8.0.189b7667745.N7a5d" name="StageReply" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/logging/config">
+                <con:context/>
+                <con:actions>
+                    <con2:reply>
+                        <con2:id>_ActionId-a000204.N38efe8e8.0.189b7667745.N7a5c</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="Pipeline Pair Node1">
+                <con:request>request-N53e8047d.704934bd.0.189aebad98c.N7510</con:request>
+                <con:response>response-N53e8047d.704934bd.0.189aebad98c.N750f</con:response>
+            </con:pipeline-node>
+        </con:flow>
+        <con:shared-variables>
+            <con:variable>requestService</con:variable>
+            <con:variable>responseService</con:variable>
+            <con:variable>AuthenticationHeader</con:variable>
+            <con:variable>sourceBank</con:variable>
+            <con:variable>destinationBank</con:variable>
+            <con:variable>userName</con:variable>
+            <con:variable>requestError</con:variable>
+            <con:variable>responseError</con:variable>
+        </con:shared-variables>
+    </con:router>
+</con:templateEntry>

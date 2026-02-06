@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/SolicitudTarjetaDebitoRelieve/wsdl/solicitudTarjetaDebitoRelievePS"/>
+            <con:binding>
+                <con:name>solicitudTarjetaDebitoRelievePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/solicitudTarjetaDebitoRelieve/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con2:router errorHandler="_onErrorHandler-7154017698575798026-37701765.16b28028612.-7baf" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+        <con:pipeline type="request" name="HN01_SolicitudTarjetaDebitoRelieve_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con2="http://www.bea.com/wli/sb/stages/config"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/solicitudTarjetaDebitoRelieveTypes" prefix="sol" xmlns:con2="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-1465101999325085688--7609d513.16c4403cc0e.-5276</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/tarjetasDebito/Resources/tarjetasDebitoBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>ConsultaSecuenciaTDconRelieve</con1:operation>
+                        <con1:request>
+                            <con1:body>reqConsultaSecuenciaTDconRelieve</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>rspConsultaSecuenciaTDconRelieve</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="reqConsultaSecuenciaTDconRelieve">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-1465101999325085688--7609d513.16c4403cc0e.-5207</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="Middleware/v2/Resources/SolicitudTarjetaDebitoRelieve/xq/consultaSecuenciaTDconRelieveIn"/>
+                                        <con2:param name="requestHeader">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                        <con2:param name="solicitudTarjetaDebitoRelieve">
+                                            <con2:path>$body/sol:solicitudTarjetaDebitoRelieve</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="newSequency">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-1465101999325085688--7609d513.16c4403cc0e.-51cf</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if (fn:string-length(data($rspConsultaSecuenciaTDconRelieve/WSFICOHNDEBITCARDCOUNTType/NEXTSECUENCIA/text())) &lt; 2)
+then
+   ( concat('0', fn:string(data($rspConsultaSecuenciaTDconRelieve/WSFICOHNDEBITCARDCOUNTType/NEXTSECUENCIA/text()))))
+else
+   (fn:string(data($rspConsultaSecuenciaTDconRelieve/WSFICOHNDEBITCARDCOUNTType/NEXTSECUENCIA/text())))</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-1465101999325085688--7609d513.16c4403cc0e.-51b2</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if (fn:string($rspConsultaSecuenciaTDconRelieve/Status/text()) = 'Success')
+then (
+	if (empty($rspConsultaSecuenciaTDconRelieve/WSFICOHNDEBITCARDCOUNTType/ZERORECORD/text()))
+	then ('')
+	else ('No se encontro registros')
+)
+else( fn:string($rspConsultaSecuenciaTDconRelieve/Status/messages/text()))</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con1:ifThenElse>
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8277481586973226072--3bdfb0ce.16c4fafd36a.-7fc4</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8277481586973226072--3bdfb0ce.16c4fafd36a.-7fc0</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/tarjetasDebito/Resources/tarjetasDebitoBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>SolicituddeTDconRelieve</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQSolicitudTarjetaDebitoRelieve</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPSolicitudTarjetaDebitoRelieve</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQSolicitudTarjetaDebitoRelieve">
+                                            <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-8277481586973226072--3bdfb0ce.16c4fafd36a.-7fc1</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                    <con2:resource ref="Middleware/v2/Resources/SolicitudTarjetaDebitoRelieve/xq/solicitudTarjetaDebitoRelieveIn"/>
+                                                    <con2:param name="requestHeader">
+                                                        <con2:path>$header/aut:RequestHeader</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="newSequency">
+                                                        <con2:path>$newSequency</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="solicitudTarjetaDebitoRelieve">
+                                                        <con2:path>$body/sol:solicitudTarjetaDebitoRelieve</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform/>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="HN01_SolicitudTarjetaDebitoRelieve_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/solicitudTarjetaDebitoRelieveTypes" prefix="sol" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace contents-only="true" varName="header">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7154017698575798026-37701765.16b28028612.-7bdc</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="Middleware/v2/Resources/SolicitudTarjetaDebitoRelieve/xq/solicitudTarjetaDebitoRelieveHeaderOut"/>
+                                <con2:param name="solicituddeTDconRelieveResponse">
+                                    <con2:path>$RSPSolicitudTarjetaDebitoRelieve</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7154017698575798026-37701765.16b28028612.-7bb0</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">&lt;sol:solicitudTarjetaDebitoRelieveResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-7154017698575798026-37701765.16b28028612.-7baf" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/solicitudTarjetaDebitoRelieveTypes" prefix="sol" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="errorCode">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7154017698575798026-37701765.16b28028612.-7b97</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="errorMessage">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7154017698575798026-37701765.16b28028612.-7b77</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($fault/ctx:reason/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:replace contents-only="true" varName="header">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7154017698575798026-37701765.16b28028612.-7b4a</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $errorMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-7154017698575798026-37701765.16b28028612.-7b2d</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">&lt;sol:solicitudTarjetaDebitoRelieveResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:reply xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+                        <con1:id>_ActionId-7154017698575798026-37701765.16b28028612.-7b0f</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:pipeline-node name="HN01_SolicitudTarjetaDebitoRelieve">
+                <con:request>HN01_SolicitudTarjetaDebitoRelieve_request</con:request>
+                <con:response>HN01_SolicitudTarjetaDebitoRelieve_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con2:router>
+</con:pipelineEntry>

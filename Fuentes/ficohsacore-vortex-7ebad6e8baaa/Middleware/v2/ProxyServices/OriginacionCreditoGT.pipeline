@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/OriginacionCredito/wsdl/originacionCreditoPS"/>
+            <con:binding>
+                <con:name>originancionCreditoPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/originacionCreditoPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-7768192783228854291-353eaae6.198962a34dd.-7dc0" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="error" name="_onErrorHandler-7768192783228854291-353eaae6.198962a34dd.-7dc0">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/originacionCreditoTypes" prefix="orig"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace contents-only="true" varName="header">
+                        <con2:id>_ActionId-7768192783228854291-353eaae6.198962a34dd.-7da7</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader> 
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace contents-only="true" varName="body">
+                        <con2:id>_ActionId-7768192783228854291-353eaae6.198962a34dd.-7d92</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;orig:originacionCreditoResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-7768192783228854291-353eaae6.198962a34dd.-7d87</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="GT01_OriginacionCredito_request">
+            <con:stage name="ConsultaListasCliente">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/originacionCreditoTypes" prefix="orig"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7f80</con2:id>
+                        <con1:service ref="Middleware/v2/ProxyServices/ConsultaListasClienteGT" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>consultaListasCliente</con1:operation>
+                        <con1:request>
+                            <con1:body>REQconsultaListasCliente</con1:body>
+                            <con1:header>REQHeaderconsultaListasCliente</con1:header>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPconsultaListasCliente</con1:body>
+                            <con1:header>RSPHeaderconsultaListasCliente</con1:header>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQHeaderconsultaListasCliente">
+                                <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7f5b</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>$header</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="REQconsultaListasCliente">
+                                <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7f39</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/OriginacionCreditoGT/xq/consultaListasClienteIn"/>
+                                        <con2:param name="legalId">
+                                            <con2:path>fn:data($body/orig:originacionCreditoRequest/CLIENT_ID)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform/>
+                    </con1:wsCallout>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-8579684745595027725--4f284c30.198b3ab2d3b.-7fbf</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/CreditOrigination/ProcessCustomerListXML/biz/processCustomerListXML_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>processCustomerListXML</con1:operation>
+                        <con1:request>
+                            <con1:body>REQprocessCustomerListXML</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPprocessCustomerListXML</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQprocessCustomerListXML">
+                                <con2:id>_ActionId-8579684745595027725--4f284c30.198b3ab2d3b.-7fa5</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/OriginacionCreditoGT/xq/processCustomerListXMLIn"/>
+                                        <con2:param name="consultaListasClienteResponse">
+                                            <con2:path>$RSPconsultaListasCliente</con2:path>
+                                        </con2:param>
+                                        <con2:param name="caseId">
+                                            <con2:path>fn:data($body/orig:originacionCreditoRequest/CASE_ID)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="message">
+                                            <con2:path>fn:string($RSPHeaderconsultaListasCliente/aut:ResponseHeader/messages/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>fn:data($RSPHeaderconsultaListasCliente/aut:ResponseHeader/successIndicator)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform/>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaConsilidadaRiesgoCliente">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/originacionCreditoTypes" prefix="orig"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7f21</con2:id>
+                        <con1:service ref="Middleware/v2/ProxyServices/ConsultaConsolidadaRiesgoClienteGT" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>consultaConsolidadaRiesgoCliente</con1:operation>
+                        <con1:request>
+                            <con1:body>REQconsultaConsolidadaRiesgoCliente</con1:body>
+                            <con1:header>REQHeaderconsultaConsolidadaRiesgoCliente</con1:header>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPconsultaConsolidadaRiesgoCliente</con1:body>
+                            <con1:header>RSPHeaderconsultaConsolidadaRiesgoCliente</con1:header>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQHeaderconsultaConsolidadaRiesgoCliente">
+                                <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7f07</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>$header</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="REQconsultaConsolidadaRiesgoCliente">
+                                <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7ed4</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/OriginacionCreditoGT/xq/consultaConsolidadaRiesgoClienteIn"/>
+                                        <con2:param name="originacionCreditoRequest">
+                                            <con2:path>$body/orig:originacionCreditoRequest</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform/>
+                    </con1:wsCallout>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-8579684745595027725--4f284c30.198b3ab2d3b.-7f88</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/CreditOrigination/ProcessCustomerRiskXML/biz/processCustomerRiskXML_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>processCustomerRiskXML</con1:operation>
+                        <con1:request>
+                            <con1:body>REQprocessCustomerRiskXML</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPprocessCustomerRiskXML</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQprocessCustomerRiskXML">
+                                <con2:id>_ActionId-1309292765515841355-17926f8f.198c7c99c13.-7fdb</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/OriginacionCreditoGT/xq/processCustomerRiskXMLIn"/>
+                                        <con2:param name="caseId">
+                                            <con2:path>fn:data($body/orig:originacionCreditoRequest/CASE_ID)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="message">
+                                            <con2:path>fn:string($RSPHeaderconsultaConsolidadaRiesgoCliente/aut:ResponseHeader/messages/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="consultaConsolidadaRiesgoClienteResponse">
+                                            <con2:path>$RSPconsultaConsolidadaRiesgoCliente</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>fn:data($RSPHeaderconsultaConsolidadaRiesgoCliente/aut:ResponseHeader/successIndicator)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform/>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaOfertaCreditoConsumo">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/originacionCreditoTypes" prefix="orig"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7ebb</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>fn:upper-case(fn:data($RSPHeaderconsultaConsolidadaRiesgoCliente/aut:ResponseHeader/successIndicator)) = "SUCCESS"</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7e9a</con2:id>
+                                    <con1:service ref="Middleware/v2/ProxyServices/ConsultaOfertaCreditoConsumoGT" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>consultaOfertaCreditoConsumo</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQconsultaOfertaCreditoConsumo</con1:body>
+                                        <con1:header>REQHeaderconsultaOfertaCreditoConsumo</con1:header>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPconsultaOfertaCreditoConsumo</con1:body>
+                                        <con1:header>RSPHeaderconsultaOfertaCreditoConsumo</con1:header>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQHeaderconsultaOfertaCreditoConsumo">
+                                            <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7e7a</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>$header</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="REQconsultaOfertaCreditoConsumo">
+                                            <con2:id>_ActionId-8480069156029296822-641d4fb8.198aead256e.-7e63</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/OriginacionCreditoGT/xq/consultaOfertaCreditoConsumoIn"/>
+                                                    <con2:param name="originacionCreditoRequest">
+                                                        <con2:path>$body/orig:originacionCreditoRequest</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="consultaConsolidadaRiesgoClienteResponse">
+                                                        <con2:path>$RSPconsultaConsolidadaRiesgoCliente</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform/>
+                                </con1:wsCallout>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-1309292765515841355-17926f8f.198c7c99c13.-28a6</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/CreditOrigination/ProcessCustomerOfferXML/biz/processCustomerOfferXML_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>processCustomerOfferXML</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQprocessCustomerOfferXML</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPprocessCustomerOfferXML</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQprocessCustomerOfferXML">
+                                            <con2:id>_ActionId-1309292765515841355-17926f8f.198c7c99c13.-2887</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/OriginacionCreditoGT/xq/processCustomerOfferXMLIn"/>
+                                                    <con2:param name="message">
+                                                        <con2:path>fn:string($RSPHeaderconsultaOfertaCreditoConsumo/aut:ResponseHeader/messages/text())</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="consultaOfertaCreditoConsumoResponse">
+                                                        <con2:path>$RSPconsultaOfertaCreditoConsumo</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="successIndicator">
+                                                        <con2:path>fn:data($RSPHeaderconsultaOfertaCreditoConsumo/aut:ResponseHeader/successIndicator)</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform/>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GT01_OriginacionCredito_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/originacionCreditoTypes" prefix="orig"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-1315980818093412609--2df3f7e.198d24652db.-7fe7</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>fn:exists($RSPconsultaListasCliente) and fn:not(fn:empty($RSPconsultaListasCliente)) and fn:upper-case(fn:data($RSPHeaderconsultaListasCliente/aut:ResponseHeader/successIndicator)) = 'SUCCESS' and fn:exists($RSPconsultaConsolidadaRiesgoCliente) and fn:not(fn:empty($RSPconsultaConsolidadaRiesgoCliente)) and fn:upper-case(fn:data($RSPHeaderconsultaConsolidadaRiesgoCliente/aut:ResponseHeader/successIndicator)) = 'SUCCESS' and fn:exists($RSPconsultaOfertaCreditoConsumo) and fn:not(fn:empty($RSPconsultaOfertaCreditoConsumo)) and fn:upper-case(fn:data($RSPHeaderconsultaOfertaCreditoConsumo/aut:ResponseHeader/successIndicator)) = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="header">
+                                    <con2:id>_ActionId-1315980818093412609--2df3f7e.198d24652db.-7fe5</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText>&lt;aut:ResponseHeader> 
+  &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con2:id>_ActionId-9097734071592763651--3265e855.198d9207888.-7fe5</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/OriginacionCreditoGT/xq/originacionCreditoGTOut"/>
+                                            <con2:param name="consultaListasClienteResponse">
+                                                <con2:path>$RSPconsultaListasCliente</con2:path>
+                                            </con2:param>
+                                            <con2:param name="consultaOfertaCreditoConsumoResponse">
+                                                <con2:path>$RSPconsultaOfertaCreditoConsumo</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="header">
+                                <con2:id>_ActionId-1315980818093412609--2df3f7e.198d24652db.-7fb7</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+{
+	if (fn:not(fn:upper-case(fn:data($RSPHeaderconsultaListasCliente/aut:ResponseHeader/successIndicator)) = 'SUCCESS')) then (
+		<successIndicator>{ fn:data($RSPHeaderconsultaListasCliente/aut:ResponseHeader/successIndicator) }</successIndicator>,
+		<messages>{ fn:data($RSPHeaderconsultaListasCliente/aut:ResponseHeader/messages) }</messages>
+	) else if (fn:not(fn:upper-case(fn:data($RSPHeaderconsultaConsolidadaRiesgoCliente/aut:ResponseHeader/successIndicator)) = 'SUCCESS')) then (
+		<successIndicator>{ fn:data($RSPHeaderconsultaConsolidadaRiesgoCliente/aut:ResponseHeader/successIndicator) }</successIndicator>,
+		<messages>{ fn:data($RSPHeaderconsultaConsolidadaRiesgoCliente/aut:ResponseHeader/messages) }</messages>
+	) else (
+		<successIndicator>{ fn:data($RSPHeaderconsultaOfertaCreditoConsumo/aut:ResponseHeader/successIndicator) }</successIndicator>,
+		<messages>{ fn:data($RSPHeaderconsultaOfertaCreditoConsumo/aut:ResponseHeader/messages) }</messages>
+	)
+}
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id>_ActionId-1315980818093412609--2df3f7e.198d24652db.-7f9f</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>&lt;orig:originacionCreditoResponse/></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="GT01_OriginacionCredito">
+                <con:request>GT01_OriginacionCredito_request</con:request>
+                <con:response>GT01_OriginacionCredito_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

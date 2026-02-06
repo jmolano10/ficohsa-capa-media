@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaLotesCliente/wsdl/consultaLotesClientePS"/>
+            <con:binding>
+                <con:name>consultaLotesClientePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/pagosMasivosPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8435082887423668043--5b77dac4.179c9b36585.-4176" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="error" name="_onErrorHandler-8435082887423668043--5b77dac4.179c9b36585.-4176">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-8435082887423668043--5b77dac4.179c9b36585.-4166</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-8435082887423668043--5b77dac4.179c9b36585.-4154</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;pag:consultaLotesClienteResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-8435082887423668043--5b77dac4.179c9b36585.-4147</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="NI01_ConsultaLotesCliente_request">
+            <con:stage name="ValidaAccesosPagosMasivos">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-8435082887423668043--5b77dac4.179c9b36585.-4133</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MTR/validaAccesoPMS/biz/validaAccesoPMS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>validaAccesoPMS</con1:operation>
+                        <con1:request>
+                            <con1:body>REQValidaAccesoPMS</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPValidaAccesoPMS</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQValidaAccesoPMS">
+                                <con2:id>_ActionId-8435082887423668043--5b77dac4.179c9b36585.-411c</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/PagosMasivos/xq/validarAccesoPMSRGIn"/>
+                                        <con2:param name="customerId">
+                                            <con2:path>string($body/pag:consultaLotesCliente/CUSTOMER_ID/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="userName">
+                                            <con2:path>string($header/aut:RequestHeader/Authentication/UserName/text())</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-8435082887423668043--5b77dac4.179c9b36585.-410e</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if(string($RSPValidaAccesoPMS/status/text()) = '00000')then(
+	'SUCCESS'
+)else('ERROR')</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-8435082887423668043--5b77dac4.179c9b36585.-40ff</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPValidaAccesoPMS/message/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaLotesCliente">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7ff3</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$errorCode = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="countryCode">
+                                    <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7fe2</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                            <con2:param name="sentidoConversion">
+                                                <con2:path>'OSB-ISO2'</con2:path>
+                                            </con2:param>
+                                            <con2:param name="codigoPais">
+                                                <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7fc8</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MTR/consultorLotesCliente/biz/consultorLotesCliente" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>customerBatchQuery</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQCustomerBatchQuery</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPCustomerBatchQuery</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQCustomerBatchQuery">
+                                            <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7fb9</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/ConsultaLotesCliente/xq/consultaLotesClienteRGIn"/>
+                                                    <con2:param name="consultaLotesCliente">
+                                                        <con2:path>$body/pag:consultaLotesCliente</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="countryCode">
+                                                        <con2:path>$countryCode</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7fa9</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPCustomerBatchQuery/status/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7f97</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPCustomerBatchQuery/message/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="NI01_ConsultaLotesCliente_response">
+            <con:stage name="FlujodeSalida">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7f88</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7f77</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace varName="body" contents-only="true">
+                                    <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7f5b</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/ConsultaLotesCliente/xq/consultaLotesClienteNIOut"/>
+                                            <con2:param name="consultaLotesCliente">
+                                                <con2:path>$body/pag:consultaLotesCliente</con2:path>
+                                            </con2:param>
+                                            <con2:param name="customerBatchQueryResponse">
+                                                <con2:path>$RSPCustomerBatchQuery</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id>_ActionId-3957838261349582498--42680560.179e7ca0ea7.-7f4c</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>&lt;pag:consultaLotesClienteResponse/></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="NI01_ConsultaLotesCliente">
+                <con:request>NI01_ConsultaLotesCliente_request</con:request>
+                <con:response>NI01_ConsultaLotesCliente_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

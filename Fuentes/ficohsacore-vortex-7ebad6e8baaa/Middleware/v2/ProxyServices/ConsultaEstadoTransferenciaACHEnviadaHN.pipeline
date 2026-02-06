@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaEstadoTransferenciaACHEnviada/wsdl/consultaEstadoTransferenciaACHEnviadaPS"/>
+            <con:binding>
+                <con:name>consultaEstadoTransferenciaACHEnviadaPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaEstadoTransferenciaACHEnviadaPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8592896901985548259--2a276dd8.17c5b5c3b2a.-7b22" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="ConsultaEstadoTransferenciaACHEnviada_request">
+            <con:stage name="ConsultaEstadoTransferencia">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoTransferenciaACHEnviadaTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaEstado" prefix="con1"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-8592896901985548259--2a276dd8.17c5b5c3b2a.-77f4</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ACH/Enviado/consultaEstado/biz/consultaEstado_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>consultaEstado</con2:operation>
+                        <con2:request>
+                            <con2:body>REQconsultaEstado</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPconsultaEstado</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQconsultaEstado">
+                                <con1:id>_ActionId-8592896901985548259--2a276dd8.17c5b5c3b2a.-77d1</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ConsultaEstadoTransferenciaACHEnviada/xq/consultaEstadoIn"/>
+                                        <con1:param name="consultaEstadoTransferenciaACHEnviada">
+                                            <con1:path>$body/con:consultaEstadoTransferenciaACHEnviada</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="statusDB">
+                                <con1:id>_ActionId-8592896901985548259--2a276dd8.17c5b5c3b2a.-77b7</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPconsultaEstado/con1:PV_SUCCESSINDICATOR/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-6a64</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPconsultaEstado/con1:PV_MESSAGES/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="consultaEstadoPaySett " errorHandler="_onErrorHandler-4857831329841060576-65ab13c6.18173acbec5.3ba3">
+                <con:context>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaEstado" prefix="con"/>
+                    <con1:varNsDecl namespace="http://tempuri.org/" prefix="tem"/>
+                    <con1:varNsDecl namespace="http://schemas.datacontract.org/2004/07/WcfACHOnline" prefix="wcf"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-6c86</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case($statusDB) = "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="txnRef">
+                                    <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-2da9</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>fn:string($RSPconsultaEstado/con:PV_PXP_ID_TXN_REF/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="currency">
+                                    <con1:id>_ActionId-684847358479001798-38ca34f4.18414f05e42.-7fc3</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>fn:string($RSPconsultaEstado/con:PV_MONEDA_BEN/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-6bf9</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$currency = "USD"</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-6bc1</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/PYST/envioTransfACH/biz/envioTransfACH" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>GetStatusReportUSD</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQgetStatusReportUSD</con2:body>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPgetStatusReportUSD</con2:body>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQgetStatusReportUSD">
+                                                        <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-6b4e</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/PYST/xq/getStatusReportUSDIn"/>
+                                                                <con1:param name="searchCriteria">
+                                                                    <con1:path>"MESSAGEID"</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="searchValue">
+                                                                    <con1:path>$txnRef</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con2:assign varName="status">
+                                                        <con1:id>_ActionId-6976471350567779014-24528a9c.18347ce8365.16cb</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>let $status := fn:upper-case(fn:string($RSPgetStatusReportUSD/tem:GetStatusReportUSDResult/wcf:ItemDetails/wcf:ResponseItemDetails/wcf:Status/text()))
+return(
+	if($status = "SUCCESS" or  $status = "SETTLED" or  $status = "PENDING")then(
+		$status
+	)else(
+		"ERROR"
+	)
+)</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="errorMns">
+                                                        <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-6ac1</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>fn:string($RSPgetStatusReportUSD/tem:GetStatusReportUSDResult/wcf:ItemDetails/wcf:ResponseItemDetails[1]/wcf:Results/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default>
+                                        <con2:wsCallout>
+                                            <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-6b89</con1:id>
+                                            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/PYST/envioTransfACH/biz/envioTransfACH" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                            <con2:operation>GetStatusReportHNL</con2:operation>
+                                            <con2:request>
+                                                <con2:body>REQgetStatusReportHNL</con2:body>
+                                            </con2:request>
+                                            <con2:response>
+                                                <con2:body>RSPgetStatusReportHNL</con2:body>
+                                            </con2:response>
+                                            <con2:requestTransform>
+                                                <con2:assign varName="REQgetStatusReportHNL">
+                                                    <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-2d6c</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryTransform>
+                                                            <con1:resource ref="Middleware/v2/Resources/PYST/xq/getStatusReportHNLIn"/>
+                                                            <con1:param name="searchCriteria">
+                                                                <con1:path>"MESSAGEID"</con1:path>
+                                                            </con1:param>
+                                                            <con1:param name="searchValue">
+                                                                <con1:path>$txnRef</con1:path>
+                                                            </con1:param>
+                                                        </con1:xqueryTransform>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:requestTransform>
+                                            <con2:responseTransform>
+                                                <con2:assign varName="status">
+                                                    <con1:id>_ActionId-6976471350567779014-24528a9c.18347ce8365.16cd</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>let $status := fn:upper-case(fn:string($RSPgetStatusReportHNL/tem:GetStatusReportHNLResult/wcf:ItemDetails/wcf:ResponseItemDetails/wcf:Status/text()))
+return(
+	if($status = "SUCCESS" or  $status = "SETTLED" or  $status = "PENDING")then(
+		$status
+	)else(
+		"ERROR"
+	)
+)</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:assign varName="errorMns">
+                                                    <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-6a6c</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>fn:string($RSPgetStatusReportHNL/tem:GetStatusReportHNLResult/wcf:ItemDetails/wcf:ResponseItemDetails[1]/wcf:Results/text())</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:responseTransform>
+                                        </con2:wsCallout>
+                                    </con2:default>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaEstadoT24" errorHandler="_onErrorHandler-504511480168886616-31242481.180fd1f7444.-646c">
+                <con:context>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaEstado" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-6532</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$status = "SUCCESS" or $status = "SETTLED"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-64fa</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ACH/Enviado/SvcACHConsultas/biz/svcACHConsultas" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>ConsultatxnreprocesoACHEnviadas</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQconsultatxnreprocesoACHEnviadas</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPconsultatxnreprocesoACHEnviadas</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQconsultatxnreprocesoACHEnviadas">
+                                            <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-64c2</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ReprocesoACHEnviadasCR/xq/consultaTxnReprocesoACHEnviadasIn"/>
+                                                    <con1:param name="requestHeader">
+                                                        <con1:path>$header/aut:RequestHeader</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="transactionId">
+                                                        <con1:path>fn:string($RSPconsultaEstado/con:PV_REF_CONTROL_T24/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="status">
+                                            <con1:id>_ActionId-6976471350567779014-24528a9c.18347ce8365.16ec</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>let $getStatus := fn:upper-case(fn:string($RSPconsultatxnreprocesoACHEnviadas/WSACHOUTGOINGREPROCESSType/gWSACHOUTGOINGREPROCESSDetailType/mWSACHOUTGOINGREPROCESSDetailType/TXNSTATUS/text()))
+return(
+	if($getStatus = "SUCCESS")then(
+		$getStatus
+	)else(
+		"PENDING"
+	)
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaEstadoTransferenciaACHEnviada_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoTransferenciaACHEnviadaTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+                    <con1:varNsDecl namespace="http://tempuri.org/" prefix="tem"/>
+                    <con1:varNsDecl namespace="http://schemas.datacontract.org/2004/07/WcfACHOnline" prefix="wcf"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-5a9b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+{
+	if(fn:upper-case($statusDB) != "ERROR")then(
+		<successIndicator>Success</successIndicator>
+	)else(
+		<successIndicator>ERROR</successIndicator>,
+		<messages>{$validationMessage}</messages>						
+	)
+}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8592896901985548259--2a276dd8.17c5b5c3b2a.-7761</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case($statusDB) != "ERROR"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-4857831329841060576-65ab13c6.18173acbec5.3aa1</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaEstadoTransferenciaACHEnviada/xq/consultaEstadoTransferenciaACHEnviadaOut"/>
+                                            <con1:param name="refTransT24">
+                                                <con1:path>fn:string($RSPconsultatxnreprocesoACHEnviadas/WSACHOUTGOINGREPROCESSType/gWSACHOUTGOINGREPROCESSDetailType/mWSACHOUTGOINGREPROCESSDetailType/IDTXNT24/text())</con1:path>
+                                            </con1:param>
+                                            <con1:param name="errorMns">
+                                                <con1:path>if(fn:upper-case($status) = "ERROR")then(
+	$errorMns
+)else(
+	""
+)</con1:path>
+                                            </con1:param>
+                                            <con1:param name="secuenceId">
+                                                <con1:path>fn:string($body/con:consultaEstadoTransferenciaACHEnviada/SEQUENCE_ID/text())</con1:path>
+                                            </con1:param>
+                                            <con1:param name="debitAccount">
+                                                <con1:path>fn:string($body/con:consultaEstadoTransferenciaACHEnviada/DEBIT_ACCOUNT/text())</con1:path>
+                                            </con1:param>
+                                            <con1:param name="refControlT24">
+                                                <con1:path>fn:string($RSPconsultaEstado/con:PV_REF_CONTROL_T24/text())</con1:path>
+                                            </con1:param>
+                                            <con1:param name="errorCode">
+                                                <con1:path>let $reasonCodeUSD := fn:string($RSPgetStatusReportUSD/tem:GetStatusReportUSDResult/wcf:ReasonCode/text())
+let $reasonCodeHNL := fn:string($RSPgetStatusReportHNL/tem:GetStatusReportHNLResult/wcf:ReasonCode/text())
+return(
+	if($status = "ERROR")then(
+		if($currency = "USD")then(
+			$reasonCodeUSD
+		)else(
+			$reasonCodeHNL
+		)
+	)else(
+		""
+	)
+)</con1:path>
+                                            </con1:param>
+                                            <con1:param name="statusError">
+                                                <con1:path>$status</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-4857831329841060576-65ab13c6.18173acbec5.3a9f</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con:consultaEstadoTransferenciaACHEnviadaResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-8592896901985548259--2a276dd8.17c5b5c3b2a.-7b22">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEstadoTransferenciaACHEnviadaTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8592896901985548259--2a276dd8.17c5b5c3b2a.-7ace</con3:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>	
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-8592896901985548259--2a276dd8.17c5b5c3b2a.-7aab</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;con:consultaEstadoTransferenciaACHEnviadaResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-8592896901985548259--2a276dd8.17c5b5c3b2a.-7a91</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-504511480168886616-31242481.180fd1f7444.-646c">
+            <con:stage name="ManejadorDeErrorT24">
+                <con:context/>
+                <con:actions>
+                    <con2:assign varName="status">
+                        <con1:id>_ActionId-504511480168886616-31242481.180fd1f7444.-63fe</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>"PENDING"</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-4857831329841060576-65ab13c6.18173acbec5.3ba3">
+            <con:stage name="ManejadorDeErrorPYST">
+                <con:context/>
+                <con:actions>
+                    <con2:assign varName="status">
+                        <con1:id>_ActionId-4857831329841060576-65ab13c6.18173acbec5.3c64</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>"PENDING"</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ConsultaEstadoTransferenciaACHEnviada">
+                <con:request>ConsultaEstadoTransferenciaACHEnviada_request</con:request>
+                <con:response>ConsultaEstadoTransferenciaACHEnviada_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

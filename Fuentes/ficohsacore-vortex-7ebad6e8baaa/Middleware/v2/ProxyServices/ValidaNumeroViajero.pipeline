@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ValidaNumeroViajero/wsdl/validaNumeroViajeroPS"/>
+            <con:binding>
+                <con:name>ValidaNumeroViajeroPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/validaNumeroViajeroPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8264668412821699024--3495a06c.1921c0db67d.-7ff5" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="request" name="ValidaNumeroViajero_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaNumeroViajeroTypes" prefix="ope"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7fce</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/ValidaNumeroViajero/xsd/validaNumeroViajeroTypes"/>
+                        <con2:schemaElement xmlns:val="http://www.ficohsa.com.hn/middleware.services/validaNumeroViajeroTypes">val:validaNumeroViajero</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./ope:validaNumeroViajero</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaNumeroViajeroTypes" prefix="ope"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/validaNumeroViajero" prefix="vnv"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7f85</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaNumeroViajero/biz/validaNumeroViajero_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>validaNumeroViajero</con2:operation>
+                        <con2:request>
+                            <con2:body>REvalidaNumeroViajero</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSvalidaNumeroViajero</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REvalidaNumeroViajero">
+                                <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7f68</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ValidaNumeroViajero/xq/ValidaNumeroViajeroIn"/>
+                                        <con1:param name="validaNumeroViajero1">
+                                            <con1:path>$body/ope:validaNumeroViajero</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7f4e</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSvalidaNumeroViajero/PV_ERROR_CODE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7f3b</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSvalidaNumeroViajero/PV_ERROR_MESAJE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidaNumeroViajero_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaNumeroViajeroTypes" prefix="val"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7f26</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$errorCode = 'SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7f06</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7e94</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ValidaNumeroViajero/xq/ValidaNumeroViajeroOut"/>
+                                            <con1:param name="outputParameters1">
+                                                <con1:path>$RSvalidaNumeroViajero</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace contents-only="true" varName="header">
+                                <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7ef0</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{$errorCode}</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-7386469643758093579-35f12492.1938ff6ad9f.-7fcd</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;val:validaNumeroViajeroResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-8264668412821699024--3495a06c.1921c0db67d.-7ff5">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaNumeroViajeroTypes" prefix="ope"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7fb3</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messageId>{ string($fault/ctx:errorCode/text()) }</messageId>	
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="Body" contents-only="true">
+                        <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7fa0</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ope:validaNumeroViajeroResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-8264668412821699024--3495a06c.1921c0db67d.-7e73</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidaNumeroViajero">
+                <con:request>ValidaNumeroViajero_request</con:request>
+                <con:response>ValidaNumeroViajero_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

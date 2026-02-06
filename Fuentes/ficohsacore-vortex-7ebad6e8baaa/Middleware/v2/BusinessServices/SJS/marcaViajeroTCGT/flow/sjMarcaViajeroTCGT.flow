@@ -1,0 +1,270 @@
+<bpel:process name="sjMarcaViajeroTCGT" targetNamespace="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/marcaViajeroTCGT/flow/sjMarcaViajeroTCGT" bea:name="sjMarcaViajeroTCGT" xmlns:tns="http://www.example.com/flow/Middleware/v2/BusinessServices/SJS/marcaViajeroTCGT/flow/sjMarcaViajeroTCGT" xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable" xmlns:rescon="http://www.bea.com/alsb/flow/resources/config" xmlns:bea="http://www.bea.com/bpel/ui/extensions" xmlns:ext="http://www.bea.com/bpel/extensions" xmlns:expr="http://www.bea.com/wli/sb/stages/config" xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config" xmlns:bind="http://www.ficohsa.com.hn/middleware.services/sjMarcaViajeroTCGTPS" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ns1="http://www.ficohsa.com.hn/middleware.services/sjMarcaViajeroTCGTTypes" xmlns:ns0="http://www.ficohsa.com.hn/middleware.services/consultaDatosTarjetaCreditoPS/" xmlns:cdt="http://www.ficohsa.com.hn/middleware.services/consultaDatosTarjetaCreditoTypes" xmlns:ns2="http://www.ficohsa.com.hn/middleware.services/salesforceMarcaViajeroTCPS" xmlns:aut="http://www.ficohsa.com.hn/middleware.services/autType" xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjMarcaViajeroTCGT" partnerLinkType="tns:sjMarcaViajeroTCGT" myRole="sjMarcaViajeroTCGT">
+	       </bpel:partnerLink>
+	   <bpel:partnerLink name="ConsultaDatosTarjetaCredito" partnerLinkType="tns:ConsultaDatosTarjetaCredito_plnkType" partnerRole="ConsultaDatosTarjetaCredito_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="SalesforceMarcaViajeroTC" partnerLinkType="tns:SalesforceMarcaViajeroTC_plnkType" partnerRole="SalesforceMarcaViajeroTC_PartnerRole">
+	   </bpel:partnerLink></bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="sjMarcaViajeroTC" messageType="bind:sjMarcaViajeroTC">
+	       </bpel:variable>
+	       <bpel:variable name="sjMarcaViajeroTCResponse" messageType="bind:sjMarcaViajeroTCResponse">
+	       </bpel:variable>
+    <bpel:variable name="totalCards" type="xsd:int"/>
+    <bpel:variable name="resultGroup" type="xsd:anyType"/>
+    </bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjMarcaViajeroTCGT" operation="sjMarcaViajeroTCGT" variable="sjMarcaViajeroTC" createInstance="yes">
+	           <rescon:receiveInfo>
+                
+            <rescon:wsdl ref="Middleware/v2/BusinessServices/SJS/marcaViajeroTCGT/wsdl/sjMarcaViajeroTCGTPS" binding="bind:sjMarcaViajeroTCGTPSSOAP"/></rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:assign>
+        	
+        <bpel:extensionAssignOperation>
+		<trf:assign varName="totalCards">
+			<trf:expr>
+				<expr:xqueryText>count($sjMarcaViajeroTC.parameters/CREDIT_CARDS/CREDIT_CARD_INFORMATION)</expr:xqueryText></trf:expr></trf:assign>
+        </bpel:extensionAssignOperation>
+        <bpel:extensionAssignOperation>
+        	<trf:assign varName="resultGroup">
+        		<trf:expr>
+        			<expr:xqueryText>&lt;sjMarcaViajeroTCResponse>
+	&lt;ns1:CREDIT_CARDS/>
+&lt;/sjMarcaViajeroTCResponse></expr:xqueryText></trf:expr></trf:assign>
+        </bpel:extensionAssignOperation></bpel:assign>
+        <bpel:forEach parallel="yes" counterName="typePosition">
+        	<bpel:startCounterValue>1</bpel:startCounterValue>
+        	<bpel:finalCounterValue>$totalCards</bpel:finalCounterValue>
+        	<bpel:scope>
+        		<bpel:variables>
+        			<bpel:variable name="REQconsultaDatosTarjetaCredito" messageType="ns0:consultaDatosTarjetaCreditoRequest">
+        			</bpel:variable>
+        			<bpel:variable name="RSPconsultaDatosTarjetaCredito" messageType="ns0:consultaDatosTarjetaCreditoResponse">
+        			</bpel:variable>
+        			<bpel:variable name="card" type="xsd:string"/>
+        			<bpel:variable name="errorCode" type="xsd:string"/>
+        			<bpel:variable name="sessionId" type="xsd:string"/>
+        			<bpel:variable name="accountNumber" type="xsd:string">
+        			</bpel:variable>
+        			<bpel:variable name="REQsalesforceMarcaViajeroTC" messageType="ns2:salesforceMarcaViajeroTC">
+        			</bpel:variable>
+        			<bpel:variable name="RSPsalesforceMarcaViajeroTC" messageType="ns2:salesforceMarcaViajeroTCResponse">
+        			</bpel:variable>
+        			<bpel:variable name="validationMessage" type="xsd:string">
+        			</bpel:variable>
+        			<bpel:variable name="errorMessage" type="xsd:string">
+        			</bpel:variable></bpel:variables>
+        		<bpel:faultHandlers>
+        			<bpel:catchAll ext:soapFaultVariable="soapFault">
+        				<bpel:sequence>
+        					<bpel:empty/>
+        				<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="errorCode">
+				<trf:expr>
+					<expr:xqueryText>if(fn:string($soapFault/soap:Fault/soap:Code/text())!= '')then(
+	fn:string($soapFault/soap:Fault/soap:Code/text())
+)else(
+	"ERROR"
+)</expr:xqueryText></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+        				<bpel:extensionAssignOperation>
+		<trf:assign varName="errorMessage">
+			<trf:expr>
+				<expr:xqueryText>if(fn:string($soapFault/soap:Fault/soap:Reason/text()) != '')then(
+	fn:string($soapFault/soap:Fault/soap:Reason/text())
+)else(
+	"Ha ocurrido un Error"
+)</expr:xqueryText></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        				<bpel:extensionAssignOperation>
+        					<trf:insert varName="resultGroup">
+        						<trf:location>
+        							<expr:xpathText>./ns1:CREDIT_CARDS</expr:xpathText></trf:location>
+        						<trf:where>last-child</trf:where>
+        					<trf:expr>
+        						<expr:xqueryText><![CDATA[<CREDIT_CARD_INFORMATION>
+	<INDEX>{$typePosition}</INDEX>
+	<CREDIT_CARD_NUMBER>{$card}</CREDIT_CARD_NUMBER>
+	<MESSAGES_ID>-1</MESSAGES_ID>
+    <SUCCESS_INDICATOR>{$errorCode}</SUCCESS_INDICATOR>
+    <MESSAGES>{$errorMessage}</MESSAGES>
+</CREDIT_CARD_INFORMATION>]]></expr:xqueryText></trf:expr></trf:insert>
+        				</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        			</bpel:catchAll></bpel:faultHandlers>
+        		<bpel:sequence>
+        			<bpel:assign>
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="card">
+        						<trf:expr>
+        							<expr:xqueryText>string($sjMarcaViajeroTC.parameters/CREDIT_CARDS/CREDIT_CARD_INFORMATION[xs:integer($typePosition)]/CREDIT_CARD_NUMBER/text())</expr:xqueryText></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        			<bpel:extensionAssignOperation>
+		<trf:assign varName="REQconsultaDatosTarjetaCredito.RequestHeader">
+			<trf:expr>
+				<expr:xqueryText>$sjMarcaViajeroTC.RequestHeader</expr:xqueryText></trf:expr></trf:assign>
+        			</bpel:extensionAssignOperation>
+        			<bpel:extensionAssignOperation>
+        				<trf:assign varName="REQconsultaDatosTarjetaCredito.parameters">
+        					<trf:expr>
+        						<expr:xqueryTransform>
+        							<expr:resource ref="Middleware/v2/BusinessServices/SJS/marcaViajeroTCGT/xq/consultaDatosTarjetaCreditoGTIn"/>
+        							<expr:param name="card">
+        								<expr:path>$card</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+        			</bpel:extensionAssignOperation></bpel:assign>
+        			<bpel:invoke operation="consultaDatosTarjetaCredito" partnerLink="ConsultaDatosTarjetaCredito" inputVariable="REQconsultaDatosTarjetaCredito" outputVariable="RSPconsultaDatosTarjetaCredito" bea:name="CallProxyConsultaDatosTC">
+        				<rescon:invokeInfo><rescon:service ref="Middleware/v2/ProxyServices/ConsultaDatosTarjetaCredito" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/></rescon:invokeInfo></bpel:invoke>
+        			<bpel:assign>
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="errorCode">
+        						<trf:expr>
+        							<expr:xqueryText>upper-case(string($RSPconsultaDatosTarjetaCredito.ResponseHeader/successIndicator/text()))</expr:xqueryText></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        			</bpel:assign>
+        			<bpel:if>
+        				<bpel:condition>$errorCode = 'SUCCESS'</bpel:condition>
+        				<bpel:sequence>
+        					<bpel:empty/>
+        				<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="sessionId">
+				<trf:expr>
+					<expr:xqueryText>string($sjMarcaViajeroTC.parameters/SALESFORCE_INFO/SESION_ID/text())</expr:xqueryText></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+        				<bpel:extensionAssignOperation>
+		<trf:assign varName="accountNumber">
+			<trf:expr>
+				<expr:xqueryText>string($RSPconsultaDatosTarjetaCredito.result/cdt:consultaDatosTarjetaCreditoResponseType/cdt:consultaDatosTarjetaCreditoResponseRecordType/ACCOUNT_NUMBER/text())</expr:xqueryText></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="REQsalesforceMarcaViajeroTC.RequestHeader">
+        						<trf:expr>
+        							<expr:xqueryText>$sjMarcaViajeroTC.RequestHeader</expr:xqueryText></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation>
+        				<bpel:extensionAssignOperation>
+        					<trf:assign varName="REQsalesforceMarcaViajeroTC.parameters">
+        						<trf:expr>
+        							<expr:xqueryTransform>
+        								<expr:resource ref="Middleware/v2/BusinessServices/SJS/marcaViajeroTCGT/xq/salesforceMarcaViajeroTCIn"/>
+        								
+        								
+        								
+        								<expr:param name="sjMarcaViajeroTC">
+        									<expr:path>$sjMarcaViajeroTC.parameters</expr:path></expr:param>
+        								<expr:param name="consultaDatosTarjetaCreditoResponse1">
+        									<expr:path>$RSPconsultaDatosTarjetaCredito.result</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign>
+        				</bpel:extensionAssignOperation></bpel:assign>
+        				<bpel:invoke operation="salesforceMarcaViajeroTC" partnerLink="SalesforceMarcaViajeroTC" inputVariable="REQsalesforceMarcaViajeroTC" outputVariable="RSPsalesforceMarcaViajeroTC" bea:name="CallProxySalesforceMarcaViajeroTC">
+        					<rescon:invokeInfo><rescon:service ref="Middleware/v2/ProxyServices/SalesforceMarcaViajeroTC" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/></rescon:invokeInfo></bpel:invoke>
+        				<bpel:assign>
+        					<bpel:extensionAssignOperation>
+        						<trf:assign varName="errorCode">
+        							<trf:expr>
+        								<expr:xqueryText>fn:upper-case(string($RSPsalesforceMarcaViajeroTC.ResponseHeader/successIndicator/text()))</expr:xqueryText></trf:expr></trf:assign>
+        					</bpel:extensionAssignOperation>
+        				</bpel:assign>
+        				<bpel:if>
+        					<bpel:condition>$errorCode = "SUCCESS"</bpel:condition>
+        					<bpel:sequence>
+        						<bpel:empty/>
+        					<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="resultGroup">
+				<trf:location>
+					<expr:xpathText>./ns1:CREDIT_CARDS</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+			<trf:expr>
+				<expr:xqueryTransform>
+					<expr:resource ref="Middleware/v2/BusinessServices/SJS/marcaViajeroTCGT/xq/agruparRespuestasMarcaViajeroTC"/>
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					<expr:param name="errorCode">
+						<expr:path>$errorCode</expr:path></expr:param>
+					<expr:param name="index">
+						<expr:path>$typePosition</expr:path></expr:param>
+					<expr:param name="validationMessage">
+						<expr:path>""</expr:path></expr:param>
+					<expr:param name="salesforceMarcaViajeroTCResponse">
+						<expr:path>$RSPsalesforceMarcaViajeroTC.result</expr:path></expr:param>
+					<expr:param name="consultaDatosTarjetaCreditoResponse">
+						<expr:path>$RSPconsultaDatosTarjetaCredito.result</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:insert>
+		</bpel:extensionAssignOperation>
+        					</bpel:assign></bpel:sequence>
+        					<bpel:else>
+        						<bpel:sequence>
+        							<bpel:empty/>
+        						<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:assign varName="validationMessage">
+				<trf:expr>
+					<expr:xqueryText>fn:upper-case(string($RSPsalesforceMarcaViajeroTC.ResponseHeader/messages/text()))</expr:xqueryText></trf:expr></trf:assign>
+		</bpel:extensionAssignOperation>
+        						<bpel:extensionAssignOperation>
+		<trf:insert varName="resultGroup">
+			<trf:location>
+				<expr:xpathText>./ns1:CREDIT_CARDS</expr:xpathText></trf:location>
+			<trf:where>last-child</trf:where>
+		<trf:expr>
+			<expr:xqueryText><![CDATA[<CREDIT_CARD_INFORMATION>
+	<INDEX>{$typePosition}</INDEX>
+	<CREDIT_CARD_NUMBER>{$card}</CREDIT_CARD_NUMBER>
+	<MESSAGES_ID>{ string($RSPsalesforceMarcaViajeroTC.ResponseHeader/messageId/text()) }</MESSAGES_ID>
+    <SUCCESS_INDICATOR>{$errorCode}</SUCCESS_INDICATOR>
+    <MESSAGES>{$validationMessage}</MESSAGES>
+</CREDIT_CARD_INFORMATION>]]></expr:xqueryText></trf:expr></trf:insert>
+        						</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        					</bpel:else>
+        				</bpel:if></bpel:sequence>
+        				<bpel:else>
+        					<bpel:sequence>
+        						<bpel:empty/>
+        					<bpel:assign>
+		<bpel:extensionAssignOperation>
+			<trf:insert varName="resultGroup">
+				<trf:location>
+					<expr:xpathText>./ns1:CREDIT_CARDS</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+			<trf:expr>
+				<expr:xqueryText><![CDATA[<CREDIT_CARD_INFORMATION>
+	<INDEX>{$typePosition}</INDEX>
+	<CREDIT_CARD_NUMBER>{$card}</CREDIT_CARD_NUMBER>
+	<MESSAGES_ID>{string($RSPconsultaDatosTarjetaCredito.ResponseHeader/messageId/text())}</MESSAGES_ID>
+    <SUCCESS_INDICATOR>{string($RSPconsultaDatosTarjetaCredito.ResponseHeader/successIndicator/text())}</SUCCESS_INDICATOR>
+    <MESSAGES>{string($RSPconsultaDatosTarjetaCredito.ResponseHeader/messages/text())}</MESSAGES>
+</CREDIT_CARD_INFORMATION>]]></expr:xqueryText></trf:expr></trf:insert>
+		</bpel:extensionAssignOperation>
+        					</bpel:assign></bpel:sequence>
+        				</bpel:else>
+        			</bpel:if></bpel:sequence>
+        	</bpel:scope>
+        </bpel:forEach>
+        <bpel:assign>
+        	<bpel:extensionAssignOperation>
+        		<trf:assign varName="sjMarcaViajeroTCResponse.ResponseHeader">
+        			<trf:expr>
+        				<expr:xqueryText>&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></expr:xqueryText></trf:expr></trf:assign>
+        	</bpel:extensionAssignOperation>
+        <bpel:extensionAssignOperation>
+		<trf:assign varName="sjMarcaViajeroTCResponse.result">
+			<trf:expr>
+				<expr:xqueryText>$resultGroup</expr:xqueryText></trf:expr></trf:assign>
+        </bpel:extensionAssignOperation></bpel:assign>
+        <bpel:reply partnerLink="sjMarcaViajeroTCGT" operation="sjMarcaViajeroTCGT" variable="sjMarcaViajeroTCResponse"/>
+    </bpel:sequence>
+</bpel:process>

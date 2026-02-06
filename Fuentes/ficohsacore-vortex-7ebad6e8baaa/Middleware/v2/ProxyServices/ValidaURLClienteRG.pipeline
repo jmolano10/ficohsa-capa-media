@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ValidaURLClienteRG/wsdl/validaURLClienteRGPS"/>
+            <con:binding>
+                <con:name>validaURLClienteRGPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/validaURLClienteRGPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-2954892204326511545-160a7390.17966cdba44.-7310" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="request" name="ValidaURLCliente_request">
+            <con:stage name="FlujEntreda">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaURLClienteTypes" prefix="val"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/validaCliente" prefix="val1"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-7428</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKGT/validaCliente/biz/validaCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>validaCliente</con1:operation>
+                        <con1:request>
+                            <con1:body>REQvalidaCliente</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPvalidaCliente</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQvalidaCliente">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-73f2</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="Middleware/v2/Resources/ValidaURLClienteRG/xq/validaClienteIn"/>
+                                        <con2:param name="validaURLCliente">
+                                            <con2:path>$body/val:validaURLCliente</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-73dd</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">string($RSPvalidaCliente/val1:PV_CODIGO_ESTADO/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-73b5</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">string($RSPvalidaCliente/val1:PV_MENSAJE_ESTADO/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidaURLCliente_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaURLClienteTypes" prefix="val"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace contents-only="true" varName="header" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-735a</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+{	if(upper-case($errorCode) = 'SUCCESS')then(
+		<successIndicator>Success</successIndicator>
+	)else(
+		<successIndicator>{$errorCode}</successIndicator>,
+		<messages>{$validationMessage}</messages>
+	)
+}
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-736e</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">upper-case($errorCode) = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-732b</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:resource ref="Middleware/v2/Resources/ValidaURLClienteRG/xq/validaURLClienteRGOut"/>
+                                            <con2:param name="outputParameters">
+                                                <con2:path>$RSPvalidaCliente</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-7312</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">&lt;val:validaURLClienteResponse/></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-2954892204326511545-160a7390.17966cdba44.-7310">
+            <con:stage name="ManejoError">
+                <con2:context xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionPuntosTarjetasTypes" prefix="ges" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaURLClienteTypes" prefix="val" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con2:context>
+                <con2:actions xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+                    <con1:replace contents-only="true" varName="header">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-729d</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+    <successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+    <messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace contents-only="true" varName="body">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2954892204326511545-160a7390.17966cdba44.-729c</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;val:validaURLClienteResponse/></con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con3:reply xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                        <con3:id>_ActionId-2954892204326511545-160a7390.17966cdba44.-729b</con3:id>
+                    </con3:reply>
+                </con2:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidaURLCliente">
+                <con:request>ValidaURLCliente_request</con:request>
+                <con:response>ValidaURLCliente_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

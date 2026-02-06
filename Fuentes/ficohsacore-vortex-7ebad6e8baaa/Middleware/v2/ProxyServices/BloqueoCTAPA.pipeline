@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/BloqueoCTA/wsdl/bloqueoCTAPS"/>
+            <con:binding>
+                <con:name>bloqueoCTAPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/bloqueoCTAPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con2:router errorHandler="_onErrorHandler-5660618727154209533--4d5fd211.16b22e50f7b.-7d09" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+        <con:pipeline type="request" name="PA01_BloqueoCTA_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="ConsultaDatosCuenta">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta" prefix="con" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="codigoPais">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7fe8</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con2:param name="sentidoConversion">
+                                    <con2:path>"OSB-ISO3"</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoPais">
+                                    <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7fbc</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataPA/conDatoCuenta/biz/conDatoCuenta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>conDatoCuenta</con1:operation>
+                        <con1:request>
+                            <con1:body>REQconDatoCuenta</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPconDatoCuenta</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQconDatoCuenta">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7f95</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="Middleware/v2/Resources/MasterDataPA/xq/conDatoCuentaPAIn"/>
+                                        <con2:param name="accountNumber">
+                                            <con2:path>string($body/ges:bloqueoCTA/ACCOUNT_NUMBER/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="countryCode">
+                                            <con2:path>$codigoPais</con2:path>
+                                        </con2:param>
+                                        <con2:param name="org">
+                                            <con2:path>''</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:validate>
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7f80</con2:id>
+                                <con1:schema ref="Middleware/v2/BusinessServices/MasterDataPA/conDatoCuenta/xsd/conDatoCuenta_sp"/>
+                                <con1:schemaElement xmlns:con="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta">con:InputParameters</con1:schemaElement>
+                                <con1:varName>REQconDatoCuenta</con1:varName>
+                                <con1:location>
+                                    <con2:xpathText xmlns:con2="http://www.bea.com/wli/sb/stages/config">.</con2:xpathText>
+                                </con1:location>
+                            </con1:validate>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7f59</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">string($RSPconDatoCuenta/con:CodigoError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7f3b</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode != '-1')then(
+	string($RSPconDatoCuenta/con:MensajeError/text())
+)else(
+	''
+)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BloqueoCTA">
+                <con:context>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta" prefix="con" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7f14</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="foreignUse">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7eeb</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">let $org_ind := data($body/ges:bloqueoCTA/ORG_IND)
+return
+	if($org_ind = 'BASE') then (
+		'0'
+	) else (
+		'1'
+	)</con2:xqueryText>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:assign varName="orgNumber">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7eaf</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">for $row in $RSPconDatoCuenta/con:RowSet/con:Row
+	where $row/con:Column[upper-case(@name) = 'TIPOORG' and text() = 'BASE']
+	return
+		data($row/con:Column[upper-case(@name) = 'ORG'])</con2:xqueryText>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:wsCallout>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7e7c</con3:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlusGT/fdcs/biz/fdcs" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>AccountBlock</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQAccountBlock</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPAccountBlock</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQAccountBlock">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7e43</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/VisionPlusPA/xq/accountBlockIn"/>
+                                                    <con3:param name="foreignUse">
+                                                        <con3:path>$foreignUse</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="accountNumber">
+                                                        <con3:path>string($body/ges:bloqueoCTA/ACCOUNT_NUMBER/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="blockCodeIndicator">
+                                                        <con3:path>string($body/ges:bloqueoCTA/BLOCK_CODE_IND/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="blockCode">
+                                                        <con3:path>string($body/ges:bloqueoCTA/BLOCK_CODE/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="orgNumber">
+                                                        <con3:path>$orgNumber</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:validate>
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7e32</con3:id>
+                                            <con1:wsdl ref="Middleware/v2/BusinessServices/VisionPlusPA/fdcs/wsdl/Fdcs"/>
+                                            <con1:schemaElement xmlns:fdcs="http://www.procesa.com/fdcs">fdcs:AccountBlockRequest</con1:schemaElement>
+                                            <con1:varName>REQAccountBlock</con1:varName>
+                                            <con1:location>
+                                                <con3:xpathText xmlns:con3="http://www.bea.com/wli/sb/stages/config">.</con3:xpathText>
+                                            </con1:location>
+                                        </con1:validate>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="validationMessage">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7e1d</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">let $messaje := fn-bea:trim(string($RSPAccountBlock/ResponseMessage/text()))
+return
+	fn:substring($messaje, 11)</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="errorCode">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7ded</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if($validationMessage != '')then(
+	fn:substring(fn-bea:trim(string($RSPAccountBlock/ResponseMessage/text())), 1,10)
+)else('')</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="PA01_BloqueoCTA_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7d69</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace varName="header" contents-only="true">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7d55</con3:id>
+                                    <con1:expr>
+                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con3:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace varName="header" contents-only="true">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7d29</con3:id>
+                                <con1:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{$errorCode}</successIndicator>
+	<messages>{$validationMessage}</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                    <con1:replace varName="body" contents-only="true">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7d0a</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;ges:bloqueoCTAResponse/></con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con2:pipeline type="error" name="_onErrorHandler-5660618727154209533--4d5fd211.16b22e50f7b.-7d09">
+            <con2:stage name="ManejoError">
+                <con2:context>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+                </con2:context>
+                <con2:actions>
+                    <con1:replace varName="header" contents-only="true">
+                        <con:id>_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7cd7</con:id>
+                        <con1:expr>
+                            <con:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con:id>_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7cc0</con:id>
+                        <con1:expr>
+                            <con:xqueryText>&lt;ges:bloqueoCTAResponse/></con:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con:reply>
+                        <con:id>_ActionId-5660618727154209533--4d5fd211.16b22e50f7b.-7ca3</con:id>
+                    </con:reply>
+                </con2:actions>
+            </con2:stage>
+        </con2:pipeline>
+        <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:pipeline-node name="PA01_BloqueoCTA">
+                <con:request>PA01_BloqueoCTA_request</con:request>
+                <con:response>PA01_BloqueoCTA_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con2:router>
+</con:pipelineEntry>

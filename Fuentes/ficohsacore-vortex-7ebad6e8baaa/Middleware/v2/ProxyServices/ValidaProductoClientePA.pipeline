@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ValidaProductoClientePA/wsdl/validaProductoClientePAPS"/>
+            <con:binding>
+                <con:name>validaProductoClientePAPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/validaProductoClientePAPS</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="validaProductoCliente_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaListaPrestamos" prefix="listPres"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaListaDepositosCliente" prefix="listDep"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaDetallesCuenta" prefix="conDet"/>
+                    <con1:userNsDecl namespace="http://alcance.local/wsinfotarjetas/" prefix="cTrc"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaGeneralPrestamo" prefix="conG"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaProductoClienteTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaCliente" prefix="con1"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conConsultaCliente" prefix="con2"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="productType">
+                        <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-7ec9</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/con:validaProductoCliente/PRODUCT_TYPE/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-7f01</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$productType = 'PTM'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-6d45</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/consultaPasivosCliente/biz/consultaPasivosCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaListaPrestamos</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsultaListaPrestamos</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsultaListaPrestamos</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConsultaListaPrestamos">
+                                            <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-6d0d</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<listPres:InputParameters>
+	<listPres:CUSTOMER_ID>
+	{
+		fn:string($body/con:validaProductoCliente/CUSTOMER_ID/text())
+	}
+	</listPres:CUSTOMER_ID>
+	<listPres:LIABILITY_TYPE>PTM</listPres:LIABILITY_TYPE>
+</listPres:InputParameters>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:ifThenElse>
+                                            <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7d46</con1:id>
+                                            <con2:case>
+                                                <con2:condition>
+                                                    <con1:xqueryText>let $prestamos := $RSPConsultaListaPrestamos/listPres:LIABILITY_NUMBER/listPres:LIABILITY_NUMBER_ITEM
+let $numProducto := fn:string($body/con:validaProductoCliente/PRODUCT_NUMBER/text())
+return
+
+exists($prestamos[text() = $numProducto])</con1:xqueryText>
+                                                </con2:condition>
+                                                <con2:actions>
+                                                    <con2:wsCallout>
+                                                        <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b71</con1:id>
+                                                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/consultaGeneralPrestamo/biz/consultaGeneralPrestamo_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                        <con2:operation>consultaGeneralPrestamo</con2:operation>
+                                                        <con2:request>
+                                                            <con2:body>REQConsultaGeneralPrestamo</con2:body>
+                                                        </con2:request>
+                                                        <con2:response>
+                                                            <con2:body>RSPConsultaGeneralPrestamo</con2:body>
+                                                        </con2:response>
+                                                        <con2:requestTransform>
+                                                            <con2:assign varName="REQConsultaGeneralPrestamo">
+                                                                <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b77</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>&lt;conG:InputParameters>
+	&lt;conG:LOAN_ID>
+	{ 
+		fn:string($body/con:validaProductoCliente/PRODUCT_NUMBER/text()) 
+	}
+	&lt;/conG:LOAN_ID>
+&lt;/conG:InputParameters></con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                        </con2:requestTransform>
+                                                        <con2:responseTransform>
+                                                            <con2:assign varName="successIndicator">
+                                                                <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b69</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>fn:string($RSPConsultaGeneralPrestamo/conG:ERROR_CODE/text())</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:ifThenElse>
+                                                                <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b76</con1:id>
+                                                                <con2:case>
+                                                                    <con2:condition>
+                                                                        <con1:xqueryText>$successIndicator = 'SUCCESS'</con1:xqueryText>
+                                                                    </con2:condition>
+                                                                    <con2:actions>
+                                                                        <con2:replace contents-only="true" varName="body">
+                                                                            <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b67</con1:id>
+                                                                            <con2:expr>
+                                                                                <con1:xqueryTransform>
+                                                                                    <con1:resource ref="Middleware/v2/Resources/ValidaProductoClientePA/xq/validaProductoClientePTMPAOut"/>
+                                                                                    <con1:param name="outputParameters">
+                                                                                        <con1:path>$RSPConsultaGeneralPrestamo</con1:path>
+                                                                                    </con1:param>
+                                                                                </con1:xqueryTransform>
+                                                                            </con2:expr>
+                                                                        </con2:replace>
+                                                                    </con2:actions>
+                                                                </con2:case>
+                                                                <con2:default>
+                                                                    <con2:assign varName="errorMessage">
+                                                                        <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b65</con1:id>
+                                                                        <con2:expr>
+                                                                            <con1:xqueryText>fn:string($RSPConsultaGeneralPrestamo/conG:ERROR_MESSAGE/text())</con1:xqueryText>
+                                                                        </con2:expr>
+                                                                    </con2:assign>
+                                                                    <con2:replace varName="body" contents-only="true">
+                                                                        <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b63</con1:id>
+                                                                        <con2:expr>
+                                                                            <con1:xqueryText>&lt;con:validaProductoClienteResponse/></con1:xqueryText>
+                                                                        </con2:expr>
+                                                                    </con2:replace>
+                                                                </con2:default>
+                                                            </con2:ifThenElse>
+                                                        </con2:responseTransform>
+                                                    </con2:wsCallout>
+                                                </con2:actions>
+                                            </con2:case>
+                                            <con2:default>
+                                                <con2:assign varName="successIndicator">
+                                                    <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b6b</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>'NO RECORDS'</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:assign varName="errorMessage">
+                                                    <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b6d</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>'No se encontró el préstamo'</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:replace contents-only="true" varName="body">
+                                                    <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7b6f</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>&lt;con:validaProductoClienteResponse/></con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:replace>
+                                            </con2:default>
+                                        </con2:ifThenElse>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$productType = 'DEP'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-7def</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/consultaListaDepositos/biz/consultaListaDepositosCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaListaDepositosCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsultaListaDepositosCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsultaListaDepositosCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConsultaListaDepositosCliente">
+                                            <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-7aec</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<listDep:InputParameters>
+    <listDep:CUSTOMER_ID>{ fn:string($body/con:validaProductoCliente/CUSTOMER_ID/text()) }</listDep:CUSTOMER_ID>
+    <listDep:ASSET_TYPE>DEP</listDep:ASSET_TYPE>
+</listDep:InputParameters>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:replace varName="body" contents-only="true">
+                                            <con1:id>_ActionId-8004062143574153398--90f50a7.15edd5364a0.-7eff</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ValidaProductoClientePA/xq/validaProductoClienteDEPPAOut"/>
+                                                    <con1:param name="outputParameters">
+                                                        <con1:path>$RSPConsultaListaDepositosCliente</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="productNumber">
+                                                        <con1:path>fn:string($body/con:validaProductoCliente/PRODUCT_NUMBER/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:assign varName="successIndicator">
+                                            <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7ff1</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPConsultaListaDepositosCliente/listDep:ERROR_CODE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="errorMessage">
+                                            <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7fef</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPConsultaListaDepositosCliente/listDep:ERROR_MESSAGE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryConditionExpr>
+                                    <con1:boolExpr operator="or">
+                                        <con1:compExpr operator="=">
+                                            <con1:leftPath>$productType</con1:leftPath>
+                                            <con1:rightPath>'TRC'</con1:rightPath>
+                                        </con1:compExpr>
+                                        <con1:compExpr operator="=">
+                                            <con1:leftPath>$productType</con1:leftPath>
+                                            <con1:rightPath>'CTR'</con1:rightPath>
+                                        </con1:compExpr>
+                                    </con1:boolExpr>
+                                </con1:xqueryConditionExpr>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="productNumber">
+                                    <con1:id>_ActionId-8225829549221549742--320f0ab.17743ca3d07.-7f0c</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>fn:string($body/con:validaProductoCliente/PRODUCT_NUMBER/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="customerId">
+                                    <con1:id>_ActionId-7095064485006854317-304dd008.1779672f830.-7fb6</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>fn:string($body/con:validaProductoCliente/CUSTOMER_ID/text())</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="codigoPais">
+                                    <con1:id>_ActionId-4478203677274912360--1a1feb75.1773fbf552a.-7b98</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                            <con1:param name="sentidoConversion">
+                                                <con1:path>'OSB-ISO3'</con1:path>
+                                            </con1:param>
+                                            <con1:param name="codigoPais">
+                                                <con1:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4478203677274912360--1a1feb75.1773fbf552a.-7c56</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterData/conConsultaCliente/biz/conConsultaCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>conConsultaCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConConsultaCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConConsultaCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConConsultaCliente">
+                                            <con1:id>_ActionId-4478203677274912360--1a1feb75.1773fbf552a.-7bd2</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ValidaProductoCliente/xq/conConsultaClienteIn"/>
+                                                    <con1:param name="customerId">
+                                                        <con1:path>$customerId</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="countryCode">
+                                                        <con1:path>$codigoPais</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="productNumber">
+                                                        <con1:path>$productNumber</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:replace varName="body" contents-only="true">
+                                            <con1:id>_ActionId-8225829549221549742--320f0ab.17743ca3d07.-7e3d</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ValidaProductoCliente/xq/validaProductoClienteTCRGOut"/>
+                                                    <con1:param name="outputParameters">
+                                                        <con1:path>$RSPConConsultaCliente</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="customerId">
+                                                        <con1:path>$customerId</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="productType">
+                                                        <con1:path>$productType</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="country">
+                                                        <con1:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:assign varName="successIndicator">
+                                            <con1:id>_ActionId-4478203677274912360--1a1feb75.1773fbf552a.-7c0c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>let $errorCode := fn:string($RSPConConsultaCliente/con2:CodigoError/text())
+
+return
+	if($errorCode = '-1') then (
+		'SUCCESS'
+	)else( 'ERROR' )</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="errorMessage">
+                                            <con1:id>_ActionId-4478203677274912360--1a1feb75.1773fbf552a.-7c0a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPConConsultaCliente/con2:MensajeError/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$productType = 'FPC'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="successIndicator">
+                                    <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-7ca1</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>'ERROR'</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="errorMessage">
+                                    <con1:id>_ActionId-8004062143574153398--90f50a7.15edd5364a0.-7f90</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>'Producto no implementado'</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-8004062143574153398--90f50a7.15edd5364a0.-7ec6</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;con:validaProductoClienteResponse/></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:wsCallout>
+                                <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-7d11</con1:id>
+                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKPA/consultaDetallesCuenta/biz/consultaDetallesCuenta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                <con2:operation>consultaDetallesCuenta</con2:operation>
+                                <con2:request>
+                                    <con2:body>REQConsultaDetallesCuenta</con2:body>
+                                </con2:request>
+                                <con2:response>
+                                    <con2:body>RSPConsultaDetallesCuenta</con2:body>
+                                </con2:response>
+                                <con2:requestTransform>
+                                    <con2:assign varName="REQConsultaDetallesCuenta">
+                                        <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-79d6</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>&lt;conDet:InputParameters>
+    &lt;conDet:ACCOUNT_NUMBER>{ fn:string($body/con:validaProductoCliente/PRODUCT_NUMBER/text()) }&lt;/conDet:ACCOUNT_NUMBER>
+&lt;/conDet:InputParameters></con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:requestTransform>
+                                <con2:responseTransform>
+                                    <con2:replace varName="body" contents-only="true">
+                                        <con1:id>_ActionId-8004062143574153398--90f50a7.15edd5364a0.-7f58</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/ValidaProductoClientePA/xq/validaProductoClienteCTAPAOut"/>
+                                                <con1:param name="outputParameters">
+                                                    <con1:path>$RSPConsultaDetallesCuenta</con1:path>
+                                                </con1:param>
+                                                <con1:param name="customerID">
+                                                    <con1:path>fn:string($body/con:validaProductoCliente/CUSTOMER_ID/text())</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:replace>
+                                    <con2:assign varName="successIndicator">
+                                        <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7ff5</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>fn:string($RSPConsultaDetallesCuenta/conDet:ERROR_CODE/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="errorMessage">
+                                        <con1:id>_ActionId-5138380549741855110-25179955.15edde4fa75.-7ff3</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>fn:string($RSPConsultaDetallesCuenta/conDet:ERROR_MESSAGE/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:responseTransform>
+                            </con2:wsCallout>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="validaProductoCliente_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaProductoClienteTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-6f95</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$successIndicator != 'SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-4081626417759830107--37f67134.15ec8a8ce8f.-65e1</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{data($successIndicator)}</successIndicator>
+	<messages>{data($errorMessage)}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-8004062143574153398--90f50a7.15edd5364a0.-7fd3</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>fn:count($body/con:validaProductoClienteResponse/PRODUCT_NAME) = 0</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-8004062143574153398--90f50a7.15edd5364a0.-7fad</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>NO RECORDS&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:replace varName="header" contents-only="true">
+                                        <con1:id>_ActionId-8004062143574153398--90f50a7.15edd5364a0.-7fca</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:replace>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="validaProductoCliente">
+                <con:request>validaProductoCliente_request</con:request>
+                <con:response>validaProductoCliente_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/TransferenciaCuentas/wsdl/transferenciaCuentasPS"/>
+            <con:binding>
+                <con:name>transferenciaCuentasPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/transferenciaCuentasPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-845924723285002581-53bc0aac.1733ed99b00.-7e97" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="GT01_TransferenciaCuentas_request">
+            <con3:stage name="FlujoEntrada" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con6="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/services/security/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+                <con3:context>
+                    <con:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/registrarUsoServicio" prefix="osb2"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con3:context>
+                <con3:actions>
+                    <con1:ifThenElse>
+                        <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7f9b</con:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con:xqueryText>(: element &lt;REGIONAL_DETAILS> exists :)
+string(data($body/tran:transferenciaCuentasRequest/REGIONAL_DETAILS))</con:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7ef8</con:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKGT/transferenciaIntergrupal/biz/transferenciaIntergrupal_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>transferenciaIntergrupal</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQtransferenciaIntergrupal</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPtransferenciaIntergrupal</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQtransferenciaIntergrupal">
+                                            <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7e3e</con:id>
+                                            <con1:expr>
+                                                <con:xqueryTransform>
+                                                    <con:resource ref="Middleware/v2/Resources/TransferenciaCuentas/xq/transferenciaIntergrupalGTIn"/>
+                                                    <con:param name="user">
+                                                        <con:path>fn:string($header/aut:RequestHeader/Authentication/UserName/text())</con:path>
+                                                    </con:param>
+                                                    <con:param name="transferenciaCuentasRequest">
+                                                        <con:path>$body/tran:transferenciaCuentasRequest</con:path>
+                                                    </con:param>
+                                                </con:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform/>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:assign varName="validationMessage">
+                                <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7f8f</con:id>
+                                <con1:expr>
+                                    <con:xqueryTransform>
+                                        <con:resource ref="Middleware/Business_Resources/Transferencias/TransferenciasEntreCuentas/transferenciaCuentasValidate"/>
+                                        <con:param name="transferenciaCuentasRequest">
+                                            <con:path>$body/tran:transferenciaCuentasRequest</con:path>
+                                        </con:param>
+                                    </con:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:ifThenElse>
+                                <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7f8c</con:id>
+                                <con1:case>
+                                    <con1:condition>
+                                        <con:xqueryText>$validationMessage != ""</con:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con:skip>
+                                            <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7f8b</con:id>
+                                        </con:skip>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:wsCallout>
+                                        <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7f87</con:id>
+                                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKGT/transferenciaCuentas/biz/TransferenciaCuentas_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con1:operation>TransferenciaCuentas</con1:operation>
+                                        <con1:request>
+                                            <con1:body>rq</con1:body>
+                                        </con1:request>
+                                        <con1:response>
+                                            <con1:body>rp</con1:body>
+                                        </con1:response>
+                                        <con1:requestTransform>
+                                            <con1:assign varName="rq">
+                                                <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7f88</con:id>
+                                                <con1:expr>
+                                                    <con:xqueryTransform>
+                                                        <con:resource ref="Middleware/v2/Resources/TransferenciaCuentas/xq/transferenciaCuentasGTIn"/>
+                                                        <con:param name="usuarioCanalRequest1">
+                                                            <con:path>fn:string($header/aut:RequestHeader/Authentication/UserName)</con:path>
+                                                        </con:param>
+                                                        <con:param name="transferenciaCuentasRequest1">
+                                                            <con:path>$body/tran:transferenciaCuentasRequest</con:path>
+                                                        </con:param>
+                                                    </con:xqueryTransform>
+                                                </con1:expr>
+                                            </con1:assign>
+                                        </con1:requestTransform>
+                                        <con1:responseTransform/>
+                                    </con1:wsCallout>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con3:actions>
+            </con3:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GT01_TransferenciaCuentas_response">
+            <con3:stage name="FlujoSalida" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con6="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con4="http://www.bea.com/wli/sb/stages/logging/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/services/security/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+                <con3:context>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con3:context>
+                <con3:actions>
+                    <con1:ifThenElse>
+                        <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7dcd</con:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con:xqueryText>(: element &lt;REGIONAL_DETAILS> exists :)
+string(data($body/tran:transferenciaCuentasRequest/REGIONAL_DETAILS))</con:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="header">
+                                    <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7d87</con:id>
+                                    <con1:expr>
+                                        <con:xqueryTransform>
+                                            <con:resource ref="Middleware/v2/Resources/TransferenciaCuentas/xq/transferenciaIntergrupalGTHeaderOut"/>
+                                            <con:param name="outputParameters">
+                                                <con:path>$RSPtransferenciaIntergrupal</con:path>
+                                            </con:param>
+                                        </con:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                                <con1:ifThenElse>
+                                    <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7d69</con:id>
+                                    <con1:case>
+                                        <con1:condition>
+                                            <con:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) !=  "SUCCESS"</con:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:replace contents-only="true" varName="body">
+                                                <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7cfb</con:id>
+                                                <con1:expr>
+                                                    <con:xqueryText>&lt;tran:transferenciaCuentasResponse/></con:xqueryText>
+                                                </con1:expr>
+                                            </con1:replace>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:default>
+                                        <con1:replace contents-only="true" varName="body">
+                                            <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7c8d</con:id>
+                                            <con1:expr>
+                                                <con:xqueryTransform>
+                                                    <con:resource ref="Middleware/v2/Resources/TransferenciaCuentas/xq/transferenciaIntergrupalGTBodyOut"/>
+                                                    <con:param name="outputParameters">
+                                                        <con:path>$RSPtransferenciaIntergrupal</con:path>
+                                                    </con:param>
+                                                </con:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con1:default>
+                                </con1:ifThenElse>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:ifThenElse>
+                                <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7dc5</con:id>
+                                <con1:case>
+                                    <con1:condition>
+                                        <con:xqueryText>$validationMessage != ""</con:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:replace contents-only="true" varName="header">
+                                            <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7dc4</con:id>
+                                            <con1:expr>
+                                                <con:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{ fn:string($validationMessage) }</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:replace contents-only="true" varName="body">
+                                            <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7dc3</con:id>
+                                            <con1:expr>
+                                                <con:xqueryText>&lt;tran:transferenciaCuentasResponse/></con:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:replace contents-only="true" varName="header">
+                                        <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7dc2</con:id>
+                                        <con1:expr>
+                                            <con:xqueryTransform>
+                                                <con:resource ref="Middleware/v2/Resources/TransferenciaCuentas/xq/transferenciaCuentasGTHeaderOut"/>
+                                                <con:param name="outputParameters1">
+                                                    <con:path>$rp</con:path>
+                                                </con:param>
+                                            </con:xqueryTransform>
+                                        </con1:expr>
+                                    </con1:replace>
+                                    <con1:ifThenElse>
+                                        <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7dc1</con:id>
+                                        <con1:case>
+                                            <con1:condition>
+                                                <con:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))!="SUCCESS"</con:xqueryText>
+                                            </con1:condition>
+                                            <con1:actions>
+                                                <con1:replace varName="body" contents-only="true">
+                                                    <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7dc0</con:id>
+                                                    <con1:expr>
+                                                        <con:xqueryText>&lt;tran:transferenciaCuentasResponse/></con:xqueryText>
+                                                    </con1:expr>
+                                                </con1:replace>
+                                            </con1:actions>
+                                        </con1:case>
+                                        <con1:default>
+                                            <con1:replace contents-only="true" varName="body">
+                                                <con:id>_ActionId-6899168316773989874-7d62a14b.17c752f5c1b.-7dbf</con:id>
+                                                <con1:expr>
+                                                    <con:xqueryTransform>
+                                                        <con:resource ref="Middleware/v2/Resources/TransferenciaCuentas/xq/transferenciaCuentasGTOut"/>
+                                                        <con:param name="outputParameters1">
+                                                            <con:path>$rp</con:path>
+                                                        </con:param>
+                                                    </con:xqueryTransform>
+                                                </con1:expr>
+                                            </con1:replace>
+                                        </con1:default>
+                                    </con1:ifThenElse>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con3:actions>
+            </con3:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-845924723285002581-53bc0aac.1733ed99b00.-7e97">
+            <con:stage name="ReplyAction">
+                <con:context xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciasType" prefix="tran"/>
+                </con:context>
+                <con:actions xmlns:con1="http://www.bea.com/wli/sb/stages/config">
+                    <con2:replace contents-only="true" varName="header" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-7a2a</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con1:id>_ActionId-1577307397948231885-39da3c28.17d2a99375c.-79fb</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;tran:transferenciaCuentasResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply isError="false">
+                        <con1:id>_ActionId-845924723285002581-53bc0aac.1733ed99b00.-7e5f</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="GT01_TransferenciaCuentas">
+                <con:request>GT01_TransferenciaCuentas_request</con:request>
+                <con:response>GT01_TransferenciaCuentas_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

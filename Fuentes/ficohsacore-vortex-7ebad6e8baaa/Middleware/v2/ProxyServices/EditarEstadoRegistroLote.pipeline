@@ -1,0 +1,692 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/EditarEstadoRegistroLote/wsdl/editarEstadoRegistroLotePS"/>
+            <con:binding>
+                <con:name>editarEstadoRegistroLotePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/editarEstadoRegistroLotePS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f48" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f54</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/PagosMasivos/xsd/pagosMasivosTypes"/>
+                        <con2:schemaElement xmlns:pag="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes">pag:editarEstadoRegistroLote</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./pag:editarEstadoRegistroLote</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegional" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f4d</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>ValidaServicioRegional</con2:operation>
+                        <con2:request>
+                            <con2:body>reqValidaServicioRegional</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respValidaServicioRegional</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqValidaServicioRegional">
+                                <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f53</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con1:param name="requestHeader1">
+                                            <con1:path>$header/aut:RequestHeader</con1:path>
+                                        </con1:param>
+                                        <con1:param name="serviceId">
+                                            <con1:path>"FICBCO0231"</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f52</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f51</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:replace contents-only="true" varName="body">
+                                            <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f50</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>&lt;pag:editarEstadoRegistroLoteResponse/></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con1:reply>
+                                            <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f4f</con1:id>
+                                        </con1:reply>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:replace contents-only="true" varName="header">
+                                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f4e</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con1:param name="requestHeader">
+                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:replace>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="MapeoError" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con:context xmlns:jms="http://www.bea.com/wli/sb/transports/jms" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions xmlns:jms="http://www.bea.com/wli/sb/transports/jms" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f4c</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f49</con1:id>
+                                    <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>mapeoErrores</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQMapeoErrores</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPMapeoErrores</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQMapeoErrores">
+                                            <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f4b</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con1:param name="CODIGO_ERROR">
+                                                        <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MENSAJE_ERROR">
+                                                        <con1:path>fn:concat("FICBCO0231","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f4a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con1:param name="mapeoErroresResponse1">
+                                                        <con1:path>$RSPMapeoErrores</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="successIndicator">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-2266732705770886376--43cb2bc0.15cf48c2f7a.-7f48">
+            <con:stage name="ManejoError">
+                <con:context xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con5:assign varName="errorCode" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7ecd</con1:id>
+                        <con5:expr>
+                            <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($fault/ctx:errorCode/text())</con5:xqueryText>
+                        </con5:expr>
+                    </con5:assign>
+                    <con5:assign varName="errorMessage" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/pipeline/config">
+                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7ecc</con1:id>
+                        <con5:expr>
+                            <con6:xqueryText xmlns:con6="http://www.bea.com/wli/sb/stages/config">fn:string($fault/ctx:reason/text())</con6:xqueryText>
+                        </con5:expr>
+                    </con5:assign>
+                    <con5:wsCallout xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7ec9</con1:id>
+                        <con5:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con5:operation>mapeoErrores</con5:operation>
+                        <con5:request>
+                            <con5:body>reqMapeoErrores</con5:body>
+                        </con5:request>
+                        <con5:response>
+                            <con5:body>respMapeoErrores</con5:body>
+                        </con5:response>
+                        <con5:requestTransform>
+                            <con5:assign varName="reqMapeoErrores">
+                                <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7ecb</con1:id>
+                                <con5:expr>
+                                    <con6:xqueryTransform xmlns:con6="http://www.bea.com/wli/sb/stages/config">
+                                        <con6:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con6:param name="MENSAJE_ERROR">
+                                            <con6:path>fn:concat("FICBCO0231", "$#$", $errorMessage)</con6:path>
+                                        </con6:param>
+                                        <con6:param name="CODIGO_ERROR">
+                                            <con6:path>$errorCode</con6:path>
+                                        </con6:param>
+                                    </con6:xqueryTransform>
+                                </con5:expr>
+                            </con5:assign>
+                        </con5:requestTransform>
+                        <con5:responseTransform>
+                            <con5:replace contents-only="true" varName="header">
+                                <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7eca</con1:id>
+                                <con5:expr>
+                                    <con6:xqueryTransform xmlns:con6="http://www.bea.com/wli/sb/stages/config">
+                                        <con6:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con6:param name="mapeoErroresResponse1">
+                                            <con6:path>$respMapeoErrores</con6:path>
+                                        </con6:param>
+                                        <con6:param name="successIndicator">
+                                            <con6:path>$errorCode</con6:path>
+                                        </con6:param>
+                                    </con6:xqueryTransform>
+                                </con5:expr>
+                            </con5:replace>
+                        </con5:responseTransform>
+                    </con5:wsCallout>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7ec8</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;pag:editarEstadoRegistroLoteResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7ec7</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="Default_EditarEstadoRegistroLote_request">
+            <con:stage name="FlujoEntrada" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con:context/>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="Default_EditarEstadoRegistroLote_response">
+            <con:stage name="FlujoSalida" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:Error>
+                        <con1:id>_ActionId-2266732705770886376--43cb2bc0.15cf48c2f7a.-7e4c</con1:id>
+                        <con2:errCode>MW-0008</con2:errCode>
+                        <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                    </con2:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="HN01_EditarEstadoRegistroLote_request">
+            <con:stage name="FlujoEntrada">
+                <con:context xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/validaAccesoPMS" prefix="val"/>
+                </con:context>
+                <con:actions xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con5:wsCallout xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-750b</con6:id>
+                        <con5:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/PMSV/validaAccesoPMS/biz/validaAccesoPMS_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con5:operation>validaAccesoPMS</con5:operation>
+                        <con5:request>
+                            <con5:body>REQValidaAccesoPMS</con5:body>
+                        </con5:request>
+                        <con5:response>
+                            <con5:body>RSPValidaAccesoPMS</con5:body>
+                        </con5:response>
+                        <con5:requestTransform>
+                            <con5:assign varName="REQValidaAccesoPMS">
+                                <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-750d</con6:id>
+                                <con5:expr>
+                                    <con5:xqueryTransform xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                                        <con5:resource ref="Middleware/v2/Resources/PagosMasivos/xq/validarAccesoPMSIn"/>
+                                        <con5:param name="CUSTOMER_ID">
+                                            <con5:path>fn:string($body/pag:editarEstadoRegistroLote/CUSTOMER_ID/text())</con5:path>
+                                        </con5:param>
+                                        <con5:param name="USER_NAME">
+                                            <con5:path>fn:string($header/aut:RequestHeader/Authentication/UserName/text())</con5:path>
+                                        </con5:param>
+                                    </con5:xqueryTransform>
+                                </con5:expr>
+                            </con5:assign>
+                        </con5:requestTransform>
+                        <con5:responseTransform>
+                            <con5:assign varName="validationMessage">
+                                <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-750c</con6:id>
+                                <con5:expr>
+                                    <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($RSPValidaAccesoPMS/val:ERROR_MESSAGE/text())</con5:xqueryText>
+                                </con5:expr>
+                            </con5:assign>
+                        </con5:responseTransform>
+                    </con5:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="HN01_EditarEstadoRegistroLote_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-74e8</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage != ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con5:replace contents-only="true" varName="header" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con5="http://www.bea.com/wli/sb/stages/transform/config">
+                                    <con6:id xmlns:con6="http://www.bea.com/wli/sb/stages/config">_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-74e1</con6:id>
+                                    <con5:expr>
+                                        <con6:xqueryText xmlns:con6="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>Error</successIndicator>
+	<messages>{$validationMessage}</messages>
+</aut:ResponseHeader>]]></con6:xqueryText>
+                                    </con5:expr>
+                                </con5:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true" xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                                <con1:id>_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-74df</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/EditarEstadoRegistroLote/xq/editarEstadoRegistroLoteHeaderOut"/>
+                                        <con1:param name="outputParameters">
+                                            <con1:path>$body/*</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con2:replace contents-only="true" varName="body" xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                        <con1:id>_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-74dd</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;pag:editarEstadoRegistroLoteResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="PA01_EditarEstadoRegistroLote_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-5196591773395843277-11caa80e.1657bb151eb.-763a</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MTR/editorRegistroLote/biz/editorRegistroLote" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>editarValidezRegistroLote</con2:operation>
+                        <con2:request>
+                            <con2:body>REQeditarValidezRegistroLote</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPeditarValidezRegistroLote</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQeditarValidezRegistroLote">
+                                <con1:id>_ActionId-5196591773395843277-11caa80e.1657bb151eb.-7602</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/EditarEstadoRegistroLote/xq/editarEstadoRegistroLotePAIn"/>
+                                        <con1:param name="sourceBank">
+                                            <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="editarEstadoRegistroLote">
+                                            <con1:path>$body/pag:editarEstadoRegistroLote</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:validate>
+                                <con1:id>_ActionId-5196591773395843277-11caa80e.1657bb151eb.-75e5</con1:id>
+                                <con2:wsdl ref="Middleware/v2/BusinessServices/MTR/editorRegistroLote/wsdl/editorRegistroLoteEndpoint"/>
+                                <con2:schemaElement xmlns:ser1="http://servicio.editarregistrolotews.mtrpmsv.cidenet.com.co/">ser1:editarValidezRegistroLote</con2:schemaElement>
+                                <con2:varName>REQeditarValidezRegistroLote</con2:varName>
+                                <con2:location>
+                                    <con1:xpathText>.</con1:xpathText>
+                                </con2:location>
+                            </con2:validate>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="PA01_EditarEstadoRegistroLote_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-5196591773395843277-11caa80e.1657bb151eb.-75ad</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/EditarEstadoRegistroLote/xq/editarEstadoRegistroLotePAHeaderOut"/>
+                                <con1:param name="editarValidezRegistroLoteResponse">
+                                    <con1:path>$RSPeditarValidezRegistroLote</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-5196591773395843277-11caa80e.1657bb151eb.-7590</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;pag:editarEstadoRegistroLoteResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="NI01_EditarEstadoRegistroLote_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-6172333013980326819--3aae8aa3.161ba1587a2.-7f53</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MTR/editorRegistroLote/biz/editorRegistroLote" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>editarValidezRegistroLote</con2:operation>
+                        <con2:request>
+                            <con2:body>REQeditarValidezRegistroLote</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPeditarValidezRegistroLote</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQeditarValidezRegistroLote">
+                                <con1:id>_ActionId-6172333013980326819--3aae8aa3.161ba1587a2.-7f19</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/EditarEstadoRegistroLote/xq/editarEstadoRegistroLoteNIIn"/>
+                                        <con1:param name="editarEstadoRegistroLote">
+                                            <con1:path>$body/pag:editarEstadoRegistroLote</con1:path>
+                                        </con1:param>
+                                        <con1:param name="sourceBank">
+                                            <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:validate>
+                                <con1:id>_ActionId-3437510619932831460--649800aa.161d252965b.-7e92</con1:id>
+                                <con2:wsdl ref="Middleware/v2/BusinessServices/MTR/editorRegistroLote/wsdl/editorRegistroLoteEndpoint"/>
+                                <con2:schemaElement xmlns:ser1="http://servicio.editarregistrolotews.mtrpmsv.cidenet.com.co/">ser1:editarValidezRegistroLote</con2:schemaElement>
+                                <con2:varName>REQeditarValidezRegistroLote</con2:varName>
+                                <con2:location>
+                                    <con1:xpathText>.</con1:xpathText>
+                                </con2:location>
+                            </con2:validate>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="NI01_EditarEstadoRegistroLote_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-6172333013980326819--3aae8aa3.161ba1587a2.-7ee1</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/EditarEstadoRegistroLote/xq/editarEstadoRegistroLoteNIHeaderOut"/>
+                                <con1:param name="editarValidezRegistroLoteResponse">
+                                    <con1:path>$RSPeditarValidezRegistroLote</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-6172333013980326819--3aae8aa3.161ba1587a2.-7ede</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;pag:editarEstadoRegistroLoteResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="GT01_EditarEstadoRegistroLote_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-5458770602595246364--60fbf08.1648eefb5f8.-7e5a</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MTR/editorRegistroLote/biz/editorRegistroLote" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>editarValidezRegistroLote</con2:operation>
+                        <con2:request>
+                            <con2:body>REQeditarValidezRegistroLote</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPeditarValidezRegistroLote</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQeditarValidezRegistroLote">
+                                <con1:id>_ActionId-5458770602595246364--60fbf08.1648eefb5f8.-7e22</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/EditarEstadoRegistroLote/xq/editarEstadoRegistroLoteGTIn"/>
+                                        <con1:param name="editarEstadoRegistroLote">
+                                            <con1:path>$body/pag:editarEstadoRegistroLote</con1:path>
+                                        </con1:param>
+                                        <con1:param name="sourceBank">
+                                            <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:validate>
+                                <con1:id>_ActionId-5458770602595246364--60fbf08.1648eefb5f8.-7e05</con1:id>
+                                <con2:wsdl ref="Middleware/v2/BusinessServices/MTR/editorRegistroLote/wsdl/editorRegistroLoteEndpoint"/>
+                                <con2:schemaElement xmlns:ser1="http://servicio.editarregistrolotews.mtrpmsv.cidenet.com.co/">ser1:editarValidezRegistroLote</con2:schemaElement>
+                                <con2:varName>REQeditarValidezRegistroLote</con2:varName>
+                                <con2:location>
+                                    <con1:xpathText>.</con1:xpathText>
+                                </con2:location>
+                            </con2:validate>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GT01_EditarEstadoRegistroLote_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-5458770602595246364--60fbf08.1648eefb5f8.-7dcd</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/EditarEstadoRegistroLote/xq/editarEstadoRegistroLoteGTHeaderOut"/>
+                                <con1:param name="editarValidezRegistroLoteResponse">
+                                    <con1:path>$RSPeditarValidezRegistroLote</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-5458770602595246364--60fbf08.1648eefb5f8.-7dcb</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;pag:editarEstadoRegistroLoteResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:context xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con:xpath>
+                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                    </con:xpath>
+                    <con:branch name="HN01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'HN01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="HN01_EditarEstadoRegistroLote">
+                                <con:request>HN01_EditarEstadoRegistroLote_request</con:request>
+                                <con:response>HN01_EditarEstadoRegistroLote_response</con:response>
+                            </con:pipeline-node>
+                            <con:route-node name="EditarEstadoRegistroLote">
+                                <con:context>
+                                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagosMasivosTypes" prefix="pag"/>
+                                </con:context>
+                                <con:actions>
+                                    <con2:ifThenElse>
+                                        <con1:id>_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-74c9</con1:id>
+                                        <con2:case>
+                                            <con2:condition>
+                                                <con1:xqueryText>$validationMessage != ""</con1:xqueryText>
+                                            </con2:condition>
+                                            <con2:actions/>
+                                        </con2:case>
+                                        <con2:default>
+                                            <con4:route xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                                                <con1:id>_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-74c6</con1:id>
+                                                <con4:service ref="Middleware/v2/BusinessServices/PMSV/editarRegistroLote/biz/editarRegistroLote_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con4:operation>editarRegistroLote</con4:operation>
+                                                <con4:outboundTransform>
+                                                    <con2:replace varName="body" contents-only="true">
+                                                        <con1:id>_ActionId-5747588246875680314-2a3e07b6.15d751e3b27.-74c5</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/EditarEstadoRegistroLote/xq/editarEstadoRegistroLoteIn"/>
+                                                                <con1:param name="editarEstadoRegistroLote">
+                                                                    <con1:path>$body/pag:editarEstadoRegistroLote</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:replace>
+                                                </con4:outboundTransform>
+                                                <con4:responseTransform/>
+                                            </con4:route>
+                                        </con2:default>
+                                    </con2:ifThenElse>
+                                </con:actions>
+                            </con:route-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="PA01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'PA01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="PA01_EditarEstadoRegistroLote">
+                                <con:request>PA01_EditarEstadoRegistroLote_request</con:request>
+                                <con:response>PA01_EditarEstadoRegistroLote_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="NI01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'NI01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="NI01_EditarEstadoRegistroLote">
+                                <con:request>NI01_EditarEstadoRegistroLote_request</con:request>
+                                <con:response>NI01_EditarEstadoRegistroLote_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="GT01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'GT01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="GT01_EditarEstadoRegistroLote">
+                                <con:request>GT01_EditarEstadoRegistroLote_request</con:request>
+                                <con:response>GT01_EditarEstadoRegistroLote_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_EditarEstadoRegistroLote">
+                                <con:request>Default_EditarEstadoRegistroLote_request</con:request>
+                                <con:response>Default_EditarEstadoRegistroLote_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

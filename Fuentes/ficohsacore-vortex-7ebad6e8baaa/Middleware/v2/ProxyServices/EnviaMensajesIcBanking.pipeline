@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/EnviaMensajesIcBanking/wsdl/enviaMensajesIcBankingPS"/>
+            <con:binding>
+                <con:name>enviaMensajesIcBankingPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/enviaMensajesIcBankingPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-2600186690613735434-72472c62.16b00652a3b.-7fbb" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="error" name="_onErrorHandler-2600186690613735434-72472c62.16b00652a3b.-7fbb">
+            <con:stage name="ManejoError">
+                <con3:context xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaOmnicanalTypes" prefix="not"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/enviaMensajesIcBankingTypes" prefix="env"/>
+                </con3:context>
+                <con3:actions xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+                    <con1:assign varName="errorCode">
+                        <con:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7fb4</con:id>
+                        <con1:expr>
+                            <con:xqueryText>fn:string($fault/ctx:errorCode/text())</con:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="errorMessage">
+                        <con:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7fb3</con:id>
+                        <con1:expr>
+                            <con:xqueryText>fn:string($fault/ctx:reason/text())</con:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7fb0</con:id>
+                        <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>mapeoErrores</con1:operation>
+                        <con1:request>
+                            <con1:body>reqMapeoErrores</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>respMapeoErrores</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="reqMapeoErrores">
+                                <con:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7fb2</con:id>
+                                <con1:expr>
+                                    <con:xqueryTransform>
+                                        <con:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con:param name="MENSAJE_ERROR">
+                                            <con:path>fn:concat("FICBCO0327", "$#$", $errorMessage)</con:path>
+                                        </con:param>
+                                        <con:param name="CODIGO_ERROR">
+                                            <con:path>$errorCode</con:path>
+                                        </con:param>
+                                    </con:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:replace varName="header" contents-only="true">
+                                <con:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7fb1</con:id>
+                                <con1:expr>
+                                    <con:xqueryTransform>
+                                        <con:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con:param name="mapeoErroresResponse1">
+                                            <con:path>$respMapeoErrores</con:path>
+                                        </con:param>
+                                        <con:param name="successIndicator">
+                                            <con:path>$errorCode</con:path>
+                                        </con:param>
+                                    </con:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con1:replace varName="body" contents-only="true">
+                        <con:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7faf</con:id>
+                        <con1:expr>
+                            <con:xqueryText>&lt;env:enviaMensajesIcBankingResponse/></con:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con5:reply xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                        <con5:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7f95</con5:id>
+                    </con5:reply>
+                </con3:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="HN01_EnviaMensajesIcBanking_request">
+            <con2:stage name="FlujoEntrada" xmlns:con="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con2:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/obtenerBitacoraEC" prefix="con2"/>
+                    <con1:userNsDecl namespace="urn:infocorp.framework.businessentities.common" prefix="d4p1"/>
+                    <con1:userNsDecl namespace="urn:infocorp.framework.services.common" prefix="urn"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEnvioEstadoCuentaTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/enviaMensajesIcBankingTypes" prefix="env"/>
+                </con2:context>
+                <con2:actions>
+                    <con:wsCallout>
+                        <con1:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7f52</con1:id>
+                        <con:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ICB/notificationService/biz/notificationService" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con:operation>ExecuteNotification</con:operation>
+                        <con:request>
+                            <con:body>REQExecuteNotificacion</con:body>
+                            <con:header>REQHExecuteNotificacion</con:header>
+                        </con:request>
+                        <con:response>
+                            <con:body>RSPExecuteNotificacion</con:body>
+                            <con:header>RSPHExecuteNotificacion</con:header>
+                        </con:response>
+                        <con:requestTransform>
+                            <con3:assign varName="REQHExecuteNotificacion" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-5447375094395406407--22a66861.16b03d0f046.-7fd4</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/EnviaMensajesIcBanking/xq/ficohsaNotificationsServiceHeaderIn"/>
+                                        <con2:param name="serviceAccount">
+                                            <con2:path>"ICBWS"</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                            <con:assign varName="REQExecuteNotificacion">
+                                <con1:id>_ActionId-564536831711286724-465c6040.16b94234e6a.-7e6e</con1:id>
+                                <con:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/EnviaMensajesIcBanking/xq/executeNotificacionIn"/>
+                                        <con1:param name="enviaMensajesIcBanking">
+                                            <con1:path>$body/env:enviaMensajesIcBanking</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con:expr>
+                            </con:assign>
+                        </con:requestTransform>
+                        <con:responseTransform>
+                            <con:assign varName="errorCode">
+                                <con1:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7f53</con1:id>
+                                <con:expr>
+                                    <con1:xqueryText>fn:string($RSPExecuteNotificacion/urn:OperationResult/d4p1:Value/text())</con1:xqueryText>
+                                </con:expr>
+                            </con:assign>
+                            <con:assign varName="validationMessage">
+                                <con1:id>_ActionId-2987945472207594730-5dc76821.16bdcd65ed7.-7cac</con1:id>
+                                <con:expr>
+                                    <con1:xqueryText>if ($errorCode = '0')
+then(
+	'SUCCESS'
+)else(
+	'ERROR'
+)</con1:xqueryText>
+                                </con:expr>
+                            </con:assign>
+                        </con:responseTransform>
+                    </con:wsCallout>
+                </con2:actions>
+            </con2:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="HN01_EnviaMensajesIcBanking_response">
+            <con2:stage name="FlujoSalida" xmlns:con="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con2:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaEnvioEstadoCuentaTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/enviaMensajesIcBankingTypes" prefix="env"/>
+                </con2:context>
+                <con2:actions>
+                    <con:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-5395211590156347025--46b4b7f5.16b9a940a8b.-7fe8</con1:id>
+                        <con:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if ($validationMessage = 'SUCCESS')then(
+			<successIndicator>SUCCESS</successIndicator>
+		)else(
+			<successIndicator>ERROR</successIndicator>,
+			<messages>{$errorCode}</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con:expr>
+                    </con:replace>
+                    <con:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-2818185120297342648-2c181f5f.16b959ac1d7.-7fb7</con1:id>
+                        <con:expr>
+                            <con1:xqueryText>&lt;env:enviaMensajesIcBankingResponse/></con1:xqueryText>
+                        </con:expr>
+                    </con:replace>
+                </con2:actions>
+            </con2:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="Default_EnviaMensajesIcBanking_request">
+            <con2:stage name="FlujoEntrada" xmlns:con="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con2:context/>
+            </con2:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="Default_EnviaMensajesIcBanking_response">
+            <con2:stage name="FlujoSalida" xmlns:con="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                <con2:context/>
+                <con2:actions>
+                    <con:Error>
+                        <con1:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7f4d</con1:id>
+                        <con:errCode>MW-0008</con:errCode>
+                        <con:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con:message>
+                    </con:Error>
+                </con2:actions>
+            </con2:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con3:stage name="ValidacionXSD" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+                <con3:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaOmnicanalTypes" prefix="not" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaLiberacionFondosChqVirtualTypes" prefix="not1" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+                    <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaEstadoChequeVirtualTypes" prefix="not2" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+                    <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/enviaMensajesIcBankingTypes" prefix="env" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+                </con3:context>
+                <con3:actions>
+                    <con1:validate>
+                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7f01</con5:id>
+                        <con1:schema ref="Middleware/v2/Resources/EnviaMensajesIcBanking/xsd/enviaMensajesIcBankingTypes"/>
+                        <con1:schemaElement xmlns:not="http://www.ficohsa.com.hn/middleware.services/notificaOmnicanalTypes" xmlns:not1="http://www.ficohsa.com.hn/middleware.services/notificaLiberacionFondosChqVirtualTypes" xmlns:not2="http://www.ficohsa.com.hn/middleware.services/notificaEstadoChequeVirtualTypes" xmlns:env1="http://www.ficohsa.com.hn/middleware.services/enviaMensajesIcBankingTypes">env1:enviaMensajesIcBanking</con1:schemaElement>
+                        <con1:varName>body</con1:varName>
+                        <con1:location>
+                            <con5:xpathText xmlns:con5="http://www.bea.com/wli/sb/stages/config">./env:enviaMensajesIcBanking</con5:xpathText>
+                        </con1:location>
+                    </con1:validate>
+                </con3:actions>
+            </con3:stage>
+            <con3:stage name="ValidacionServicioRegional" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+                <con3:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con4:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaOmnicanalTypes" prefix="not" xmlns:con4="http://www.bea.com/wli/sb/stages/config"/>
+                    <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/notificaLiberacionFondosChqVirtualTypes" prefix="not1" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+                    <con5:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/enviaMensajesIcBankingTypes" prefix="env" xmlns:con5="http://www.bea.com/wli/sb/stages/config"/>
+                </con3:context>
+                <con3:actions>
+                    <con1:wsCallout>
+                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7efa</con5:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>ValidaServicioRegional</con1:operation>
+                        <con1:request>
+                            <con1:body>reqValidaServicioRegional</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>respValidaServicioRegional</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="reqValidaServicioRegional">
+                                <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7f00</con5:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con2:param name="serviceId">
+                                            <con2:path>"FICBCO0327"</con2:path>
+                                        </con2:param>
+                                        <con2:param name="requestHeader1">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:ifThenElse>
+                                <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7eff</con5:id>
+                                <con1:case>
+                                    <con1:condition>
+                                        <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con2:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:replace varName="header" contents-only="true">
+                                            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7efe</con5:id>
+                                            <con1:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con4:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:replace varName="body" contents-only="true">
+                                            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7efd</con5:id>
+                                            <con1:expr>
+                                                <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">&lt;env:enviaMensajesIcBankingResponse/></con5:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con4:reply xmlns:con4="http://www.bea.com/wli/sb/stages/config">
+                                            <con4:id>_ActionId-2600186690613735434-72472c62.16b00652a3b.-7efc</con4:id>
+                                        </con4:reply>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:replace contents-only="true" varName="header">
+                                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7efb</con5:id>
+                                        <con1:expr>
+                                            <con4:xqueryTransform xmlns:con4="http://www.bea.com/wli/sb/stages/config">
+                                                <con4:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con4:param name="requestHeader">
+                                                    <con4:path>$header/aut:RequestHeader</con4:path>
+                                                </con4:param>
+                                            </con4:xqueryTransform>
+                                        </con1:expr>
+                                    </con1:replace>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con3:actions>
+            </con3:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con3:stage name="MapeoError" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+                <con3:context>
+                    <con4:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con4="http://www.bea.com/wli/sb/stages/config"/>
+                </con3:context>
+                <con3:actions>
+                    <con1:ifThenElse>
+                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7ef9</con5:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con4:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7ef6</con5:id>
+                                    <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>mapeoErrores</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQMapeoErrores</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPMapeoErrores</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQMapeoErrores">
+                                            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7ef8</con5:id>
+                                            <con1:expr>
+                                                <con4:xqueryTransform xmlns:con4="http://www.bea.com/wli/sb/stages/config">
+                                                    <con4:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con4:param name="MENSAJE_ERROR">
+                                                        <con4:path>fn:concat("FICBCO0327","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con4:path>
+                                                    </con4:param>
+                                                    <con4:param name="CODIGO_ERROR">
+                                                        <con4:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con4:path>
+                                                    </con4:param>
+                                                </con4:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:replace varName="header" contents-only="true">
+                                            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-2600186690613735434-72472c62.16b00652a3b.-7ef7</con5:id>
+                                            <con1:expr>
+                                                <con4:xqueryTransform xmlns:con4="http://www.bea.com/wli/sb/stages/config">
+                                                    <con4:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con4:param name="mapeoErroresResponse1">
+                                                        <con4:path>$RSPMapeoErrores</con4:path>
+                                                    </con4:param>
+                                                    <con4:param name="successIndicator">
+                                                        <con4:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con4:path>
+                                                    </con4:param>
+                                                </con4:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:replace>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con3:actions>
+            </con3:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con2:context xmlns:con2="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con2:context>
+                <con2:branch-table variable="header" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con2:xpath>
+                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                    </con2:xpath>
+                    <con2:branch name="HN01">
+                        <con2:operator>equals</con2:operator>
+                        <con2:value>'HN01'</con2:value>
+                        <con2:flow>
+                            <con2:pipeline-node name="HN01_EnviaMensajesIcBanking">
+                                <con2:request>HN01_EnviaMensajesIcBanking_request</con2:request>
+                                <con2:response>HN01_EnviaMensajesIcBanking_response</con2:response>
+                            </con2:pipeline-node>
+                        </con2:flow>
+                    </con2:branch>
+                    <con2:default-branch>
+                        <con2:flow>
+                            <con2:pipeline-node name="Default_EnviaMensajesIcBanking">
+                                <con2:request>Default_EnviaMensajesIcBanking_request</con2:request>
+                                <con2:response>Default_EnviaMensajesIcBanking_response</con2:response>
+                            </con2:pipeline-node>
+                        </con2:flow>
+                    </con2:default-branch>
+                </con2:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

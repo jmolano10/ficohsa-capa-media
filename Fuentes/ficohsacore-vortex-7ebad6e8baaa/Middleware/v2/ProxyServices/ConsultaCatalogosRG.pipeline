@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaCatalogosRG/wsdl/consultaCatalogosRegionalesPS"/>
+            <con:binding>
+                <con:name>consultaCatalogosRegionalesPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaCatalogosRegionalesPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-1260803192848677548-1a39f326.17a14346504.-7eab" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="request" name="ConsultaCatalogosRG_request">
+            <con:stage name="ConsultaCatalogos">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaCatalogosRegionalesTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/generaCatalogos" prefix="gen"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-5661500159768982106-6f2e6a9a.179cd9d288c.-7fe5</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ABKGT/generaCatalogos/biz/generaCatalogos_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>generaCatalogos</con1:operation>
+                        <con1:request>
+                            <con1:body>REQgeneraCatalogos</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPgeneraCatalogos</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQgeneraCatalogos">
+                                <con2:id>_ActionId-1260803192848677548-1a39f326.17a14346504.-7fd8</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaCatalogosRG/xq/generaCatalogosIn"/>
+                                        <con2:param name="consultaCatalogosRG">
+                                            <con2:path>$body/con:consultaCatalogosRG</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-1260803192848677548-1a39f326.17a14346504.-7fbd</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPgeneraCatalogos/gen:PV_CODIGO_ESTADO/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-1260803192848677548-1a39f326.17a14346504.-7f94</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPgeneraCatalogos/gen:PV_MENSAJE_ESTADO/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaCatalogosRG_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaURLClienteTypes" prefix="val"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaCatalogosRegionalesTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace contents-only="true" varName="header">
+                        <con2:id>_ActionId-1260803192848677548-1a39f326.17a14346504.-7ee5</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+{	if(upper-case($validationMessage) = 'SUCCESS')then(
+		<successIndicator>Success</successIndicator>
+	)else(
+		<successIndicator>{$errorCode}</successIndicator>,
+		<messages>{$validationMessage}</messages>
+	)
+}
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-1260803192848677548-1a39f326.17a14346504.-7ee4</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>upper-case($validationMessage) = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con2:id>_ActionId-1260803192848677548-1a39f326.17a14346504.-7ee3</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/ConsultaCatalogosRG/xq/consultaCatalogosRGOut"/>
+                                            <con2:param name="outputParameters1">
+                                                <con2:path>$RSPgeneraCatalogos</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id>_ActionId-1260803192848677548-1a39f326.17a14346504.-7ee2</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>&lt;con:consultaCatalogosRGResponse/></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-1260803192848677548-1a39f326.17a14346504.-7eab">
+            <con:stage name="ManejoError">
+                <con2:context xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionPuntosTarjetasTypes" prefix="ges" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/validaURLClienteTypes" prefix="val" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaCatalogosRegionalesTypes" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con2:context>
+                <con2:actions xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+                    <con1:replace contents-only="true" varName="header">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1260803192848677548-1a39f326.17a14346504.-7e38</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+    <successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+    <messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace contents-only="true" varName="body">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1260803192848677548-1a39f326.17a14346504.-7e37</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;con:consultaCatalogosRGResponse/></con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con3:reply xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                        <con3:id>_ActionId-1260803192848677548-1a39f326.17a14346504.-7e36</con3:id>
+                    </con3:reply>
+                </con2:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ConsultaCatalogosRG">
+                <con:request>ConsultaCatalogosRG_request</con:request>
+                <con:response>ConsultaCatalogosRG_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

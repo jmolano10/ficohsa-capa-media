@@ -1,0 +1,109 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Proxy as PagosMasivos.proxy
+    participant Internal as PagosMasivosInterno.proxy (Pipeline NI01)
+    participant CargadorMTR as cargadorArchivoLote (MTR)
+    participant MapeoErr as MapeoErrores.proxy
+
+    Note over Client, MapeoErr: Flujo Nicaragua (NI01) - PagosMasivos<br/>SIMPLIFICADO: Sin Bitácora, Sin Validación de Acceso
+
+    Client->>Proxy: SOAP Request
+    Note right of Client: Header: SourceBank=NI01<br/>Authentication: UserName/Password
+
+    Proxy->>Proxy: Validar Autenticación Custom Token
+
+    Proxy->>Proxy: Enrutamiento por Operación
+    Note right of Proxy: operation = 'pagosMasivos'
+
+    Proxy->>Internal: Forward Request
+
+    Internal->>Internal: Validación XSD
+    Note right of Internal: Schema: pagosMasivosTypes.xsd<br/>Element: pag:pagosMasivos
+
+    alt Validación XSD Fallida
+        Internal->>MapeoErr: Mapear Error
+        Internal->>Client: SOAP Response con Error
+    end
+
+    Internal->>Internal: Validación Servicio Regional
+    Note right of Internal: PV_SERVICE_ID: FICBCO0231<br/>PV_SOURCE_BANK: NI01
+
+    alt Región No Válida
+        Internal->>Client: SOAP Response con Error
+    end
+
+    Internal->>Internal: Enrutamiento Regional
+    Note right of Internal: Branch: SourceBank = 'NI01'<br/>Pipeline: NI01_PagosMasivosInterno
+
+    Note over Internal: ❌ SIN Bitácora Request
+    Note over Internal: ❌ SIN Validación de Acceso
+
+    Internal->>Internal: Transformar Request para MTR
+    Note right of Internal: XQuery: pagosMasivosInternoNIIn.xq<br/>Mapea OSB → estructura MTR<br/>peticionHostToHost:<br/>  cabeceraPeticion:<br/>    pais: NI<br/>    empresa: 01<br/>    usuario: del header<br/>    idCliente: del body
+
+    Internal->>Internal: Validar Request MTR contra WSDL
+    Note right of Internal: Schema: cargadorArchivoLoteEndpoint<br/>Element: ser1:cargarLotes
+
+    alt Validación WSDL Fallida
+        Internal->>MapeoErr: Mapear Error
+        Internal->>Client: SOAP Response con Error
+    end
+
+    Internal->>CargadorMTR: cargarLotes
+    Note right of Internal: Web Service SOAP<br/>Namespace: http://servicio.cargararchivolotews.mtrpmsv.cidenet.com.co/<br/>Operación: cargarLotes
+
+    Note over CargadorMTR: Procesamiento MTR
+    Note right of CargadorMTR: - Valida estructura<br/>- Procesa lote<br/>- Asigna ID banco<br/>- Retorna estado
+
+    CargadorMTR-->>Internal: cargarLotesResponse
+    Note right of CargadorMTR: respuestaHostToHost:<br/>  cabeceraRespuesta:<br/>    codigo: SUCCESS/ERROR<br/>    mensaje: descripción<br/>  cuerpoRespuesta:<br/>    idLoteBanco<br/>    idLoteCliente<br/>    estado
+
+    Internal->>Internal: Construir Response Header
+    Note right of Internal: XQuery: pagosMasivosInternoNIHeaderOut.xq<br/>successIndicator: codigo (directo)<br/>messages: mensaje (directo)
+
+    Internal->>Internal: Evaluar Success Indicator
+    Note right of Internal: if upper-case(successIndicator) = 'SUCCESS'
+
+    alt Procesamiento Exitoso
+        Internal->>Internal: Transformar Response Body
+        Note right of Internal: XQuery: pagosMasivosInternoNIOut.xq<br/>Mapea MTR → pagosMasivosResponse<br/>BANK_BATCH_ID: idLoteBanco<br/>CUSTOMER_BATCH_ID: idLoteCliente<br/>STATUS: estado
+    else Error en Procesamiento
+        Internal->>Internal: Response Body Vacío
+        Note right of Internal: pagosMasivosResponse vacío
+    end
+
+    Note over Internal: ❌ SIN Bitácora Response
+
+    Internal->>Internal: Mapeo de Errores (heredado)
+    Note right of Internal: if successIndicator != SUCCESS<br/>Invocar MapeoErrores
+
+    alt Error Detectado
+        Internal->>MapeoErr: mapeoErrores
+        Note right of Internal: CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0231$#$messages
+        MapeoErr-->>Internal: Error Mapeado
+        Internal->>Internal: Actualizar Header
+    end
+
+    Internal->>Proxy: Response
+    Proxy->>Client: SOAP Response
+    Note right of Proxy: Header: ResponseHeader<br/>Body: pagosMasivosResponse
+
+    Note over Client, MapeoErr: Flujo de Error
+
+    alt Error en Cualquier Punto
+        Internal->>Internal: Error Handler Activado (heredado)
+        Note right of Internal: Captura errorCode y errorMessage
+
+        Internal->>MapeoErr: mapeoErrores
+        MapeoErr-->>Internal: Error Mapeado
+
+        Internal->>Internal: Construir Response Error
+        Note right of Internal: Header: successIndicator=ERROR<br/>Body: pagosMasivosResponse vacío
+
+        Note over Internal: ❌ SIN Bitácora de Error
+
+        Internal->>Client: SOAP Response con Error
+    end
+
+    Note over Client, MapeoErr: RIESGOS IDENTIFICADOS NI01
+    Note right of Internal: ⚠️ Sin auditoría de transacciones<br/>⚠️ Sin control de acceso<br/>⚠️ Sin trazabilidad de errores<br/>⚠️ Imposible rastrear requests/responses

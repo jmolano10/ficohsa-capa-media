@@ -1,0 +1,799 @@
+<bpel:process name="CallBothEnginesGetBatchStatusSJ" targetNamespace="http://xmlns.oracle.com/SBRG_MassivePayment/SBRG_MassivePayment_Router/" bea:name="CallBothEnginesGetBatchStatusSJ" rescon:snippetVersion="1.0" xmlns:tns="http://xmlns.oracle.com/SBRG_MassivePayment/SBRG_MassivePayment_Router/" xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable" xmlns:rescon="http://www.bea.com/alsb/flow/resources/config" xmlns:bea="http://www.bea.com/bpel/ui/extensions" xmlns:ext="http://www.bea.com/bpel/extensions" xmlns:expr="http://www.bea.com/wli/sb/stages/config" xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config" xmlns:bind="http://www.ficohsa.com.hn/middleware.services/pagosMasivosPS/" xmlns:ns0="http://www.bea.com/wli/sb/reference" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:ns1="https://www.ficohsa.com/regional/massivePayment/apiPagosMasivosGatewayTypes" xmlns:ns2="http://www.bea.com/wli/sb/pipeline/config" xmlns:ns3="http://xmlns.oracle.com/SBRG_MassivePayment/SBRG_MassivePayment_Commons/LoggingRegionalRestBS" xmlns:ns4="http://xmlns.oracle.com/ServiceBusApplication/SBRG_MassivePayment_Router/ApiPagosMasivosGatewayRestBS">
+    <rescon:importInfo>
+        <rescon:schema-import ref="SBRG_MassivePayment_Router/Schemas/ApiPagosMasivosGatewayTypes"/>
+    </rescon:importInfo>
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="CallBothEnginesGetBatchStatusSJ" partnerLinkType="tns:CallBothEnginesGetBatchStatusSJ" myRole="CallBothEnginesGetBatchStatusSJ">
+	       </bpel:partnerLink>
+        <bpel:partnerLink name="ConsultaEstadoLote11gBS" partnerLinkType="tns:ConsultaEstadoLote11gBS" partnerRole="ConsultaEstadoLote11gBS"/>
+        <bpel:partnerLink name="ConsultaEstadoLoteSoapPS" partnerLinkType="tns:ConsultaEstadoLoteSoapPS" partnerRole="ConsultaEstadoLoteSoapPS"/>
+        <bpel:partnerLink name="ApiPagosMasivosGatewayRestBS" partnerLinkType="tns:ApiPagosMasivosGatewayRestBS" partnerRole="ApiPagosMasivosGatewayRestBS"/>
+        <bpel:partnerLink name="CallLoggingRegional" partnerLinkType="tns:CallLoggingRegional" partnerRole="CallLoggingRegional"/>
+    </bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request" messageType="bind:consultaEstadoLoteRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response" messageType="bind:consultaEstadoLoteResponse">
+	       </bpel:variable>
+        <bpel:variable name="responseOld" messageType="bind:consultaEstadoLoteResponse"/>
+        <bpel:variable name="responseNew" messageType="bind:consultaEstadoLoteResponse"/>
+        <bpel:variable name="sourceBank" type="xsd:string"/>
+        <bpel:variable name="destinationBank" type="xsd:string"/>
+        <bpel:variable name="user" type="xsd:string"/>
+        <bpel:variable name="version" type="xsd:string"/>
+        <bpel:variable name="service" type="xsd:string"/>
+        <bpel:variable name="endPoint" type="xsd:string"/>
+        <bpel:variable name="method" type="xsd:string"/>
+        <bpel:variable name="successIndicatorOld" type="xsd:string"/>
+        <bpel:variable name="successIndicatorNew" type="xsd:string"/>
+        <bpel:variable name="customerId" type="xsd:string"/>
+        <bpel:variable name="queryType" type="xsd:string"/>
+        <bpel:variable name="queryValue" type="xsd:string"/>
+        <bpel:variable name="requestApiGateway" messageType="ns4:System_inputMessage"/>
+        <bpel:variable name="responseApiGateway" messageType="ns4:System_outputMessage"/>
+        <bpel:variable name="system" type="xsd:string"/>
+        <bpel:variable name="protocol" type="xsd:string"/>
+        <bpel:variable name="operation" type="xsd:string"/>
+        <bpel:variable name="successIndicatorApiGateway" type="xsd:string"/>
+        <bpel:variable name="requestLoggingOld" messageType="ns3:SaveLogInFileSystem_inputMessage"/>
+        <bpel:variable name="requestLoggingNew" messageType="ns3:SaveLogInFileSystem_inputMessage"/>
+        <bpel:variable name="requestLoggingApiGateway" messageType="ns3:SaveLogInFileSystem_inputMessage"/>
+    </bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="CallBothEnginesGetBatchStatusSJ" operation="consultaEstadoLote" variable="request" createInstance="yes">
+	           <rescon:receiveInfo>
+                <rescon:wsdl ref="SBRG_MassivePayment_Commons_Virtual/Resources/PagosMasivos/consultaEstadoLotePS" binding="bind:consultaEstadoLotePSSOAP"/>
+            </rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:scope bea:name="ScopeVariablesGenerales">
+            <bpel:sequence>
+                <bpel:assign>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="sourceBank">
+                            <trf:expr>
+                                <expr:xqueryText>if(($request.RequestHeader/Region/SourceBank) and (data($request.RequestHeader/Region/SourceBank)!= '')) then
+    data($request.RequestHeader/Region/SourceBank)
+else(
+    'HN01'
+)</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="destinationBank">
+                            <trf:expr>
+                                <expr:xqueryText>if(($request.RequestHeader/Region/DestinationBank) and (data($request.RequestHeader/Region/DestinationBank)!= '')) then
+data($request.RequestHeader/Region/DestinationBank)
+else(
+$sourceBank
+)</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="protocol">
+                            <trf:expr>
+                                <expr:xqueryText>'SOAP'</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="user">
+                            <trf:expr>
+                                <expr:xqueryText>data($request.RequestHeader/Authentication/UserName)</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="version">
+                            <trf:expr>
+                                <expr:xqueryText>'v1'</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="service">
+                            <trf:expr>
+                                <expr:xqueryText>'MassivePayment/Router/CallBothEnginesGetBatchStatusSJ'</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="endPoint">
+                            <trf:expr>
+                                <expr:xqueryText>'SBRG_MassivePayment_Router/SJ/CallBothEnginesGetBatchStatusSJ.flow'</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="operation">
+                            <trf:expr>
+                                <expr:xqueryText>'consultaEstadoLote'</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                </bpel:assign>
+            </bpel:sequence>
+        </bpel:scope>
+        <bpel:scope bea:name="ScopeVariablesParaApiGateway">
+            <bpel:sequence>
+                <bpel:assign>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="method">
+                            <trf:expr>
+                                <expr:xqueryText>'CONSULTAESTADOLOTE'</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="customerId">
+                            <trf:expr>
+                                <expr:xqueryText>fn:data($request.parameters/CUSTOMER_ID)</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="queryType">
+                            <trf:expr>
+                                <expr:xqueryTransform>
+                                    <expr:resource ref="SBRG_MassivePayment_Router/Transformations/GetQueryType"/>
+                                    <expr:param name="body">
+                                        <expr:path>$request.parameters</expr:path>
+                                    </expr:param>
+                                    <expr:param name="operation">
+                                        <expr:path>'consultaEstadoLote'</expr:path>
+                                    </expr:param>
+                                </expr:xqueryTransform>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="queryValue">
+                            <trf:expr>
+                                <expr:xqueryTransform>
+                                    <expr:resource ref="SBRG_MassivePayment_Router/Transformations/GetQueryValue"/>
+                                    <expr:param name="body">
+                                        <expr:path>$request.parameters</expr:path>
+                                    </expr:param>
+                                    <expr:param name="operation">
+                                        <expr:path>'consultaEstadoLote'</expr:path>
+                                    </expr:param>
+                                </expr:xqueryTransform>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="requestApiGateway.request">
+                            <trf:expr>
+                                <expr:xqueryTransform>
+                                    <expr:resource ref="SBRG_MassivePayment_Router/Transformations/ServiceToAPIGateway"/>
+                                    <expr:param name="destinationBank">
+                                        <expr:path>$destinationBank</expr:path>
+                                    </expr:param>
+                                    <expr:param name="method">
+                                        <expr:path>$method</expr:path>
+                                    </expr:param>
+                                    <expr:param name="customerId">
+                                        <expr:path>$customerId</expr:path>
+                                    </expr:param>
+                                    <expr:param name="queryValue">
+                                        <expr:path>$queryValue</expr:path>
+                                    </expr:param>
+                                    <expr:param name="sourceBank">
+                                        <expr:path>$sourceBank</expr:path>
+                                    </expr:param>
+                                    <expr:param name="queryType">
+                                        <expr:path>$queryType</expr:path>
+                                    </expr:param>
+                                </expr:xqueryTransform>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                </bpel:assign>
+            </bpel:sequence>
+        </bpel:scope>
+        <bpel:scope bea:name="ScopeLoggingRequestApiGateway">
+            <bpel:faultHandlers>
+                <bpel:catchAll>
+                    <bpel:sequence>
+                        <bpel:empty/>
+                    </bpel:sequence>
+                </bpel:catchAll>
+            </bpel:faultHandlers>
+            <bpel:sequence>
+                <bpel:assign>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="requestLoggingApiGateway.request">
+                            <trf:expr>
+                                <expr:xqueryTransform>
+                                    <expr:resource ref="SBRG_MassivePayment_Commons/Transformations/ServiceToLog"/>
+                                    <expr:param name="destinationBank">
+                                        <expr:path>$destinationBank</expr:path>
+                                    </expr:param>
+                                    <expr:param name="method">
+                                        <expr:path>$protocol</expr:path>
+                                    </expr:param>
+                                    <expr:param name="errorFlowName">
+                                        <expr:path>''</expr:path>
+                                    </expr:param>
+                                    <expr:param name="channel">
+                                        <expr:path>$user</expr:path>
+                                    </expr:param>
+                                    <expr:param name="messageError">
+                                        <expr:path>''</expr:path>
+                                    </expr:param>
+                                    <expr:param name="body">
+                                        <expr:path>$requestApiGateway.request</expr:path>
+                                    </expr:param>
+                                    <expr:param name="version">
+                                        <expr:path>$version</expr:path>
+                                    </expr:param>
+                                    <expr:param name="targetSystem">
+                                        <expr:path>'APIGATEWAYPMSV'</expr:path>
+                                    </expr:param>
+                                    <expr:param name="GlobalId">
+                                        <expr:path>''</expr:path>
+                                    </expr:param>
+                                    <expr:param name="sourceBank">
+                                        <expr:path>$sourceBank</expr:path>
+                                    </expr:param>
+                                    <expr:param name="endpoint">
+                                        <expr:path>$endPoint</expr:path>
+                                    </expr:param>
+                                    <expr:param name="messageType">
+                                        <expr:path>'REQUEST'</expr:path>
+                                    </expr:param>
+                                    <expr:param name="service">
+                                        <expr:path>$service</expr:path>
+                                    </expr:param>
+                                    <expr:param name="codeError">
+                                        <expr:path>''</expr:path>
+                                    </expr:param>
+                                    <expr:param name="state">
+                                        <expr:path>''</expr:path>
+                                    </expr:param>
+                                    <expr:param name="operation">
+                                        <expr:path>$operation</expr:path>
+                                    </expr:param>
+                                    <expr:param name="value">
+                                        <expr:path>$queryValue</expr:path>
+                                    </expr:param>
+                                    <expr:param name="user">
+                                        <expr:path>$user</expr:path>
+                                    </expr:param>
+                                    <expr:param name="parameters">
+                                        <expr:path>''</expr:path>
+                                    </expr:param>
+                                    <expr:param name="key">
+                                        <expr:path>$queryType</expr:path>
+                                    </expr:param>
+                                    <expr:param name="errorDetails">
+                                        <expr:path>''</expr:path>
+                                    </expr:param>
+                                </expr:xqueryTransform>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                </bpel:assign>
+                <bpel:invoke partnerLink="CallLoggingRegional" operation="SaveLogInFileSystem" inputVariable="requestLoggingApiGateway">
+                    <rescon:invokeInfo>
+                        <rescon:service ref="SBRG_MassivePayment_Router/PP/CallLoggingRegionalPP" xsi:type="ns2:PipelineRef"/>
+                    </rescon:invokeInfo>
+                </bpel:invoke>
+            </bpel:sequence>
+        </bpel:scope>
+        <bpel:flow>
+            <bpel:scope bea:name="ScopeCallOldEngine">
+                <bpel:faultHandlers>
+                    <bpel:catchAll>
+                        <bpel:sequence>
+                            <bpel:empty/>
+                            <bpel:assign>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="successIndicatorOld">
+                                        <trf:expr>
+                                            <expr:xqueryText>'ERROR'</expr:xqueryText>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                            </bpel:assign>
+                        </bpel:sequence>
+                    </bpel:catchAll>
+                </bpel:faultHandlers>
+                <bpel:sequence>
+                    <bpel:invoke outputVariable="responseOld" inputVariable="request" operation="consultaEstadoLote" partnerLink="ConsultaEstadoLote11gBS">
+                        <rescon:invokeInfo>
+                            <rescon:service xsi:type="ns0:BusinessServiceRef" ref="SBRG_MassivePayment_Router/BS/ConsultaEstadoLote11gBS"/>
+                        </rescon:invokeInfo>
+                    </bpel:invoke>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="successIndicatorOld">
+                                <trf:expr>
+                                    <expr:xqueryText>fn:upper-case(fn:data($responseOld.ResponseHeader/successIndicator))</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                    <bpel:scope bea:name="ScopeLoggingOldEngine">
+                        <bpel:faultHandlers>
+                            <bpel:catchAll>
+                                <bpel:sequence>
+                                    <bpel:empty/>
+                                </bpel:sequence>
+                            </bpel:catchAll>
+                        </bpel:faultHandlers>
+                        <bpel:sequence>
+                            <bpel:assign>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="requestLoggingOld.request">
+                                        <trf:expr>
+                                            <expr:xqueryTransform>
+                                                <expr:resource ref="SBRG_MassivePayment_Commons/Transformations/ServiceToLog"/>
+                                                <expr:param name="destinationBank">
+                                                    <expr:path>$destinationBank</expr:path>
+                                                </expr:param>
+                                                <expr:param name="method">
+                                                    <expr:path>$protocol</expr:path>
+                                                </expr:param>
+                                                <expr:param name="errorFlowName">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="channel">
+                                                    <expr:path>$user</expr:path>
+                                                </expr:param>
+                                                <expr:param name="messageError">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="body">
+                                                    <expr:path><![CDATA[<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+   <soap-env:Header xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/">
+      { $responseOld.ResponseHeader }
+   </soap-env:Header>
+   <soap-env:Body xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/">
+      { $responseOld.result }
+   </soap-env:Body>
+</soapenv:Envelope>]]></expr:path>
+                                                </expr:param>
+                                                <expr:param name="version">
+                                                    <expr:path>$version</expr:path>
+                                                </expr:param>
+                                                <expr:param name="targetSystem">
+                                                    <expr:path>'OLDENGINEPMSV'</expr:path>
+                                                </expr:param>
+                                                <expr:param name="GlobalId">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="sourceBank">
+                                                    <expr:path>$sourceBank</expr:path>
+                                                </expr:param>
+                                                <expr:param name="endpoint">
+                                                    <expr:path>$endPoint</expr:path>
+                                                </expr:param>
+                                                <expr:param name="messageType">
+                                                    <expr:path>'RESPONSE'</expr:path>
+                                                </expr:param>
+                                                <expr:param name="service">
+                                                    <expr:path>$service</expr:path>
+                                                </expr:param>
+                                                <expr:param name="codeError">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="state">
+                                                    <expr:path>$successIndicatorOld</expr:path>
+                                                </expr:param>
+                                                <expr:param name="operation">
+                                                    <expr:path>$operation</expr:path>
+                                                </expr:param>
+                                                <expr:param name="value">
+                                                    <expr:path>$queryValue</expr:path>
+                                                </expr:param>
+                                                <expr:param name="user">
+                                                    <expr:path>$user</expr:path>
+                                                </expr:param>
+                                                <expr:param name="parameters">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="key">
+                                                    <expr:path>$queryType</expr:path>
+                                                </expr:param>
+                                                <expr:param name="errorDetails">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                            </expr:xqueryTransform>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                            </bpel:assign>
+                            <bpel:invoke partnerLink="CallLoggingRegional" portType="ns3:LoggingRegionalRestBS_ptt"
+                                         operation="SaveLogInFileSystem" inputVariable="requestLoggingOld">
+                                <rescon:invokeInfo>
+                                    <rescon:service ref="SBRG_MassivePayment_Router/PP/CallLoggingRegionalPP"
+                                                    xsi:type="ns2:PipelineRef"/>
+                                </rescon:invokeInfo>
+                            </bpel:invoke>
+                        </bpel:sequence>
+                    </bpel:scope>
+                </bpel:sequence>
+            </bpel:scope>
+            <bpel:scope bea:name="ScopeCallNewEngine">
+                <bpel:faultHandlers>
+                    <bpel:catchAll>
+                        <bpel:sequence>
+                            <bpel:empty/>
+                            <bpel:assign>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="successIndicatorNew">
+                                        <trf:expr>
+                                            <expr:xqueryText>'ERROR'</expr:xqueryText>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                            </bpel:assign>
+                        </bpel:sequence>
+                    </bpel:catchAll>
+                </bpel:faultHandlers>
+                <bpel:sequence>
+                    <bpel:invoke partnerLink="ConsultaEstadoLoteSoapPS" operation="consultaEstadoLote" inputVariable="request" outputVariable="responseNew">
+                        <rescon:invokeInfo>
+                            <rescon:service ref="SBRG_MassivePayment_Commons_Virtual/PS/PagosMasivos/ConsultaEstadoLoteSoapPS" xsi:type="ns0:ProxyRef"/>
+                        </rescon:invokeInfo>
+                    </bpel:invoke>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="successIndicatorNew">
+                                <trf:expr>
+                                    <expr:xqueryText>fn:upper-case(fn:data($responseNew.ResponseHeader/successIndicator))</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                    <bpel:scope bea:name="ScopeLoggingNewEngine">
+                        <bpel:faultHandlers>
+                            <bpel:catchAll>
+                                <bpel:sequence>
+                                    <bpel:empty/>
+                                </bpel:sequence>
+                            </bpel:catchAll>
+                        </bpel:faultHandlers>
+                        <bpel:sequence>
+                            <bpel:assign>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="requestLoggingNew.request">
+                                        <trf:expr>
+                                            <expr:xqueryTransform>
+                                                <expr:resource ref="SBRG_MassivePayment_Commons/Transformations/ServiceToLog"/>
+                                                <expr:param name="destinationBank">
+                                                    <expr:path>$destinationBank</expr:path>
+                                                </expr:param>
+                                                <expr:param name="method">
+                                                    <expr:path>$protocol</expr:path>
+                                                </expr:param>
+                                                <expr:param name="errorFlowName">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="channel">
+                                                    <expr:path>$user</expr:path>
+                                                </expr:param>
+                                                <expr:param name="messageError">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="body">
+                                                    <expr:path><![CDATA[<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+   <soap-env:Header xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/">
+      { $responseNew.ResponseHeader }
+   </soap-env:Header>
+   <soap-env:Body xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/">
+      { $responseNew.result }
+   </soap-env:Body>
+</soapenv:Envelope>]]></expr:path>
+                                                </expr:param>
+                                                <expr:param name="version">
+                                                    <expr:path>$version</expr:path>
+                                                </expr:param>
+                                                <expr:param name="targetSystem">
+                                                    <expr:path>'NEWENGINEPMSV'</expr:path>
+                                                </expr:param>
+                                                <expr:param name="GlobalId">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="sourceBank">
+                                                    <expr:path>$sourceBank</expr:path>
+                                                </expr:param>
+                                                <expr:param name="endpoint">
+                                                    <expr:path>$endPoint</expr:path>
+                                                </expr:param>
+                                                <expr:param name="messageType">
+                                                    <expr:path>'RESPONSE'</expr:path>
+                                                </expr:param>
+                                                <expr:param name="service">
+                                                    <expr:path>$service</expr:path>
+                                                </expr:param>
+                                                <expr:param name="codeError">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="state">
+                                                    <expr:path>$successIndicatorNew</expr:path>
+                                                </expr:param>
+                                                <expr:param name="operation">
+                                                    <expr:path>$operation</expr:path>
+                                                </expr:param>
+                                                <expr:param name="value">
+                                                    <expr:path>$queryValue</expr:path>
+                                                </expr:param>
+                                                <expr:param name="user">
+                                                    <expr:path>$user</expr:path>
+                                                </expr:param>
+                                                <expr:param name="parameters">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="key">
+                                                    <expr:path>$queryType</expr:path>
+                                                </expr:param>
+                                                <expr:param name="errorDetails">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                            </expr:xqueryTransform>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                            </bpel:assign>
+                            <bpel:invoke partnerLink="CallLoggingRegional" portType="ns3:LoggingRegionalRestBS_ptt"
+                                         operation="SaveLogInFileSystem" inputVariable="requestLoggingNew">
+                                <rescon:invokeInfo>
+                                    <rescon:service ref="SBRG_MassivePayment_Router/PP/CallLoggingRegionalPP"
+                                                    xsi:type="ns2:PipelineRef"/>
+                                </rescon:invokeInfo>
+                            </bpel:invoke>
+                        </bpel:sequence>
+                    </bpel:scope>
+                </bpel:sequence>
+            </bpel:scope>
+            <bpel:scope bea:name="ScopeCallApiGateway">
+                <bpel:faultHandlers>
+                    <bpel:catchAll>
+                        <bpel:sequence>
+                            <bpel:empty/>
+                            <bpel:assign>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="successIndicatorApiGateway">
+                                        <trf:expr>
+                                            <expr:xqueryText>'ERROR'</expr:xqueryText>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                            </bpel:assign>
+                        </bpel:sequence>
+                    </bpel:catchAll>
+                </bpel:faultHandlers>
+                <bpel:sequence>
+                    <bpel:invoke partnerLink="ApiPagosMasivosGatewayRestBS" operation="System" inputVariable="requestApiGateway" outputVariable="responseApiGateway">
+                        <rescon:invokeInfo>
+                            <rescon:service ref="SBRG_MassivePayment_Router/BS/ApiPagosMasivosGatewayRestBS" xsi:type="ns0:BusinessServiceRef"/>
+                        </rescon:invokeInfo>
+                    </bpel:invoke>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="successIndicatorApiGateway">
+                                <trf:expr>
+                                    <expr:xqueryText>fn:upper-case(fn:data($responseApiGateway.reply/successIndicator))</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                    <bpel:scope bea:name="ScopeLoggingNewEngine">
+                        <bpel:faultHandlers>
+                            <bpel:catchAll>
+                                <bpel:sequence>
+                                    <bpel:empty/>
+                                </bpel:sequence>
+                            </bpel:catchAll>
+                        </bpel:faultHandlers>
+                        <bpel:sequence>
+                            <bpel:assign>
+                                <bpel:extensionAssignOperation>
+                                    <trf:assign varName="requestLoggingApiGateway.request">
+                                        <trf:expr>
+                                            <expr:xqueryTransform>
+                                                <expr:resource ref="SBRG_MassivePayment_Commons/Transformations/ServiceToLog"/>
+                                                <expr:param name="destinationBank">
+                                                    <expr:path>$destinationBank</expr:path>
+                                                </expr:param>
+                                                <expr:param name="method">
+                                                    <expr:path>$protocol</expr:path>
+                                                </expr:param>
+                                                <expr:param name="errorFlowName">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="channel">
+                                                    <expr:path>$user</expr:path>
+                                                </expr:param>
+                                                <expr:param name="messageError">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="body">
+                                                    <expr:path>$responseApiGateway.reply</expr:path>
+                                                </expr:param>
+                                                <expr:param name="version">
+                                                    <expr:path>$version</expr:path>
+                                                </expr:param>
+                                                <expr:param name="targetSystem">
+                                                    <expr:path>'APIGATEWAYPMSV'</expr:path>
+                                                </expr:param>
+                                                <expr:param name="GlobalId">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="sourceBank">
+                                                    <expr:path>$sourceBank</expr:path>
+                                                </expr:param>
+                                                <expr:param name="endpoint">
+                                                    <expr:path>$endPoint</expr:path>
+                                                </expr:param>
+                                                <expr:param name="messageType">
+                                                    <expr:path>'RESPONSE'</expr:path>
+                                                </expr:param>
+                                                <expr:param name="service">
+                                                    <expr:path>$service</expr:path>
+                                                </expr:param>
+                                                <expr:param name="codeError">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="state">
+                                                    <expr:path>$successIndicatorApiGateway</expr:path>
+                                                </expr:param>
+                                                <expr:param name="operation">
+                                                    <expr:path>$operation</expr:path>
+                                                </expr:param>
+                                                <expr:param name="value">
+                                                    <expr:path>$queryValue</expr:path>
+                                                </expr:param>
+                                                <expr:param name="user">
+                                                    <expr:path>$user</expr:path>
+                                                </expr:param>
+                                                <expr:param name="parameters">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                                <expr:param name="key">
+                                                    <expr:path>$queryType</expr:path>
+                                                </expr:param>
+                                                <expr:param name="errorDetails">
+                                                    <expr:path>''</expr:path>
+                                                </expr:param>
+                                            </expr:xqueryTransform>
+                                        </trf:expr>
+                                    </trf:assign>
+                                </bpel:extensionAssignOperation>
+                            </bpel:assign>
+                            <bpel:invoke partnerLink="CallLoggingRegional" portType="ns3:LoggingRegionalRestBS_ptt"
+                                         operation="SaveLogInFileSystem" inputVariable="requestLoggingApiGateway">
+                                <rescon:invokeInfo>
+                                    <rescon:service ref="SBRG_MassivePayment_Router/PP/CallLoggingRegionalPP"
+                                                    xsi:type="ns2:PipelineRef"/>
+                                </rescon:invokeInfo>
+                            </bpel:invoke>
+                        </bpel:sequence>
+                    </bpel:scope>
+                </bpel:sequence>
+            </bpel:scope>
+        </bpel:flow>
+        <bpel:scope>
+            <bpel:faultHandlers>
+                <bpel:catchAll>
+                    <bpel:sequence>
+                        <bpel:empty/>
+                        <bpel:assign>
+                            <bpel:extensionAssignOperation>
+                                <trf:assign varName="system">
+                                    <trf:expr>
+                                        <expr:xqueryText>'OLD'</expr:xqueryText>
+                                    </trf:expr>
+                                </trf:assign>
+                            </bpel:extensionAssignOperation>
+                        </bpel:assign>
+                    </bpel:sequence>
+                </bpel:catchAll>
+            </bpel:faultHandlers>
+            <bpel:sequence>
+                <bpel:assign>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="system">
+                            <trf:expr>
+                                <expr:xqueryText>fn:data($responseApiGateway.reply/system)</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                </bpel:assign>
+            </bpel:sequence>
+        </bpel:scope>
+        <bpel:if>
+            <bpel:condition>$successIndicatorOld='SUCCESS'</bpel:condition>
+            <bpel:sequence>
+                <bpel:empty/>
+                <bpel:assign>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="response.ResponseHeader">
+                            <trf:expr>
+                                <expr:xqueryText>$responseOld.ResponseHeader</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                    <bpel:extensionAssignOperation>
+                        <trf:assign varName="response.result">
+                            <trf:expr>
+                                <expr:xqueryText>$responseOld.result</expr:xqueryText>
+                            </trf:expr>
+                        </trf:assign>
+                    </bpel:extensionAssignOperation>
+                </bpel:assign>
+            </bpel:sequence>
+            <bpel:elseif>
+                <bpel:condition>$successIndicatorNew='SUCCESS'</bpel:condition>
+                <bpel:sequence>
+                    <bpel:empty/>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="response.ResponseHeader">
+                                <trf:expr>
+                                    <expr:xqueryText>$responseNew.ResponseHeader</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="response.result">
+                                <trf:expr>
+                                    <expr:xqueryText>$responseNew.result</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                </bpel:sequence>
+            </bpel:elseif>
+            <bpel:elseif>
+                <bpel:condition>$system='OLD'</bpel:condition>
+                <bpel:sequence>
+                    <bpel:empty/>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="response.ResponseHeader">
+                                <trf:expr>
+                                    <expr:xqueryText>$responseOld.ResponseHeader</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="response.result">
+                                <trf:expr>
+                                    <expr:xqueryText>$responseOld.result</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                </bpel:sequence>
+            </bpel:elseif>
+            <bpel:else>
+                <bpel:sequence>
+                    <bpel:empty/>
+                    <bpel:assign>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="response.ResponseHeader">
+                                <trf:expr>
+                                    <expr:xqueryText>$responseNew.ResponseHeader</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                        <bpel:extensionAssignOperation>
+                            <trf:assign varName="response.result">
+                                <trf:expr>
+                                    <expr:xqueryText>$responseNew.result</expr:xqueryText>
+                                </trf:expr>
+                            </trf:assign>
+                        </bpel:extensionAssignOperation>
+                    </bpel:assign>
+                </bpel:sequence>
+            </bpel:else>
+        </bpel:if>
+        <bpel:reply partnerLink="CallBothEnginesGetBatchStatusSJ" operation="consultaEstadoLote" variable="response"/>
+    </bpel:sequence>
+</bpel:process>

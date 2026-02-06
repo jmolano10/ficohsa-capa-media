@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaTarjetasCreditoPorCliente/wsdl/consultaTarjetasCreditoPorClientePS"/>
+            <con:binding>
+                <con:name>consultaTarjetasCreditoPorClientePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaTarjetasCreditoPorCliente/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-329507440137599411--6de664c9.17156653d53.-7f0b" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="request" name="ConsultaTarjetasCreditoPorClienteGT_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjetasActivasCliente" prefix="con1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaTarjetasCreditoPorClienteTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="codPais">
+                        <con2:id>_ActionId-329507440137599411--6de664c9.17156653d53.-7f0c</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con2:param name="sentidoConversion">
+                                    <con2:path>"OSB-ISO3"</con2:path>
+                                </con2:param>
+                                <con2:param name="codigoPais">
+                                    <con2:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-329507440137599411--6de664c9.17156653d53.-7fd5</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataGT/conDatoTarjetasActivasCliente/biz/conDatoTarjetasActivasCliente_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>conDatoTarjetasActivasCliente</con1:operation>
+                        <con1:request>
+                            <con1:body>REQConDatoTarjetasActivasCliente</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPConDatoTarjetasActivasCliente</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQConDatoTarjetasActivasCliente">
+                                <con2:id>_ActionId-329507440137599411--6de664c9.17156653d53.-7fd3</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaTarjetasCreditoPorCliente/xq/conDatosTarjetasActivasClienteGTIn"/>
+                                        <con2:param name="consultaTarjetasCreditoPorCliente">
+                                            <con2:path>$body/con:consultaTarjetasCreditoPorCliente</con2:path>
+                                        </con2:param>
+                                        <con2:param name="codigoPais">
+                                            <con2:path>$codPais</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-329507440137599411--6de664c9.17156653d53.-7fb6</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>fn:string($RSPConDatoTarjetasActivasCliente/con1:CodigoError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-329507440137599411--6de664c9.17156653d53.-7fa1</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if($errorCode != '-1')then (
+	string($RSPConDatoTarjetasActivasCliente/con1:MensajeError/text())
+)else('')</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaTarjetasCreditoPorClienteGT_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaTarjetasCreditoPorClienteTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-6038293603495386007--3b1d5ea4.171503e2199.-7fdf</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage=''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="header">
+                                    <con2:id>_ActionId-6038293603495386007--3b1d5ea4.171503e2199.-7fce</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText>&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con2:id>_ActionId-6038293603495386007--3b1d5ea4.171503e2199.-7f76</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/ConsultaTarjetasCreditoPorCliente/xq/consultaTarjetasCreditoPorClienteGTOut"/>
+                                            <con2:param name="outputParameters">
+                                                <con2:path>$RSPConDatoTarjetasActivasCliente</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="header">
+                                <con2:id>_ActionId-6038293603495386007--3b1d5ea4.171503e2199.-7fb7</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>Error</successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id>_ActionId-6038293603495386007--3b1d5ea4.171503e2199.-7f9c</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>&lt;con:consultaTarjetasCreditoPorClienteResponse/></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-329507440137599411--6de664c9.17156653d53.-7f0b">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaTarjetasCreditoPorClienteTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace contents-only="true" varName="header">
+                        <con2:id>_ActionId-329507440137599411--6de664c9.17156653d53.-7efc</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-329507440137599411--6de664c9.17156653d53.-7ee8</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;con:consultaTarjetasCreditoPorClienteResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-329507440137599411--6de664c9.17156653d53.-7ec3</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ConsultaTarjetasCreditoPorClienteGT">
+                <con:request>ConsultaTarjetasCreditoPorClienteGT_request</con:request>
+                <con:response>ConsultaTarjetasCreditoPorClienteGT_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

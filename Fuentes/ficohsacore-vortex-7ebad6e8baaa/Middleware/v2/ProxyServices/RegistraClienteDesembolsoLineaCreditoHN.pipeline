@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/RegistraClienteDesembolsoLineaCredito/wsdl/registraClienteDesembolsoLineaCreditoPS"/>
+            <con:binding>
+                <con:name>registraClienteDesembolsoLineaCreditoPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/registraClienteDesembolsoLineaCreditoPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-1514576921039790618--46dc5c0.16d69ff054c.-7f71" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="request" name="RegistraClienteDLCHN_request">
+            <con:stage name="RegistrarClienteDLC">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/registraClienteSolEmprendedor" prefix="reg"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/serviciosEmpresarialesTypes" prefix="ser"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-748037937011439740-2c497fd1.16d82af5e0f.-2d13</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ServiciosEmpresariales/registraClienteSolEmprendedor/biz/registraClienteSolEmprendedor_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>registraClienteSolEmprendedor</con1:operation>
+                        <con1:request>
+                            <con1:body>REQRegistraClienteSolEmprendedor</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPRegistraClienteSolEmprendedor</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQRegistraClienteSolEmprendedor">
+                                <con2:id>_ActionId-8147075661852338498--3907fe05.16d8937bfcc.-7f71</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/RegistraClienteDesembolsoLineaCredito/xq/registraClienteSolEmprendedorHNIn"/>
+                                        <con2:param name="registraClienteDesembolsoLineaCredito">
+                                            <con2:path>$body/ser:registraClienteDesembolsoLineaCredito</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-476142061429915580--4bdb0e9f.16d8e66e3d4.-7e5b</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>$RSPRegistraClienteSolEmprendedor/reg:P_SUCCESSINDICATOR/text()</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-476142061429915580--4bdb0e9f.16d8e66e3d4.-7e3e</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if ($errorCode != 'SUCCESS') then (
+	$RSPRegistraClienteSolEmprendedor/reg:P_MESSAGES/text()
+)else('')</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="RegistraClienteDLCHN_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/serviciosEmpresarialesTypes" prefix="ser"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace contents-only="true" varName="header">
+                        <con2:id>_ActionId-476142061429915580--4bdb0e9f.16d8e66e3d4.-7d77</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[if ($validationMessage = '') then (
+	<aut:ResponseHeader>
+		<successIndicator>Success</successIndicator>
+	</aut:ResponseHeader>
+)else(
+	<aut:ResponseHeader>
+		<successIndicator>{ $errorCode }</successIndicator>
+		<messages>{$validationMessage}</messages>
+	</aut:ResponseHeader>
+)]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace contents-only="true" varName="body">
+                        <con2:id>_ActionId-476142061429915580--4bdb0e9f.16d8e66e3d4.-7d56</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;ser:registraClienteDesembolsoLineaCreditoResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-1514576921039790618--46dc5c0.16d69ff054c.-7f71">
+            <con:stage name="ManejoError">
+                <con:context xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con3:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaBarrioColoniaTypes" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/SubscribeEstadoCuentaTCTypes" prefix="sub" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/actualizaDatosClienteTypes" prefix="act" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/serviciosEmpresarialesTypes" prefix="ser" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con2:replace contents-only="true" varName="header">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1514576921039790618--46dc5c0.16d69ff054c.-7efe</con3:id>
+                        <con2:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1514576921039790618--46dc5c0.16d69ff054c.-7efd</con3:id>
+                        <con2:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;ser:registraClienteDesembolsoLineaCreditoResponse/></con3:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con3:reply xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                        <con3:id>_ActionId-1514576921039790618--46dc5c0.16d69ff054c.-7efc</con3:id>
+                    </con3:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="RegistraClienteDLCHN">
+                <con:request>RegistraClienteDLCHN_request</con:request>
+                <con:response>RegistraClienteDLCHN_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>
