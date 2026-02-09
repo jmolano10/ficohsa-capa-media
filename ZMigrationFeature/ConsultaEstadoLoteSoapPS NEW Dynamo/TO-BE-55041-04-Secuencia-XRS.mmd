@@ -1,0 +1,123 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Estado Lote Comp (PM) <br> Epica 54856: ConsultaEstadoLotePagosMasivos <br> HU 55041:  GET - /payments/payment-batch-status/v1/retrieve
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant APIV1 as API Consulta Estado Lote V1 (PM) <br> HU 55039:  GET - /payments/payment-execution-batch-retrieve/v1/retrieve-status
+    participant APIV2 as API Consulta Estado Lote V2 (PM) <br> HU 55040:  GET - /payments/payment-execution-batch-retrieve/v2/retrieve-status
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Regional (HN01 | GT01 | NI01 | PA01) - Consulta Estado Lote Pagos Masivos v1
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: customerReference, bankBatchId, batchUploadDate
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> customerReference (obligatorio), bankBatchId (obligatorio)
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "PAYMENT_BATCH_STATUS" <br> name: "retrieve" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización
+
+    else Consulta  parametros en Lambda Parámetros
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "PAYMENT_BATCH_STATUS" <br> name: "retrieve" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | GT01 | NI01 | PA01 
+
+    API->>API: Construye Request API Consulta Estado Lote Pagos Masivos V2
+    Note over API: Mapeo: customerReference = request.customerReference <br> bankBatchId = request.bankBatchId <br> batchUploadDate = request.batchUploadDate
+
+    API->>APIV1: Consume API Consulta Estado Lote Pagos Masivos V1
+    Note over API, Lambda: queryParam: queryParam: customerReference, bankBatchId, batchUploadDate
+
+    API->>CW: Log Request WS API Consulta Estado Lote Pagos Masivos V1
+    Note right of API: Logea todos los campos del request para monitoreo y trazabilidad
+
+    APIV1->>API: Response WS API Consulta Estado Lote Pagos Masivos V1
+    Note over APIV1: Response: <br> 19 Campos
+
+    API->>CW: Log Response WS API Consulta Estado Lote Pagos Masivos V1
+    Note right of API: Logea todos los campos del response para monitoreo y trazabilidad
+
+    API->>API: Evalúa Response WS API Consulta Estado Lote Pagos Masivos V1
+
+    alt Response API V1 exitosa HTTP Code == 200
+       
+       API->>API: Construye response API
+        Note over API: Mapeo: <br> 19 Campos
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    else Response API V1 con error Code != 200
+        
+        API->>API: Construye Request API Consulta Estado Lote Pagos Masivos V2
+        Note over API: Mapeo: customerReference = request.customerReference <br> bankBatchId = request.bankBatchId <br> batchUploadDate = request.batchUploadDate
+
+        API->>APIV2: Consume API Consulta Estado Lote Pagos Masivos V2
+        Note over API, Lambda: queryParam: queryParam: customerReference, bankBatchId, batchUploadDate
+
+        API->>CW: Log Request WS API Consulta Estado Lote Pagos Masivos V2
+        Note right of API: Logea todos los campos del request para monitoreo y trazabilidad
+
+        APIV2->>API: Response WS API Consulta Estado Lote Pagos Masivos V2
+        Note over APIV2: Response: <br> 19 Campos
+
+        API->>CW: Log Response WS API Consulta Estado Lote Pagos Masivos V2
+        Note right of API: Logea todos los campos del response para monitoreo y trazabilidad
+
+        API->>API: Evalúa Response WS API Consulta Estado Lote Pagos Masivos V2
+
+        alt Response API V2 exitosa HTTP Code == 200
+            
+            API->>API: Construye response API
+            Note over API: Mapeo: <br> 19 Campos
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+
+        else Response API V2 con error Code != 200
+
+            API-->> Consumidor: Retorna error 
+            Note left of API: HTTP Code y mensaje de error retornado por API V1
+
+        end
+    
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
