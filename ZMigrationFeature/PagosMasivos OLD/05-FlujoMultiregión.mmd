@@ -1,0 +1,220 @@
+flowchart TD
+    Start([Cliente/Aplicación]) --> ProxyEntry[PagosMasivos.proxy<br/>Endpoint: /Middleware/OperationsAndExecution/Payments/PagosMasivos]
+    
+    ProxyEntry --> Auth{Custom Token<br/>Authentication}
+    Auth -->|Invalid| AuthError[Error: Authentication Failed]
+    AuthError --> End([Response Error])
+    
+    Auth -->|Valid| Pipeline[PagosMasivos.pipeline]
+    
+    Pipeline --> OpBranch{Operation<br/>Branch}
+    
+    OpBranch -->|pagosMasivos| PagosMasivosOp[Route to<br/>PagosMasivosInterno]
+    OpBranch -->|consultaLotesCliente| ConsultaLotes[Route to<br/>ConsultaLotesCliente]
+    OpBranch -->|consultaDetalleLote| ConsultaDetalle[Route to<br/>ConsultaDetalleLote]
+    OpBranch -->|consultaTransaccionLote| ConsultaTxn[Route to<br/>ConsultaTransaccionLote]
+    OpBranch -->|consultaEstadoLote| ConsultaEstado[Route to<br/>ConsultaEstadoLote]
+    OpBranch -->|cargarProveedores| CargaProv[Route to<br/>CargaProveedores]
+    OpBranch -->|consultarProveedores| ConsultaProv[Route to<br/>ConsultaProveedores]
+    OpBranch -->|autorizarProveedores| AutorizaProv[Route to<br/>AutorizarProveedores]
+    OpBranch -->|eliminarProveedores| EliminaProv[Route to<br/>EliminarProveedores]
+    OpBranch -->|autorizarLote| AutorizaLote[Route to<br/>AutorizarLotePagosMasivos]
+    OpBranch -->|cancelarLote| CancelaLote[Route to<br/>CancelarLote]
+    OpBranch -->|editarEstadoRegistroLote| EditaEstado[Route to<br/>EditarEstadoRegistroLote]
+    OpBranch -->|cargarArchivoLote| CargaArchivo[Route to<br/>CargarArchivoLote]
+    
+    PagosMasivosOp --> InternoEntry[PagosMasivosInterno.pipeline]
+    
+    InternoEntry --> ValidacionesGen[ValidacionesGenerales<br/>Request Pipeline]
+    
+    ValidacionesGen --> ValidaXSD[Validación XSD<br/>pagosMasivosTypes.xsd]
+    ValidaXSD -->|Invalid| XSDError[Error: Invalid Schema]
+    XSDError --> ErrorHandler1[Error Handler:<br/>MapeoErrores]
+    
+    ValidaXSD -->|Valid| ValidaRegion[ValidaServicioRegional<br/>Service ID: FICBCO0231]
+    ValidaRegion -->|Error| RegionError[Error: Servicio no habilitado]
+    RegionError --> ErrorHandler1
+    
+    ValidaRegion -->|Success| RegionBranch{Region<br/>SourceBank}
+    
+    %% HN01 Branch
+    RegionBranch -->|HN01| HN01Pipeline[HN01_PagosMasivosInterno<br/>Request Pipeline]
+    
+    HN01Pipeline --> HN01Bitacora1[Bitácora Request<br/>registraBitacoraPagosMasivos_db<br/>UUID generado]
+    
+    HN01Bitacora1 --> HN01ValidaAcceso[Validación Acceso<br/>validaAccesoPMS_db<br/>CUSTOMER_ID + USERNAME]
+    
+    HN01ValidaAcceso -->|Error| HN01AccessError[Error: Acceso Denegado]
+    HN01AccessError --> HN01Response[HN01 Response Pipeline]
+    
+    HN01ValidaAcceso -->|Success| HN01BPEL[sjPagosMasivosInterno<br/>BPEL Flow]
+    
+    HN01BPEL --> HN01ForEach[forEach Parallel<br/>Por cada BATCH]
+    
+    HN01ForEach --> HN01ValidaEst[validaEstructuraLote_db<br/>SP: validaEstructuraLote]
+    
+    HN01ValidaEst -->|Error| HN01EstError[Error en estructura]
+    HN01EstError --> HN01BatchError[Batch con ERROR]
+    
+    HN01ValidaEst -->|Success| HN01CheckValidations{Validaciones<br/>Opcionales}
+    
+    HN01CheckValidations -->|DEBIT_ACCT_BALANCE=YES<br/>or DEBIT_ACCT_STATUS=YES| HN01Agrupa[Agrupación por Cuenta<br/>agrupaTxnLoteXCuenta.xqy]
+    
+    HN01Agrupa --> HN01ForEachCuenta[forEach Secuencial<br/>Por cada CUENTA]
+    
+    HN01ForEachCuenta -->|DEBIT_ACCT_BALANCE=YES| HN01ConsultaSaldo[ConsultaDetallesCuentaMasivos<br/>Obtiene CURRENT_BALANCE]
+    
+    HN01ConsultaSaldo --> HN01CheckSaldo{Saldo >= Monto}
+    HN01CheckSaldo -->|No| HN01SaldoError[Fault: saldoInsuficiente]
+    HN01SaldoError --> HN01BatchError
+    
+    HN01CheckSaldo -->|Sí| HN01CheckEstado
+    
+    HN01ForEachCuenta -->|DEBIT_ACCT_STATUS=YES| HN01CheckEstado{Validar Estado}
+    
+    HN01CheckEstado --> HN01ConsultaT24[consultaCuentasBS T24<br/>INACTIVEMARKER<br/>POSTINGRESTRICT]
+    
+    HN01ConsultaT24 --> HN01ValidaEstado{Estado Válido}
+    HN01ValidaEstado -->|Inactiva o Restricción| HN01EstadoError[Fault: estadoInvalido]
+    HN01EstadoError --> HN01BatchError
+    
+    HN01ValidaEstado -->|Válido| HN01NextCuenta[Siguiente Cuenta]
+    HN01NextCuenta --> HN01ForEachCuenta
+    
+    HN01CheckValidations -->|NO validations| HN01Procesa
+    HN01NextCuenta -->|Todas OK| HN01Procesa[procesaLotePagoMasivo_db<br/>SP: procesaLotePagoMasivo]
+    
+    HN01Procesa --> HN01BatchSuccess[Batch PROCESSED<br/>BANK_BATCH_ID generado]
+    
+    HN01BatchSuccess --> HN01NextBatch[Siguiente Batch]
+    HN01BatchError --> HN01NextBatch
+    HN01NextBatch --> HN01ForEach
+    
+    HN01NextBatch -->|Todos procesados| HN01Response
+    
+    HN01Response --> HN01Bitacora2[Bitácora Response<br/>registraBitacoraPagosMasivos_db<br/>UUID generado]
+    
+    HN01Bitacora2 --> HN01MapeoError{successIndicator<br/>!= SUCCESS}
+    HN01MapeoError -->|Sí| HN01Mapeo[MapeoErrores<br/>FICBCO0231]
+    HN01MapeoError -->|No| HN01End
+    HN01Mapeo --> HN01End[Response HN01]
+    
+    %% GT01 Branch
+    RegionBranch -->|GT01| GT01Pipeline[GT01_PagosMasivosInterno<br/>PagosMasivosInternoGT.pipeline]
+    
+    GT01Pipeline --> GT01Bitacora1[Bitácora Request<br/>registraBitacoraPagosMasivosRG_db<br/>UUID + countryCode=GT01]
+    
+    GT01Bitacora1 --> GT01ValidaAcceso[Validación Acceso MTR<br/>validaAccesoPMS servicio<br/>CUSTOMER_ID + USERNAME]
+    
+    GT01ValidaAcceso -->|status != 00000| GT01AccessError[Error: Acceso Denegado]
+    GT01AccessError --> GT01Response[GT01 Response Pipeline]
+    
+    GT01ValidaAcceso -->|status = 00000| GT01Transform[Transformación<br/>pagosMasivosInternoGTIn.xqy<br/>OSB → MTR format]
+    
+    GT01Transform --> GT01Validate[Schema Validation<br/>cargadorArchivoLoteEndpoint.wsdl]
+    
+    GT01Validate --> GT01MTR[cargadorArchivoLote<br/>Servicio SOAP MTR<br/>Operation: cargarLotes]
+    
+    GT01MTR --> GT01MTRResponse[Response MTR<br/>respuestaHostToHost]
+    
+    GT01MTRResponse --> GT01Response
+    
+    GT01Response --> GT01TransformOut[Transformación Response<br/>pagosMasivosInternoGTOut.xqy<br/>MTR → OSB format]
+    
+    GT01TransformOut --> GT01Header[Construcción Header<br/>pagosMasivosInternoGTHeaderOut.xqy<br/>errorCode + validationMessage]
+    
+    GT01Header --> GT01Bitacora2[Bitácora Response<br/>registraBitacoraPagosMasivosRG_db<br/>UUID + countryCode=GT01]
+    
+    GT01Bitacora2 --> GT01End[Response GT01]
+    
+    %% PA01 Branch
+    RegionBranch -->|PA01| PA01Pipeline[PA01_PagosMasivosInterno<br/>PagosMasivosInternoPA.pipeline]
+    
+    PA01Pipeline --> PA01Bitacora1[Bitácora Request<br/>registraBitacoraPagosMasivosRG_db<br/>UUID + countryCode=PA01]
+    
+    PA01Bitacora1 --> PA01ValidaAcceso[Validación Acceso MTR<br/>validaAccesoPMS servicio<br/>CUSTOMER_ID + USERNAME]
+    
+    PA01ValidaAcceso -->|status != 00000| PA01AccessError[Error: Acceso Denegado]
+    PA01AccessError --> PA01Response[PA01 Response Pipeline]
+    
+    PA01ValidaAcceso -->|status = 00000| PA01Transform[Transformación<br/>pagosMasivosInternoPAIn.xqy<br/>OSB → MTR format]
+    
+    PA01Transform --> PA01Validate[Schema Validation<br/>cargadorArchivoLoteEndpoint.wsdl]
+    
+    PA01Validate --> PA01MTR[cargadorArchivoLote<br/>Servicio SOAP MTR<br/>Operation: cargarLotes]
+    
+    PA01MTR --> PA01MTRResponse[Response MTR<br/>respuestaHostToHost]
+    
+    PA01MTRResponse --> PA01Response
+    
+    PA01Response --> PA01TransformOut[Transformación Response<br/>pagosMasivosInternoPAOut.xqy<br/>MTR → OSB format]
+    
+    PA01TransformOut --> PA01Header[Construcción Header<br/>pagosMasivosInternoPAHeaderOut.xqy<br/>errorCode + validationMessage]
+    
+    PA01Header --> PA01Bitacora2[Bitácora Response<br/>registraBitacoraPagosMasivosRG_db<br/>UUID + countryCode=PA01]
+    
+    PA01Bitacora2 --> PA01End[Response PA01]
+    
+    %% NI01 Branch
+    RegionBranch -->|NI01| NI01Pipeline[NI01_PagosMasivosInterno<br/>Request Pipeline]
+    
+    NI01Pipeline --> NI01Transform[Transformación<br/>pagosMasivosInternoNIIn.xqy<br/>OSB → MTR format]
+    
+    NI01Transform --> NI01Validate[Schema Validation<br/>cargadorArchivoLoteEndpoint.wsdl]
+    
+    NI01Validate --> NI01MTR[cargadorArchivoLote<br/>Servicio SOAP MTR<br/>Operation: cargarLotes]
+    
+    NI01MTR --> NI01MTRResponse[Response MTR<br/>respuestaHostToHost]
+    
+    NI01MTRResponse --> NI01Response[NI01 Response Pipeline]
+    
+    NI01Response --> NI01Header[Construcción Header<br/>pagosMasivosInternoNIHeaderOut.xqy<br/>errorCode + validationMessage]
+    
+    NI01Header --> NI01TransformOut[Transformación Response<br/>pagosMasivosInternoNIOut.xqy<br/>MTR → OSB format]
+    
+    NI01TransformOut --> NI01End[Response NI01]
+    
+    %% Default Branch
+    RegionBranch -->|Other| DefaultPipeline[Default Pipeline]
+    DefaultPipeline --> DefaultError[Error: SERVICE NOT IMPLEMENTED<br/>YET FOR THIS COUNTRY/COMPANY<br/>MW-0008]
+    DefaultError --> DefaultEnd[Response Error]
+    
+    %% Convergencia
+    HN01End --> ValidacionesGenResp[ValidacionesGenerales<br/>Response Pipeline]
+    GT01End --> ValidacionesGenResp
+    PA01End --> ValidacionesGenResp
+    NI01End --> ValidacionesGenResp
+    DefaultEnd --> ValidacionesGenResp
+    
+    ValidacionesGenResp --> CheckError{successIndicator<br/>!= SUCCESS}
+    CheckError -->|Sí| MapeoErrorFinal[MapeoErrores<br/>FICBCO0231]
+    CheckError -->|No| FinalResponse
+    MapeoErrorFinal --> FinalResponse[Response Final]
+    
+    FinalResponse --> End
+    
+    ErrorHandler1 --> End
+    
+    ConsultaLotes --> End
+    ConsultaDetalle --> End
+    ConsultaTxn --> End
+    ConsultaEstado --> End
+    CargaProv --> End
+    ConsultaProv --> End
+    AutorizaProv --> End
+    EliminaProv --> End
+    AutorizaLote --> End
+    CancelaLote --> End
+    EditaEstado --> End
+    CargaArchivo --> End
+    
+    style Start fill:#e1f5e1
+    style End fill:#ffe1e1
+    style ProxyEntry fill:#e3f2fd
+    style HN01BPEL fill:#fff3e0
+    style GT01MTR fill:#f3e5f5
+    style PA01MTR fill:#f3e5f5
+    style NI01MTR fill:#f3e5f5
+    style HN01ForEach fill:#fff9c4
+    style ErrorHandler1 fill:#ffcdd2
+    style DefaultError fill:#ffcdd2

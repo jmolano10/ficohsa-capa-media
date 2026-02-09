@@ -1,0 +1,153 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant VirtualPS as ConsultaEstadoLoteSoapPS<br/>(Virtual 11g)
+    participant VirtualPP as ConsultaEstadoLotePP<br/>(Pipeline Virtual)
+    participant VirtualBS as GetBatchStatusSoapBS<br/>(BS Virtual→Regional)
+    participant RegionalPS as GetBatchStatusSoapPS<br/>(Regional v2)
+    participant RegionalPP as GetBatchStatusPP<br/>(Pipeline Regional)
+    participant RegionSvc as GetCountryURLByName<br/>(Regionalización)
+    participant LogSvc as LoggingRegionalRestBS<br/>(Logging)
+    participant CountryBS as GetBatchStatusCountryBS<br/>(BS Regional→Country)
+    participant CountrySvc as Country Service<br/>(Honduras v2)
+
+    Note over Client,CountrySvc: Flujo Honduras (HN01) - ConsultaEstadoLoteSoapPS
+
+    Client->>VirtualPS: SOAP Request (WSS)
+    Note right of Client: Header: SourceBank=HN01<br/>Body: CUSTOMER_ID, BANK_BATCH_ID
+
+    VirtualPS->>VirtualPS: Validar WSS
+    Note right of VirtualPS: Procesar WS-Security<br/>Extraer username/password
+
+    VirtualPS->>VirtualPP: Invocar Pipeline
+    
+    VirtualPP->>VirtualPP: Stage: Definitions
+    Note right of VirtualPP: Extraer userName del header<br/>sourceBank = HN01 (o default)<br/>destinationBank = HN01<br/>Generar AuthenticationHeader (Base64)
+
+    VirtualPP->>VirtualPP: Stage: StageTransformInput
+    Note right of VirtualPP: Transformación: Virtual11gToGetBatchStatus.xqy<br/>Mapeo:<br/>- CUSTOMER_ID → CustomerId<br/>- BANK_BATCH_ID → QueryValue<br/>- QueryType = 'BANK_BATCH_ID'<br/>- GeneralInfo (SourceBank, DestinationBank)
+
+    VirtualPP->>VirtualBS: wsCallout
+    Note right of VirtualPP: Agregar headers:<br/>Authorization: Basic <base64><br/>Accept: text/xml<br/>URI: https://...v1
+
+    VirtualBS->>RegionalPS: SOAP Request (Basic Auth)
+    Note right of VirtualBS: Timeout: 40s<br/>Connection Timeout: 35s<br/>Retry: 0
+
+    RegionalPS->>RegionalPS: Validar Basic Auth
+    Note right of RegionalPS: Policy: http_basic_auth_over_ssl
+
+    RegionalPS->>RegionalPP: Invocar Pipeline
+
+    RegionalPP->>RegionalPP: Stage: Definitions
+    Note right of RegionalPP: service = 'MassivePayment/GetBatchStatus'<br/>version = 'v2'<br/>key = 'QueryValue'<br/>value = BANK_BATCH_ID<br/>language = 'es' (default)<br/>uuid = GlobalId o fn-bea:uuid()<br/>sourceBank = HN01<br/>destinationBank = HN01<br/>user = username (Basic Auth)<br/>targetSystem = 'OSB'<br/>method = 'SOAP'
+
+    RegionalPP->>RegionalPP: Actualizar GeneralInfo
+    Note right of RegionalPP: Insertar:<br/>- GlobalId (UUID)<br/>- ApplicationId (user)<br/>- Language (es)
+
+    RegionalPP->>LogSvc: route (async)
+    Note right of RegionalPP: Logging Request<br/>Campos: GlobalId, SourceBank,<br/>DestinationBank, User, Body,<br/>Endpoint, MessageType=REQUEST
+
+    LogSvc-->>RegionalPP: (async, no espera)
+
+    RegionalPP->>RegionalPP: Stage: Validate
+    Note right of RegionalPP: Validar esquema XSD:<br/>GetBatchStatusTypes.xsd<br/>Elemento: mas:getBatchStatus
+
+    alt Validación Fallida
+        RegionalPP->>RegionalPP: Error Pipeline
+        RegionalPP->>LogSvc: route (async)
+        Note right of RegionalPP: Logging Error
+        RegionalPP->>Client: SOAP Fault
+    end
+
+    RegionalPP->>RegionSvc: wsCallout
+    Note right of RegionalPP: GetCountryURLByName<br/>Request:<br/>- destinationBank: HN01<br/>- service: MassivePayment/GetBatchStatus<br/>- version: v2
+
+    RegionSvc-->>RegionalPP: URL Country Service
+    Note left of RegionSvc: Response:<br/>https://...country/.../v2<br/>o "N/A" si no implementado
+
+    alt URL = "N/A"
+        RegionalPP->>RegionalPP: Error
+        Note right of RegionalPP: MW-0008:<br/>SERVICE NOT IMPLEMENTED YET
+        RegionalPP->>Client: Error Response
+    end
+
+    RegionalPP->>CountryBS: wsCallout
+    Note right of RegionalPP: Routing Options:<br/>uriExpr = $responseRegional<br/>Request: $body/mas:getBatchStatus
+
+    CountryBS->>CountrySvc: REST POST (Basic Auth)
+    Note right of CountryBS: URL dinámica<br/>Content-Type: application/json<br/>Timeout: 70s<br/>Connection Timeout: 65s<br/>Body: JSON con GeneralInfo,<br/>CustomerId, QueryType, QueryValue
+
+    CountrySvc->>CountrySvc: Procesar Consulta
+    Note right of CountrySvc: Consultar base de datos<br/>Obtener estado del lote<br/>Calcular totales
+
+    CountrySvc-->>CountryBS: REST Response (JSON)
+    Note left of CountrySvc: StatusInfo: {Status, Code, Description}<br/>BankBatchId, CustomerId, CustomerName<br/>Status, StatusDescription, Optimistic<br/>Accounts[], Payments[]<br/>TotalAmount, NumberOfTransactions<br/>ApplicationDate, ProcessInfo<br/>ErrorInfo
+
+    CountryBS-->>RegionalPP: Response
+    Note left of CountryBS: Mapear JSON a SOAP
+
+    RegionalPP->>RegionalPP: Stage: Definitions (Response)
+    Note right of RegionalPP: Extraer:<br/>state = StatusInfo/Status<br/>codeError = ErrorInfo/Code<br/>messageError = ErrorInfo/Description
+
+    RegionalPP->>LogSvc: route (async)
+    Note right of RegionalPP: Logging Response<br/>Campos: state, codeError,<br/>messageError, Body completo
+
+    LogSvc-->>RegionalPP: (async, no espera)
+
+    RegionalPP->>RegionalPP: Stage: errorCodeHandling
+    Note right of RegionalPP: Si method=REST y state!=SUCCESS:<br/>Insertar http-response-code
+
+    RegionalPP-->>RegionalPS: Response
+
+    RegionalPS-->>VirtualBS: SOAP Response
+
+    VirtualBS-->>VirtualPP: Response
+
+    VirtualPP->>VirtualPP: Stage: StageTransformOutput
+    Note right of VirtualPP: Detectar región:<br/>if contains(sourceBank, "HN")
+
+    VirtualPP->>VirtualPP: Transformar Header
+    Note right of VirtualPP: GetBatchStatusToVirtual11gHeaderHN.xqy<br/>Mapeo:<br/>- ErrorInfo/Error → messageId<br/>- StatusInfo/Status → successIndicator<br/>  (si 'Error' → 'ERROR', sino valor)<br/>- ErrorInfo/Description → messages
+
+    VirtualPP->>VirtualPP: Transformar Body
+    Note right of VirtualPP: GetBatchStatusToVirtual11gBodyHN.xqy<br/>Mapeo:<br/>- BankBatchId → BANK_BATCH_ID<br/>- CustomerId → CUSTOMER_ID<br/>- CustomerName → CUSTOMER_NAME<br/>- Status → STATUS<br/>- StatusDescription → STATUS_DESC<br/>- Optimistic (true→YES, false→NO)<br/>- Accounts[] → ACCOUNTS/ACCOUNT[]<br/>- Payments[] → PAYMENTS/PAYMENT[]<br/>- TotalAmount → TOTAL_AMOUNT<br/>- NumberOfTransactions → NUMBER_OF_TRANSACTIONS<br/>- ApplicationDate → APPLICATION_DATE<br/>- ProcessInfo → PROCESS_INFO
+
+    VirtualPP-->>VirtualPS: Response
+
+    VirtualPS-->>Client: SOAP Response
+    Note left of VirtualPS: Header: ResponseHeader<br/>Body: consultaEstadoLoteResponse
+
+    Note over Client,CountrySvc: Flujo de Error
+
+    alt Error en cualquier etapa
+        Note over VirtualPP,RegionalPP: Pipeline Error Handler
+
+        RegionalPP->>RegionalPP: Stage: StageIT
+        Note right of RegionalPP: Report error code, reason, uuid
+
+        RegionalPP->>RegionSvc: wsCallout
+        Note right of RegionalPP: GetCustomErrorByStackTrace<br/>Mapear error técnico a error negocio
+
+        RegionSvc-->>RegionalPP: Error mapeado
+        Note left of RegionSvc: {error, code, description}
+
+        RegionalPP->>LogSvc: route (async)
+        Note right of RegionalPP: Logging Error<br/>Incluir stack trace completo
+
+        RegionalPP->>RegionalPP: Stage: errorCodeHandling
+        Note right of RegionalPP: Insertar http-response-code<br/>si method=REST
+
+        RegionalPP->>Client: Error Response
+        Note right of RegionalPP: StatusInfo/Status = Error<br/>ErrorInfo con detalles
+
+        VirtualPP->>VirtualPP: Error Handler
+        Note right of VirtualPP: Report error
+
+        VirtualPP->>RegionSvc: wsCallout
+        Note right of VirtualPP: GetCustomErrorByStackTrace
+
+        VirtualPP->>VirtualPP: Transformar Error
+        Note right of VirtualPP: ResponseHeader:<br/>successIndicator = Error<br/>messageId = error code<br/>messages = description
+
+        VirtualPP->>Client: SOAP Fault
+        Note right of VirtualPP: Body vacío<br/>Header con error
+    end

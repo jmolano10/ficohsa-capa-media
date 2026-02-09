@@ -1,0 +1,142 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Proxy as PagosMasivos.proxy
+    participant Pipeline as PagosMasivos.pipeline
+    participant Interno as PagosMasivosInterno.pipeline
+    participant ValidaReg as ValidaServicioRegional_db
+    participant InternoPA as PagosMasivosInternoPA.pipeline
+    participant ValidaAcc as validaAccesoPMS (MTR)
+    participant BitacoraDB as registraBitacoraPagosMasivosRG_db
+    participant MTR as cargadorArchivoLote (MTR)
+    participant MapeoErr as MapeoErrores
+
+    Note over Client,MapeoErr: Flujo Panamá (PA01) - PagosMasivos<br/>IDÉNTICO A GT01 CON CAMBIOS MÍNIMOS
+
+    Client->>Proxy: SOAP Request pagosMasivos
+    Note right of Client: Header: SourceBank=PA01<br/>Authentication: UserName/Password<br/>Body: BATCHES con transacciones
+
+    Proxy->>Proxy: Custom Token Authentication
+
+    alt Authentication Failed
+        Proxy->>Client: SOAP Fault (Authentication Error)
+    end
+
+    Proxy->>Pipeline: Route to PagosMasivos.pipeline
+
+    Pipeline->>Pipeline: Operation Branch (pagosMasivos)
+
+    Pipeline->>Interno: Route to PagosMasivosInterno
+
+    Interno->>Interno: ValidacionesGenerales Request Pipeline
+    
+    Interno->>Interno: Validación XSD
+
+    alt XSD Validation Failed
+        Interno->>MapeoErr: mapeoErrores (FICBCO0231)
+        MapeoErr-->>Interno: Error mapeado
+        Interno->>Client: SOAP Response (Error)
+    end
+
+    Interno->>ValidaReg: ValidaServicioRegional
+    Note right of Interno: PV_SERVICE_ID: FICBCO0231<br/>PV_SOURCE_BANK: PA01
+
+    ValidaReg-->>Interno: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+
+    alt Servicio No Habilitado
+        Interno->>Client: SOAP Response (Error)
+    end
+
+    Interno->>Interno: RegionalizacionPaisEmpresa Branch
+    Note right of Interno: XPath: ./aut:RequestHeader/Region/SourceBank<br/>Value: 'PA01'
+
+    Interno->>InternoPA: Route to PagosMasivosInternoPA
+
+    InternoPA->>InternoPA: PA01_PagosMasivosInterno Request Pipeline
+
+    InternoPA->>InternoPA: Stage: BitacoraRequest
+
+    InternoPA->>BitacoraDB: registraBitacoraPagosMasivosRG (REQ)
+    Note right of InternoPA: PV_COUNTRY_CODE: PA01<br/>(resto igual a GT01)
+
+    BitacoraDB-->>InternoPA: Registro insertado
+
+    InternoPA->>InternoPA: Stage: ValidaAccesosPagosMasivos
+
+    InternoPA->>ValidaAcc: validaAccesoPMS (Servicio MTR)
+    Note right of InternoPA: customerId: $body/CUSTOMER_ID<br/>userName: $header/Authentication/UserName
+
+    ValidaAcc-->>InternoPA: status, message
+
+    InternoPA->>InternoPA: Evaluar status
+    Note right of InternoPA: errorCode = (status = '00000') ? 'SUCCESS' : 'ERROR'
+
+    alt Acceso Denegado
+        InternoPA->>InternoPA: PA01 Response Pipeline
+        InternoPA->>BitacoraDB: registraBitacoraPagosMasivosRG (RSP)
+        BitacoraDB-->>InternoPA: Registro insertado
+        InternoPA->>Client: SOAP Response (Error)
+    end
+
+    InternoPA->>InternoPA: Stage: CargarLotes
+
+    InternoPA->>InternoPA: Transformación a formato MTR
+    Note right of InternoPA: XQuery: pagosMasivosInternoPAIn.xqy<br/>OSB format → MTR format<br/>pais: PA (extraído de SourceBank)
+
+    InternoPA->>InternoPA: Schema Validation
+
+    InternoPA->>MTR: cargarLotes (SOAP)
+    Note right of InternoPA: Namespace: http://servicio.cargararchivolotews.mtrpmsv.cidenet.com.co/<br/>Operation: cargarLotes
+
+    MTR->>MTR: Procesar lotes
+
+    MTR-->>InternoPA: cargarLotesResponse
+
+    InternoPA->>InternoPA: Extraer errorCode y validationMessage
+
+    InternoPA->>InternoPA: PA01 Response Pipeline
+
+    InternoPA->>InternoPA: Stage: FlujoSalida
+
+    InternoPA->>InternoPA: Construir ResponseHeader
+    Note right of InternoPA: XQuery: pagosMasivosInternoPAHeaderOut.xqy
+
+    alt successIndicator = SUCCESS
+        InternoPA->>InternoPA: Transformación Response
+        Note right of InternoPA: XQuery: pagosMasivosInternoPAOut.xqy<br/>MTR format → OSB format
+    else successIndicator != SUCCESS
+        InternoPA->>InternoPA: Construir body vacío
+    end
+
+    InternoPA->>InternoPA: Stage: BitacoraResponse
+
+    InternoPA->>BitacoraDB: registraBitacoraPagosMasivosRG (RSP)
+    Note right of InternoPA: PV_COUNTRY_CODE: PA01<br/>(resto igual a GT01)
+
+    BitacoraDB-->>InternoPA: Registro insertado
+
+    InternoPA-->>Interno: pagosMasivosResponse
+
+    Interno->>Interno: ValidacionesGenerales Response Pipeline
+
+    alt successIndicator != SUCCESS
+        Interno->>MapeoErr: mapeoErrores
+        MapeoErr-->>Interno: Error mapeado
+    end
+
+    Interno-->>Pipeline: pagosMasivosResponse
+
+    Pipeline-->>Proxy: pagosMasivosResponse
+
+    Proxy->>Client: SOAP Response
+
+    Note over Client,MapeoErr: Fin del flujo PA01
+
+    rect rgb(255, 255, 240)
+        Note over InternoPA: Diferencias con GT01
+        Note over InternoPA: NINGUNA DIFERENCIA FUNCIONAL<br/><br/>Solo cambian:<br/>- SourceBank: PA01 (vs GT01)<br/>- countryCode en bitácora: PA01 (vs GT01)<br/>- Archivos XQuery: *PA*.xqy (vs *GT*.xqy)<br/>- Pipeline: PagosMasivosInternoPA (vs PagosMasivosInternoGT)<br/><br/>El flujo, validaciones y transformaciones<br/>son IDÉNTICOS a GT01
+    end
+
+    rect rgb(240, 255, 240)
+        Note over InternoPA: Para detalles completos del flujo
+        Note over InternoPA: Ver diagrama: 04-Secuencia-GT01.mmd<br/><br/>Este diagrama (PA01) es una referencia<br/>simplificada que muestra solo las<br/>diferencias de identificadores
+    end

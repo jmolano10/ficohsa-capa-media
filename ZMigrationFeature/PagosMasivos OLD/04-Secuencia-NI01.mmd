@@ -1,0 +1,139 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Proxy as PagosMasivos.proxy
+    participant Pipeline as PagosMasivos.pipeline
+    participant Interno as PagosMasivosInterno.pipeline
+    participant ValidaReg as ValidaServicioRegional_db
+    participant MTR as cargadorArchivoLote (MTR)
+    participant MapeoErr as MapeoErrores
+
+    Note over Client,MapeoErr: Flujo Nicaragua (NI01) - PagosMasivos<br/>FLUJO SIMPLIFICADO SIN BITÁCORA NI VALIDACIÓN DE ACCESO
+
+    Client->>Proxy: SOAP Request pagosMasivos
+    Note right of Client: Header: SourceBank=NI01<br/>Authentication: UserName/Password<br/>Body: BATCHES con transacciones
+
+    Proxy->>Proxy: Custom Token Authentication
+    Note right of Proxy: XPath: ./aut:RequestHeader/Authentication/UserName<br/>XPath: ./aut:RequestHeader/Authentication/Password
+
+    alt Authentication Failed
+        Proxy->>Client: SOAP Fault (Authentication Error)
+    end
+
+    Proxy->>Pipeline: Route to PagosMasivos.pipeline
+    Note right of Proxy: Endpoint: /Middleware/OperationsAndExecution/Payments/PagosMasivos
+
+    Pipeline->>Pipeline: Operation Branch
+    Note right of Pipeline: Operation: pagosMasivos
+
+    Pipeline->>Interno: Route to PagosMasivosInterno
+
+    Interno->>Interno: ValidacionesGenerales Request Pipeline
+    
+    Interno->>Interno: Validación XSD
+    Note right of Interno: Schema: pagosMasivosTypes.xsd<br/>Element: pag:pagosMasivos
+
+    alt XSD Validation Failed
+        Interno->>MapeoErr: mapeoErrores (FICBCO0231)
+        MapeoErr-->>Interno: Error mapeado
+        Interno->>Client: SOAP Response (Error)
+    end
+
+    Interno->>ValidaReg: ValidaServicioRegional
+    Note right of Interno: PV_SERVICE_ID: FICBCO0231<br/>PV_SOURCE_BANK: NI01
+
+    ValidaReg-->>Interno: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+
+    alt Servicio No Habilitado
+        Interno->>Client: SOAP Response (Error: Servicio no habilitado)
+    end
+
+    Interno->>Interno: aplicarValoresPorDefectoRegion
+    Note right of Interno: Aplica valores por defecto según región
+
+    Interno->>Interno: RegionalizacionPaisEmpresa Branch
+    Note right of Interno: XPath: ./aut:RequestHeader/Region/SourceBank<br/>Value: 'NI01'
+
+    Interno->>Interno: NI01_PagosMasivosInterno Request Pipeline
+    Note right of Interno: NOTA: Sin Stage de BitacoraRequest<br/>NOTA: Sin Stage de ValidaAccesosPagosMasivos
+
+    Interno->>Interno: Stage: FlujoEntrada (único stage)
+
+    Interno->>Interno: Transformación a formato MTR
+    Note right of Interno: XQuery: pagosMasivosInternoNIIn.xqy<br/>OSB format → MTR format<br/>Mapeo de campos:<br/>- SourceBank → pais (NI)<br/>- USERNAME → usuario<br/>- CUSTOMER_ID → idCliente<br/>- BATCHES/BATCH → cuerpoLotes/lote<br/>- DEBIT_ACCT_BALANCE → validarSaldoCuentaDebito<br/>- DEBIT_ACCT_STATUS → validarEstadoCuentaDebito
+
+    Interno->>Interno: Schema Validation
+    Note right of Interno: WSDL: cargadorArchivoLoteEndpoint.wsdl<br/>Element: ser:cargarLotes
+
+    Interno->>MTR: cargarLotes (SOAP)
+    Note right of Interno: Namespace: http://servicio.cargararchivolotews.mtrpmsv.cidenet.com.co/<br/>Operation: cargarLotes<br/>Request: peticionHostToHost
+
+    MTR->>MTR: Procesar lotes
+    Note right of MTR: Validación de estructura<br/>Procesamiento de transacciones<br/>Generación de BANK_BATCH_ID
+
+    MTR-->>Interno: cargarLotesResponse
+    Note right of MTR: respuestaHostToHost:<br/>- cabeceraRespuesta/codigo<br/>- cabeceraRespuesta/mensaje<br/>- cuerpoRespuesta/lote
+
+    Interno->>Interno: NI01_PagosMasivosInterno Response Pipeline
+
+    Interno->>Interno: Stage: FlujoSalida (único stage)
+
+    Interno->>Interno: Construir ResponseHeader
+    Note right of Interno: XQuery: pagosMasivosInternoNIHeaderOut.xqy<br/>errorCode = respuestaHostToHost/cabeceraRespuesta/codigo<br/>validationMessage = respuestaHostToHost/cabeceraRespuesta/mensaje<br/>successIndicator: $errorCode<br/>messages: $validationMessage
+
+    alt successIndicator = SUCCESS
+        Interno->>Interno: Transformación Response
+        Note right of Interno: XQuery: pagosMasivosInternoNIOut.xqy<br/>MTR format → OSB format<br/>Mapeo de campos:<br/>- idLoteBanco → BANK_BATCH_ID<br/>- idLoteCliente → CUSTOMER_BATCH_ID<br/>- estado → STATUS<br/>- codigoError → ERROR_CODE<br/>- mensajeError → ERROR_MESSAGE
+    else successIndicator != SUCCESS
+        Interno->>Interno: Construir body vacío
+        Note right of Interno: <pag:pagosMasivosResponse/>
+    end
+
+    Note right of Interno: NOTA: Sin Stage de BitacoraResponse
+
+    Interno->>Interno: ValidacionesGenerales Response Pipeline
+
+    Interno->>Interno: Stage: MapeoError
+
+    alt successIndicator != SUCCESS
+        Interno->>MapeoErr: mapeoErrores
+        Note right of Interno: CODIGO_ERROR: $successIndicator<br/>MENSAJE_ERROR: FICBCO0231$#$messages
+
+        MapeoErr-->>Interno: Error mapeado
+
+        Interno->>Interno: Replace ResponseHeader
+        Note right of Interno: Actualiza successIndicator y messages
+    end
+
+    Interno-->>Pipeline: pagosMasivosResponse
+
+    Pipeline-->>Proxy: pagosMasivosResponse
+
+    Proxy->>Client: SOAP Response
+    Note right of Proxy: Header: ResponseHeader<br/>Body: pagosMasivosResponse con BATCHES
+
+    Note over Client,MapeoErr: Fin del flujo NI01
+
+    rect rgb(255, 240, 240)
+        Note over Interno: Diferencias con GT01 y PA01
+        Note over Interno: AUSENCIAS:<br/>- Sin BitacoraRequest<br/>- Sin BitacoraResponse<br/>- Sin ValidaAccesosPagosMasivos<br/>- Sin BitacoraResponseError en error handler<br/><br/>SIMPLIFICACIONES:<br/>- Solo 1 stage en request pipeline (vs 3)<br/>- Solo 1 stage en response pipeline (vs 2)<br/>- Flujo más directo y rápido
+    end
+
+    rect rgb(255, 255, 240)
+        Note over Interno: Diferencias con HN01
+        Note over Interno: - Sin procesamiento BPEL interno<br/>- Sin validación de saldos en OSB<br/>- Sin validación de estado en OSB<br/>- Sin procesamiento paralelo<br/>- Sin bitácora de auditoría<br/>- Sin validación de acceso<br/>- Transformación adicional (OSB ↔ MTR)<br/>- Procesamiento externo en MTR
+    end
+
+    rect rgb(240, 255, 255)
+        Note over MTR: Servicio Externo MTR
+        Note over MTR: El servicio MTR es responsable de:<br/>- Validación de estructura de lotes<br/>- Validación de saldos (si aplica)<br/>- Validación de estado de cuentas (si aplica)<br/>- Procesamiento de transacciones<br/>- Generación de BANK_BATCH_ID<br/>- Registro en base de datos externa
+    end
+
+    rect rgb(255, 240, 255)
+        Note over Interno: Recomendaciones para NI01
+        Note over Interno: 1. Implementar bitácora de auditoría<br/>2. Implementar validación de acceso<br/>3. Documentar razón de ausencias<br/>4. Implementar monitoreo compensatorio<br/>5. Evaluar riesgos de seguridad
+    end
+
+    rect rgb(240, 255, 240)
+        Note over Interno: Flujo Simplificado NI01
+        Note over Interno: 1. ValidacionesGenerales (común)<br/>   - ValidaServicioRegional<br/>   - ValidacionXSD<br/><br/>2. RegionalizacionPaisEmpresa<br/>   - Branch NI01<br/><br/>3. NI01_PagosMasivosInterno_request<br/>   - Transformación (pagosMasivosInternoNIIn.xqy)<br/>   - Schema validation<br/>   - Invocación MTR<br/><br/>4. NI01_PagosMasivosInterno_response<br/>   - Construcción header (pagosMasivosInternoNIHeaderOut.xqy)<br/>   - Transformación response (pagosMasivosInternoNIOut.xqy)<br/><br/>5. ValidacionesGenerales_response (común)<br/>   - MapeoError (si aplica)
+    end

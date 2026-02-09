@@ -11,12 +11,12 @@
   "methos": {
     "initiate": [
       {
-        "key": "debit-retrieve-loyalty-points-attributeName",
+        "key": "debit-retrieve-loyalty-points-attributeName-HN",
         "value": "BIN"
       },
       {
-        "key": "debit-retrieve-loyalty-points-comparisonOperator",
-        "value": "EQ"
+        "key": "debit-retrieve-loyalty-points-comparisonOperator-HN",
+        "value": "LK"
       }
     ]
   }

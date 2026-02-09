@@ -1,0 +1,220 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Proxy as PagosMasivos.proxy
+    participant Pipeline as PagosMasivos.pipeline
+    participant Interno as PagosMasivosInterno.pipeline
+    participant ValidaReg as ValidaServicioRegional_db
+    participant ValidaAcc as validaAccesoPMS_db
+    participant BitacoraDB as registraBitacoraPagosMasivos_db
+    participant BPEL as sjPagosMasivosInterno.flow
+    participant ValidaEst as validaEstructuraLote_db
+    participant ConsultaSaldo as ConsultaDetallesCuentaMasivos
+    participant ConsultaT24 as consultaCuentasBS (T24)
+    participant ProcesaLote as procesaLotePagoMasivo_db
+    participant MapeoErr as MapeoErrores
+
+    Note over Client,MapeoErr: Flujo Honduras (HN01) - PagosMasivos
+
+    Client->>Proxy: SOAP Request pagosMasivos
+    Note right of Client: Header: SourceBank=HN01<br/>Authentication: UserName/Password<br/>Body: BATCHES con transacciones
+
+    Proxy->>Proxy: Custom Token Authentication
+    Note right of Proxy: XPath: ./aut:RequestHeader/Authentication/UserName<br/>XPath: ./aut:RequestHeader/Authentication/Password
+
+    alt Authentication Failed
+        Proxy->>Client: SOAP Fault (Authentication Error)
+    end
+
+    Proxy->>Pipeline: Route to PagosMasivos.pipeline
+    Note right of Proxy: Endpoint: /Middleware/OperationsAndExecution/Payments/PagosMasivos
+
+    Pipeline->>Pipeline: Operation Branch
+    Note right of Pipeline: Operation: pagosMasivos
+
+    Pipeline->>Interno: Route to PagosMasivosInterno
+    Note right of Pipeline: Transport header: host=$inbound/ctx:transport/ctx:request/http:client-address
+
+    Interno->>Interno: ValidacionesGenerales Request Pipeline
+    
+    Interno->>Interno: Validación XSD
+    Note right of Interno: Schema: pagosMasivosTypes.xsd<br/>Element: pag:pagosMasivos
+
+    alt XSD Validation Failed
+        Interno->>MapeoErr: mapeoErrores (FICBCO0231)
+        MapeoErr-->>Interno: Error mapeado
+        Interno->>Client: SOAP Response (Error)
+    end
+
+    Interno->>ValidaReg: ValidaServicioRegional
+    Note right of Interno: PV_SERVICE_ID: FICBCO0231<br/>PV_SOURCE_BANK: HN01
+
+    ValidaReg-->>Interno: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+
+    alt Servicio No Habilitado
+        Interno->>Client: SOAP Response (Error: Servicio no habilitado)
+    end
+
+    Interno->>Interno: aplicarValoresPorDefectoRegion
+    Note right of Interno: Aplica valores por defecto según región
+
+    Interno->>Interno: RegionalizacionPaisEmpresa Branch
+    Note right of Interno: XPath: ./aut:RequestHeader/Region/SourceBank<br/>Value: 'HN01'
+
+    Interno->>Interno: HN01_PagosMasivosInterno Request Pipeline
+
+    Interno->>Interno: Stage: BitacoraRequest
+    Note right of Interno: Genera UUID para request<br/>Almacena originalRequestHeader<br/>Almacena originalRequestBody
+
+    Interno->>BitacoraDB: registraBitacoraPagosMasivos (REQ)
+    Note right of Interno: PV_ID: uuid-generated<br/>PV_RECORD_TYPE: REQ<br/>PV_CUSTOMER_ID: $body/CUSTOMER_ID<br/>PV_USERNAME: $body/USERNAME<br/>PV_AUTH_USERNAME: $header/Authentication/UserName<br/>PV_OPERATION: PagosMasivos<br/>PV_GLOBAL_ID: $body/GLOBAL_ID<br/>PV_SOAP_CONTENT: $body/pagosMasivos
+
+    BitacoraDB-->>Interno: Registro insertado
+
+    Interno->>Interno: Stage: FlujoEntrada
+
+    Interno->>ValidaAcc: validaAccesoPMS
+    Note right of Interno: PV_CUSTOMER_ID: $body/CUSTOMER_ID<br/>PV_USER_NAME: $header/Authentication/UserName
+
+    ValidaAcc-->>Interno: ERROR_MESSAGE
+
+    alt Acceso Denegado
+        Interno->>Interno: HN01 Response Pipeline
+        Interno->>Interno: Construir error response
+        Interno->>BitacoraDB: registraBitacoraPagosMasivos (RSP)
+        BitacoraDB-->>Interno: Registro insertado
+        Interno->>Client: SOAP Response (Error: Acceso Denegado)
+    end
+
+    Interno->>BPEL: Invoke sjPagosMasivosInterno
+    Note right of Interno: XQuery: sjPagosMasivosInternoIn.xqy<br/>Transforma $body/pagosMasivos a inputParameters
+
+    BPEL->>BPEL: Inicializar variables
+    Note right of BPEL: totalBatches = count(BATCHES/BATCH)<br/>response.outputParameters inicializado
+
+    BPEL->>BPEL: forEach parallel="yes"
+    Note right of BPEL: Procesa cada BATCH en paralelo<br/>contador: 1 to totalBatches
+
+    loop Por cada BATCH (paralelo)
+        BPEL->>BPEL: Scope para BATCH[contador]
+        
+        BPEL->>ValidaEst: validaEstructuraLote
+        Note right of BPEL: PV_CUSTOMER_ID: $CUSTOMER_ID<br/>PV_BATCH: $BATCH[contador] (XML)<br/>PV_BATCH_NUMBER: $contador
+
+        ValidaEst-->>BPEL: ERROR_CODE, ERROR_MESSAGE
+
+        alt Estructura Inválida
+            BPEL->>BPEL: Construir batchError
+            Note right of BPEL: STATUS: ERROR<br/>ERROR_CODE: ERROR<br/>ERROR_MESSAGE: $ERROR_MESSAGE
+            BPEL->>BPEL: Insert batchError en response
+        else Estructura Válida
+            BPEL->>BPEL: Evaluar validaciones opcionales
+            Note right of BPEL: validarSaldo = (DEBIT_ACCT_BALANCE = "YES")<br/>validarEstado = (DEBIT_ACCT_STATUS = "YES")
+
+            alt Validar Saldo OR Validar Estado
+                BPEL->>BPEL: Agrupar transacciones por cuenta
+                Note right of BPEL: XQuery: agrupaTxnLoteXCuenta.xqy<br/>Agrupa por DEBIT_ACCOUNT<br/>Suma TOTAL_AMOUNT por cuenta
+
+                loop Por cada CUENTA (secuencial)
+                    alt Validar Saldo
+                        BPEL->>ConsultaSaldo: consultaDetallesCuentaMasivos
+                        Note right of BPEL: ACCOUNT_NUMBER: $ACCOUNT_NUMBER
+
+                        ConsultaSaldo-->>BPEL: CURRENT_BALANCE
+
+                        BPEL->>BPEL: Calcular disponible
+                        Note right of BPEL: disponible = CURRENT_BALANCE<br/>totalAmount = ACCOUNT/TOTAL_AMOUNT
+
+                        alt Saldo Insuficiente
+                            BPEL->>BPEL: Throw Fault: saldoInsuficiente
+                            Note right of BPEL: ERROR_MESSAGE: "La cuenta {ACCOUNT_NUMBER}<br/>no tiene saldo suficiente"
+                            BPEL->>BPEL: Catch saldoInsuficiente
+                            BPEL->>BPEL: Insert batchError en response
+                        end
+                    end
+
+                    alt Validar Estado
+                        BPEL->>ConsultaT24: Consultadedetallesdelacuenta
+                        Note right of BPEL: ACCOUNTID: $ACCOUNT_NUMBER
+
+                        ConsultaT24-->>BPEL: INACTIVEMARKER, POSTINGRESTRICT
+
+                        BPEL->>BPEL: Evaluar estado
+                        Note right of BPEL: inactiveMarker = (INACTIVEMARKER = "Y")<br/>restriccion = (POSTINGRESTRICT = "DEBIT" or "ALL")
+
+                        alt Cuenta Inactiva o Restringida
+                            BPEL->>BPEL: Throw Fault: estadoInvalido
+                            Note right of BPEL: ERROR_MESSAGE: "La cuenta {ACCOUNT_NUMBER}<br/>se encuentra inactiva o con restricciones"
+                            BPEL->>BPEL: Catch estadoInvalido
+                            BPEL->>BPEL: Insert batchError en response
+                        end
+                    end
+                end
+            end
+
+            alt Validaciones OK
+                BPEL->>ProcesaLote: procesaLotePagoMasivo
+                Note right of BPEL: PV_CUSTOMER_ID: $CUSTOMER_ID<br/>PV_USERNAME: $USERNAME<br/>PV_GLOBAL_ID: $GLOBAL_ID<br/>PV_BATCH: $BATCH[contador] (XML)<br/>PV_BATCH_NUMBER: $contador
+
+                ProcesaLote-->>BPEL: BANK_BATCH_ID, STATUS, ERROR_CODE, ERROR_MESSAGE
+
+                BPEL->>BPEL: Construir batch response
+                Note right of BPEL: XQuery: sjPagosMasivosInternoBacthOut.xqy<br/>ID_POSITION: $contador<br/>BANK_BATCH_ID: $BANK_BATCH_ID<br/>CUSTOMER_BATCH_ID: $CUSTOMER_BATCH_ID<br/>STATUS: $STATUS
+
+                BPEL->>BPEL: Insert batch en response
+            end
+        end
+    end
+
+    BPEL-->>Interno: outputParameters con BATCHES procesados
+
+    Interno->>Interno: HN01 Response Pipeline
+
+    Interno->>Interno: Stage: FlujoSalida
+    Note right of Interno: XQuery: pagosMasivosInternoOut.xqy<br/>Transforma outputParameters a pagosMasivosResponse
+
+    Interno->>Interno: Construir ResponseHeader
+    Note right of Interno: successIndicator: Success<br/>messages: (vacío si OK)
+
+    Interno->>Interno: Stage: BitacoraResponse
+
+    Interno->>Interno: Generar UUID para response
+
+    Interno->>BitacoraDB: registraBitacoraPagosMasivos (RSP)
+    Note right of Interno: PV_ID: uuid-generated-response<br/>PV_REQUEST_ID: uuid-request<br/>PV_RECORD_TYPE: RSP<br/>PV_RESPONSE_CODE: $successIndicator<br/>PV_RESPONSE_MESSAGE: $messages<br/>PV_SOAP_CONTENT: $pagosMasivosResponse
+
+    BitacoraDB-->>Interno: Registro insertado
+
+    Interno->>Interno: ValidacionesGenerales Response Pipeline
+
+    Interno->>Interno: Stage: MapeoError
+
+    alt successIndicator != SUCCESS
+        Interno->>MapeoErr: mapeoErrores
+        Note right of Interno: CODIGO_ERROR: $successIndicator<br/>MENSAJE_ERROR: FICBCO0231$#$messages
+
+        MapeoErr-->>Interno: Error mapeado
+
+        Interno->>Interno: Replace ResponseHeader
+        Note right of Interno: Actualiza successIndicator y messages
+    end
+
+    Interno-->>Pipeline: pagosMasivosResponse
+
+    Pipeline-->>Proxy: pagosMasivosResponse
+
+    Proxy->>Client: SOAP Response
+    Note right of Proxy: Header: ResponseHeader<br/>Body: pagosMasivosResponse con BATCHES
+
+    Note over Client,MapeoErr: Fin del flujo HN01
+
+    rect rgb(255, 240, 240)
+        Note over BPEL: Error Handling en BPEL
+        Note over BPEL: Catch saldoInsuficiente:<br/>- Construye batchError con mensaje específico<br/>- Inserta en response.outputParameters<br/>- Continúa con siguiente batch
+        Note over BPEL: Catch estadoInvalido:<br/>- Construye batchError con mensaje específico<br/>- Inserta en response.outputParameters<br/>- Continúa con siguiente batch
+        Note over BPEL: CatchAll:<br/>- Construye batchError genérico<br/>- Inserta en response.outputParameters<br/>- Continúa con siguiente batch
+    end
+
+    rect rgb(240, 255, 240)
+        Note over Interno: Error Handling en Pipeline
+        Note over Interno: Error Handler _onErrorHandler:<br/>1. Captura errorCode y errorMessage<br/>2. Invoca MapeoErrores (FICBCO0231)<br/>3. Construye ResponseHeader con error<br/>4. Construye body vacío según operación<br/>5. Registra en BitacoraResponseError<br/>6. Reply con error
+    end

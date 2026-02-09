@@ -1,0 +1,166 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Proxy as PagosMasivos.proxy
+    participant Pipeline as PagosMasivos.pipeline
+    participant Interno as PagosMasivosInterno.pipeline
+    participant ValidaReg as ValidaServicioRegional_db
+    participant InternoGT as PagosMasivosInternoGT.pipeline
+    participant ValidaAcc as validaAccesoPMS (MTR)
+    participant BitacoraDB as registraBitacoraPagosMasivosRG_db
+    participant MTR as cargadorArchivoLote (MTR)
+    participant MapeoErr as MapeoErrores
+
+    Note over Client,MapeoErr: Flujo Guatemala (GT01) - PagosMasivos
+
+    Client->>Proxy: SOAP Request pagosMasivos
+    Note right of Client: Header: SourceBank=GT01<br/>Authentication: UserName/Password<br/>Body: BATCHES con transacciones
+
+    Proxy->>Proxy: Custom Token Authentication
+    Note right of Proxy: XPath: ./aut:RequestHeader/Authentication/UserName<br/>XPath: ./aut:RequestHeader/Authentication/Password
+
+    alt Authentication Failed
+        Proxy->>Client: SOAP Fault (Authentication Error)
+    end
+
+    Proxy->>Pipeline: Route to PagosMasivos.pipeline
+
+    Pipeline->>Pipeline: Operation Branch
+    Note right of Pipeline: Operation: pagosMasivos
+
+    Pipeline->>Interno: Route to PagosMasivosInterno
+
+    Interno->>Interno: ValidacionesGenerales Request Pipeline
+    
+    Interno->>Interno: Validación XSD
+    Note right of Interno: Schema: pagosMasivosTypes.xsd<br/>Element: pag:pagosMasivos
+
+    alt XSD Validation Failed
+        Interno->>MapeoErr: mapeoErrores (FICBCO0231)
+        MapeoErr-->>Interno: Error mapeado
+        Interno->>Client: SOAP Response (Error)
+    end
+
+    Interno->>ValidaReg: ValidaServicioRegional
+    Note right of Interno: PV_SERVICE_ID: FICBCO0231<br/>PV_SOURCE_BANK: GT01
+
+    ValidaReg-->>Interno: PV_CODIGO_ERROR, PV_MENSAJE_ERROR
+
+    alt Servicio No Habilitado
+        Interno->>Client: SOAP Response (Error: Servicio no habilitado)
+    end
+
+    Interno->>Interno: RegionalizacionPaisEmpresa Branch
+    Note right of Interno: XPath: ./aut:RequestHeader/Region/SourceBank<br/>Value: 'GT01'
+
+    Interno->>InternoGT: Route to PagosMasivosInternoGT
+
+    InternoGT->>InternoGT: GT01_PagosMasivosInterno Request Pipeline
+
+    InternoGT->>InternoGT: Stage: BitacoraRequest
+    Note right of InternoGT: Genera UUID para request<br/>Almacena originalRequestHeader<br/>Almacena originalRequestBody
+
+    InternoGT->>BitacoraDB: registraBitacoraPagosMasivosRG (REQ)
+    Note right of InternoGT: PV_ID: uuid-generated<br/>PV_RECORD_TYPE: REQ<br/>PV_CUSTOMER_ID: $body/CUSTOMER_ID<br/>PV_USERNAME: $body/USERNAME<br/>PV_AUTH_USERNAME: $header/Authentication/UserName<br/>PV_OPERATION: PagosMasivos<br/>PV_GLOBAL_ID: $body/GLOBAL_ID<br/>PV_COUNTRY_CODE: GT01<br/>PV_SOAP_CONTENT: $body/pagosMasivos
+
+    BitacoraDB-->>InternoGT: Registro insertado
+
+    InternoGT->>InternoGT: Stage: ValidaAccesosPagosMasivos
+
+    InternoGT->>ValidaAcc: validaAccesoPMS (Servicio MTR)
+    Note right of InternoGT: customerId: $body/CUSTOMER_ID<br/>userName: $header/Authentication/UserName
+
+    ValidaAcc-->>InternoGT: status, message
+
+    InternoGT->>InternoGT: Evaluar status
+    Note right of InternoGT: errorCode = (status = '00000') ? 'SUCCESS' : 'ERROR'<br/>validationMessage = message
+
+    alt Acceso Denegado (status != 00000)
+        InternoGT->>InternoGT: GT01 Response Pipeline
+        InternoGT->>InternoGT: Construir error response
+        InternoGT->>BitacoraDB: registraBitacoraPagosMasivosRG (RSP)
+        BitacoraDB-->>InternoGT: Registro insertado
+        InternoGT->>Client: SOAP Response (Error: Acceso Denegado)
+    end
+
+    InternoGT->>InternoGT: Stage: CargarLotes
+
+    InternoGT->>InternoGT: Transformación a formato MTR
+    Note right of InternoGT: XQuery: pagosMasivosInternoGTIn.xqy<br/>OSB format → MTR format<br/>Mapeo de campos:<br/>- SourceBank → pais (GT)<br/>- USERNAME → usuario<br/>- CUSTOMER_ID → idCliente<br/>- BATCHES/BATCH → cuerpoLotes/lote<br/>- DEBIT_ACCT_BALANCE → validarSaldoCuentaDebito<br/>- DEBIT_ACCT_STATUS → validarEstadoCuentaDebito
+
+    InternoGT->>InternoGT: Schema Validation
+    Note right of InternoGT: WSDL: cargadorArchivoLoteEndpoint.wsdl<br/>Element: ser:cargarLotes
+
+    InternoGT->>MTR: cargarLotes (SOAP)
+    Note right of InternoGT: Namespace: http://servicio.cargararchivolotews.mtrpmsv.cidenet.com.co/<br/>Operation: cargarLotes<br/>Request: peticionHostToHost
+
+    MTR->>MTR: Procesar lotes
+    Note right of MTR: Validación de estructura<br/>Procesamiento de transacciones<br/>Generación de BANK_BATCH_ID
+
+    MTR-->>InternoGT: cargarLotesResponse
+    Note right of MTR: respuestaHostToHost:<br/>- cabeceraRespuesta/codigo<br/>- cabeceraRespuesta/mensaje<br/>- cuerpoRespuesta/lote
+
+    InternoGT->>InternoGT: Extraer errorCode y validationMessage
+    Note right of InternoGT: errorCode = respuestaHostToHost/cabeceraRespuesta/codigo<br/>validationMessage = respuestaHostToHost/cabeceraRespuesta/mensaje
+
+    InternoGT->>InternoGT: GT01 Response Pipeline
+
+    InternoGT->>InternoGT: Stage: FlujoSalida
+
+    InternoGT->>InternoGT: Construir ResponseHeader
+    Note right of InternoGT: XQuery: pagosMasivosInternoGTHeaderOut.xqy<br/>successIndicator: $errorCode<br/>messages: $validationMessage
+
+    alt successIndicator = SUCCESS
+        InternoGT->>InternoGT: Transformación Response
+        Note right of InternoGT: XQuery: pagosMasivosInternoGTOut.xqy<br/>MTR format → OSB format<br/>Mapeo de campos:<br/>- idLoteBanco → BANK_BATCH_ID<br/>- idLoteCliente → CUSTOMER_BATCH_ID<br/>- estado → STATUS<br/>- codigoError → ERROR_CODE<br/>- mensajeError → ERROR_MESSAGE
+    else successIndicator != SUCCESS
+        InternoGT->>InternoGT: Construir body vacío
+        Note right of InternoGT: <pag:pagosMasivosResponse/>
+    end
+
+    InternoGT->>InternoGT: Stage: BitacoraResponse
+
+    InternoGT->>InternoGT: Generar UUID para response
+
+    InternoGT->>BitacoraDB: registraBitacoraPagosMasivosRG (RSP)
+    Note right of InternoGT: PV_ID: uuid-generated-response<br/>PV_REQUEST_ID: uuid-request<br/>PV_RECORD_TYPE: RSP<br/>PV_RESPONSE_CODE: $successIndicator<br/>PV_RESPONSE_MESSAGE: $messages<br/>PV_COUNTRY_CODE: GT01<br/>PV_SOAP_CONTENT: $pagosMasivosResponse
+
+    BitacoraDB-->>InternoGT: Registro insertado
+
+    InternoGT-->>Interno: pagosMasivosResponse
+
+    Interno->>Interno: ValidacionesGenerales Response Pipeline
+
+    Interno->>Interno: Stage: MapeoError
+
+    alt successIndicator != SUCCESS
+        Interno->>MapeoErr: mapeoErrores
+        Note right of Interno: CODIGO_ERROR: $successIndicator<br/>MENSAJE_ERROR: FICBCO0231$#$messages
+
+        MapeoErr-->>Interno: Error mapeado
+
+        Interno->>Interno: Replace ResponseHeader
+    end
+
+    Interno-->>Pipeline: pagosMasivosResponse
+
+    Pipeline-->>Proxy: pagosMasivosResponse
+
+    Proxy->>Client: SOAP Response
+    Note right of Proxy: Header: ResponseHeader<br/>Body: pagosMasivosResponse con BATCHES
+
+    Note over Client,MapeoErr: Fin del flujo GT01
+
+    rect rgb(255, 240, 240)
+        Note over InternoGT: Error Handling en PagosMasivosInternoGT
+        Note over InternoGT: Error Handler _onErrorHandler:<br/>1. Captura errorCode y errorMessage<br/>2. Invoca MapeoErrores (FICBCO0231)<br/>3. Construye ResponseHeader con error<br/>4. Construye body vacío<br/>5. Registra en BitacoraResponseError con countryCode=GT01<br/>6. Reply con error
+    end
+
+    rect rgb(240, 255, 255)
+        Note over MTR: Servicio Externo MTR
+        Note over MTR: El servicio MTR es responsable de:<br/>- Validación de estructura de lotes<br/>- Validación de saldos (si aplica)<br/>- Validación de estado de cuentas (si aplica)<br/>- Procesamiento de transacciones<br/>- Generación de BANK_BATCH_ID<br/>- Registro en base de datos externa
+    end
+
+    rect rgb(240, 255, 240)
+        Note over InternoGT: Diferencias con HN01
+        Note over InternoGT: - Sin procesamiento BPEL interno<br/>- Sin validación de saldos en OSB<br/>- Sin validación de estado en OSB<br/>- Sin procesamiento paralelo<br/>- Bitácora con countryCode<br/>- Validación de acceso externa (MTR)<br/>- Transformación adicional (OSB ↔ MTR)
+    end

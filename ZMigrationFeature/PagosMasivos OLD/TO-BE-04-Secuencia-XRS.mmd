@@ -1,0 +1,164 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Estado Lote Pagos Masivos v1 <br> Epica 54856: ConsultaEstadoLotePagosMasivos <br> HU 55039:  GET - /payments/payment-execution-batch-retrieve/v1/retrieve-status
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Abanks as Wrapper ProxyAbanks <br/> SP: SP: OSB_P_VALIDA_ACCESO_PMS o <br/> SP: PMS_P_CON_ESTADO_LOTE
+    participant pagosOLD as Wrapper Pagos Masivos <br/> Operación: consultarLote 
+    participant Homologador as Liberería de <br> Homologación
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Regional (HN01 | GT01 | NI01 | PA01) - Consulta Estado Lote Pagos Masivos v1
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: customerReference, bankBatchId, batchUploadDate
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> customerReference (obligatorio), bankBatchId (obligatorio)
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE" <br> name: "v1-retrieve-status" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+        API->>CL: Consultar parámetros Parameter Store caché local
+        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-hn o <br> lambda.param-name-cons-est-lote
+
+        CL->>API: Obtiene parámetros Parameter Store Caché Local
+        Note left of CL: Obtiene parámetros de consumo a Wrapper ProxyAbanks
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE" <br> name: "v1-retrieve-status" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+        API->>Parameter: Consultar parámetros Parameter Store
+        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-hn o <br> lambda.param-name-cons-est-lote
+
+        Parameter->>API: Obtiene parámetros Parameter Store
+        Note left of Parameter: Obtiene parámetros de consumo a Wrapper ProxyAbanks
+
+        API->>CL: Guarda parámetros Parameter Store en caché local
+        Note right of API: Parámetros de consumo a Wrapper ProxyAbanks
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | GT01 | NI01 | PA01
+
+    alt Flujo Honduras (HN01)
+
+        API->>Lib: Consulta Constantes
+    
+        Lib->>API: Retorna constantes necesarias
+        Note left of Lib: Constantes: "procedureNameValidaAcceso", "procedureNameConsultaLote"
+
+        API->>API: Construye Request Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
+        Note over API: Mapeo: <br> CUSTOMER_ID = request.customerReference <br> USER_NAME = header.Application-User <br> procedureName = const.procedureNameValidaAcceso <br> + Campos adicionales obtenidos lambda.param-name-wrapper-proxy-abanks-hn 
+
+        API->>Abanks: Consume Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
+        Note over API, Lambda: connectionType, operationType, catalogueName, procedureName, params(CUSTOMER_ID, USER_NAME)
+
+        Abanks->>API: Response Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
+        Note over Abanks: Response: <br> ERROR_CODE, ERROR_MESSAGE
+
+        API->>API: Evalúa response Valida Acceso
+
+        alt Si response.ERROR_CODE = "SUCCESS" (Acceso válido)
+
+            API->>API: Construye Request Wrapper ProxyAbanks - PMS_P_CON_ESTADO_LOTE
+            Note over API: Mapeo: <br> PV_CODIGOCLIENTE = request.customerReference <br> PN_NUMEROLOTE = request.bankBatchId <br> PD_FECINGRESO = request.batchUploadDate <br> procedureName = const.procedureNameConsultaLote <br> + Campos adicionales obtenidos lambda.param-name-wrapper-proxy-abanks-hn
+
+            API->>Abanks: Consume Wrapper ProxyAbanks - PMS_P_CON_ESTADO_LOTE
+            Note over API, Lambda: connectionType, operationType, catalogueName, procedureName, params(PV_CODIGOCLIENTE, PN_NUMEROLOTE, PD_FECINGRESO)
+
+            Abanks->>API: Response Wrapper ProxyAbanks - PMS_P_CON_ESTADO_LOTE
+            Note over Abanks: Response: <br> Optimista + 17 campos
+
+            API->>Homologador: Consulta Homologación result
+            Note right of API: domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE_OPTIMISTA" <br> name: CATALOGATE <br> value.name: request.result
+
+            Homologador->>API: Retorna Valor Homologado 
+            Note left of Homologador: "S" → YES <br> "N" → NO 
+
+            API->>API: Construye response API
+            Note over API: Mapeo: <br> optimistic = optimista (Homologado) + 17 campos directo
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+        
+        else Si response.ERROR_CODE = "ERROR" (Acceso denegado)
+
+            API->> Errors: Mapear código de error
+            
+            Errors ->> API: Retorna código mapeado
+            
+            API->>Consumidor: Response Acceso Denegado
+            Note left of API:  HTTP 403: Body: Access Denied
+
+        end
+
+    end
+
+    alt FLujo Guatemala, Nicaragua y Panamá (GT01 | NI01 | PA01)
+
+        API->>Lib: Consulta Constantes
+    
+        Lib->>API: Retorna constantes necesarias
+        Note left of Lib: operation = "consultarLote"
+
+        API->>API: Construye Request Wrapper Pagos Msaivos OLD
+        Note over API: data(fechaRegistroLote = request.batchUploadDate, <br> idLote = request.bankBatchId, <br> idCliente = request.customerReference, <br> idBancoOrigen = header.sourceBanks) <br> + Campos adicionales"key": "param-name-cons-xrs"
+
+        API->>pagosOLD: Consume Wrapper Pagos Masivos OLD - OP: consultarLote
+        Note right of API: operation, data, paramName
+
+        pagosOLD->>API: Response Wrapper Pagos Masivos OLD - OP: consultarLote
+        Note over pagosOLD: Response: <br> Optimista + 17 campos
+
+        API->>Homologador: Consulta Homologación result
+        Note right of API: domain: "YES_NO" <br> name: CATALOGATE
+
+        Homologador->>API: Retorna Valor Homologado 
+        Note left of Homologador: "S" → YES <br> "N" → NO 
+
+        API->>API: Construye response API
+        Note over API: Mapeo: <br> optimistic = optimista (Homologado) + 17 campos directo
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant VirtualPS as ConsultaEstadoLoteSoapPS<br/>(Virtual 11g)
+    participant RegionalPS as GetBatchStatusSoapPS<br/>(Regional v2)
+    participant CountrySvc as Country Service<br/>(Guatemala v2)
+
+    Note over Client,CountrySvc: Flujo Guatemala (GT01) - ConsultaEstadoLoteSoapPS<br/>NOTA: La lógica es idéntica a Honduras (HN01)<br/>Solo cambia el valor de SourceBank y la URL del servicio Country
+
+    Client->>VirtualPS: SOAP Request (WSS)
+    Note right of Client: Header: SourceBank=GT01<br/>Body: CUSTOMER_ID, BANK_BATCH_ID
+
+    VirtualPS->>VirtualPS: Validar WSS y Procesar
+    Note right of VirtualPS: Extraer credenciales<br/>sourceBank = GT01
+
+    VirtualPS->>RegionalPS: SOAP Request (Basic Auth)
+    Note right of VirtualPS: Transformación:<br/>Virtual11gToGetBatchStatus.xqy<br/>Mapeo idéntico a HN
+
+    RegionalPS->>RegionalPS: Validar y Procesar
+    Note right of RegionalPS: Validar esquema<br/>Obtener URL de Guatemala<br/>via GetCountryURLByName
+
+    RegionalPS->>CountrySvc: REST POST (JSON)
+    Note right of RegionalPS: URL específica de Guatemala<br/>Timeout: 70s<br/>Body: GeneralInfo con GT01
+
+    CountrySvc->>CountrySvc: Procesar Consulta
+    Note right of CountrySvc: Consultar datos de Guatemala<br/>Moneda: GTQ
+
+    CountrySvc-->>RegionalPS: REST Response (JSON)
+    Note left of CountrySvc: Datos específicos de Guatemala
+
+    RegionalPS-->>VirtualPS: SOAP Response
+
+    VirtualPS->>VirtualPS: Transformar Response
+    Note right of VirtualPS: GetBatchStatusToVirtual11gHeaderHN.xqy<br/>GetBatchStatusToVirtual11gBodyHN.xqy<br/>(Mismas transformaciones que HN)
+
+    VirtualPS-->>Client: SOAP Response
+    Note left of VirtualPS: consultaEstadoLoteResponse<br/>con datos de Guatemala
+
+    Note over Client,CountrySvc: Diferencias con Honduras:<br/>1. SourceBank = GT01 (en lugar de HN01)<br/>2. URL del servicio Country apunta a Guatemala<br/>3. Moneda típica: GTQ (en lugar de HNL)<br/>4. Datos específicos del país en Country Service
+
+    Note over Client,CountrySvc: Para diagrama detallado, ver 04-Secuencia-HN.mmd<br/>La secuencia completa es idéntica

@@ -1,0 +1,156 @@
+flowchart TD
+    Start([Cliente Invoca Servicio]) --> A[ConsultaEstadoLoteSoapPS.proxy]
+    
+    A --> B{Validar WSS<br/>WS-Security}
+    B -->|Válido| C[ConsultaEstadoLotePP.pipeline]
+    B -->|Inválido| Error1[SOAP Fault:<br/>Authentication Failed]
+    
+    C --> D[Stage: Definitions]
+    D --> D1[Extraer userName del header]
+    D1 --> D2{SourceBank<br/>especificado?}
+    D2 -->|Sí| D3[sourceBank = valor del header]
+    D2 -->|No| D4[sourceBank = HN01 default]
+    D3 --> D5[destinationBank = DestinationBank o sourceBank]
+    D4 --> D5
+    D5 --> D6[Generar AuthenticationHeader<br/>Base64 username:password]
+    
+    D6 --> E[Stage: StageTransformInput]
+    E --> E1[Transformación:<br/>Virtual11gToGetBatchStatus.xqy]
+    E1 --> E2[Mapear campos:<br/>CUSTOMER_ID → CustomerId<br/>BANK_BATCH_ID → QueryValue<br/>QueryType = BANK_BATCH_ID<br/>GeneralInfo con SourceBank/DestinationBank]
+    
+    E2 --> F[Stage: StageCallOut]
+    F --> F1[wsCallout a GetBatchStatusSoapBS]
+    F1 --> F2[Agregar headers:<br/>Authorization: Basic base64<br/>Accept: text/xml]
+    F2 --> F3[URI: https://.../v1]
+    
+    F3 --> G[GetBatchStatusSoapBS.bix]
+    G --> G1{Timeout<br/>40 segundos}
+    G1 -->|Timeout| Error2[Error: Timeout]
+    G1 -->|OK| H[GetBatchStatusSoapPS.proxy<br/>Regional v2]
+    
+    H --> H1{Validar<br/>Basic Auth}
+    H1 -->|Inválido| Error3[SOAP Fault:<br/>401 Unauthorized]
+    H1 -->|Válido| I[GetBatchStatusPP.pipeline<br/>Regional v2]
+    
+    I --> I1[Stage: Definitions]
+    I1 --> I2[service = MassivePayment/GetBatchStatus<br/>version = v2<br/>key = QueryValue<br/>value = BANK_BATCH_ID<br/>language = es default<br/>uuid = GlobalId o generar<br/>user = username Basic Auth<br/>targetSystem = OSB<br/>method = SOAP]
+    
+    I2 --> I3[Actualizar GeneralInfo:<br/>GlobalId, ApplicationId, Language]
+    
+    I3 --> J[Stage: StageLoggingInput]
+    J --> J1[route async a LoggingRegionalRestBS]
+    J1 --> J2[Logging: REQUEST<br/>GlobalId, SourceBank, User, Body]
+    
+    J2 --> K[Stage: Validate]
+    K --> K1{Validar esquema XSD:<br/>GetBatchStatusTypes.xsd}
+    K1 -->|Inválido| Error4[Error: Schema Validation]
+    K1 -->|Válido| L[Stage: StageRegionalizacion]
+    
+    L --> L1[wsCallout a<br/>GetCountryURLByNameRegionalRestBS]
+    L1 --> L2[Request:<br/>destinationBank, service,<br/>version, sourceBank]
+    L2 --> L3{Response<br/>URL?}
+    L3 -->|N/A| Error5[Error MW-0008:<br/>SERVICE NOT IMPLEMENTED]
+    L3 -->|URL válida| M[Stage: StageCountry]
+    
+    M --> M1[wsCallout a<br/>GetBatchStatusCountryGenericRestBS]
+    M1 --> M2[Routing: uriExpr = responseRegional]
+    M2 --> M3[Request: body/mas:getBatchStatus]
+    
+    M3 --> N{Región?}
+    N -->|HN| N1[Country Service Honduras]
+    N -->|GT| N2[Country Service Guatemala]
+    N -->|NI| N3[Country Service Nicaragua]
+    N -->|PA| N4[Country Service Panamá]
+    
+    N1 --> O[REST POST JSON<br/>Timeout: 70s]
+    N2 --> O
+    N3 --> O
+    N4 --> O
+    
+    O --> O1{Timeout<br/>70 segundos}
+    O1 -->|Timeout| Error6[Error: Timeout Country]
+    O1 -->|OK| P[Country Service Response<br/>JSON]
+    
+    P --> P1[Mapear JSON a SOAP]
+    P1 --> Q[Stage: Definitions Response]
+    Q --> Q1[Extraer:<br/>state = StatusInfo/Status<br/>codeError = ErrorInfo/Code<br/>messageError = ErrorInfo/Description]
+    
+    Q1 --> R[Stage: StageLoggingOutput]
+    R --> R1[route async a LoggingRegionalRestBS]
+    R1 --> R2[Logging: RESPONSE<br/>state, codeError, Body]
+    
+    R2 --> S[Stage: errorCodeHandling]
+    S --> S1{method=REST<br/>y state!=SUCCESS?}
+    S1 -->|Sí| S2[Insertar http-response-code]
+    S1 -->|No| T[Response a Virtual 11g]
+    S2 --> T
+    
+    T --> U[Stage: StageTransformOutput<br/>Virtual 11g]
+    U --> U1{Detectar<br/>Región}
+    U1 -->|contains HN| U2[Región: Honduras]
+    U1 -->|contains GT| U3[Región: Guatemala]
+    U1 -->|contains NI| U4[Región: Nicaragua]
+    U1 -->|contains PA| U5[Región: Panamá]
+    U1 -->|Otro| Error7[Error:<br/>INVALID REGION REQUEST]
+    
+    U2 --> V[Transformar Header:<br/>GetBatchStatusToVirtual11gHeaderHN.xqy]
+    U3 --> V
+    U4 --> V
+    U5 --> V
+    
+    V --> V1[Mapear:<br/>ErrorInfo/Error → messageId<br/>StatusInfo/Status → successIndicator<br/>ErrorInfo/Description → messages]
+    
+    V1 --> W[Transformar Body:<br/>GetBatchStatusToVirtual11gBodyHN.xqy]
+    W --> W1[Mapear todos los campos:<br/>BankBatchId → BANK_BATCH_ID<br/>CustomerId → CUSTOMER_ID<br/>CustomerName → CUSTOMER_NAME<br/>Status → STATUS<br/>Optimistic true→YES, false→NO<br/>Accounts#91;#93; → ACCOUNTS/ACCOUNT#91;#93;<br/>Payments#91;#93; → PAYMENTS/PAYMENT#91;#93;<br/>Totales y contadores]
+    
+    W1 --> X{successIndicator<br/>= SUCCESS}
+    X -->|Sí| Y[Response Body con datos]
+    X -->|No| Z[Response Body vacío]
+    
+    Y --> End1([SOAP Response al Cliente])
+    Z --> End1
+    
+    Error1 --> ErrorHandler[Error Handler Pipeline]
+    Error2 --> ErrorHandler
+    Error3 --> ErrorHandler
+    Error4 --> ErrorHandler
+    Error5 --> ErrorHandler
+    Error6 --> ErrorHandler
+    Error7 --> ErrorHandler
+    
+    ErrorHandler --> EH1[Stage: StageIT]
+    EH1 --> EH2[Report error code, reason, uuid]
+    EH2 --> EH3[wsCallout a<br/>GetCustomErrorByStackTraceRegionalRestBS]
+    EH3 --> EH4[Mapear error técnico<br/>a error de negocio]
+    EH4 --> EH5[Stage: StageLoggingOutputError]
+    EH5 --> EH6[route async a LoggingRegionalRestBS<br/>Logging: ERROR con stack trace]
+    EH6 --> EH7[Stage: errorCodeHandling]
+    EH7 --> EH8{method<br/>= REST?}
+    EH8 -->|Sí| EH9[Insertar http-response-code]
+    EH8 -->|No| EH10[SOAP Fault]
+    EH9 --> EH10
+    EH10 --> End2([Error Response al Cliente])
+    
+    style Start fill:#90EE90
+    style End1 fill:#90EE90
+    style End2 fill:#FFB6C1
+    style Error1 fill:#FFB6C1
+    style Error2 fill:#FFB6C1
+    style Error3 fill:#FFB6C1
+    style Error4 fill:#FFB6C1
+    style Error5 fill:#FFB6C1
+    style Error6 fill:#FFB6C1
+    style Error7 fill:#FFB6C1
+    style ErrorHandler fill:#FFA500
+    style N1 fill:#87CEEB
+    style N2 fill:#87CEEB
+    style N3 fill:#87CEEB
+    style N4 fill:#87CEEB
+    
+    classDef virtualLayer fill:#E6F3FF,stroke:#0066CC,stroke-width:2px
+    classDef regionalLayer fill:#FFF4E6,stroke:#FF9900,stroke-width:2px
+    classDef countryLayer fill:#F0FFF0,stroke:#00CC66,stroke-width:2px
+    
+    class A,C,D,E,F,G virtualLayer
+    class H,I,J,K,L,M,Q,R,S,T regionalLayer
+    class N1,N2,N3,N4,O,P countryLayer

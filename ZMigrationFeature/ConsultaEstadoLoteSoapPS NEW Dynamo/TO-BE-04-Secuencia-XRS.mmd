@@ -1,0 +1,124 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Estado Lote Pagos Masivos v1 <br> Epica 54856: ConsultaEstadoLotePagosMasivos <br> HU 55040:  GET - /payments/payment-execution-batch-retrieve/v2/retrieve-status
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant LibPagosNEW as Librería Pagos Masivos NEW 
+    participant pagosNEW as WS Pagos Masivos <br/> Operación: ConsultaEstadoLote 
+    participant CW as CloudWatch
+    participant Homologador as Liberería de <br> Homologación
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Regional (HN01 | GT01 | NI01 | PA01) - Consulta Estado Lote Pagos Masivos v1
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, queryParam: customerReference, bankBatchId, batchUploadDate
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI <br> customerReference (obligatorio), bankBatchId (obligatorio)
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE" <br> name: "v2-retrieve-status" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización, conexión y negocio
+ 
+        API->>CL: Consultar parámetros Parameter Store caché local
+        Note right of API: Param Name: <br> llambda.param-name-api-pagos-masivos
+
+        CL->>API: Obtiene parámetros Parameter Store Caché Local
+        Note left of CL: Obtiene parámetros de consumo a WS Pagos Masivos
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE" <br> name: "v1-retrieve-status" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización, conexión y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+        API->>Parameter: Consultar parámetros Parameter Store
+        Note right of API: Param Name: <br> lambda.param-name-api-pagos-masivos
+
+        Parameter->>API: Obtiene parámetros Parameter Store
+        Note left of Parameter: Obtiene parámetros de consumo a WS Pagos Masivos
+
+        API->>CL: Guarda parámetros Parameter Store en caché local
+        Note right of API: Parámetros de consumo a WS Pagos Masivos
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: "operation"
+
+    API->>LibPagosNEW: Genera AuthorizationHeader 
+    Note right of API: Parámetros para generación de token: <br> lambda.secret-name + (reemplaza variable {application-id} con header.application-id) <br> Si no se recibe header.application-id por defecto se envía sales-force
+
+    LibPagosNEW->>API: Retorna AuthorizationHeader
+    Note left of LibPagosNEW: AuthorizationHeader
+
+    API->>API: Construye campos queryType y queryValue - Request WS Pagos Masivos - OP: ConsultaEstadoLote
+    Note over API: Mapeo: <br> queryType = lambda.queryType <br> queryValue = lambda.queryValue (reemplaza variable del parámetro QueryValue)  
+
+    API->>API: Construye Request WS Pagos Masivos - OP: ConsultaEstadoLote
+    Note over API: Mapeo: <br> sourceBank = header.sourceBank <br> destinationBank = header.destinationBanks <br> customerId = request.customerReference <br> userName = header.Application-User 
+
+    API->>pagosNEW: Consume WS Pagos Masivos - OP: ConsultaEstadoLote
+    Note over API, Lambda: sourceBank, destinationBank, customerId, userName, queryType, queryValue, AuthorizationHeader
+
+    API->>CW: Log Request WS Pagos Masivos - OP: ConsultaEstadoLote
+    Note right of API: Logea todos los campos del request para monitoreo y trazabilidad
+
+    pagosNEW->>API: Response WS Pagos Masivos - OP: ConsultaEstadoLote
+    Note over pagosNEW: Response: <br> Optimistic + 25 campos
+
+    API->>CW: Log Response WS Pagos Masivos - OP: ConsultaEstadoLote
+    Note right of API: Logea todos los campos del response para monitoreo y trazabilidad
+
+    API->>API: Evalúa Response WS Pagos Masivos
+
+    API->>Homologador: Consulta Homologación result
+    Note right of API: domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE_OPTIMISTA" <br> name: CATALOGATE 
+
+    Homologador->>API: Retorna Valor Homologado 
+    Note left of Homologador: true → YES <br> false → NO 
+
+    API->>API: Construye response API
+    Note over API: Mapeo: <br> optimistic = optimistic (Homologado) + 25 campos directo
+
+    API->>Consumidor: Response Exitoso
+    Note left of API: HTTP 200: Response Body 
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
