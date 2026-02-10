@@ -9,6 +9,7 @@ sequenceDiagram
     participant Lib as Librería Pipeline (ConfigMap)
     participant Abanks as Wrapper ProxyAbanks <br/> SP: SP: OSB_P_VALIDA_ACCESO_PMS o <br/> SP: PMS_P_CON_ESTADO_LOTE
     participant pagosOLD as Wrapper Pagos Masivos <br/> Operación: consultarLote 
+    participant CW as CloudWatch
     participant Homologador as Liberería de <br> Homologación
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
@@ -74,12 +75,18 @@ sequenceDiagram
         API->>API: Construye Request Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
         Note over API: Mapeo: <br> CUSTOMER_ID = request.customerReference <br> USER_NAME = header.Application-User <br> procedureName = const.procedureNameValidaAcceso <br> + Campos adicionales obtenidos lambda.param-name-wrapper-proxy-abanks-hn 
 
+        API->>CW: Log Request Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
+        Note right of API: Logea todos los campos del request para monitoreo y trazabilidad
+
         API->>Abanks: Consume Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
         Note over API, Lambda: connectionType, operationType, catalogueName, procedureName, params(CUSTOMER_ID, USER_NAME)
 
         Abanks->>API: Response Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
         Note over Abanks: Response: <br> ERROR_CODE, ERROR_MESSAGE
 
+        API->>CW: Log Response Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
+        Note right of API: Logea todos los campos del response para monitoreo y trazabilidad
+        
         API->>API: Evalúa response Valida Acceso
 
         alt Si response.ERROR_CODE = "SUCCESS" (Acceso válido)
@@ -87,12 +94,18 @@ sequenceDiagram
             API->>API: Construye Request Wrapper ProxyAbanks - PMS_P_CON_ESTADO_LOTE
             Note over API: Mapeo: <br> PV_CODIGOCLIENTE = request.customerReference <br> PN_NUMEROLOTE = request.bankBatchId <br> PD_FECINGRESO = request.batchUploadDate <br> procedureName = const.procedureNameConsultaLote <br> + Campos adicionales obtenidos lambda.param-name-wrapper-proxy-abanks-hn
 
+            API->>CW: Log Request Wrapper ProxyAbanks - OSB_P_CON_ESTADO_LOTE
+            Note right of API: Logea todos los campos del request para monitoreo y trazabilidad
+    
             API->>Abanks: Consume Wrapper ProxyAbanks - PMS_P_CON_ESTADO_LOTE
             Note over API, Lambda: connectionType, operationType, catalogueName, procedureName, params(PV_CODIGOCLIENTE, PN_NUMEROLOTE, PD_FECINGRESO)
 
             Abanks->>API: Response Wrapper ProxyAbanks - PMS_P_CON_ESTADO_LOTE
             Note over Abanks: Response: <br> Optimista + 17 campos
-
+            
+            API->>CW: Log Response Wrapper ProxyAbanks - OSB_P_CON_ESTADO_LOTE
+            Note right of API: Logea todos los campos del response para monitoreo y trazabilidad
+    
             API->>Homologador: Consulta Homologación result
             Note right of API: domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE_OPTIMISTA" <br> name: CATALOGATE <br> value.name: request.result
 
@@ -131,8 +144,14 @@ sequenceDiagram
         API->>pagosOLD: Consume Wrapper Pagos Masivos OLD - OP: consultarLote
         Note right of API: operation, data, paramName
 
+        API->>CW: Log Request WS Pagos Masivos OLD - OP: consultarLote
+        Note right of API: Logea todos los campos del request para monitoreo y trazabilidad
+    
         pagosOLD->>API: Response Wrapper Pagos Masivos OLD - OP: consultarLote
         Note over pagosOLD: Response: <br> Optimista + 17 campos
+
+        API->>CW: Log Response WS Pagos Masivos OLD - OP: consultarLote
+        Note right of API: Logea todos los campos del response para monitoreo y trazabilidad
 
         API->>Homologador: Consulta Homologación result
         Note right of API: domain: "YES_NO" <br> name: CATALOGATE
