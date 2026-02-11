@@ -9,22 +9,22 @@
     {
       "region": "HN01-HN01",
       "enabled": true,
-      "param-name-wrapper-proxy-abanks-hn": "ban-hnd-ic-consumo-wrapper-abanks-db-<env>"
+      "param-name": "ban-hnd-ic-consumo-wrapper-abanks-db-<env>"
     },
     {
       "region": "GT01-GT01",
       "enabled": true,
-      "param-name-wrapper-proxy-abanks-gt": "ban-gtm-ic-consumo-wrapper-abanks-gt-db-<env>"
+      "param-name": "ban-gtm-ic-consumo-wrapper-abanks-gt-db-<env>"
     },
     {
       "region": "NI01-NI01",
       "enabled": true,
-      "param-name-wrapper-proxy-abanks-ni": "ban-pan-ic-consumo-wrapper-abanks-db-<env>"
+      "param-name": "ban-pan-ic-consumo-wrapper-abanks-db-<env>"
     },
     {
       "region": "PA01-PA01",
       "enabled": true,
-      "param-name-wrapper-proxy-abanks-pa": "ban-xrs-ic-consumo-wrapper-abanks-pa-wsdl-<env>"
+      "param-name": "ban-xrs-ic-consumo-wrapper-abanks-pa-wsdl-<env>"
     }
   ],
   "type": "JSON",
