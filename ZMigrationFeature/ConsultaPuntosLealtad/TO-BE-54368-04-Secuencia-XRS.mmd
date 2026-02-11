@@ -6,13 +6,14 @@ sequenceDiagram
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
     participant Parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
     participant proxyAbanks as Wrapper Proxy Abanks <br> SP: PL_P_CANJE_PUNTOS_EFECTIVO
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
     Note over Consumidor, Errors: Flujos Honduras, Gutaemala, Panamá y Nicaragua (HN01 | GT01 | PN01 | NI01) - ConsultaPuntosMastercard
 
     Consumidor->>API: REST Request
-    Note right of Consumidor: Header, queryParam: binLogoRequestAPI, merchantReference, <br> merchantCategoryType, terminalReference, <br> conversionType, conversionPointsAmount
+    Note right of Consumidor: Header, queryParam: cardLogoReference, merchantReference, <br> merchantCategoryType, terminalReference, <br> conversionType, conversionPointsAmount
 
     API->>API: Validar Request
     Note over API: Valida campos obligatorios según contrato OpenAPI 
@@ -28,51 +29,52 @@ sequenceDiagram
     alt Consulta parametros en caché local
 
         API->>CL: Consultar parámetros Lambda Parámetros caché local
-        Note right of API: Domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: PARAM <br> methods: initiate-conversion
+        Note right of API: Domain: "REWARD_POINTS_ACCOUNT_ADMIN" <br> name: "initiate-conversion" <br> country: XRS 
 
         CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
-        Note left of CL: ObtenerParametrizacion Parámetros: <br> key = {sourceBank} <br> value = ban-{countryISO3}-lc-canje-puntos-efectivo-param-wsdl-<env>
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+        API->>CL: Consultar parámetros Parameter Store caché local
+        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-{hn, gt, ni, pa} 
 
-        alt Consulta Parámetros de conexión backend en caché local
-
-            API->>CL: Consultar parámetros Parameter Store caché local
-            Note right of API: Param Name: ban-{countryISO3}-lc-canje-puntos-efectivo-param-wsdl-<env>
-
-            CL->>API: Obtiene parámetros Parameter Store Caché Local
-            Note left of CL: ObtenerParametrizacion 5 Campos: <br> connection, connectionType, operationType, catalogueName, procedureName
-
-        end 
+        CL->>API: Obtiene parámetros Parameter Store Caché Local
+        Note left of CL: Obtiene parámetros de consumo a Wrapper ProxyAbanks
 
     else Consulta  parametros en Lambda Parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
-        Note right of API: Domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: PARAM <br> methods: initiate-conversion
+        Note right of API: Domain: "REWARD_POINTS_ACCOUNT_ADMIN" <br> name: "initiate-conversion" <br> country: XRS 
 
         Lambda->>API: Obtiene parámetros Lambda Parámetros
-        Note left of Lambda: ObtenerParametrizacion Parámetros: <br> value.key = {sourceBank} <br> value.value = ban-{countryISO3}-lc-canje-puntos-efectivo-param-wsdl-<env>
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
-        Note right of API: key, value
+        Note right of API: value.param-name 
 
-        alt Consulta Parámetros de conexión backend en parameter store
+        API->>Parameter: Consultar parámetros Parameter Store
+        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-{hn, gt, ni, pa}
 
-            API->>Parameter: Consultar parámetros Parameter Store
-            Note right of API: Param Name: ban-{countryISO3}-lc-canje-puntos-efectivo-param-wsdl-<env>
+        Parameter->>API: Obtiene parámetros Parameter Store
+        Note left of Parameter: Obtiene parámetros de consumo a Wrapper ProxyAbanks
 
-            Parameter->>API: Obtiene parámetros Parameter Store
-            Note left of Parameter: ObtenerParametrizacion 5 Campos: <br> connection, connectionType, operationType, catalogueName, procedureName
+        API->>CL: Guarda parámetros Parameter Store en caché local
+        Note right of API: Parámetros de consumo a Wrapper ProxyAbanks
 
-            API->>CL: Guarda parámetros Parameter Store en caché local
-            Note right of API: connection, connectionType, operationType, catalogueName, procedureName
-
-        end 
     end
 
-    API->>API: Aplica patrón strategy
-    Note over API: Selecciona lógica de negocio según header.sourceBank
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | GT01 | NI01 | PA01
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: "procedureName"
 
     API->>API: Construye request Wrapper Proxy Abanks SP: PL_P_CANJE_PUNTOS_EFECTIVO
-    Note over API: PN_LOGO = request.binLogoRequestAPI <br> PV_CODIGOCOMERCIO = request.merchantReference <br> PV_GRUPOCOMERCIO = request.merchantCategoryType <br> PV_CODIGOTERMINAL = request.terminalReference <br> PN_TIPOCONVERSION = request.tipoConversiónRequestAPI <br>  PN_VALORENTRADA = request.conversionPointsAmount
+    Note over API: PN_LOGO = request.cardLogoReference <br> PV_CODIGOCOMERCIO = request.merchantReference <br> PV_GRUPOCOMERCIO = request.merchantCategoryType <br> PV_CODIGOTERMINAL = request.terminalReference <br> PN_TIPOCONVERSION = request.tipoConversiónRequestAPI <br>  PN_VALORENTRADA = request.conversionPointsAmount
 
     API->>proxyAbanks: Consume SP PL_P_CANJE_PUNTOS_EFECTIVO
     Note right of API: Parámetros Consultados : <br> connection, connectionType, operationType, catalogueName, procedureName <br> Params : <br> PN_LOGO, PV_CODIGOCOMERCIO, PV_GRUPOCOMERCIO, <br> PV_CODIGOTERMINAL, PN_TIPOCONVERSION, PN_VALORENTRADA
