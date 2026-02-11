@@ -74,13 +74,13 @@
   "value": [
     {
       "name": "YES",
-      "valueOld": "Y", 
+      "valueOld": "1", 
       "valueNew": true,  
       "description": "SI"
     },
     {
       "name": "NO",  
-      "valueOld": "N",  
+      "valueOld": "0",  
       "valueNew": false,  
       "description": "NO"
     }

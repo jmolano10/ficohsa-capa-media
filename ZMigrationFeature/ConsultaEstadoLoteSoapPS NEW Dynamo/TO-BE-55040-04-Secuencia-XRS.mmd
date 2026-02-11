@@ -8,7 +8,7 @@ sequenceDiagram
     participant Parameter as Parameter Store
     participant Lib as Librería Pipeline (ConfigMap)
     participant LibPagosNEW as Librería Pagos Masivos NEW 
-    participant pagosNEW as WS Pagos Masivos <br/> Operación: ConsultaEstadoLote 
+    participant pagosNEW as API REST Pagos Masivos <br/> Operación: ConsultaEstadoLote 
     participant CW as CloudWatch
     participant Homologador as Liberería de <br> Homologación
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
@@ -35,7 +35,7 @@ sequenceDiagram
         Note right of API: Param Name: <br> llambda.param-name-api-pagos-masivos
 
         CL->>API: Obtiene parámetros Parameter Store Caché Local
-        Note left of CL: Obtiene parámetros de consumo a WS Pagos Masivos
+        Note left of CL: Obtiene parámetros de consumo a API REST Pagos Masivos
 
     else Consulta  parametros en Lambda Parámetros / Parameter Store
 
@@ -52,10 +52,10 @@ sequenceDiagram
         Note right of API: Param Name: <br> lambda.param-name-api-pagos-masivos
 
         Parameter->>API: Obtiene parámetros Parameter Store
-        Note left of Parameter: Obtiene parámetros de consumo a WS Pagos Masivos
+        Note left of Parameter: Obtiene parámetros de consumo a API REST Pagos Masivos
 
         API->>CL: Guarda parámetros Parameter Store en caché local
-        Note right of API: Parámetros de consumo a WS Pagos Masivos
+        Note right of API: Parámetros de consumo a API REST Pagos Masivos
 
     end
 
@@ -71,30 +71,30 @@ sequenceDiagram
     Note left of Lib: Constantes: "operation"
 
     API->>LibPagosNEW: Genera AuthorizationHeader 
-    Note right of API: Parámetros para generación de token: <br> lambda.secret-name + (reemplaza variable {application-id} con header.application-id) <br> Si no se recibe header.application-id por defecto se envía sales-force
+    Note right of API: Parámetros para generación de token: <br> lambda.secret-name + (reemplaza variable {application-id} con header.application-id)
 
     LibPagosNEW->>API: Retorna AuthorizationHeader
     Note left of LibPagosNEW: AuthorizationHeader
 
-    API->>API: Construye campos queryType y queryValue - Request WS Pagos Masivos - OP: ConsultaEstadoLote
+    API->>API: Construye campos queryType y queryValue - Request API REST Pagos Masivos - OP: ConsultaEstadoLote
     Note over API: Mapeo: <br> queryType = lambda.queryType <br> queryValue = lambda.queryValue (reemplaza variable del parámetro QueryValue)  
 
-    API->>API: Construye Request WS Pagos Masivos - OP: ConsultaEstadoLote
+    API->>API: Construye Request API REST Pagos Masivos - OP: ConsultaEstadoLote
     Note over API: Mapeo: <br> sourceBank = header.sourceBank <br> destinationBank = header.destinationBanks <br> customerId = request.customerReference <br> userName = header.Application-User 
 
-    API->>pagosNEW: Consume WS Pagos Masivos - OP: ConsultaEstadoLote
+    API->>pagosNEW: Consume API REST Pagos Masivos - OP: ConsultaEstadoLote
     Note over API, Lambda: sourceBank, destinationBank, customerId, userName, queryType, queryValue, AuthorizationHeader
 
-    API->>CW: Log Request WS Pagos Masivos - OP: ConsultaEstadoLote
+    API->>CW: Log Request API REST Pagos Masivos - OP: ConsultaEstadoLote
     Note right of API: Logea todos los campos del request para monitoreo y trazabilidad
 
-    pagosNEW->>API: Response WS Pagos Masivos - OP: ConsultaEstadoLote
+    pagosNEW->>API: Response API REST Pagos Masivos - OP: ConsultaEstadoLote
     Note over pagosNEW: Response: <br> Optimistic + 19 campos
 
-    API->>CW: Log Response WS Pagos Masivos - OP: ConsultaEstadoLote
+    API->>CW: Log Response API REST Pagos Masivos - OP: ConsultaEstadoLote
     Note right of API: Logea todos los campos del response para monitoreo y trazabilidad
 
-    API->>API: Evalúa Response WS Pagos Masivos
+    API->>API: Evalúa Response API REST Pagos Masivos
 
     API->>Homologador: Consulta Homologación result
     Note right of API: domain: "YES_NO" <br> name: CATALOGATE 

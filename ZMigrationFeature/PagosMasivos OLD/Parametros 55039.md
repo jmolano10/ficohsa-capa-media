@@ -88,17 +88,20 @@
   "domain": "YES_NO",
   "value": [
     {
-      "name": "S",
-      "value": "YES",
+      "name": "YES",
+      "valueOld": "1", 
+      "valueNew": true,  
       "description": "SI"
     },
     {
-      "name": "N",  
-      "value": "NO",    
+      "name": "NO",  
+      "valueOld": "0",  
+      "valueNew": false,  
       "description": "NO"
     }
   ],
   "status": "active",
   "updated_at": "2025-09-23T18:10:00Z"
 }
+```
 ```
