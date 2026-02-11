@@ -9,17 +9,17 @@
     {
       "region": "HN01-HN01",
       "enabled": true,
-      "param-name-wrapper-proxy-abanks-hn": "ban-xrs-ic-consumo-wrapper-abanks-hn-wsdl-<env>"
+      "param-name-wrapper-proxy-abanks-hn": "ban-hnd-ic-consumo-wrapper-abanks-db-<env>"
     },
     {
       "region": "GT01-GT01",
       "enabled": true,
-      "param-name-wrapper-proxy-abanks-gt": "ban-xrs-ic-consumo-wrapper-abanks-gt-wsdl-<env>"
+      "param-name-wrapper-proxy-abanks-gt": "ban-gtm-ic-consumo-wrapper-abanks-gt-db-<env>"
     },
     {
       "region": "NI01-NI01",
       "enabled": true,
-      "param-name-wrapper-proxy-abanks-ni": "ban-xrs-ic-consumo-wrapper-proxy-ni-wsdl-<env>"
+      "param-name-wrapper-proxy-abanks-ni": "ban-pan-ic-consumo-wrapper-abanks-db-<env>"
     },
     {
       "region": "PA01-PA01",
@@ -43,7 +43,7 @@
 ##### AWS Systems Manager Parameter Store
 
 ```json
-"ban-xrs-ic-consumo-wrapper-abanks-hn-wsdl-<env>"
+"ban-hnd-ic-consumo-wrapper-abanks-db-<env>"
 {
   "connection": "ConnectionProxyAbanksHN",
   "connectionType": "jca",
@@ -53,7 +53,7 @@
 ```
 
 ```json
-"ban-xrs-ic-consumo-wrapper-abanks-gt-wsdl-<env>"
+"ban-gtm-ic-consumo-wrapper-abanks-gt-db-<env>"
 {
   "connection": "ConnectionProxyAbanksPA",
   "connectionType": "jca",
@@ -63,17 +63,17 @@
 ```
 
 ```json
-"ban-xrs-ic-consumo-wrapper-proxy-ni-wsdl-<env>"
+"ban-pan-ic-consumo-wrapper-abanks-db-<env>"
 {
   "connection": "",
   "connectionType": "jca",
   "operationType": "query", 
-  "catalogueName": "proxynicaragua
+  "catalogueName": "proxynicaragua"
 }
 ```
 
 ```json
-"ban-xrs-ic-consumo-wrapper-abanks-pa-wsdl-<env>"
+"ban-pan-ic-consumo-wrapper-abanks-db-<env>"
 {
   "connection": "ConnectionProxyAbanksPA",
   "connectionType": "jca",
