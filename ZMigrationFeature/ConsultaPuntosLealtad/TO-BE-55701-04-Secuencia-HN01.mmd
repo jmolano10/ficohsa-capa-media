@@ -6,6 +6,8 @@ sequenceDiagram
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
     participant Parameter as Parameter Store
+    participant Homologador as Liberería de <br> Homologación
+    participant secret as Secret Manager
     participant Lib as Librería Pipeline (ConfigMap)
     participant SP as ConnectionProcesosHN <br/> SP OSBConInfoLealtad
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
@@ -23,21 +25,21 @@ sequenceDiagram
     alt Consulta parametros en caché local
 
         API->>CL: Consultar parámetros Lambda Parámetros caché local
-        Note right of API: Domain: "XXXX" <br> name: "MMMM" <br> country: XRS 
+        Note right of API: Domain: "XXXX" <br> name: "mmmm" <br> country: XRS 
 
         CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
  
         API->>CL: Consultar parámetros Parameter Store caché local
-        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-{hn, gt, ni, pa} 
+        Note right of API: Param Name: lambda.param-name
 
         CL->>API: Obtiene parámetros Parameter Store Caché Local
-        Note left of CL: Obtiene parámetros de consumo a Wrapper ProxyAbanks
+        Note left of CL: Obtiene parámetros de consumo a SP OSBConInfoLealtad
 
     else Consulta  parametros en Lambda Parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
-        Note right of API: Domain: "XXXX" <br> name: "MMMM" <br> country: XRS 
+        Note right of API: Domain: "XXXX" <br> name: "mmmm" <br> country: XRS 
 
         Lambda->>API: Obtiene parámetros Lambda Parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
@@ -46,13 +48,13 @@ sequenceDiagram
         Note right of API: value.param-name 
 
         API->>Parameter: Consultar parámetros Parameter Store
-        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-{hn, gt, ni, pa}
+        Note right of API: Param Name: lambda.param-name
 
         Parameter->>API: Obtiene parámetros Parameter Store
-        Note left of Parameter: Obtiene parámetros de consumo a Wrapper ProxyAbanks
+        Note left of Parameter: Obtiene parámetros de consumo a SP OSBConInfoLealtad
 
         API->>CL: Guarda parámetros Parameter Store en caché local
-        Note right of API: Parámetros de consumo a Wrapper ProxyAbanks
+        Note right of API: Parámetros de consumo a SP OSBConInfoLealtad
 
     end
 
@@ -60,24 +62,36 @@ sequenceDiagram
     Note over API: Usando parámetros de regionalización obtenidos
 
     API->>API: Validación Regional Exitosa
-    Note over API: Servicio habilitado para HN01 | GT01 | NI01 | PA01
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Homologador: Consulta Homologación sourceBank
+    Note right of API: domain: COUNTRY_CODE <br> name: CATALOGATE <br> country: XRS
+
+    Homologador->>API: Retorna Valor Homologado 
+    Note left of Homologador: HN01 → HND 
+
+    API->>secret: Consulta Secretos para conexion a la BD
+    Note right of API: secretName: lambda.secret-name
+
+    secret->>API: Retorna secretos para conexión a la BD
+    Note left of Homologador: user, password
 
     API->>Lib: Consulta Constantes
     
     Lib->>API: Retorna constantes necesarias
-    Note left of Lib: Constantes: "procedureName"
+    Note left of Lib: Constantes: <br> package = dbo <br> procedureName = OSBConInfoLealtad
 
-    API->>API: Construye Request WS Transaccion Alcance
-    Note over API: noTarjetaCredito = request.creditCardId
+    API->>API: Construye Request SP OSBConInfoLealtad
+    Note over API: Mapeo: <br> NumeroTarjeta = request.creditCardId <br> Pais = header.sourceBank (Homologado ISO3)
 
-    API->>InfoTC: Consume WS Transaccion Alcance - informacionTarjetas
-    Note right of API: Body: noTarjetaCredito
+    API->>SP: Consume SP OSBConInfoLealtad
+    Note right of API: serverName, port, databaseName, package, procedureName, NumeroTarjeta, Pais
 
-    InfoTC->>API: Response WS Transaccion Alcance - InformacionTarjeta
-    Note over InfoTC: Response: <br> EstatusConfirmacion, MensajeConfirmacion, NumeroCuenta, <br> NombreTarjetaTitular, NombreTarjetaHabiente, TipoTarjeta, <br> CodigoClienteCuenta, IdentificacionClienteCuenta, IdentificacionCLienteTarjeta, <br> Producto, GrupoAfinidad, EstadoCuenta, EstadoTarjeta, <br> FechaVencimiento, Producto_descripcion, GrupoAfinidad_descripcion
+    SP->>API: Response SP OSBConInfoLealtad
+    Note over SP: Response: <br> RowSet: <br> NumeroIdentificacion <br> NombreClente <br> Logo <br> TipoTarjeta <br> CodigoError, MensajeError
 
     API->>API: Construye response API
-    Note over API: accountNumber = NumeroCuenta <br> cardHolderReference = NombreTarjetaTitular <br> cardHolderName = NombreTarjetaHabiente <br> cardType = TipoTarjeta <br> customerAccountCode = CodigoClienteCuenta <br> customerLegalReference = IdentificacionClienteCuenta <br> cardholderIdentification = IdentificacionCLienteTarjeta <br> productCode = Producto <br> affinityGroupCode = GrupoAfinidad <br> creditCardAccountStatus = EstadoCuenta <br> cardStatus = EstadoTarjeta <br> cardExpirationDate = FechaVencimiento <br> productDescription = Producto_descripcion <br> affinityGroupDescription = GrupoAfinidad_descripcion
+    Note over API: legalIdAPI = RowSet.NumeroIdentificacion <br> customerNameAPI = RowSet.NombreClente <br> logo = RowSet.Logo <br> cardType = RowSet.TipoTarjeta 
 
     API->>Consumidor: Response Exitoso
     Note left of API: HTTP 200: Response Body 

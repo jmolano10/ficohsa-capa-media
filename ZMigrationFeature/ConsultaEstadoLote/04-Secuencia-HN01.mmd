@@ -1,0 +1,105 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>ConsultaEstadoLote
+    participant ValidaSvc as ValidaServicioRegional<br/>(Oracle DB)
+    participant ValidaAcceso as validaAccesoPMS<br/>(Oracle DB)
+    participant ConsultaDB as consultarEstadoLote<br/>(Oracle DB)
+    participant MapeoErr as MapeoErrores<br/>(OSB Service)
+
+    Note over Client,MapeoErr: Flujo Honduras (HN01) - ConsultaEstadoLote
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Authentication: UserName<br/>Body: CUSTOMER_ID, BANK_BATCH_ID, UPLOAD_DATE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Schema: pagosMasivosTypes.xsd<br/>Element: consultaEstadoLote
+
+    alt Validación XSD Fallida
+        OSB->>Client: SOAP Fault (Error de Esquema)
+    end
+
+    OSB->>ValidaSvc: Validar Servicio Regional
+    Note right of ValidaSvc: SP: ValidaServicioRegional<br/>PV_SERVICIO_ID: FICBCO0231<br/>PV_REGION: HN01
+
+    ValidaSvc-->>OSB: Response
+    Note left of ValidaSvc: PV_CODIGO_ERROR<br/>PV_MENSAJE_ERROR
+
+    alt Región No Válida (PV_CODIGO_ERROR != SUCCESS)
+        OSB->>OSB: Construir Error Response
+        Note right of OSB: successIndicator: ERROR<br/>messages: PV_MENSAJE_ERROR<br/>body: vacío
+        OSB->>Client: SOAP Response (Error)
+    end
+
+    OSB->>OSB: Aplicar Valores por Defecto Región
+    Note right of OSB: XQuery: aplicarValoresPorDefectoRegion.xqy
+
+    OSB->>OSB: Branch por Región (HN01)
+    Note right of OSB: Condición: SourceBank = 'HN01'
+
+    OSB->>ValidaAcceso: Validar Acceso Usuario
+    Note right of ValidaAcceso: SP: validaAccesoPMS<br/>PV_CUSTOMER_ID: {CUSTOMER_ID}<br/>PV_USER_NAME: {UserName}
+
+    ValidaAcceso-->>OSB: Response
+    Note left of ValidaAcceso: ERROR_MESSAGE
+
+    alt Acceso Denegado (ERROR_MESSAGE != "")
+        OSB->>OSB: Construir Error Response
+        Note right of OSB: successIndicator: Error<br/>messages: ERROR_MESSAGE<br/>body: vacío
+        OSB->>Client: SOAP Response (Error)
+    end
+
+    OSB->>OSB: Transformar Request
+    Note right of OSB: XQuery: consultaEstadoLoteIn.xqy<br/>Mapeo:<br/>CUSTOMER_ID → PV_CODIGOCLIENTE<br/>BANK_BATCH_ID → PN_NUMEROLOTE<br/>UPLOAD_DATE → PD_FECINGRESO
+
+    OSB->>ConsultaDB: Invocar Stored Procedure
+    Note right of ConsultaDB: Package: PMS_K_PAGOS_MASIVOS<br/>SP: PMS_P_CON_ESTADO_LOTE<br/>Connection: eis/DB/ConnectionProxyAbanksHN
+
+    ConsultaDB->>ConsultaDB: Ejecutar SP
+    Note right of ConsultaDB: Consultar estado del lote<br/>Obtener cuentas, pagos, estadísticas
+
+    ConsultaDB-->>OSB: OutputParameters
+    Note left of ConsultaDB: PV_CODIGOMENSAJE, PV_DESCRIPCIONMENSAJE<br/>PN_NUMEROLOTE, PV_NOMBRECLIENTE<br/>PN_ESTADOLOTE, PV_DESCESTADOLOTE<br/>PN_OPTIMISTA, PT_CUENTADB[], PT_MONTO[]<br/>PT_MONEDA[], PT_MONEDAPAGOS[]<br/>PT_MONTOPAGOS[], PT_TASAPAGOS[]<br/>PN_MONTOTOTAL, PN_NROTRANS, etc.
+
+    OSB->>OSB: Transformar Header Response
+    Note right of OSB: XQuery: consultaEstadoLoteHeaderOut.xqy<br/>SI PV_CODIGOMENSAJE = "SUCCESS":<br/>  successIndicator: Success<br/>SINO:<br/>  successIndicator: {PV_CODIGOMENSAJE}<br/>  messages: {PV_DESCRIPCIONMENSAJE}
+
+    alt Error en SP (PV_CODIGOMENSAJE != SUCCESS)
+        OSB->>MapeoErr: Mapear Error
+        Note right of MapeoErr: CODIGO_ERROR: {PV_CODIGOMENSAJE}<br/>MENSAJE_ERROR: FICBCO0231$#${PV_DESCRIPCIONMENSAJE}
+
+        MapeoErr-->>OSB: Error Mapeado
+        Note left of MapeoErr: CODIGO_ERROR_MAPEADO<br/>MENSAJE_ERROR_MAPEADO
+
+        OSB->>OSB: Actualizar Header
+        Note right of OSB: successIndicator: {CODIGO_ERROR_MAPEADO}<br/>messages: {MENSAJE_ERROR_MAPEADO}
+
+        OSB->>OSB: Body Vacío
+        Note right of OSB: <consultaEstadoLoteResponse/>
+
+        OSB->>Client: SOAP Response (Error)
+    end
+
+    OSB->>OSB: Transformar Body Response
+    Note right of OSB: XQuery: consultaEstadoLoteOut.xqy<br/>Conversiones:<br/>PN_OPTIMISTA: 1→YES, otro→NO<br/>Arrays paralelos:<br/>  PT_CUENTADB[i] → DEBIT_ACCOUNT<br/>  PT_MONTO[i] → AMOUNT<br/>  PT_MONEDA[i] → CURRENCY<br/>PD_FECAPLICACION: ajustar timezone
+
+    OSB->>Client: SOAP Response (Success)
+    Note left of OSB: Header: successIndicator=Success<br/>Body: consultaEstadoLoteResponse<br/>  BANK_BATCH_ID, CUSTOMER_ID<br/>  CUSTOMER_NAME, STATUS, STATUS_DESC<br/>  OPTIMISTIC, ACCOUNTS[], PAYMENTS[]<br/>  TOTAL_AMOUNT, NUMBER_OF_TRANSACTIONS<br/>  APPLICATION_DATE, PROCESS_INFO
+
+    Note over Client,MapeoErr: Error Handler Global
+
+    alt Error de Pipeline (Exception)
+        OSB->>OSB: Capturar Error
+        Note right of OSB: $fault/ctx:errorCode<br/>$fault/ctx:reason
+
+        OSB->>MapeoErr: Mapear Error
+        Note right of MapeoErr: CODIGO_ERROR: {errorCode}<br/>MENSAJE_ERROR: FICBCO0231$#${errorMessage}
+
+        MapeoErr-->>OSB: Error Mapeado
+
+        OSB->>OSB: Construir Error Response
+        Note right of OSB: Header: successIndicator, messages<br/>Body: vacío
+
+        OSB->>Client: SOAP Response (Error)
+    end
+```

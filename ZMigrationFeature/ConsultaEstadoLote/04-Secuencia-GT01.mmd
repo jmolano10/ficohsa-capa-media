@@ -1,0 +1,99 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>ConsultaEstadoLote
+    participant ValidaSvc as ValidaServicioRegional<br/>(Oracle DB)
+    participant MTR as Servicio MTR<br/>consultorLote
+    participant MapeoErr as MapeoErrores<br/>(OSB Service)
+
+    Note over Client,MapeoErr: Flujo Guatemala (GT01) - ConsultaEstadoLote
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=GT01<br/>Authentication: UserName<br/>Body: CUSTOMER_ID, BANK_BATCH_ID, UPLOAD_DATE
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Schema: pagosMasivosTypes.xsd<br/>Element: consultaEstadoLote
+
+    alt Validación XSD Fallida
+        OSB->>Client: SOAP Fault (Error de Esquema)
+    end
+
+    OSB->>ValidaSvc: Validar Servicio Regional
+    Note right of ValidaSvc: SP: ValidaServicioRegional<br/>PV_SERVICIO_ID: FICBCO0231<br/>PV_REGION: GT01
+
+    ValidaSvc-->>OSB: Response
+    Note left of ValidaSvc: PV_CODIGO_ERROR<br/>PV_MENSAJE_ERROR
+
+    alt Región No Válida (PV_CODIGO_ERROR != SUCCESS)
+        OSB->>OSB: Construir Error Response
+        Note right of OSB: successIndicator: ERROR<br/>messages: PV_MENSAJE_ERROR<br/>body: vacío
+        OSB->>Client: SOAP Response (Error)
+    end
+
+    OSB->>OSB: Aplicar Valores por Defecto Región
+    Note right of OSB: XQuery: aplicarValoresPorDefectoRegion.xqy
+
+    OSB->>OSB: Branch por Región (GT01)
+    Note right of OSB: Condición: SourceBank = 'GT01'
+
+    OSB->>OSB: Transformar Request
+    Note right of OSB: XQuery: consultaEstadoLoteGTIn.xqy<br/>Mapeo:<br/>UPLOAD_DATE → fechaRegistroLote (dateTime)<br/>SourceBank → idBancoOrigen (GT01)<br/>CUSTOMER_ID → idCliente<br/>BANK_BATCH_ID → idLote
+
+    OSB->>OSB: Validar Request contra WSDL
+    Note right of OSB: WSDL: consultorLoteEndpoint.wsdl<br/>Element: ser1:consultarLote
+
+    alt Validación WSDL Fallida
+        OSB->>Client: SOAP Fault (Error de Validación)
+    end
+
+    OSB->>MTR: Invocar Servicio SOAP
+    Note right of MTR: Endpoint:<br/>https://172.23.14.243:7004/<br/>ConsultaLotePmsWS/services/<br/>consultorLoteEndpoint<br/>Operation: consultarLote<br/>Namespace:<br/>http://servicio.consultalotews.<br/>mtrpmsv.cidenet.com.co/
+
+    MTR->>MTR: Procesar Solicitud
+    Note right of MTR: Consultar lote en sistema MTR<br/>Obtener detalles de cuentas, pagos<br/>Calcular estadísticas
+
+    MTR-->>OSB: consultarLoteResponse
+    Note left of MTR: respuestaConsultaLote:<br/>  cabeceraRespuesta:<br/>    codigo, mensaje<br/>  detalleRespuesta:<br/>    lote: {idLote, idClienteCore,<br/>      idEstado, nombreEstado, optimista,<br/>      cantidadTransacciones, montoTotal, etc.}<br/>    cuentas: [{idProductoDebito,<br/>      monto, idMoneda}]<br/>    pagos: [{idMoneda, monto, tasaCambio}]
+
+    OSB->>OSB: Transformar Header Response
+    Note right of OSB: XQuery: consultaEstadoLoteGTHeaderOut.xqy<br/>cabeceraRespuesta/codigo → successIndicator<br/>cabeceraRespuesta/mensaje → messages
+
+    alt Error en Servicio MTR (codigo != SUCCESS)
+        OSB->>MapeoErr: Mapear Error
+        Note right of MapeoErr: CODIGO_ERROR: {codigo}<br/>MENSAJE_ERROR: FICBCO0231$#${mensaje}
+
+        MapeoErr-->>OSB: Error Mapeado
+        Note left of MapeoErr: CODIGO_ERROR_MAPEADO<br/>MENSAJE_ERROR_MAPEADO
+
+        OSB->>OSB: Actualizar Header
+        Note right of OSB: successIndicator: {CODIGO_ERROR_MAPEADO}<br/>messages: {MENSAJE_ERROR_MAPEADO}
+
+        OSB->>OSB: Body Vacío
+        Note right of OSB: <consultaEstadoLoteResponse/>
+
+        OSB->>Client: SOAP Response (Error)
+    end
+
+    OSB->>OSB: Transformar Body Response
+    Note right of OSB: XQuery: consultaEstadoLoteGTOut.xqy<br/>Conversiones:<br/>lote/optimista: 'S'→YES, 'N'→NO<br/>  (con trim y upper-case)<br/>Iteraciones:<br/>  cuentas/cuenta → ACCOUNTS/ACCOUNT<br/>    idProductoDebito → DEBIT_ACCOUNT<br/>    monto → AMOUNT<br/>    idMoneda → CURRENCY<br/>  pagos/pago → PAYMENTS/PAYMENT<br/>    idMoneda → CURRENCY<br/>    monto → TOTAL_AMOUNT<br/>    tasaCambio → EXCHANGE_RATE
+
+    OSB->>Client: SOAP Response (Success)
+    Note left of OSB: Header: successIndicator=SUCCESS<br/>Body: consultaEstadoLoteResponse<br/>  BANK_BATCH_ID, CUSTOMER_ID<br/>  CUSTOMER_NAME, STATUS, STATUS_DESC<br/>  OPTIMISTIC, ACCOUNTS[], PAYMENTS[]<br/>  TOTAL_AMOUNT, NUMBER_OF_TRANSACTIONS<br/>  APPLICATION_DATE, PROCESS_INFO
+
+    Note over Client,MapeoErr: Error Handler Global
+
+    alt Error de Pipeline (Exception)
+        OSB->>OSB: Capturar Error
+        Note right of OSB: $fault/ctx:errorCode<br/>$fault/ctx:reason
+
+        OSB->>MapeoErr: Mapear Error
+        Note right of MapeoErr: CODIGO_ERROR: {errorCode}<br/>MENSAJE_ERROR: FICBCO0231$#${errorMessage}
+
+        MapeoErr-->>OSB: Error Mapeado
+
+        OSB->>OSB: Construir Error Response
+        Note right of OSB: Header: successIndicator, messages<br/>Body: vacío
+
+        OSB->>Client: SOAP Response (Error)
+    end
+```

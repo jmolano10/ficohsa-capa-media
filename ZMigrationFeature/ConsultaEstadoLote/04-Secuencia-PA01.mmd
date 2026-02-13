@@ -1,0 +1,59 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>ConsultaEstadoLote
+    participant ValidaSvc as ValidaServicioRegional<br/>(Oracle DB)
+    participant MTR as Servicio MTR<br/>consultorLote
+    participant MapeoErr as MapeoErrores<br/>(OSB Service)
+
+    Note over Client,MapeoErr: Flujo Panamá (PA01) - ConsultaEstadoLote<br/>IDÉNTICO A GT01/NI01, solo difiere idBancoOrigen
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=PA01<br/>Body: CUSTOMER_ID, BANK_BATCH_ID, UPLOAD_DATE
+
+    OSB->>OSB: Validar Esquema XML
+
+    OSB->>ValidaSvc: Validar Servicio Regional
+    Note right of ValidaSvc: PV_SERVICIO_ID: FICBCO0231<br/>PV_REGION: PA01
+
+    ValidaSvc-->>OSB: Response
+
+    alt Región No Válida
+        OSB->>Client: SOAP Response (Error)
+    end
+
+    OSB->>OSB: Branch por Región (PA01)
+
+    OSB->>OSB: Transformar Request
+    Note right of OSB: XQuery: consultaEstadoLotePAIn.xqy<br/>idBancoOrigen: PA01<br/>(resto idéntico a GT01/NI01)
+
+    OSB->>OSB: Validar Request contra WSDL
+
+    OSB->>MTR: Invocar Servicio SOAP
+    Note right of MTR: Endpoint: https://172.23.14.243:7004/<br/>ConsultaLotePmsWS/services/<br/>consultorLoteEndpoint<br/>Operation: consultarLote<br/>idBancoOrigen: PA01
+
+    MTR->>MTR: Procesar Solicitud
+
+    MTR-->>OSB: consultarLoteResponse
+    Note left of MTR: Estructura idéntica a GT01/NI01
+
+    OSB->>OSB: Transformar Header Response
+    Note right of OSB: XQuery: consultaEstadoLotePAHeaderOut.xqy<br/>(lógica idéntica a GT01/NI01)
+
+    alt Error en Servicio MTR
+        OSB->>MapeoErr: Mapear Error
+        MapeoErr-->>OSB: Error Mapeado
+        OSB->>Client: SOAP Response (Error)
+    end
+
+    OSB->>OSB: Transformar Body Response
+    Note right of OSB: XQuery: consultaEstadoLotePAOut.xqy<br/>(lógica idéntica a GT01/NI01)
+
+    OSB->>Client: SOAP Response (Success)
+
+    alt Error de Pipeline
+        OSB->>MapeoErr: Mapear Error
+        MapeoErr-->>OSB: Error Mapeado
+        OSB->>Client: SOAP Response (Error)
+    end
+```

@@ -1,0 +1,174 @@
+```mermaid
+flowchart TD
+    Start([Cliente SOAP Request]) --> ValidateXSD[Validar Esquema XSD<br/>pagosMasivosTypes.xsd]
+    
+    ValidateXSD -->|Error| ErrorXSD[SOAP Fault<br/>Error de Esquema]
+    ErrorXSD --> End1([Fin])
+    
+    ValidateXSD -->|OK| ValidateRegion[Validar Servicio Regional<br/>SP: ValidaServicioRegional<br/>Service ID: FICBCO0231]
+    
+    ValidateRegion -->|PV_CODIGO_ERROR != SUCCESS| ErrorRegion[Construir Error Response<br/>successIndicator: ERROR<br/>messages: PV_MENSAJE_ERROR]
+    ErrorRegion --> End2([Fin])
+    
+    ValidateRegion -->|SUCCESS| ApplyDefaults[Aplicar Valores por Defecto<br/>XQuery: aplicarValoresPorDefectoRegion]
+    
+    ApplyDefaults --> BranchRegion{Branch por Región<br/>SourceBank?}
+    
+    BranchRegion -->|HN01| HN01Flow[Pipeline HN01]
+    BranchRegion -->|GT01| GT01Flow[Pipeline GT01]
+    BranchRegion -->|NI01| NI01Flow[Pipeline NI01]
+    BranchRegion -->|PA01| PA01Flow[Pipeline PA01]
+    BranchRegion -->|Otro| DefaultFlow[Pipeline Default]
+    
+    DefaultFlow --> ErrorDefault[Error MW-0008<br/>SERVICE NOT IMPLEMENTED<br/>FOR THIS COUNTRY/COMPANY]
+    ErrorDefault --> End3([Fin])
+    
+    %% HN01 Flow
+    HN01Flow --> ValidateAccess[Validar Acceso Usuario<br/>SP: validaAccesoPMS<br/>CUSTOMER_ID, USER_NAME]
+    
+    ValidateAccess -->|ERROR_MESSAGE != ""| ErrorAccess[Construir Error Response<br/>successIndicator: Error<br/>messages: ERROR_MESSAGE]
+    ErrorAccess --> End4([Fin])
+    
+    ValidateAccess -->|OK| TransformHN01In[Transformar Request<br/>XQuery: consultaEstadoLoteIn.xqy<br/>CUSTOMER_ID → PV_CODIGOCLIENTE<br/>BANK_BATCH_ID → PN_NUMEROLOTE<br/>UPLOAD_DATE → PD_FECINGRESO]
+    
+    TransformHN01In --> CallDBHN01[Invocar Stored Procedure<br/>Package: PMS_K_PAGOS_MASIVOS<br/>SP: PMS_P_CON_ESTADO_LOTE<br/>Connection: eis/DB/ConnectionProxyAbanksHN]
+    
+    CallDBHN01 --> TransformHN01HeaderOut[Transformar Header<br/>XQuery: consultaEstadoLoteHeaderOut.xqy<br/>PV_CODIGOMENSAJE → successIndicator]
+    
+    TransformHN01HeaderOut --> CheckHN01Success{successIndicator<br/>= SUCCESS?}
+    
+    CheckHN01Success -->|No| MapErrorHN01[Mapear Error<br/>Service: MapeoErrores<br/>CODIGO_ERROR: PV_CODIGOMENSAJE<br/>MENSAJE_ERROR: FICBCO0231$#$PV_DESCRIPCIONMENSAJE]
+    MapErrorHN01 --> EmptyBodyHN01[Body Vacío<br/>consultaEstadoLoteResponse]
+    EmptyBodyHN01 --> End5([Fin])
+    
+    CheckHN01Success -->|Sí| TransformHN01Out[Transformar Body<br/>XQuery: consultaEstadoLoteOut.xqy<br/>Conversión PN_OPTIMISTA: 1→YES<br/>Arrays paralelos: PT_CUENTADB, PT_MONTO, PT_MONEDA<br/>Ajustar timezone: PD_FECAPLICACION]
+    
+    TransformHN01Out --> ResponseHN01[SOAP Response Success]
+    ResponseHN01 --> End6([Fin])
+    
+    %% GT01 Flow
+    GT01Flow --> TransformGT01In[Transformar Request<br/>XQuery: consultaEstadoLoteGTIn.xqy<br/>UPLOAD_DATE → fechaRegistroLote<br/>SourceBank → idBancoOrigen GT01<br/>CUSTOMER_ID → idCliente<br/>BANK_BATCH_ID → idLote]
+    
+    TransformGT01In --> ValidateWSDLGT01[Validar Request contra WSDL<br/>consultorLoteEndpoint.wsdl<br/>Element: ser1:consultarLote]
+    
+    ValidateWSDLGT01 -->|Error| ErrorWSDLGT01[SOAP Fault<br/>Error de Validación WSDL]
+    ErrorWSDLGT01 --> End7([Fin])
+    
+    ValidateWSDLGT01 -->|OK| CallMTRGT01[Invocar Servicio SOAP MTR<br/>Endpoint: https://172.23.14.243:7004/<br/>ConsultaLotePmsWS/services/consultorLoteEndpoint<br/>Operation: consultarLote<br/>idBancoOrigen: GT01]
+    
+    CallMTRGT01 --> TransformGT01HeaderOut[Transformar Header<br/>XQuery: consultaEstadoLoteGTHeaderOut.xqy<br/>cabeceraRespuesta/codigo → successIndicator]
+    
+    TransformGT01HeaderOut --> CheckGT01Success{successIndicator<br/>= SUCCESS?}
+    
+    CheckGT01Success -->|No| MapErrorGT01[Mapear Error<br/>Service: MapeoErrores]
+    MapErrorGT01 --> EmptyBodyGT01[Body Vacío]
+    EmptyBodyGT01 --> End8([Fin])
+    
+    CheckGT01Success -->|Sí| TransformGT01Out[Transformar Body<br/>XQuery: consultaEstadoLoteGTOut.xqy<br/>Conversión optimista: S→YES, N→NO<br/>Iteración cuentas/cuenta → ACCOUNTS<br/>Iteración pagos/pago → PAYMENTS]
+    
+    TransformGT01Out --> ResponseGT01[SOAP Response Success]
+    ResponseGT01 --> End9([Fin])
+    
+    %% NI01 Flow
+    NI01Flow --> TransformNI01In[Transformar Request<br/>XQuery: consultaEstadoLoteNIIn.xqy<br/>idBancoOrigen: NI01<br/>resto idéntico a GT01]
+    
+    TransformNI01In --> ValidateWSDLNI01[Validar Request contra WSDL]
+    
+    ValidateWSDLNI01 -->|Error| ErrorWSDLNI01[SOAP Fault]
+    ErrorWSDLNI01 --> End10([Fin])
+    
+    ValidateWSDLNI01 -->|OK| CallMTRNI01[Invocar Servicio SOAP MTR<br/>idBancoOrigen: NI01]
+    
+    CallMTRNI01 --> TransformNI01HeaderOut[Transformar Header<br/>XQuery: consultaEstadoLoteNIHeaderOut.xqy]
+    
+    TransformNI01HeaderOut --> CheckNI01Success{successIndicator<br/>= SUCCESS?}
+    
+    CheckNI01Success -->|No| MapErrorNI01[Mapear Error]
+    MapErrorNI01 --> EmptyBodyNI01[Body Vacío]
+    EmptyBodyNI01 --> End11([Fin])
+    
+    CheckNI01Success -->|Sí| TransformNI01Out[Transformar Body<br/>XQuery: consultaEstadoLoteNIOut.xqy<br/>lógica idéntica a GT01]
+    
+    TransformNI01Out --> ResponseNI01[SOAP Response Success]
+    ResponseNI01 --> End12([Fin])
+    
+    %% PA01 Flow
+    PA01Flow --> TransformPA01In[Transformar Request<br/>XQuery: consultaEstadoLotePAIn.xqy<br/>idBancoOrigen: PA01<br/>resto idéntico a GT01/NI01]
+    
+    TransformPA01In --> ValidateWSDLPA01[Validar Request contra WSDL]
+    
+    ValidateWSDLPA01 -->|Error| ErrorWSDLPA01[SOAP Fault]
+    ErrorWSDLPA01 --> End13([Fin])
+    
+    ValidateWSDLPA01 -->|OK| CallMTRPA01[Invocar Servicio SOAP MTR<br/>idBancoOrigen: PA01]
+    
+    CallMTRPA01 --> TransformPA01HeaderOut[Transformar Header<br/>XQuery: consultaEstadoLotePAHeaderOut.xqy]
+    
+    TransformPA01HeaderOut --> CheckPA01Success{successIndicator<br/>= SUCCESS?}
+    
+    CheckPA01Success -->|No| MapErrorPA01[Mapear Error]
+    MapErrorPA01 --> EmptyBodyPA01[Body Vacío]
+    EmptyBodyPA01 --> End14([Fin])
+    
+    CheckPA01Success -->|Sí| TransformPA01Out[Transformar Body<br/>XQuery: consultaEstadoLotePAOut.xqy<br/>lógica idéntica a GT01/NI01]
+    
+    TransformPA01Out --> ResponsePA01[SOAP Response Success]
+    ResponsePA01 --> End15([Fin])
+    
+    %% Error Handler Global
+    ValidateXSD -.->|Exception| ErrorHandler[Error Handler Global<br/>Capturar $fault/ctx:errorCode<br/>$fault/ctx:reason]
+    ValidateRegion -.->|Exception| ErrorHandler
+    HN01Flow -.->|Exception| ErrorHandler
+    GT01Flow -.->|Exception| ErrorHandler
+    NI01Flow -.->|Exception| ErrorHandler
+    PA01Flow -.->|Exception| ErrorHandler
+    
+    ErrorHandler --> MapErrorGlobal[Mapear Error<br/>Service: MapeoErrores<br/>CODIGO_ERROR: errorCode<br/>MENSAJE_ERROR: FICBCO0231$#$errorMessage]
+    
+    MapErrorGlobal --> ErrorResponse[Construir Error Response<br/>Header: successIndicator, messages<br/>Body: vacío]
+    
+    ErrorResponse --> End16([Fin])
+    
+    %% Response Flow
+    ResponseHN01 --> CheckErrorResponse{successIndicator<br/>!= SUCCESS?}
+    ResponseGT01 --> CheckErrorResponse
+    ResponseNI01 --> CheckErrorResponse
+    ResponsePA01 --> CheckErrorResponse
+    
+    CheckErrorResponse -->|Sí| MapErrorResponse[Mapear Error en Response<br/>Service: MapeoErrores<br/>Pipeline: ValidacionesGenerales_response]
+    
+    MapErrorResponse --> UpdateHeader[Actualizar Header<br/>con error mapeado]
+    UpdateHeader --> End17([Fin])
+    
+    CheckErrorResponse -->|No| End18([Fin - Success])
+    
+    style Start fill:#90EE90
+    style End1 fill:#FFB6C1
+    style End2 fill:#FFB6C1
+    style End3 fill:#FFB6C1
+    style End4 fill:#FFB6C1
+    style End5 fill:#FFB6C1
+    style End6 fill:#90EE90
+    style End7 fill:#FFB6C1
+    style End8 fill:#FFB6C1
+    style End9 fill:#90EE90
+    style End10 fill:#FFB6C1
+    style End11 fill:#FFB6C1
+    style End12 fill:#90EE90
+    style End13 fill:#FFB6C1
+    style End14 fill:#FFB6C1
+    style End15 fill:#90EE90
+    style End16 fill:#FFB6C1
+    style End17 fill:#FFB6C1
+    style End18 fill:#90EE90
+    
+    style BranchRegion fill:#FFD700
+    style CheckHN01Success fill:#FFD700
+    style CheckGT01Success fill:#FFD700
+    style CheckNI01Success fill:#FFD700
+    style CheckPA01Success fill:#FFD700
+    style CheckErrorResponse fill:#FFD700
+    
+    style ErrorHandler fill:#FF6347
+    style MapErrorGlobal fill:#FF6347
+```
