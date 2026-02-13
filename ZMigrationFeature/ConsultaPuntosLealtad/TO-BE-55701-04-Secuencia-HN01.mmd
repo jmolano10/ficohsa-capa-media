@@ -2,7 +2,7 @@
 sequenceDiagram
     autonumber
     participant Consumidor as Consumidore/Aplicación
-    participant API as API Consulta Info Lealtad <br> Epica 2382: ConsultaPuntosLealtad <br> HU 55701:  GET - XXXX
+    participant API as API Consulta Info Lealtad <br> Epica 2382: ConsultaPuntosLealtad <br> HU 55701:  GET - /operational-services/issued-dev-admin-retrieves/v1/retrieve-customer
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
     participant Parameter as Parameter Store
@@ -25,7 +25,7 @@ sequenceDiagram
     alt Consulta parametros en caché local
 
         API->>CL: Consultar parámetros Lambda Parámetros caché local
-        Note right of API: Domain: "XXXX" <br> name: "mmmm" <br> country: XRS 
+        Note right of API: Domain: "ISSUED_DEV_ADMIN_RETRIEVES" <br> name: "retrieve-customer" <br> country: XRS 
 
         CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
@@ -39,7 +39,7 @@ sequenceDiagram
     else Consulta  parametros en Lambda Parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
-        Note right of API: Domain: "XXXX" <br> name: "mmmm" <br> country: XRS 
+        Note right of API: Domain: "ISSUED_DEV_ADMIN_RETRIEVES" <br> name: "retrieve-customer" <br> country: XRS 
 
         Lambda->>API: Obtiene parámetros Lambda Parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
@@ -65,7 +65,7 @@ sequenceDiagram
     Note over API: Servicio habilitado para HN01 
 
     API->>Homologador: Consulta Homologación sourceBank
-    Note right of API: domain: COUNTRY_CODE <br> name: CATALOGATE <br> country: XRS
+    Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
 
     Homologador->>API: Retorna Valor Homologado 
     Note left of Homologador: HN01 → HND 
@@ -90,11 +90,26 @@ sequenceDiagram
     SP->>API: Response SP OSBConInfoLealtad
     Note over SP: Response: <br> RowSet: <br> NumeroIdentificacion <br> NombreClente <br> Logo <br> TipoTarjeta <br> CodigoError, MensajeError
 
-    API->>API: Construye response API
-    Note over API: legalIdAPI = RowSet.NumeroIdentificacion <br> customerNameAPI = RowSet.NombreClente <br> logo = RowSet.Logo <br> cardType = RowSet.TipoTarjeta 
+    API->>API: Evalúa Response SP OSBConInfoLealtad
+    
+    alt If CodigoError == -1
 
-    API->>Consumidor: Response Exitoso
-    Note left of API: HTTP 200: Response Body 
+        API->>API: Construye response API
+        Note over API: customerLegalReference = RowSet.NumeroIdentificacion <br> cardHolderName = RowSet.NombreClente <br> cardLogoReference = RowSet.Logo <br> cardType = RowSet.TipoTarjeta 
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    else If If CodigoError != -1
+
+        API->> Errors: Mapear código de error
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 422 + responseSP.mensajeError
+    
+    end
 
     Note over Consumidor, Errors: Flujo Alternativo - Error
     activate API

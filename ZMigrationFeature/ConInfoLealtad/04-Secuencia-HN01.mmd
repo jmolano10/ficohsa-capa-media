@@ -1,0 +1,141 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>ConsultaPuntosLealtadHN
+    participant ConsultaPL as consultaPuntosLealtad_db<br/>(Oracle)
+    participant ConvertPais as convertirCodigoPais<br/>(XQuery)
+    participant ConInfoLeal as conInfoLealtad_db<br/>(SQL Server)
+    participant ConsultaProg as consultaProgramaLealtad_db<br/>(Oracle)
+    participant Mastercard as Mastercard<br/>CustomerService
+    participant VisionPlus as VisionPlus<br/>PointsAdjustmentInquiry
+
+    Note over Client,VisionPlus: Flujo Honduras (HN01) - ConInfoLealtad
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: CUSTOMER_ID_TYPE=CARD_NUMBER<br/>CUSTOMER_ID_VALUE=4111111111111111<br/>RETURN_CASH_EQUIVALENT=YES
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Schema: programaLealtadTypes.xsd<br/>Element: consultaPuntosLealtad
+
+    alt Validación XSD Fallida
+        OSB->>Client: SOAP Fault (Error de Esquema)
+    end
+
+    OSB->>ConsultaPL: Consulta Inicial de Puntos
+    Note right of ConsultaPL: SP: consultaPuntosLealtad<br/>Connection: eis/DB/ConnectionCLIENTDATA<br/>Parámetros: CUSTOMER_ID_TYPE, CUSTOMER_ID_VALUE
+
+    ConsultaPL-->>OSB: Response (sin BALANCE)
+    Note left of ConsultaPL: PV_CODIGO_ERROR: "NO_DATA"<br/>PT_PUNTOS_LEALTAD/BALANCE: no existe
+
+    OSB->>OSB: Verificar Balance
+    Note right of OSB: not(exists($RSPconsultaPuntosLealtad/<br/>PT_PUNTOS_LEALTAD/BALANCE))
+
+    alt Balance Existe
+        OSB->>Client: Response con puntos (flujo normal)
+    end
+
+    OSB->>OSB: Extraer Tipo y Valor de ID
+    Note right of OSB: $customerIdType = "CARD_NUMBER"<br/>$customerIdValue = "4111111111111111"
+
+    alt CUSTOMER_ID_TYPE != "CARD_NUMBER"
+        OSB->>OSB: Error
+        Note right of OSB: errorCode = 'ERROR'<br/>validationMessage = 'CUSTOMER_ID_TYPE no soportado'
+        OSB->>Client: SOAP Response (Error)
+    end
+
+    OSB->>ConvertPais: Convertir Código de País
+    Note right of ConvertPais: XQuery: convertirCodigoPais<br/>codigoPais: "HN01"<br/>sentidoConversion: "OSB-ISO3"
+
+    ConvertPais-->>OSB: Código ISO3
+    Note left of ConvertPais: "HND"
+
+    OSB->>ConInfoLeal: Consultar Información de Cliente
+    Note right of ConInfoLeal: Connection: eis/DB/ConnectionProcesosHN<br/>Schema: dbo<br/>SP: OSBConInfoLealtad<br/>NumeroTarjeta: "4111111111111111"<br/>Pais: "HND"
+
+    ConInfoLeal->>ConInfoLeal: Ejecutar SP
+    Note right of ConInfoLeal: SELECT LEGALID, CUSTOMERNAME,<br/>CARDTYPE, LOGO<br/>FROM [tabla_tarjetas]<br/>WHERE NumeroTarjeta = @NumeroTarjeta<br/>AND Pais = @Pais
+
+    ConInfoLeal-->>OSB: OutputParameters
+    Note left of ConInfoLeal: RowSet:<br/>  LEGALID: "0801199012345"<br/>  CUSTOMERNAME: "JUAN PEREZ"<br/>  CARDTYPE: "CREDIT"<br/>  LOGO: "625"<br/>CodigoError: -1<br/>MensajeError: ""
+
+    alt CodigoError != -1
+        OSB->>OSB: Asignar Error
+        Note right of OSB: $errorCode = CodigoError<br/>$validationMessage = MensajeError
+        OSB->>Client: SOAP Response (Error)
+    end
+
+    OSB->>OSB: Extraer Datos del RowSet
+    Note right of OSB: $legalId = fn-bea:trim("0801199012345")<br/>$customerName = "JUAN PEREZ"<br/>$cardType = "CREDIT"<br/>$grupoAfinidad = "625"<br/>$errorCode = "-1"<br/>$validationMessage = ""
+
+    OSB->>OSB: Determinar Programa de Lealtad
+    Note right of OSB: SI $cardType = 'DEBIT':<br/>  programaLealtad = '1' (Mastercard)<br/>SINO:<br/>  Consultar consultaProgramaLealtad_db
+
+    alt Tarjeta de Débito
+        OSB->>OSB: Asignar Programa
+        Note right of OSB: $programaLealtad = '1'
+    else Tarjeta de Crédito
+        OSB->>ConsultaProg: Consultar Programa
+        Note right of ConsultaProg: SP: consultaProgramaLealtad<br/>codigoPais: "HN01"<br/>logo: "625"
+
+        ConsultaProg-->>OSB: Response
+        Note left of ConsultaProg: PV_CODIGOLEALTAD: "2"<br/>PV_CODIGOMENSAJE: "SUCCESS"
+
+        OSB->>OSB: Asignar Programa
+        Note right of OSB: $programaLealtad = '2'
+    end
+
+    alt Programa = '1' (Mastercard)
+        OSB->>OSB: Obtener Parametrización
+        Note right of OSB: institutionName = "FICOHSA"
+
+        OSB->>Mastercard: getPointDetails
+        Note right of Mastercard: Endpoint: Mastercard CustomerService<br/>Header: MRSIdentity<br/>  institutionName: "FICOHSA"<br/>  appID: "0801199012345"
+
+        Mastercard-->>OSB: Response
+        Note left of Mastercard: AvailablePoints: 15000
+
+        OSB->>OSB: Asignar Puntos
+        Note right of OSB: $availablePoints = 15000
+    else Programa = '2' (VisionPlus)
+        OSB->>OSB: Consultar Datos de Cuenta
+        Note right of OSB: conDatoCuenta_db<br/>accountNumber: "4111111111111111"
+
+        OSB->>VisionPlus: PointsAdjustmentInquiry
+        Note right of VisionPlus: Endpoint: VisionPlus<br/>accountNumber: [LMS_ACC]<br/>scheme: [LMS_SCHEME]<br/>org: [ORG]
+
+        VisionPlus-->>OSB: Response
+        Note left of VisionPlus: GPXAIO-OPEN-TO-RED-ON-SCR: 12500000<br/>(puntos * 1000)
+
+        OSB->>OSB: Calcular Puntos
+        Note right of OSB: $availablePoints = 12500000 / 1000<br/>= 12500
+    end
+
+    alt RETURN_CASH_EQUIVALENT = "YES"
+        OSB->>OSB: Calcular Equivalencia
+        Note right of OSB: canjearPuntosEfectivo_db<br/>conversionAmount: $availablePoints<br/>logo: "625"
+
+        OSB->>OSB: Asignar Equivalencia
+        Note right of OSB: $cashEquivalent = 3750.00<br/>$cashCurrency = "HNL"
+    end
+
+    OSB->>OSB: Registrar Consulta
+    Note right of OSB: registraPuntosLealtad_db<br/>legalId, balance, cashEquivalent
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: XQuery: consultaPuntosLealtadHNOut.xqy<br/>Mapear variables a estructura de respuesta
+
+    OSB->>Client: SOAP Response (Success)
+    Note left of OSB: Header: successIndicator=Success<br/>Body:<br/>  LEGAL_ID: "0801199012345"<br/>  CUSTOMER_NAME: "JUAN PEREZ"<br/>  AVAILABLE_POINTS: 15000<br/>  CASH_EQUIVALENT: 3750.00<br/>  CASH_CURRENCY: "HNL"
+
+    Note over Client,VisionPlus: Error Handler Global
+
+    alt Error de Pipeline (Exception)
+        OSB->>OSB: Capturar Error
+        Note right of OSB: $fault/ctx:errorCode<br/>$fault/ctx:reason
+
+        OSB->>OSB: Construir Error Response
+        Note right of OSB: Header: successIndicator, messages<br/>Body: vacío
+
+        OSB->>Client: SOAP Response (Error)
+    end
+```

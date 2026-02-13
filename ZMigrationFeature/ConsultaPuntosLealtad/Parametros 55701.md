@@ -2,35 +2,33 @@
 ```json
 //REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO
 {
-  "pk": "COUNTRY#XRS#DOMAIN#REWARD_POINTS_ACCOUNT_RETRIEVES#PARAM#retrieve-points",
+  "pk": "COUNTRY#XRS#DOMAIN#ISSUED_DEV_ADMIN_RETRIEVES#PARAM#retrieve-customer",
   "sk": "V#0001",
-  "name": "retrieve-points",
+  "name": "retrieve-customer",
   "value": [
     {
       "region": "HN01-HN01",
       "enabled": true,
-      "param-name": "ban-xrs-ic-parm-vision-plus-service-wsdl-<env>"
+      "secret-name": "ban-hnd-lc-process-hn-secm-db-<env>",
+      "param-name": "ban-hnd-lc-process-hn-param-db-<env>"
     },
     {
       "region": "GT01-GT01",
-      "enabled": true,
-      "param-name": "ban-xrs-ic-parm-vision-plus-service-wsdl-<env>"
+      "enabled": false
     },
     {
       "region": "NI01-NI01",
-      "enabled": true,
-      "param-name": "ban-xrs-ic-parm-vision-plus-service-wsdl-<env>"
+      "enabled": false
     },
     {
       "region": "PA01-PA01",
-      "enabled": true,
-      "param-name": "ban-xrs-ic-parm-vision-plus-service-wsdl-<env>"
+      "enabled": false
     }
   ],
   "type": "JSON",
-  "description": "CONFIG OF XX BY METHOD",
+  "description": "CONFIG OF ISSUED_DEV_ADMIN_RETRIEVES BY METHOD",
   "country": "XRS",
-  "domain": "REWARD_POINTS_ACCOUNT_RETRIEVES",
+  "domain": "ISSUED_DEV_ADMIN_RETRIEVES",
   "tags": [],
   "precedence": 10,
   "effective_from": "",
@@ -43,7 +41,7 @@
 ##### AWS Systems Manager Parameter Store
 
 ```json
-"ban-hnd-xx-procesos-hn-param-db-<env>"
+"ban-hnd-lc-process-hn-param-db-<env>"
 {
   "serverName": "172.23.177.172",
   "port": "64102",
@@ -53,7 +51,7 @@
 ##### AWS Systems Manager SecretManager
 
 ```json
-"ban-hnd-xx-procesos-hn-secm-db-<env>"
+"ban-hnd-lc-process-hn-secm-db-<env>"
 {
   "user": "usrOSB",
   "password": "FicohsaHN2021"
@@ -66,5 +64,47 @@
 {
   "package": "dbo",
   "procedureName": "OSBConInfoLealtad"
+}
+```
+##### Registro en Dynamo Librería Homologación de datos
+```json
+{
+  "pk": "COUNTRY#XRS#DOMAIN#COUNTRY_CODE#PARAM#CATALOGATE",
+  "sk": "V#0001",
+  "type": "JSON",
+  "country": "XRS",
+  "domain": "COUNTRY_CODE",
+  "name": "CATALOGATE",
+  "description": "CATALOGATE OF COUNTRY CODE",
+  "value": [
+    {
+      "description": "Honduras",
+      "Ficohsa": "HN01",
+      "canalx": "HND",
+      "ISO2": "HN",
+      "ISO3": "HND"
+    },
+    {
+      "description": "Panamá",
+      "Ficohsa": "PA01",
+      "ISO2": "PA",
+      "ISO3": "PAN"
+    },
+    {
+      "description": "Guatemala",
+      "Ficohsa": "GT01",
+      "ISO2": "GT",
+      "ISO3": "GTM"
+    },
+    {
+      "description": "Nicaragua",
+      "Ficohsa": "NI01",
+      "ISO2": "NI",
+      "ISO3": "NIC"
+    }
+  ],
+  "status": "active",
+  "updated_at": "2026-01-20T18:10:00Z",
+  "updated_by": "alejandro.caballero@ficohsa.com"
 }
 ```

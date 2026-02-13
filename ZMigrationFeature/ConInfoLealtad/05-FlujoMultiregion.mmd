@@ -1,0 +1,139 @@
+```mermaid
+flowchart TD
+    Start([Cliente SOAP Request<br/>ConsultaPuntosLealtad]) --> ValidateXSD[Validar Esquema XSD<br/>programaLealtadTypes.xsd]
+    
+    ValidateXSD -->|Error| ErrorXSD[SOAP Fault<br/>Error de Esquema]
+    ErrorXSD --> End1([Fin])
+    
+    ValidateXSD -->|OK| ConsultaInicial[Consultar Puntos Inicial<br/>consultaPuntosLealtad_db<br/>Oracle DB]
+    
+    ConsultaInicial --> CheckBalance{¿Balance<br/>existe?}
+    
+    CheckBalance -->|Sí| FlujoDirecto[Usar datos de consulta inicial<br/>$availablePoints, $legalId, etc.]
+    FlujoDirecto --> ContinuarFlujo[Continuar flujo normal]
+    ContinuarFlujo --> End2([Fin - Success])
+    
+    CheckBalance -->|No| ExtractIDType[Extraer Tipo de ID<br/>$customerIdType<br/>$customerIdValue]
+    
+    ExtractIDType --> CheckIDType{¿CUSTOMER_ID_TYPE<br/>= CARD_NUMBER?}
+    
+    CheckIDType -->|No| ErrorIDType[Error<br/>CUSTOMER_ID_TYPE no soportado]
+    ErrorIDType --> End3([Fin - Error])
+    
+    CheckIDType -->|Sí| CheckRegion{¿Región?}
+    
+    CheckRegion -->|HN01| ConvertPais[Convertir Código País<br/>XQuery: convertirCodigoPais<br/>HN01 → HND]
+    
+    CheckRegion -->|GT01/NI01/PA01| NoImplementado[ConInfoLealtad<br/>NO IMPLEMENTADO<br/>para esta región]
+    NoImplementado --> ErrorRegion[Error o flujo alternativo]
+    ErrorRegion --> End4([Fin])
+    
+    ConvertPais --> InvokeConInfo[Invocar conInfoLealtad_db<br/>SQL Server<br/>Connection: eis/DB/ConnectionProcesosHN<br/>SP: dbo.OSBConInfoLealtad<br/>Params: NumeroTarjeta, Pais]
+    
+    InvokeConInfo --> CheckError{¿CodigoError<br/>= -1?}
+    
+    CheckError -->|No| ErrorDB[Asignar Error<br/>$errorCode = CodigoError<br/>$validationMessage = MensajeError]
+    ErrorDB --> End5([Fin - Error])
+    
+    CheckError -->|Sí| ExtractData[Extraer Datos del RowSet<br/>$legalId = trim(LEGALID)<br/>$customerName = CUSTOMERNAME<br/>$cardType = CARDTYPE<br/>$grupoAfinidad = LOGO]
+    
+    ExtractData --> CheckCardType{¿$cardType<br/>= DEBIT?}
+    
+    CheckCardType -->|Sí| AsignMastercard[Asignar Programa<br/>$programaLealtad = '1'<br/>Mastercard Rewards]
+    
+    CheckCardType -->|No| ConsultaProg[Consultar Programa<br/>consultaProgramaLealtad_db<br/>Params: codigoPais, logo]
+    
+    ConsultaProg --> CheckProgError{¿Error?}
+    
+    CheckProgError -->|Sí| ErrorProg[Error en consulta programa]
+    ErrorProg --> End6([Fin - Error])
+    
+    CheckProgError -->|No| AsignPrograma[Asignar Programa<br/>$programaLealtad = PV_CODIGOLEALTAD]
+    
+    AsignMastercard --> CheckPrograma{¿Programa?}
+    AsignPrograma --> CheckPrograma
+    
+    CheckPrograma -->|'1'<br/>Mastercard| GetParam[Obtener Parametrización<br/>obtenerParametrizacion<br/>FICBCO0229.MRS.INSTITUTION.NAME]
+    
+    GetParam --> InvokeMastercard[Invocar Mastercard<br/>CustomerService.getPointDetails<br/>Header: MRSIdentity<br/>institutionName, appID=legalId]
+    
+    InvokeMastercard --> ExtractPointsMC[Extraer Puntos<br/>$availablePoints = AvailablePoints]
+    
+    CheckPrograma -->|'2'<br/>VisionPlus| ConsultaCuenta[Consultar Datos Cuenta<br/>conDatoCuenta_db<br/>Params: accountNumber, countryCode]
+    
+    ConsultaCuenta --> ExtractCuentaData[Extraer Datos<br/>$org, $scheme, $accountNumber<br/>de RowSet con TIPOORG='ALT']
+    
+    ExtractCuentaData --> InvokeVisionPlus[Invocar VisionPlus<br/>PointsAdjustmentInquiry<br/>Params: accountNumber, scheme, org]
+    
+    InvokeVisionPlus --> ExtractPointsVP[Calcular Puntos<br/>$availablePoints =<br/>GPXAIO-OPEN-TO-RED-ON-SCR / 1000]
+    
+    CheckPrograma -->|Otro| ErrorPrograma[Error<br/>Programa de lealtad no soportado]
+    ErrorPrograma --> End7([Fin - Error])
+    
+    ExtractPointsMC --> CheckCashEquiv{¿RETURN_CASH_EQUIVALENT<br/>= YES?}
+    ExtractPointsVP --> CheckCashEquiv
+    
+    CheckCashEquiv -->|Sí| CalcEquiv[Calcular Equivalencia<br/>canjearPuntosEfectivo_db<br/>Params: conversionAmount, logo]
+    
+    CalcEquiv --> AssignCash[Asignar Equivalencia<br/>$cashEquivalent = PN_VALORSALIDA<br/>$cashCurrency = 'HNL']
+    
+    CheckCashEquiv -->|No| SkipCash[Omitir cálculo equivalencia]
+    
+    AssignCash --> RegistrarConsulta[Registrar Consulta<br/>registraPuntosLealtad_db<br/>Params: legalId, balance,<br/>cashEquivalent, customerName]
+    SkipCash --> RegistrarConsulta
+    
+    RegistrarConsulta --> CheckRegError{¿Error<br/>registro?}
+    
+    CheckRegError -->|Sí| ErrorReg[Error en registro<br/>continuar con respuesta]
+    
+    CheckRegError -->|No| BuildResponse[Construir Response<br/>XQuery: consultaPuntosLealtadHNOut.xqy]
+    ErrorReg --> BuildResponse
+    
+    BuildResponse --> CheckValidation{¿$validationMessage<br/>= ""?}
+    
+    CheckValidation -->|No| ErrorResponse[Construir Error Response<br/>successIndicator = $errorCode<br/>messages = $validationMessage<br/>body = vacío]
+    ErrorResponse --> End8([Fin - Error])
+    
+    CheckValidation -->|Sí| SuccessResponse[Construir Success Response<br/>successIndicator = Success<br/>body = consultaPuntosLealtadResponse<br/>LEGAL_ID, CUSTOMER_NAME,<br/>AVAILABLE_POINTS, CASH_EQUIVALENT]
+    
+    SuccessResponse --> End9([Fin - Success])
+    
+    %% Error Handler Global
+    ValidateXSD -.->|Exception| ErrorHandler[Error Handler Global<br/>Capturar $fault/ctx:errorCode<br/>$fault/ctx:reason]
+    ConsultaInicial -.->|Exception| ErrorHandler
+    InvokeConInfo -.->|Exception| ErrorHandler
+    ConsultaProg -.->|Exception| ErrorHandler
+    InvokeMastercard -.->|Exception| ErrorHandler
+    InvokeVisionPlus -.->|Exception| ErrorHandler
+    
+    ErrorHandler --> BuildErrorResp[Construir Error Response<br/>successIndicator = errorCode<br/>messages = reason<br/>body = vacío]
+    
+    BuildErrorResp --> End10([Fin - Error])
+    
+    style Start fill:#90EE90
+    style End1 fill:#FFB6C1
+    style End2 fill:#90EE90
+    style End3 fill:#FFB6C1
+    style End4 fill:#FFB6C1
+    style End5 fill:#FFB6C1
+    style End6 fill:#FFB6C1
+    style End7 fill:#FFB6C1
+    style End8 fill:#FFB6C1
+    style End9 fill:#90EE90
+    style End10 fill:#FFB6C1
+    
+    style CheckBalance fill:#FFD700
+    style CheckIDType fill:#FFD700
+    style CheckRegion fill:#FFD700
+    style CheckError fill:#FFD700
+    style CheckCardType fill:#FFD700
+    style CheckProgError fill:#FFD700
+    style CheckPrograma fill:#FFD700
+    style CheckCashEquiv fill:#FFD700
+    style CheckRegError fill:#FFD700
+    style CheckValidation fill:#FFD700
+    
+    style InvokeConInfo fill:#87CEEB
+    style ErrorHandler fill:#FF6347
+    style NoImplementado fill:#FFA500
+```
