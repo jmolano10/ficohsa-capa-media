@@ -48,7 +48,7 @@
   "connection": "ConnectionProxyAbanksHN",
   "connectionType": "jca",
   "operationType": "query", 
-  "catalogueName": "proxyabankspa"
+  "catalogueName": "proxyabankshn"
 }
 ```
 
@@ -58,7 +58,7 @@
   "connection": "ConnectionProxyAbanksPA",
   "connectionType": "jca",
   "operationType": "query", 
-  "catalogueName": "proxyabankspa"
+  "catalogueName": "proxyabanksgt"
 }
 ```
 

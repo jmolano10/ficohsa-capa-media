@@ -9,6 +9,7 @@
     {
       "region": "HN01-HN01",
       "enabled": true,
+      "param-name": "ban-xrs-ic-redeem-transaction-param-db-<env>",
       "institutionName": "banficohsahnd",
       "logoInfinite": "625",
       "matrixId": "45891",
@@ -28,6 +29,7 @@
     {
       "region": "GT01-GT01",
       "enabled": true,
+      "param-name": "ban-xrs-ic-redeem-transaction-param-db-<env>",
       "institutionName": "banficohsahnd",
       "conversionType": 2,
       "description": "DESC 35",
@@ -89,6 +91,15 @@
 }
 ```
 ##### AWS Systems Manager Parameter Store
+
+```json
+"ban-xrs-ic-redeem-transaction-param-db-<env>"
+{
+  "serverName": "172.23.177.172",
+  "port": "64102",
+  "databaseName": "OSB"
+}
+```
 
 ##### AWS Systems Manager SecretManager
 

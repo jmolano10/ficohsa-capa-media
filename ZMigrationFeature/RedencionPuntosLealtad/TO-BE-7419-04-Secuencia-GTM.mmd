@@ -2,14 +2,15 @@
 sequenceDiagram
     autonumber
     participant Consumidor as Consumidore/Aplicación
-    participant API as API Redención de Puntos <br> Epica 7419: RedencionPuntosLealtad <br> HU 7395:  POST - /redeem-loyalty-points/v1/initiate
+    participant API as API Redención de Puntos <br> Epica 7419: RedencionPuntosLealtad <br> POST - /redeem-loyalty-points/v1/initiate
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
     participant Homologador as Liberería de <br> Homologación
     participant accountDetails as API Account Details <br> HU 14137: GET - /cards/credit-card-detail-retrieves/v1/{creditCardNumber}/credit-card-details
     participant loyaltyProgram as API Retrieve Loyalty Program <br> HU 54358:  GET - /account-management/reward-points-account-retrieves/v1/retrieve-loyalty-program
     participant conversion as APIPpoints Conversion <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-conversion
-    participant redeemPoints1 as API Initiate Loyalty Points <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-loyalty-points
+    participant redeemPoints1 as API Initiate Loyalty Points <br> HU 7395:  POST - /account-management/reward-points-account-admin/v1/initiate-loyalty-points
     participant Lib as Librería Pipeline (ConfigMap)
     participant SP as BD MasterDataGT <br> Package: dbo <br> SP: OSBINSTransaccionRedencion
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
@@ -32,6 +33,12 @@ sequenceDiagram
         CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
 
+        API->>CL: Consultar parámetros Parameter Store caché local
+        Note right of API: Param Name: lambda.param-name
+
+        CL->>API: Obtiene parámetros Parameter Store Caché Local
+        Note left of CL: Obtiene parámetros de consumo a SP OSBINSTransaccionRedencion
+
     else Consulta  parametros en Lambda Parámetros
 
         API->>Lambda: Consultar parámetros lambda parámetros
@@ -42,6 +49,15 @@ sequenceDiagram
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
         Note right of API: Parámetros de regionalización y negocio
+
+        API->>Parameter: Consultar parámetros Parameter Store
+        Note right of API: Param Name: lambda.param-name
+
+        Parameter->>API: Obtiene parámetros Parameter Store
+        Note left of Parameter: Obtiene parámetros de consumo a SP OSBINSTransaccionRedencion
+
+        API->>CL: Guarda parámetros Parameter Store en caché local
+        Note right of API: Parámetros de consumo a SP OSBINSTransaccionRedencion
 
     end
 
@@ -225,8 +241,11 @@ sequenceDiagram
                 end
             else If CodigoError == -1
 
+                API ->> API: Construye Request API Initiate Loyalty Points campo "rewardItemReference"
+                Note over API: "rewardItemReference" = lambda.rewardItem-{header.Application-User}, <br> si no existe parametrización para header.Application-User entonces <br> "rewardItemReference" = lambda.rewardItem-Default 
+
                 API ->> API: Construye Request API Initiate Loyalty Points
-                Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference, <br> "organizationReference" = responseAPIAccountDetails.organizationType, <br> "creditCardId" = lambda.cardNumber, <br> "accountNumber" = responseAPIAccountDetails.loanManagementAccountNumber, <br> "schemeReference" = responseAPIAccountDetails.loanManagementScheme, <br> "rewardItemReference" = lambda.matrixId-{header.Application-User}, <br> "loyaltyPointsAmount" = request.rewardRedemptionAmount * 1000 , <br> "reasonCode" = lambda.reasonCode, <br> "userContextData" = lambda.userData <br> couponAmount = lambda.couponDenom,  <br> couponReference = lambda.couponNbr <br> loyaltyProgramReference = $loyaltyProgram
+                Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference, <br> "organizationReference" = responseAPIAccountDetails.organizationType, <br> "creditCardId" = lambda.cardNumber, <br> "accountNumber" = responseAPIAccountDetails.loanManagementAccountNumber, <br> "schemeReference" = responseAPIAccountDetails.loanManagementScheme, <br> "loyaltyPointsAmount" = $totalPoints * 1000 , <br> "reasonCode" = lambda.reasonCode, <br> "userContextData" = lambda.userData <br> couponAmount = lambda.couponDenom,  <br> couponReference = lambda.couponNbr <br> loyaltyProgramReference = $loyaltyProgram
 
                 API ->> redeemPoints1: Consume API Initiate Loyalty Points
                 Note right of API: Body: <br> customerLegalReference, organizationReference, creditCardId, <br> accountNumber, schemeReference, rewardItemReference, <br> loyaltyPointsAmount, loyaltyPointsAmount, reasonCode, <br> userContextData, couponAmount, couponReference, <br> loyaltyProgramReference
