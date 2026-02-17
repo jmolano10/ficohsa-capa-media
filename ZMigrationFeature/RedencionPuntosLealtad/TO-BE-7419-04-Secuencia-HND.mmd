@@ -5,267 +5,358 @@ sequenceDiagram
     participant API as API Redención de Puntos <br> Epica 7419: RedencionPuntosLealtad <br> HU 7395:  POST - /redeem-loyalty-points/v1/initiate
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
-    participant Parameter as Parameter Store
-    participant customer as API Retrieve Customer <br> HU 6945: GET - /customer-management/customer-profile-retrieves/v1/retrieve-customer
-    participant binDeb as API Consulta BIN Tarjeta Débito <br> HU 54332: POST - /operational-services/issued-dev-admin-debit-card-retrieves/v1/retrieve-loyalty-points
-    participant binCred as API Consulta BIN Tarjeta Crédito <br> HU 54334: GET - /cards/credit-card-data-retrieves/v1/retrieve-loyalty-points
-    participant getDeb as API Consulta Detalle Tarjeta Débito <br> HU 3534: POST - /operational-services/issued-dev-admin-debit-card-retrieves/v1/retrieve-loyalty-points
-    participant getCred as API Consulta Detalle Tarjeta Crédito <br> HU 54369: GET - /cards/credit-card-data-retrieves/v1/retrieve-loyalty-points
-    participant conversion as API Consulta Conversión Puntos <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-conversion
+    participant creditCardInfo as API Retrieve Info Card <br> HU 55701: GET - /operational-services/issued-dev-admin-retrieves/v1/retrieve-info-card
+    participant Homologador as Liberería de <br> Homologación
+    participant accountDetails as API Account Details <br> HU 14137: GET - /cards/credit-card-detail-retrieves/v1/{creditCardNumber}/credit-card-details
+    participant loyaltyProgram as API Retrieve Loyalty Program <br> HU 54358:  GET - /account-management/reward-points-account-retrieves/v1/retrieve-loyalty-program
+    participant conversion as APIPpoints Conversion <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-conversion
+    participant redeemPoints1 as API Initiate Loyalty Points <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-loyalty-points
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant SP as BD MasterDataHN <br> Package: dbo <br> SP: OSBINSTransaccionRedencion
+    participant getPoints as API Available Loyalty Ponts <br> HU 54371:  GET - /account-management/reward-points-account-retrieves/v1/available-loyalty-points
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
-    Note over Consumidor, Errors: Flujos Honduras, Panamá y Nicaragua (HN01 | PN01 | NI01) - ConsultaPuntosMastercard
+    Note over Consumidor, Errors: Flujos Honduras (HN01 ) - Redención de Puntos
 
     Consumidor->>API: REST Request
-    Note right of Consumidor: Request Body: <br> customerType  <br> customerReference <br> rewardRedemptionType <br> rewardRedemptionAmount <br> creditId <br> merchantReference <br> merchantCategoryType <br> terminalReference <br> rewardRedemptionMethodType <br> accountNumber <br> creditCardNumber <br> loyaltyProgramReference
+    Note right of Consumidor: Request Body: <br> rewardRedemptionType <br> rewardRedemptionAmount <br> creditId <br> merchantReference <br> merchantCategoryType <br> terminalReference <br> rewardRedemptionMethodType <br> accountNumber <br> creditCardNumber <br> loyaltyProgramReference
 
     API->>API: Validar Request
     Note over API: Valida campos obligatorios según contrato OpenAPI 
 
     API->>API: Validación exitosa
 
-    API->>API: Validar Servicio Regional
-    Note over API: domain: REDEEM_LOYALTY_POINTS <br> name: CONFIG
-
-    API->>API: Validación Regional Exitosa
-    Note over API: Servicio habilitado para HN01 | GT01 | PN01 | NI01
-
     alt Consulta parametros en caché local
 
         API->>CL: Consultar parámetros Lambda Parámetros caché local
-        Note right of API: Domain: REDEEM_LOYALTY_POINTS <br> name: PARAM <br> country: HND <br> methods: initiate 
+        Note right of API: Domain: "REDEEM_LOYALTY_POINTS" <br> name: "initiate" <br> country: XRS 
 
         CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
-        Note left of CL: ObtenerParametrizacion Parámetros: <br> method.key = "debit-retrieve-loyalty-points-attributeName", method.value = "BIN" <br> method.key = "debit-retrieve-loyalty-points-comparisonOperator", method.value = "EQ"
+        Note left of CL: Obtiene parámetros de regionalización y negocio
 
-        alt Consulta Parámetros de conexión backend en caché local
-
-            API->>CL: Consultar parámetros Parameter Store caché local
-            Note right of API: XXXXXX
-
-            CL->>API: Obtiene parámetros Parameter Store Caché Local
-            Note left of CL: XXXXXX
-
-        end 
-
-    else Consulta  parametros en Lambda Parámetros / Parameter Store
+    else Consulta  parametros en Lambda Parámetros
 
         API->>Lambda: Consultar parámetros lambda parámetros
-        Note right of API: XXXXXX
+        Note right of API: Domain: "REDEEM_LOYALTY_POINTS" <br> name: "initiate" <br> country: XRS 
 
         Lambda->>API: Obtiene parámetros Lambda Parámetros
-        Note left of Lambda: XXXXXX
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
-        Note right of API: XXXXXX
-
-        alt Consulta Parámetros de conexión backend en parameter store
-
-            API->>Parameter: Consultar parámetros Parameter Store
-            Note right of API: XXXXXX
-
-            Parameter->>API: Obtiene parámetros Parameter Store
-            Note left of Parameter: XXXXXX
-
-            API->>CL: Guarda parámetros Parameter Store en caché local
-            Note right of API: XXXXXX
-
-        end 
+        Note right of API: Parámetros de regionalización y negocio
 
     end
 
+    API->>API: Validar Servicio Regional
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 
+
     API->>API: Aplica patrón strategy
-    Note over API: Selecciona lógica de negocio según header.sourceBank
+    Note over API: Selecciona lógica de negocio HN01
 
-    alt Flujo Honduras HN01
+    API->>API: Valida request.rewardRedemptionMethodType
+    Note over API: Solo permite CASH
 
-        API->>API: Valida request.rewardRedemptionType
-        Note over API: Solo permite CASH
+    API->>Homologador: Consulta Homologación sourceBank
+    Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
 
-        alt If request.rewardRedemptionMethodType != "CASH"
+    Homologador->>API: Retorna Valor Homologado 
+    Note left of Homologador: HN01 → HND 
 
+    alt If request.rewardRedemptionMethodType != "CASH"
+        rect rgba(248, 238, 238, 1)
             API->> Errors: Mapear código de error
             
             Errors ->> API: Retorna código mapeado
 
             API->>Consumidor: Response ERROR
             Note left of API: HTTP 422: Método de redención no permitido
+        end
+    else rewardRedemptionMethodType = "CASH" 
 
-        else rewardRedemptionMethodType = "CASH"
+        API->>API: Construye request API Retrieve Info Card
+        Note over API: queryParam: creditId = request.creditId 
 
-            API->>API: Valida request.customerType
+        API->>creditCardInfo: Consume API Retrieve Info Card
+        Note right of API: queryParam: creditId
 
-            alt If request.customerType == "CUSTOMER_ID" o "LEGAL_ID" (EN ESTE CONSUMO SE BUSCA OBTENER EL LEGAL ID Y NOMBRE DEL CLIENTE PARA EL RESPONSE DE LA API DE COMPOSICIÓN)
+        creditCardInfo->>API: Response API Retrieve Info Card
+        Note left of creditCardInfo: customerLegalReference, cardHolderName, cardType, cardLogoReference
 
-                API->>API: Construye request API Producto retrieveCustomer
-                Note over API: customerType = request.customerType <br> customerReferenceValue = request.customer
+        API->>API: Evalúa Response API Retrieve Info Card
 
-                API->>customer: Consulta información del cliente
-                Note right of API: customerType, customerReferenceValue
+        alt If HTTP Code != 200 Response API Retrieve Info Card 
+            rect rgba(248, 238, 238, 1)
+                API->> Errors: Mapear código de error
+                
+                Errors ->> API: Retorna código mapeado
 
-                customer->>API: Retorna información del cliente
-                Note left of customer: customerLegalReference, shortName
+                API->>Consumidor: Response ERROR
+                Note left of API: Retorna error API Retrieve Info Card
+            end
+        else If HTTP Code == 200 Response API Retrieve Info Card 
 
-                API->>API: Evalúa Response API Retrieve Customer
+            API->>API: Evalúa Response API Retrieve Info Card
+            Note over API: Se evalúa el tipo de tarjeta campo cardType
 
-                alt If HTTP Code != 404 y != 200 API Retrieve Customer ERROR
+            alt If cardType == "CREDIT"
 
+                API->>API: Construye request API Account Details
+                Note over API: pathParam: accountNumber = request.creditId (completar con "0" a la izquierda 19 posiciones) <br> queryParam: countryCode = header.sourceBank (Homologado)
+
+                API->>accountDetails: Consume API Account Details
+                Note right of API: pathParam: accountNumber <br> queryParam: countryCode
+
+                accountDetails->>API: Response API Account Details
+                Note left of accountDetails: organizationType, loanManagementScheme, loanManagementAccountNumber, customerReference
+
+                API->>API: Filtrar registros
+                Note over API: Filtra los registros donde organizationType == "ALT"
+
+                API->>API: Contar registros TIPOORG == "ALT"
+                Note over API: $count() = Cuenta los registros donde organizationType == "ALT"
+
+                API->>API: Evalúa Response API Account Details
+
+                alt If HTTP Code != 200 Response API Account Details or no exite organizationType == "ALT" or $count() = 0
+                    rect rgba(248, 238, 238, 1)
+                        API->> Errors: Mapear código de error
+                        
+                        Errors ->> API: Retorna código mapeado
+
+                        API->>Consumidor: Response ERROR
+                        Note left of API: HTTP 422: Tarjeta no encontrada
+                    end
+                else If HTTP Code == 200 Response API Account Details AND organizationType == "ALT" AND $count() > 0
+
+                    API->>API: Evalúa Datos obtenidos
+
+                    alt If responseRetrieveInfoCard.cardLogoReference = lambda.logoInfinite AND request.loyaltyProgramReference != vacío
+
+                        API->>API: Se usa loyaltyProgramReference recibido en el request
+                        Note over API: $loyaltyProgram = request.loyaltyProgramReference
+
+                    else 
+
+                        API->>API: Construye Request API Retrieve Loyalty Program
+                        Note over API: queryparam: <br> loyaltyProgramLogoReference = responseRetrieveInfoCard.cardLogoReference <br> countryCode = header.sourceBank
+
+                        API->>loyaltyProgram: Consume API Retrieve Loyalty Program
+                        Note right of API: queryparam: loyaltyProgramLogoReference <br> countryCode
+
+                        loyaltyProgram->>API: Response API Retrieve Loyalty Program
+                        Note left of loyaltyProgram: loyaltyProgramCode, loyaltyProgramDescription
+
+                        API->>API: Evalúa Response API Retrieve Loyalty Program
+
+                        alt If HTTP Code != 200 Response API Retrieve Loyalty Program
+                            rect rgba(248, 238, 238, 1)
+                                API->> Errors: Mapear código de error
+                                
+                                Errors ->> API: Retorna código mapeado
+
+                                API->>Consumidor: Response ERROR
+                                Note left of API: Retorna error API Retrieve Loyalty Program
+                            end
+                        else If HTTP Code == 200 API Retrieve Loyalty Program
+
+                            API->>API: Se usa loyaltyProgramCode del response API Retrieve Loyalty Program
+                            Note over API: $loyaltyProgram = responseAPIRetrieveLoyaltyProgram.loyaltyProgramCode
+                        
+                        end
+
+                    end
+                
+                end
+
+            else cardType == "DEBIT"
+
+                API->>API: Exrae BIN Tarjeta
+                Note over API: substr(creditId, 1, 6) to "binNumber"
+
+                API->>API: Asignar programa de lealtad
+                Note over API: $loyaltyProgram = 1
+
+            end
+
+            API ->> API: Evalua loyaltyProgram
+            
+            alt If $loyaltyProgram != 1 or 2
+                rect rgba(248, 238, 238, 1)
                     API->> Errors: Mapear código de error
-                    
+                                
                     Errors ->> API: Retorna código mapeado
 
                     API->>Consumidor: Response ERROR
-                    Note left of API: HTTP 500: Error inesperado
+                    Note left of API: HTTP 422: Programa de lealtad no soportado
+                end
+            else If $loyaltyProgram == 1 or 2
 
-                else If HTTP Code == 404 API Retrieve Customer NOT FOUND (AQUI SIGNIFICA QUE NO SE ENCONTRÓ EL CLIENTE)
+                API ->> API: Evalúa request.rewardRedemptionType
 
-                    API->> Errors: Mapear código de error
-                    
-                    Errors ->> API: Retorna código mapeado
+                alt If rewardRedemptionType == "CASH"
 
-                    API->>Consumidor: Response ERROR
-                    Note left of API: HTTP 422: Cliente no encontrado
+                    API ->> API: Construye Request API pointsConversion
+                    Note over API: Mapeo: <br> "cardLogoReference" = responseAPIRetrieveInfoCard.cardLogoReference, <br> "merchantReference" = request.merchantReference, <br> "merchantCategoryType" = request.merchantCategoryType, <br> "terminalReference" = request.terminalReference, <br> "conversionType" = lambda.conversionType, <br> "conversionPointsAmount" = request.rewardRedemptionAmount
+
+                    API ->> conversion: Consume API pointsConversion
+                    Note right of API: cardLogoReference, merchantReference, merchantCategoryType, terminalReference, conversionType, conversionPointsAmount
+
+                    conversion ->> API: Response API pointsConversion
+                    Note left of conversion: pointsConverted, exchangeFactor
+
+                    API ->> API: Evalúa Response API pointsConversion
+
+                    alt If HTTP Code != 200 Response API pointsConversion
+                        rect rgba(248, 238, 238, 1)
+                            API->> Errors: Mapear código de error
+                            
+                            Errors ->> API: Retorna código mapeado
+
+                            API->>Consumidor: Response ERROR
+                            Note left of API: Retorna error API pointsConversion
+                        end
+                    else If HTTP Code == 200 Response API pointsConversion
+
+                        API ->> API: Usa puntos disponibles calculados en la conversión
+                        Note over API: $totalPoints = pointsConverted
+
+                    end
+
+                else If rewardRedemptionType != "CASH"
+
+                    API ->> API: Usa puntos disponibles recibidos en el request
+                    Note over API: $totalPoints = request.rewardRedemptionAmount
 
                 end
 
-            else IF request.customerType == "CARD_NUMBER" (EN ESTE CONSUMO SE BUSCA SABER SI ES TARJETA DÉBITO)
+                API ->> API: Se evalúa loyaltyProgram
 
-                API->>API: Construye request API Consulta BIN Tarjeta Débito
-                Note over API: Mapeo : <br> attributeName = param."debit-retrieve-loyalty-points-attributeName" <br> attributeValue = request.customerReference <br> comparisonOperator = param."debit-retrieve-loyalty-points-comparisonOperator"
+                alt If $loyaltyProgram == 1
 
-                API->>binDeb: Consume API Consulta BIN Tarjeta Débito
-                Note right of API: attributeName, attributeValue, comparisonOperator
+                    API ->> API: Construye Request API Initiate Loyalty Points
+                    Note over API: Mapeo: <br> "customerLegalReference" = responseAPIRetrieveInfoCard.customerLegalReference,  <br> "rewardMatrixItemId" = lambda.matrixId,  <br> "loyaltyPointsAmount" = request.rewardRedemptionAmount <br> loyaltyProgramReference = $loyaltyProgram
 
-                binDeb->>API: Retorna información BIN Tarjeta Débito
-                Note left of binDeb: cardBinDescription, binNumber, currencyCode (NO SE USAN PARA NADA EN LA COMPOSICIÓN)
+                    API ->> redeemPoints1: Consume API Initiate Loyalty Points
+                    Note right of API: body: <br> customerLegalReference, rewardMatrixItemId, loyaltyPointsAmount
 
-                API->>API: Evalúa Response API Consulta BIN Tarjeta Débito
+                    redeemPoints1 ->> API: Response API Initiate Loyalty Points
+                    Note left of redeemPoints1: householdReference, pointTotalRemaining, redemptionDate
 
-                alt If HTTP Code == 200 API Consulta BIN Tarjeta Débito OK (AQUI SE ENTIENDE QUE ES TARJETA DÉBITO Y EN ESTE CONSUMO SE BUSCA OBTENER EL LEGAL ID Y NOMBRE DEL CLIENTE PARA EL RESPONSE DE LA API DE COMPOSICIÓN)
-
-                    API->>getDeb: Consulta Detalle Tarjeta Débito
-                    Note over API: Consulta por customerIdentification y accountstatustypevalues <br> En este punto no se tiene customerIdentification <br> Se pretende obtener el legalID y el nombre del cliente para el response de la API de Composición
-
-                else If HTTP Code != 404 y != 200 API Consulta BIN Tarjeta Débito ERROR
-
-                    API->> Errors: Mapear código de error
+                    API ->> API: Evalúa Response API Initiate Loyalty Points
                     
-                    Errors ->> API: Retorna código mapeado
-
-                    API->>Consumidor: Response ERROR
-                    Note left of API: HTTP 500: Error inesperado (Sin embargo aquí no se sabe si la tarjeta es débito o crédito)
-                
-                else If HTTP Code == 404 API Consulta BIN Tarjeta Débito NOT FOUND (AQUI SIGNIFICA QUE NO ES TARJETA DÉBITO Y EN ESTE CONSUMO SE BUSCA SABER SI ES TARJETA CRÉDITO)
-
-                    API->>API: Extrae BIN de tarjeta crédito
-                    Note over API: substrBinNumber = substr(request.customerReference, 1, 6)
-
-                    API->>API: Construye request API Consulta BIN Tarjeta Crédito
-                    Note over API: Mapeo : <br> binNumber = substrBinNumber
-
-                    API->>binCred: Consume API Consulta BIN Tarjeta Crédito
-                    Note right of API: queryParam: binNumber
-
-                    binCred->>API: Response API Consulta BIN Tarjeta Crédito
-                    Note left of binCred: countryList[], descriptionList[], binNumberList[], recordCount (NO SE USAN PARA NADA EN LA COMPOSICIÓN)
-
-                    API->>API: Evalúa Response API Consulta BIN Tarjeta Crédito
-
-                    alt If HTTP Code == 200 API Consulta BIN Tarjeta Crédito OK (AQUI SE ENTIENDE QUE ES TARJETA CRÉDITO Y EN ESTE CONSUMO SE BUSCA OBTENER EL LEGAL ID Y NOMBRE DEL CLIENTE PARA EL RESPONSE DE LA API DE COMPOSICIÓN)
-
-                        API->> API: Construye Request API Consulta Detalle Tarjeta Crédito
-                        Note over API: Mapeo : <br> creditCardId = request.customerReference
-
-                        API->> getCred: Consume API Consulta Detalle Tarjeta Crédito
-                        Note right of API: queryParam: creditCardId
-
-                        getCred->>API: Response API Consulta Detalle Tarjeta Crédito
-                        Note left of getCred: cardholderIdentification, cardHolderName
-
-                        API->>API: Evalúa Response API Consulta Detalle Tarjeta Crédito
-
-                        alt If HTTP Code == 404 API Consulta Detalle Tarjeta Crédito NOT FOUND (AQUI SIGNIFICA QUE NO SE ENCONTRÓ LA TARJETA CRÉDITO)
-
+                    alt If HTTP Code != 200 Response API Initiate Loyalty Points
+                        rect rgba(248, 238, 238, 1)
                             API->> Errors: Mapear código de error
                             
                             Errors ->> API: Retorna código mapeado
 
                             API->>Consumidor: Response ERROR
-                            Note left of API: HTTP 422: Tarjeta no encontrada
-
-                        else If HTTP Code != 404 y != 200 API Consulta Detalle Tarjeta Crédito ERROR
-
-                            API->> Errors: Mapear código de error
-                            
-                            Errors ->> API: Retorna código mapeado
-
-                            API->>Consumidor: Response ERROR
-                            Note left of API: HTTP 500: Error inesperado                            
-
+                            Note left of API: Se mapea el código de error entregado por la API
                         end
+                    else HTTP Code == 200 Response API Initiate Loyalty Points
 
-                    else If HTTP Code != 404 y != 200 API Consulta BIN Tarjeta Crédito ERROR
+                        API ->> API: Construye Response API Composición
+                        Note over API: HTTP 200: <br> customerLegalReference : responseAPIRetrieveInfoCard.customerLegalReference, <br> "customerName" = responseAPIRetrieveInfoCard.cardHolderName, <br> "rewardPointsRedeemedAmount" = request.rewardRedemptionAmount, <br> "remainingRewardPointsBalance" = responseAPIInitiateLoyaltyPoints.pointTotalRemaining, <br> "rewardRedemptionTransactionReference" = responseAPIInitiateLoyaltyPoints.householdReference
 
-                        API->> Errors: Mapear código de error
-                        
-                        Errors ->> API: Retorna código mapeado
-
-                        API->>Consumidor: Response ERROR
-                        Note left of API: HTTP 500: Error inesperado
-
-                    else If HTTP Code == 404 API Consulta BIN Tarjeta Crédito NOT FOUND (AQUI SIGNIFICA QUE NO ES TARJETA CRÉDITO NI DÉBITO)
-
-                        API->> Errors: Mapear código de error
-                        
-                        Errors ->> API: Retorna código mapeado
-
-                        API->>Consumidor: Response ERROR
-                        Note left of API: HTTP 422: Tarjeta no válida
+                        API->>Consumidor: Response Exitoso
+                        Note left of API: customerLegalReference, <br> customerName, <br> rewardPointsRedeemedAmount <br> remainingRewardPointsBalance, <br> rewardRedemptionTransactionReference
 
                     end
 
-                    alt If Response Consulta Cliente OK ó Response Consulta Detalle Tarjeta Crédito OK o Response Consulta Detalle Tarjeta Débito OK (SIGNIFICA QUE SE OBTUVO EL LEGAL ID Y NOMBRE DEL CLIENTE PARA EL RESPONSE DE LA API DE COMPOSICIÓN)
+                else If $loyaltyProgram == 2
 
-                        API->>API: Evalúa request.rewardRedemptionType
+                    API->>Lib: Consulta Constantes
+   
+                    Lib->>API: Retorna constantes necesarias
+                    Note left of Lib: package = "dbo" <br> sp = "OSBINSTransaccionRedencion"
+                    
+                    API ->> API: Construye SP OSBINSTransaccionRedencion
+                    Note over API: Mapeo: <br> NumeroTarjeta = request.creditId, <br> Monto = $totalPoints, <br> Comercio = request.merchantReference, <br> Descripción = lambda.description, <br> Pais = header.sourceBank
 
-                        alt If request.rewardRedemptionType == "CASH"
+                    API ->> SP: Consume SP OSBINSTransaccionRedencion
+                    Note right of API: NumeroTarjeta, Monto, Comercio, Descripción, Pais
 
-                            API->>API: Extrae BIN de tarjeta crédito
-                            Note over API: binNumber = substr(request.accountNumber, 0, 6) QUE PASA SI SE RECIBE UN CUSTOMERID O LEGALID EN EL REQUEST? COMO SE OBTIENE EL BIN?
+                    SP ->> API: Response SP OSBINSTransaccionRedencion
+                    Note left of SP: IDTrasnaccion, <br> CodigoError, <br> MensajeError
 
-                            API->>API: Construye request API Consulta Conversión Puntos
-                            Note over API: Mapeo : <br> cardBinLogoReference = binNumber <br> merchantReference = request.merchantReference <br> merchantCategoryType = request.merchantCategoryType <br> terminalReference = request.terminalReference <br> conversionType = "CASH" <br> conversionPointsAmount = request.rewardRedemptionAmount
+                    API ->> API: Evalúa Response SP OSBINSTransaccionRedencion
 
-                            API->>conversion: Consume API Consulta Conversión Puntos
-                            Note right of API: cardBinLogoReference, merchantReference, <br> merchantCategoryType, terminalReference, <br> conversionType, conversionPointsAmount
-
-                            conversion->>API: Response API Consulta Conversión Puntos
-                            Note left of conversion: pointsConverted, exchangeFactor
-
-                            API->>API: Construye Response API Redención Puntos
-                            Note over API: Mapeo Response : <br> loyaltyRedemptionReference = Generado por el sistema <br> customerLegalReference = customerLegalReference ó cardholderIdentification <br> customerName = shortName ó cardHolderName <br> rewardRedemptionType = request.rewardRedemptionType <br> rewardRedemptionAmount = request.rewardRedemptionAmount <br> pointsConverted = conversion.pointsConverted <br> exchangeFactor = conversion.exchangeFactor
-
-                            API->>Consumidor: REST Response Successful
-                            Note left of API: HTTP 200: Response Body <br> loyaltyRedemptionReference, customerLegalReference, <br> customerName, rewardRedemptionType, <br> rewardRedemptionAmount, pointsConverted, <br> exchangeFactor
-
-                        else If request.rewardRedemptionType != "CASH"
-
+                    alt If CodigoError != -1
+                        rect rgba(248, 238, 238, 1)
                             API->> Errors: Mapear código de error
                             
                             Errors ->> API: Retorna código mapeado
 
                             API->>Consumidor: Response ERROR
-                            Note left of API: HTTP 422: Tipo de redención no permitido
-
+                            Note left of API: HTTP 422: No ha sido posible efectuar la redención
                         end
+                    else If CodigoError == -1
 
-                    end
+                        API ->> API: Construye Request API Initiate Loyalty Points campo "rewardItemReference"
+                        Note over API: "rewardItemReference" = lambda.rewardItem-{header.Application-User}, <br> si no existe parametrización para header.Application-User entonces <br> "rewardItemReference" = lambda.rewardItem-Default 
+
+                        API ->> API: Construye Request API Initiate Loyalty Points
+                        Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference, <br> "organizationReference" = responseAPIAccountDetails.organizationType, <br> "creditCardId" = lambda.cardNumber, <br> "accountNumber" = responseAPIAccountDetails.loanManagementAccountNumber, <br> "schemeReference" = responseAPIAccountDetails.loanManagementScheme, <br> "loyaltyPointsAmount" = request.rewardRedemptionAmount * 1000, <br> "reasonCode" = lambda.reasonCode, <br> "userContextData" = lambda.userData <br> couponAmount = lambda.couponDenom,  <br> couponReference = lambda.couponNbr <br> loyaltyProgramReference = $loyaltyProgram
+
+                        API ->> redeemPoints1: Consume API Initiate Loyalty Points
+                        Note right of API: Body: <br> customerLegalReference, organizationReference, creditCardId, <br> accountNumber, schemeReference, rewardItemReference, <br> loyaltyPointsAmount, loyaltyPointsAmount, reasonCode, <br> userContextData, couponAmount, couponReference, <br> loyaltyProgramReference
+                        
+                        redeemPoints1 ->> API: Consume API Initiate Loyalty Points
+                        Note left of redeemPoints1: Body: <br> resultCode, responseDescription
+
+                        API ->> API: Evalúa Response API Initiate Loyalty Points
+
+                        alt If HTTP Code != 200
+                            rect rgba(248, 238, 238, 1)
+                                API->> Errors: Mapear código de error
+                                
+                                Errors ->> API: Retorna código mapeado
+
+                                API->>Consumidor: Response ERROR
+                                Note left of API: Retrona error API Initiate Loyalty Points
+                            end
+                        else If HTTP Code == 200
+
+                            API ->> API: Construye Request API Available Loyalty Points
+                            Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference,  <br> "institutionName" = lambda.institutionName <br> "detailLevel" = lambda.detailLevel.
+
+                            API ->> getPoints: Consume API Available Loyalty Points
+                            Note right of API: Body: <br> customerLegalReference, organizationReference,
+
+                            getPoints ->> API: Consume API Available Loyalty Points
+                            Note left of getPoints: Body: <br> customerBalances { customerReference, <br> availableBalance, onHoldBalance, <br> previousBalance, earnedPoints, redeemedPoints } 
+
+                            API ->> API: Evalúa Response API Available Loyalty Points
+
+                            alt If HTTP Code != 200
+                                
+                                API ->> API: Construye Response API Composición
+                                Note over API: HTTP 200: <br> NO SE RESPONDE EL CAMPO remainingRewardPointsBalance <br> customerLegalReference = responseAPIRetrieveInfoCard.customerLegalReference, <br> "customerName" = responseAPIRetrieveInfoCard.cardHolderName, <br> "rewardPointsRedeemedAmount" = request.rewardRedemptionAmount, <br> "rewardRedemptionTransactionReference" = responseOSBINSTransaccionRedencion.IDTrasnaccion
+
+                                API->>Consumidor: Response Exitoso
+                                Note left of API: customerLegalReference, <br> customerName, <br> rewardPointsRedeemedAmount <br> rewardRedemptionTransactionReference
+
+                            else If HTTP Code == 200
+
+                                API ->> API: Construye Response API Composición
+                                Note over API: HTTP 200: <br> customerLegalReference = responseAPIRetrieveInfoCard.customerLegalReference, <br> "customerName" = responseAPIRetrieveInfoCard.cardHolderName, <br> "rewardPointsRedeemedAmount" = request.rewardRedemptionAmount, <br> "remainingRewardPointsBalance" = responseAPIAvailableLoyaltyPoints.availableBalance, <br> "rewardRedemptionTransactionReference" = responseOSBINSTransaccionRedencion.IDTrasnaccion
+
+                                API->>Consumidor: Response Exitoso
+                                Note left of API: customerLegalReference, <br> customerName, <br> rewardPointsRedeemedAmount <br> remainingRewardPointsBalance, <br> rewardRedemptionTransactionReference
+
+                            end
+
+                        end                        
+
+                    end 
 
                 end
 
             end
 
-        end
+        end 
 
     end
 

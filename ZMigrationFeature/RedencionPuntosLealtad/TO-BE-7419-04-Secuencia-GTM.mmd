@@ -1,0 +1,278 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Redención de Puntos <br> Epica 7419: RedencionPuntosLealtad <br> HU 7395:  POST - /redeem-loyalty-points/v1/initiate
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Homologador as Liberería de <br> Homologación
+    participant accountDetails as API Account Details <br> HU 14137: GET - /cards/credit-card-detail-retrieves/v1/{creditCardNumber}/credit-card-details
+    participant loyaltyProgram as API Retrieve Loyalty Program <br> HU 54358:  GET - /account-management/reward-points-account-retrieves/v1/retrieve-loyalty-program
+    participant conversion as APIPpoints Conversion <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-conversion
+    participant redeemPoints1 as API Initiate Loyalty Points <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-loyalty-points
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant SP as BD MasterDataGT <br> Package: dbo <br> SP: OSBINSTransaccionRedencion
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujos Guatemala (GT01) - Redención de Puntos
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Request Body: <br> rewardRedemptionType <br> rewardRedemptionAmount <br> creditId <br> merchantReference <br> merchantCategoryType <br> terminalReference <br> rewardRedemptionMethodType <br> accountNumber <br> creditCardNumber <br> loyaltyProgramReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "REDEEM_LOYALTY_POINTS" <br> name: "initiate" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+    else Consulta  parametros en Lambda Parámetros
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "REDEEM_LOYALTY_POINTS" <br> name: "initiate" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Parámetros de regionalización y negocio
+
+    end
+
+    API->>API: Validar Servicio Regional
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para GT01 
+
+    API->>API: Aplica patrón strategy
+    Note over API: Selecciona lógica de negocio GT01
+
+    API->>API: Valida request.rewardRedemptionMethodType
+    Note over API: Solo permite CASH
+
+    API->>Homologador: Consulta Homologación sourceBank
+    Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
+
+    Homologador->>API: Retorna Valor Homologado 
+    Note left of Homologador: GT01 → GTM 
+
+    alt If request.rewardRedemptionMethodType != "CASH"
+        rect rgba(248, 238, 238, 1)
+            API->> Errors: Mapear código de error
+            
+            Errors ->> API: Retorna código mapeado
+
+            API->>Consumidor: Response ERROR
+            Note left of API: HTTP 422: Método de redención no permitido
+        end
+    else rewardRedemptionMethodType = "CASH" 
+
+        API->>API: Construye request API Account Details
+        Note over API: pathParam: accountNumber = request.creditId (completar con "0" a la izquierda 19 posiciones) <br> queryParam: countryCode = header.sourceBank (Homologado)
+
+        API->>accountDetails: Consume API Account Details
+        Note right of API: pathParam: accountNumber <br> queryParam: countryCode
+
+        accountDetails->>API: Response API Account Details
+        Note left of accountDetails: organizationType, accountBrandLogo, accountHolderName, customerLegalIdentification, customerReference
+
+        API->>API: Filtrar registros
+        Note over API: Filtra los registros donde organizationType == "BASE"
+
+        API->>API: Contar registros TIPOORG == "BASE"
+        Note over API: $count() = Cuenta los registros donde organizationType == "BASE"
+
+        API->>API: Evalúa Response API Account Details
+
+        alt If HTTP Code != 200 Response API Account Details or no exite organizationType == "BASE" or $count() = 0
+            rect rgba(248, 238, 238, 1)
+                API->> Errors: Mapear código de error
+                
+                Errors ->> API: Retorna código mapeado
+
+                API->>Consumidor: Response ERROR
+                Note left of API: HTTP 422: Tarjeta no encontrada
+            end
+        else If HTTP Code == 200 Response API Account Details AND organizationType == "BASE" and $count() > 0
+
+            API->>API: Evalúa Datos obtenidos
+
+            alt If responseAPIAccountDetails.accountBrandLogo ==  vacío
+
+                rect rgba(248, 238, 238, 1)
+                    API->> Errors: Mapear código de error
+                    
+                    Errors ->> API: Retorna código mapeado
+
+                    API->>Consumidor: Response ERROR
+                    Note left of API: HTTP 422: No se encontró Logo para la tarjeta
+                end
+
+            else If responseAPIAccountDetails.accountBrandLogo !=  vacío
+
+                API->>API: Construye Request API Retrieve Loyalty Program
+                Note over API: queryparam: <br> loyaltyProgramLogoReference = responseAPIAccountDetails.accountBrandLogo <br> countryCode = header.sourceBank
+
+                API->>loyaltyProgram: Consume API Retrieve Loyalty Program
+                Note right of API: queryparam: loyaltyProgramLogoReference <br> countryCode
+
+                loyaltyProgram->>API: Response API Retrieve Loyalty Program
+                Note left of loyaltyProgram: loyaltyProgramCode, loyaltyProgramDescription
+
+                API->>API: Evalúa Response API Retrieve Loyalty Program
+
+                alt If HTTP Code != 200 Response API Retrieve Loyalty Program
+                    rect rgba(248, 238, 238, 1)
+                        API->> Errors: Mapear código de error
+                        
+                        Errors ->> API: Retorna código mapeado
+
+                        API->>Consumidor: Response ERROR
+                        Note left of API: Retorna error API Retrieve Loyalty Program
+                    end
+                else If HTTP Code == 200 API Retrieve Loyalty Program
+
+                    API->>API: Se usa loyaltyProgramCode del response API Retrieve Loyalty Program
+                    Note over API: $loyaltyProgram = responseAPIRetrieveLoyaltyProgram.loyaltyProgramCode
+                
+                end
+
+            end
+        
+        end
+
+        API ->> API: Evalua loyaltyProgram
+        
+        alt If $loyaltyProgram != 2
+            rect rgba(248, 238, 238, 1)
+                API->> Errors: Mapear código de error
+                            
+                Errors ->> API: Retorna código mapeado
+
+                API->>Consumidor: Response ERROR
+                Note left of API: HTTP 422: Programa de lealtad no soportado
+            end
+        else If $loyaltyProgram ==  2
+
+            API ->> API: Evalúa request.rewardRedemptionType
+
+            alt If rewardRedemptionType == "CASH"
+
+                API ->> API: Construye Request API pointsConversion
+                Note over API: Mapeo: <br> "cardLogoReference" = responseAPIAccountDetails.accountBrandLogo, <br> "merchantReference" = request.merchantReference, <br> "merchantCategoryType" = request.merchantCategoryType, <br> "terminalReference" = request.terminalReference, <br> "conversionType" = lambda.conversionType, <br> "conversionPointsAmount" = request.rewardRedemptionAmount
+
+                API ->> conversion: Consume API pointsConversion
+                Note right of API: cardLogoReference, merchantReference, merchantCategoryType, terminalReference, conversionType, conversionPointsAmount
+
+                conversion ->> API: Response API pointsConversion
+                Note left of conversion: pointsConverted, exchangeFactor
+
+                API ->> API: Evalúa Response API pointsConversion
+
+                alt If HTTP Code != 200 Response API pointsConversion
+                    rect rgba(248, 238, 238, 1)
+                        API->> Errors: Mapear código de error
+                        
+                        Errors ->> API: Retorna código mapeado
+
+                        API->>Consumidor: Response ERROR
+                        Note left of API: Retorna error API pointsConversion
+                    end
+                else If HTTP Code == 200 Response API pointsConversion
+
+                    API ->> API: Usa puntos disponibles calculados en la conversión
+                    Note over API: $totalPoints = pointsConverted
+
+                end
+
+            else If rewardRedemptionType != "CASH"
+
+                API ->> API: Usa puntos disponibles recibidos en el request
+                Note over API: $totalPoints = request.rewardRedemptionAmount
+
+            end
+
+            API->>Lib: Consulta Constantes
+
+            Lib->>API: Retorna constantes necesarias
+            Note left of Lib: package = "dbo" <br> sp = "OSBINSTransaccionRedencion"
+            
+            API ->> API: Construye SP OSBINSTransaccionRedencion
+            Note over API: Mapeo: <br> NumeroTarjeta = request.creditId, <br> Monto = $totalPoints, <br> Comercio = request.merchantReference, <br> Descripción = lambda.description
+
+            API ->> SP: Consume SP OSBINSTransaccionRedencion
+            Note right of API: NumeroTarjeta, Monto, Comercio, Descripción
+
+            SP ->> API: Response SP OSBINSTransaccionRedencion
+            Note left of SP: IDTrasnaccion, <br> CodigoError, <br> MensajeError
+
+            API ->> API: Evalúa Response SP OSBINSTransaccionRedencion
+
+            alt If CodigoError != -1
+                rect rgba(248, 238, 238, 1)
+                    API->> Errors: Mapear código de error
+                    
+                    Errors ->> API: Retorna código mapeado
+
+                    API->>Consumidor: Response ERROR
+                    Note left of API: HTTP 422: No ha sido posible efectuar la redención
+                end
+            else If CodigoError == -1
+
+                API ->> API: Construye Request API Initiate Loyalty Points
+                Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference, <br> "organizationReference" = responseAPIAccountDetails.organizationType, <br> "creditCardId" = lambda.cardNumber, <br> "accountNumber" = responseAPIAccountDetails.loanManagementAccountNumber, <br> "schemeReference" = responseAPIAccountDetails.loanManagementScheme, <br> "rewardItemReference" = lambda.matrixId-{header.Application-User}, <br> "loyaltyPointsAmount" = request.rewardRedemptionAmount * 1000 , <br> "reasonCode" = lambda.reasonCode, <br> "userContextData" = lambda.userData <br> couponAmount = lambda.couponDenom,  <br> couponReference = lambda.couponNbr <br> loyaltyProgramReference = $loyaltyProgram
+
+                API ->> redeemPoints1: Consume API Initiate Loyalty Points
+                Note right of API: Body: <br> customerLegalReference, organizationReference, creditCardId, <br> accountNumber, schemeReference, rewardItemReference, <br> loyaltyPointsAmount, loyaltyPointsAmount, reasonCode, <br> userContextData, couponAmount, couponReference, <br> loyaltyProgramReference
+                
+                redeemPoints1 ->> API: Consume API Initiate Loyalty Points
+                Note left of redeemPoints1: Body: <br> resultCode, responseDescription
+
+                API ->> API: Evalúa Response API Initiate Loyalty Points
+
+                alt If HTTP Code != 200
+                    rect rgba(248, 238, 238, 1)
+                        API->> Errors: Mapear código de error
+                        
+                        Errors ->> API: Retorna código mapeado
+
+                        API->>Consumidor: Response ERROR
+                        Note left of API: Retrona error API Initiate Loyalty Points
+                    end
+                else If HTTP Code == 200
+                        
+                    API ->> API: Construye Response API Composición
+                    Note over API: HTTP 200: <br> NO SE RESPONDE EL CAMPO remainingRewardPointsBalance <br> customerLegalReference = responseAPIRetrieveInfoCard.customerLegalReference, <br> "customerName" = responseAPIRetrieveInfoCard.cardHolderName, <br> "rewardPointsRedeemedAmount" = request.rewardRedemptionAmount, <br> "rewardRedemptionTransactionReference" = responseOSBINSTransaccionRedencion.IDTrasnaccion
+
+                    API->>Consumidor: Response Exitoso
+                    Note left of API: customerLegalReference, <br> customerName, <br> rewardPointsRedeemedAmount <br> rewardRedemptionTransactionReference
+
+                end                        
+
+            end 
+
+        end
+
+    end
+
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
