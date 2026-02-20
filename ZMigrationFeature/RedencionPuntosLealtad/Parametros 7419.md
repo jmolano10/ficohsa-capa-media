@@ -10,6 +10,7 @@
       "region": "HN01-HN01",
       "enabled": true,
       "param-name": "ban-xrs-ic-redeem-transaction-param-db-<env>",
+      "secret-name": "ban-xrs-ic-redeem-transaction-secm-db-<env>",
       "institutionName": "banficohsahnd",
       "logoInfinite": "625",
       "matrixId": "45891",
@@ -30,6 +31,7 @@
       "region": "GT01-GT01",
       "enabled": true,
       "param-name": "ban-xrs-ic-redeem-transaction-param-db-<env>",
+      "secret-name": "ban-xrs-ic-redeem-transaction-secm-db-<env>",
       "institutionName": "banficohsahnd",
       "conversionType": 2,
       "description": "DESC 35",
@@ -103,7 +105,13 @@
 
 ##### AWS Systems Manager SecretManager
 
-
+```json
+"ban-xrs-ic-redeem-transaction-secm-db-<env>"
+{
+  "user": "UsrOSB",
+  "port": "FicohsaTC2021"
+}
+```
 
 ##### Constantes para almacenar en ConfigMap
 
@@ -111,5 +119,48 @@
 {
   "package": "dbo",
   "procedureName": "OSBINSTransaccionRedencion"
+}
+```
+
+##### Registro en Dynamo Librería Homologación de datos
+```json
+{
+  "pk": "COUNTRY#XRS#DOMAIN#COUNTRY_CODE#PARAM#CATALOGATE",
+  "sk": "V#0001",
+  "type": "JSON",
+  "country": "XRS",
+  "domain": "COUNTRY_CODE",
+  "name": "CATALOGATE",
+  "description": "CATALOGATE OF COUNTRY CODE",
+  "value": [
+    {
+      "description": "Honduras",
+      "Ficohsa": "HN01",
+      "canalx": "HND",
+      "ISO2": "HN",
+      "ISO3": "HND"
+    },
+    {
+      "description": "Panamá",
+      "Ficohsa": "PA01",
+      "ISO2": "PA",
+      "ISO3": "PAN"
+    },
+    {
+      "description": "Guatemala",
+      "Ficohsa": "GT01",
+      "ISO2": "GT",
+      "ISO3": "GTM"
+    },
+    {
+      "description": "Nicaragua",
+      "Ficohsa": "NI01",
+      "ISO2": "NI",
+      "ISO3": "NIC"
+    }
+  ],
+  "status": "active",
+  "updated_at": "2026-01-20T18:10:00Z",
+  "updated_by": "alejandro.caballero@ficohsa.com"
 }
 ```

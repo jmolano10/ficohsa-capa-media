@@ -12,6 +12,7 @@ sequenceDiagram
     participant conversion as APIPpoints Conversion <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-conversion
     participant redeemPoints1 as API Initiate Loyalty Points <br> HU 7395:  POST - /account-management/reward-points-account-admin/v1/initiate-loyalty-points
     participant Lib as Librería Pipeline (ConfigMap)
+    participant Secret as Secret Manager
     participant SP as BD MasterDataGT <br> Package: dbo <br> SP: OSBINSTransaccionRedencion
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
@@ -72,12 +73,6 @@ sequenceDiagram
     API->>API: Valida request.rewardRedemptionMethodType
     Note over API: Solo permite CASH
 
-    API->>Homologador: Consulta Homologación sourceBank
-    Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
-
-    Homologador->>API: Retorna Valor Homologado 
-    Note left of Homologador: GT01 → GTM 
-
     alt If request.rewardRedemptionMethodType != "CASH"
         rect rgba(248, 238, 238, 1)
             API->> Errors: Mapear código de error
@@ -88,6 +83,12 @@ sequenceDiagram
             Note left of API: HTTP 422: Método de redención no permitido
         end
     else rewardRedemptionMethodType = "CASH" 
+
+        API->>Homologador: Consulta Homologación sourceBank
+        Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
+
+        Homologador->>API: Retorna Valor Homologado 
+        Note left of Homologador: GT01 → GTM 
 
         API->>API: Construye request API Account Details
         Note over API: pathParam: accountNumber = request.creditId (completar con "0" a la izquierda 19 posiciones) <br> queryParam: countryCode = header.sourceBank (Homologado)
@@ -213,6 +214,12 @@ sequenceDiagram
                 Note over API: $totalPoints = request.rewardRedemptionAmount
 
             end
+
+            API->>Secret: Consulta Secretos para conexion a la BD
+            Note right of API: secretName: lambda.secret-name
+
+            Secret->>API: Retorna secretos para conexión a la BD
+            Note left of Secret: user, password
 
             API->>Lib: Consulta Constantes
 

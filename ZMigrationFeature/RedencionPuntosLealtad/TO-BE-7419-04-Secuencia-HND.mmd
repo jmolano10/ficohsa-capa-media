@@ -13,6 +13,7 @@ sequenceDiagram
     participant conversion as APIPpoints Conversion <br> HU 54368:  POST - /account-management/reward-points-account-admin/v1/initiate-conversion
     participant redeemPoints1 as API Initiate Loyalty Points <br> HU 7395:  POST - /account-management/reward-points-account-admin/v1/initiate-loyalty-points
     participant Lib as Librería Pipeline (ConfigMap)
+    participant Secret as Secret Manager
     participant SP as BD MasterDataHN <br> Package: dbo <br> SP: OSBINSTransaccionRedencion
     participant getPoints as API Available Loyalty Ponts <br> HU 54371:  GET - /account-management/reward-points-account-retrieves/v1/available-loyalty-points
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
@@ -74,12 +75,6 @@ sequenceDiagram
     API->>API: Valida request.rewardRedemptionMethodType
     Note over API: Solo permite CASH
 
-    API->>Homologador: Consulta Homologación sourceBank
-    Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
-
-    Homologador->>API: Retorna Valor Homologado 
-    Note left of Homologador: HN01 → HND 
-
     alt If request.rewardRedemptionMethodType != "CASH"
         rect rgba(248, 238, 238, 1)
             API->> Errors: Mapear código de error
@@ -90,6 +85,12 @@ sequenceDiagram
             Note left of API: HTTP 422: Método de redención no permitido
         end
     else rewardRedemptionMethodType = "CASH" 
+
+        API->>Homologador: Consulta Homologación sourceBank
+        Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
+
+        Homologador->>API: Retorna Valor Homologado 
+        Note left of Homologador: HN01 → HND 
 
         API->>API: Construye request API Retrieve Info Card
         Note over API: queryParam: creditId = request.creditId 
@@ -188,15 +189,12 @@ sequenceDiagram
 
             else cardType == "DEBIT"
 
-                API->>API: Exrae BIN Tarjeta
-                Note over API: substr(creditId, 1, 6) to "binNumber"
-
                 API->>API: Asignar programa de lealtad
                 Note over API: $loyaltyProgram = 1
 
             end
 
-            API ->> API: Evalua loyaltyProgram
+            API ->> API: Evalua $loyaltyProgram
             
             alt If $loyaltyProgram != 1 or 2
                 rect rgba(248, 238, 238, 1)
@@ -282,6 +280,12 @@ sequenceDiagram
                     end
 
                 else If $loyaltyProgram == 2
+
+                    API->>Secret: Consulta Secretos para conexion a la BD
+                    Note right of API: secretName: lambda.secret-name
+
+                    Secret->>API: Retorna secretos para conexión a la BD
+                    Note left of Secret: user, password
 
                     API->>Lib: Consulta Constantes
    
