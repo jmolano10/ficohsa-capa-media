@@ -1,0 +1,138 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Evaluate Customer Bulk <br> Epica 56253: FCM_customerBulk <br> HU 56431:  POST - /regulations-and-compliance/regulatory-compliance-admin/v1/evaluate-customer-bulk
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant db as DynamoDB
+    participant wrapper as Wrapper ThetaRay
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Guatemala, Nicaragua (GT01 | NI01) - Evalua Listas Cliente
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Header, body
+
+    API->>API: Validar Request
+    Note over API: Validar obligatoriedad de campos según contrato Open API <br> Validar minLength y maxLength según contrato Open API <br> Validar enum según contrato Open API <br> Validar formato países SO 3166, Alpha-2 code
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "REGULATORY_COMPLIANCE_ADMIN" <br> name: "evaluate-customer-bulk" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "REGULATORY_COMPLIANCE_ADMIN" <br> name: "evaluate-customer-bulk" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: param-name, statusPollingUrl
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para GT01 | NI01 
+
+    API->>API: Valida cantidad de request.requestReference
+    Note over API: Cantidad de request.requestReference <= lamnda.maxRequestReference
+
+    alt Cantidad de request.requestReference > lamnda.maxRequestReference
+
+        API->> Errors: Mapear código de error
+        Errors -->> API: Retorna código mapeado
+        API-->> Consumidor: Retorna error
+        Note left of API: HTTP 400: Número de request excede el límite "lamnda.maxRequestReference"
+
+    else Cantidad de request.requestReference <= lamnda.maxRequestReference
+
+        API->>Lib: Consulta Constantes
+        
+        Lib->>API: Retorna constantes necesarias
+        Note left of Lib: Constantes: <br> path = "/screening/customer/bulk"
+
+        API->>db: Consulta Transacción en BD
+        Note right of API: Consulta por cada uno de los request.requestReference
+
+        db->>API: Respuesta Consulta
+
+        alt Existe registro en BD
+
+            API->>API: Construye response API para cada uno de los request.requestReference
+            Note over API: Response Body 
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+
+        else No existe registro en DB
+
+            API->>db: Crea Resgirsto Transacción en BD para cada uno de lo request.requestReference
+            Note right of API: Crea registro con la key request.requestReference <br> status = "RECEIVED", <br> "origin": "BULK", <br> "statusCallback": " " <br> "screeningOutcome": { <br>  "screeningOutcome": " ", <br>  "resolution": " " <br> } 
+
+            API->>API: Construye Request Wrapper ThetaRay
+            Note over API: Mapeo: <br> operation = query <br> path = const.path <br> paramName = lambda.param-name <br> data { datos recibidos en el request }
+
+            API->>wrapper: Consume Wrapper ThetaRay
+            Note right of API: operation, path, paramName, data 
+
+            wrapper->>API: Response Wrapper ThetaRay
+            Note over wrapper: Response: success, data 
+
+            API->>API: Evalúa Response Wrapper ThetaRay
+
+            alt response.data != "SUCCESS"
+
+                API->> Errors: Mapear código de error
+            
+                Errors ->> API: Retorna código mapeado
+
+                API->>db: Actualiza Resgirsto Transacción en BD para cada uno de los request.requestReference
+                Note right of API: Actualiza registro por request.requestReference <br> status = "FINISHED_ERROR"
+                
+                API->> Consumidor: Retorna error
+                Note left of API: Mapeo responseWrapper.mensajeError <br> según tabla de homologación de errores
+
+            else respone.data == "SUCCESS"
+
+                API->>db: Actualiza Resgirsto Transacción en BD para cada uno de los request.requestReference
+                Note right of API: Actualiza registro por request.requestReference <br> Acualliza campos : <br> status = "SYNC_COMPLETED" <br> "screeningOutcome": { <br> "screeningOutcome": "responseWrapper.bulkResult" <br> } 
+
+                API->>API: Construye response API
+                Note over API: "screeningOutcome" = "checkResult"  <br> caseStatusUrl = lambda.statusPollingUrl <br> matches = matchResults []
+
+                API->>Consumidor: Response Exitoso
+                Note left of API: HTTP 200: Response Body 
+
+            end
+
+        end
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors -->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
