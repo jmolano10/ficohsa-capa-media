@@ -1,0 +1,134 @@
+
+sequenceDiagram
+    autonumber
+    participant API as API Producto
+    participant Wrapper as Wrapper ThetaRay <br> Epica 59: Componentes transversales <br> HU 56462 <br> POST - thetaray/v1/execute
+    participant CL as Caché Local
+    participant Lambda as Lambda de Parámeetros
+    participant Parameter as Parameter Store
+    participant Secret as Secret Manager
+    participant Redis as Redis Caché 
+    participant ThetaRayToken as Obtener Token <br/> URL: https://apps-pre-screening.ficohsa.ThetaRayray.cloud/security/accessToken
+    participant ThetaRayApi as API ThetaRay 
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over API, Errors: Flujo Regional (XRS) - Wrapper ThetaRay
+
+    API->>Wrapper: JSON Request
+    Note right of API: operation, path, data, paramName
+
+    Wrapper->>Wrapper: Validar Request
+    Note over Wrapper: Campos Obligatorios: operation, path, data, paramName 
+
+    Wrapper->>Wrapper: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        Wrapper->>CL: Consultar parámetros de Lambda Parámetros en caché local
+        Note right of Wrapper: Domain: "WRAPPER_THETARAY" <br> name: "wrapper-ThetaRay" <br> country: XRS 
+
+        CL->>Wrapper: Obtiene parámetros de Lambda Parámetros en Cahé Local
+        Note left of CL: Obtiene: <br> secret-name, <br> Content-Type, <br> Cookie, <br> path-token
+ 
+        Wrapper->>CL: Consultar parámetros del Parameter Store en caché local
+        Note right of Wrapper: Param Name: request.paramName
+
+        CL->>Wrapper: Obtiene parámetros del Parameter Store en Caché Local
+        Note left of CL: Obtiene basePath ThetaRay: <br> https://apps-pre-screening.ficohsa.thetaray.cloud
+
+    else Consulta  parametros en Lambda / Parameter Store
+
+        Wrapper->>Lambda: Consultar parámetros en lambda parámetros
+        Note right of Wrapper: Domain: "WRAPPER_THETARAY" <br> name: "wrapper-ThetaRay" <br> country: XRS 
+
+        Lambda->>Wrapper: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene: <br> secret-name, <br> Content-Type, <br> Cookie, <br> path-token
+
+        Wrapper->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of Wrapper: lambda.secret-name <br> Content-Type, <br> Cookie, <br> path-token
+
+        Wrapper->>Parameter: Consultar parámetros Parameter Store
+        Note right of Wrapper: Param Name: request.param-name
+
+        Parameter->>Wrapper: Obtiene parámetros Parameter Store
+        Note left of Parameter: Obtiene basePath ThetaRay: <br> basePath: https://apps-pre-screening.ficohsa.thetaray.cloud
+
+        Wrapper->>CL: Guarda parámetros Parameter Store en caché local
+        Note right of Wrapper: Guarda basePath ThetaRay: <br> basePath: https://apps-pre-screening.ficohsa.thetaray.cloud 
+
+    end
+
+    alt Consulta Token Redis Caché
+
+        Wrapper->>Redis: Consulta token en Redis Caché
+        Note right of Wrapper: Key: <br> consumer = "Wrapper_ThetaRay"
+
+        Redis->>Wrapper: Retrona token de Redis Caché
+        Note left of Redis: token
+        
+    else Si no existe token en caché local - genera Token con Wrapper ThetaRay
+
+        Wrapper->>Secret: Consulta clientSecret en Secret Manager
+        Note right of Wrapper: secretName: lambda.secret-name
+
+        Secret->>Wrapper: Retorna secretos para conexión a la BD
+        Note left of Secret: clientSecret
+
+        Wrapper->>Wrapper: Construye endpoint API ThetaRay Access Token 
+        Note over Wrapper: concat(param.basePath|lambda.path-token)
+
+        Wrapper->>Wrapper: Construye Headers API ThetaRay Access Token 
+        Note over Wrapper: Content-Type = lambda.Content-Type <br> Cookie = lambda.Cookie
+
+        Wrapper->>Wrapper: Consruye Body API Token ThetaRay Access Token 
+        Note over Wrapper: Body = clientSecret = secretManager.clientSecret
+
+        Wrapper->>ThetaRayToken: Consume Enpoint ThetaRay Access Token 
+        Note right of Wrapper: endpoint, headers, body
+
+        ThetaRayToken->>Wrapper: Retorna Token Authorización para consumir APis ThetaRay
+        Note left of ThetaRayToken: token
+
+        Wrapper->>Wrapper: Extraer caducidad token
+        Note over Wrapper: Abrir token y extraer "exp"
+
+        Wrapper->>Redis: Guarda token en Redis Caché
+        Note right of Wrapper: Key: <br> consumer = "Wrapper_ThetaRay" <br> TTL = "exp" - 1 seg
+        
+    end
+
+    Wrapper->>Wrapper: Construye endpoint API ThetaRay
+    Note over Wrapper: concat(param.basePath|request.path)
+
+    Wrapper->>Wrapper: Construye Headers API ThetaRay
+    Note over Wrapper: Content-Type = lambda.Content-Type <br> Cookie = lambda.Cookie
+
+    Wrapper->>Wrapper: Consruye Body API ThetaRay (Si es requerido)
+    Note over Wrapper: Body = request.data{}
+
+    Wrapper->>ThetaRayApi: Consume API ThetaRay
+    Note right of Wrapper: token, operation, endpoint, headers, body
+
+    ThetaRayApi->>Wrapper: Response API ThetaRay 
+    Note over ThetaRayApi: result {}
+
+    Wrapper->>Wrapper: Construye Response Wrapper
+    Note over Wrapper: success true or false, <br> data {// respuesta ThetaRay}
+
+    Wrapper->>API: Response Exitoso
+    Note left of Wrapper: HTTP 200: success, data 
+
+    Note over API, Errors: Flujo Alternativo - Error
+    activate Wrapper
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            Wrapper->> Errors: Mapear código de error
+            Errors -->> Wrapper: Retorna código mapeado
+        deactivate Errors
+        activate API
+            Wrapper-->> API: Retorna error
+        deactivate API
+        Note over API,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate Wrapper
