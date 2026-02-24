@@ -37,7 +37,7 @@ sequenceDiagram
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
-        Note right of API: param-name, statusPollingUrl
+        Note right of API: param-name, caseStatusUrl
 
     end
 
@@ -80,10 +80,10 @@ sequenceDiagram
         else No existe registro en DB
 
             API->>db: Crea Resgirsto Transacción en BD para cada uno de lo request.requestReference
-            Note right of API: Crea registro con la key request.requestReference <br> status = "RECEIVED", <br> "origin": "BULK", <br> "statusCallback": " " <br> "screeningOutcome": { <br>  "screeningOutcome": " ", <br>  "resolution": " " <br> } 
+            Note right of API: Crea registro con la key request.requestReference <br> status = "RECEIVED", <br> "origin": "BULK", <br> "statusCallback": " " <br> "screeningResultContainer": { <br>  "screeningOutcome": " ", <br>  "resolution": " " <br> } 
 
             API->>API: Construye Request Wrapper ThetaRay
-            Note over API: Mapeo: <br> operation = query <br> path = const.path <br> paramName = lambda.param-name <br> data { datos recibidos en el request }
+            Note over API: Mapeo: <br> operation = GET <br> path = const.path <br> paramName = lambda.param-name <br> data { datos recibidos en el request }
 
             API->>wrapper: Consume Wrapper ThetaRay
             Note right of API: operation, path, paramName, data 
@@ -93,7 +93,7 @@ sequenceDiagram
 
             API->>API: Evalúa Response Wrapper ThetaRay
 
-            alt response.data != "SUCCESS"
+            alt response.success == false
 
                 API->> Errors: Mapear código de error
             
@@ -105,13 +105,13 @@ sequenceDiagram
                 API->> Consumidor: Retorna error
                 Note left of API: Mapeo responseWrapper.mensajeError <br> según tabla de homologación de errores
 
-            else respone.data == "SUCCESS"
+            else response.success == false
 
                 API->>db: Actualiza Resgirsto Transacción en BD para cada uno de los request.requestReference
-                Note right of API: Actualiza registro por request.requestReference <br> Acualliza campos : <br> status = "SYNC_COMPLETED" <br> "screeningOutcome": { <br> "screeningOutcome": "responseWrapper.bulkResult" <br> } 
+                Note right of API: Actualiza registro por request.requestReference <br> Acualliza campos : <br> status = "SYNC_COMPLETED" <br> "screeningResultContainer": { <br> "screeningOutcome": "responseWrapper.bulkResult" <br> } 
 
                 API->>API: Construye response API
-                Note over API: "screeningOutcome" = "checkResult"  <br> caseStatusUrl = lambda.statusPollingUrl <br> matches = matchResults []
+                Note over API: "screeningOutcome" = "checkResult"  <br> caseStatusUrl = lambda.caseStatusUrl <br> matches = matchResults []
 
                 API->>Consumidor: Response Exitoso
                 Note left of API: HTTP 200: Response Body 

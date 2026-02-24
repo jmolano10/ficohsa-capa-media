@@ -1,0 +1,231 @@
+flowchart TD
+    Start([Cliente SOAP Request]) --> ValidateXSD{Validar<br/>Esquema XSD}
+    
+    ValidateXSD -->|Error| ErrorXSD[Error BEA-382505]
+    ErrorXSD --> MapError1[Mapear Error]
+    MapError1 --> EndError1([SOAP Fault])
+    
+    ValidateXSD -->|OK| ValidateRegion[Validar Servicio Regional<br/>FICBCO0076]
+    
+    ValidateRegion --> CheckRegion{Región<br/>Válida?}
+    CheckRegion -->|No| EndError2([Response Error])
+    
+    CheckRegion -->|Sí| ApplyDefaults[Aplicar Valores<br/>Por Defecto Región]
+    ApplyDefaults --> ValidateLoanType[Validar Tipo Préstamo<br/>Solo HN01]
+    
+    ValidateLoanType --> CheckCross{Validar Cruce<br/>País-Empresa}
+    CheckCross -->|Diferente| ErrorCross[Error MW-0008]
+    ErrorCross --> EndError3([Response Error])
+    
+    CheckCross -->|Mismo| RouteRegion{Enrutar por<br/>Región}
+    
+    RouteRegion -->|HN01| CheckLoanType{Tipo de<br/>Préstamo?}
+    RouteRegion -->|GT01| FlowGT[Flujo Guatemala]
+    RouteRegion -->|PA01| FlowPA[Flujo Panamá]
+    RouteRegion -->|NI01| FlowNI[Flujo Nicaragua]
+    RouteRegion -->|Otra| ErrorRegion[Error MW-0008]
+    ErrorRegion --> EndError4([Response Error])
+    
+    %% Flujo HN01 - ABANKS
+    CheckLoanType -->|ABANKS| CheckPaymentTypeAbanks{Tipo de<br/>Pago?}
+    
+    CheckPaymentTypeAbanks -->|ACCOUNT_DEBIT| ValidateFields1[Validar Campos<br/>DEBIT_ACCOUNT]
+    CheckPaymentTypeAbanks -->|CASH| ValidateFields2[Validar Campos<br/>LOAN_NUMBER]
+    CheckPaymentTypeAbanks -->|OTHER_BANK_CHEQUE| ValidateFields3[Validar Campos<br/>CHEQUE_NUMBER, BANK_CODE]
+    CheckPaymentTypeAbanks -->|OWN_CHEQUE| ErrorPayment1[PAYMENT TYPE<br/>NOT AVAILABLE]
+    CheckPaymentTypeAbanks -->|Otro| ErrorPayment2[PAYMENT TYPE<br/>NOT SUPPORTED]
+    
+    ErrorPayment1 --> EndError5([Response Error])
+    ErrorPayment2 --> EndError6([Response Error])
+    
+    %% ACCOUNT_DEBIT - ABANKS
+    ValidateFields1 --> CheckFields1{Campos<br/>Completos?}
+    CheckFields1 -->|No| ErrorFields1[REQUIRED FIELDS<br/>NOT SUPPLIED]
+    ErrorFields1 --> EndError7([Response Error])
+    CheckFields1 -->|Sí| ConsultProducts[Consultar Productos<br/>sjConsultaProductos]
+    
+    ConsultProducts --> CheckProducts{Productos<br/>Válidos?}
+    CheckProducts -->|No| EndError8([Response Error])
+    CheckProducts -->|Sí| GetParams[Obtener Parametrización<br/>T24T134, T24T133, T24T057]
+    
+    GetParams --> CheckParams{Parámetros<br/>OK?}
+    CheckParams -->|No| EndError9([Response Error])
+    CheckParams -->|Sí| GenUUID[Generar UUID]
+    
+    GenUUID --> CheckCurrency{Monedas<br/>Iguales?}
+    
+    CheckCurrency -->|Sí| Transfer1[Transferencia<br/>Transfmodelbankentrecuentas]
+    CheckCurrency -->|No| CheckDebitCredit{DEBIT_CREDIT<br/>= CREDIT?}
+    
+    CheckDebitCredit -->|Sí| Transfer2[Transferencia<br/>Transfentrecuentasinstrcredito]
+    CheckDebitCredit -->|No| Transfer3[Transferencia<br/>Transferenciaentrecuentas]
+    
+    Transfer1 --> CheckTransfer{Transferencia<br/>Exitosa?}
+    Transfer2 --> CheckTransfer
+    Transfer3 --> CheckTransfer
+    
+    CheckTransfer -->|No| EndError10([Response Error])
+    CheckTransfer -->|Sí| RegisterAbanks[Registrar Pago<br/>pagoPrestamoT24<br/>SP: OSB_PAG_PRESTAMO_T24]
+    
+    RegisterAbanks --> CheckRegister{Registro<br/>Exitoso?}
+    CheckRegister -->|No| ReverseTransfer[Reversar Transacción<br/>ReversarTransaccion]
+    ReverseTransfer --> EndError11([Response Error])
+    CheckRegister -->|Sí| BuildResponse1[Construir Response<br/>pagoPrestamoOut.xq]
+    
+    %% CASH - ABANKS
+    ValidateFields2 --> CheckFields2{Campos<br/>Completos?}
+    CheckFields2 -->|No| ErrorFields2[REQUIRED FIELDS<br/>NOT SUPPLIED]
+    ErrorFields2 --> EndError12([Response Error])
+    CheckFields2 -->|Sí| ConsultLoan[Consultar Préstamo<br/>consultaGeneralPrestamo]
+    
+    ConsultLoan --> CheckLoan{Préstamo<br/>Válido?}
+    CheckLoan -->|No| EndError13([Response Error])
+    CheckLoan -->|Sí| GenUUID2[Generar UUID]
+    
+    GenUUID2 --> CheckCurrencyCash{Moneda?}
+    CheckCurrencyCash -->|HNL| DepositLocal[Depósito Efectivo Local<br/>Depositoenefectivofase11]
+    CheckCurrencyCash -->|USD| DepositForeign[Depósito Efectivo Extranjera<br/>Depositoenefectivofase12]
+    
+    DepositLocal --> CheckDeposit{Depósito<br/>Exitoso?}
+    DepositForeign --> CheckDeposit
+    
+    CheckDeposit -->|No| EndError14([Response Error])
+    CheckDeposit -->|Sí| RegisterAbanks2[Registrar Pago<br/>pagoPrestamoT24]
+    
+    RegisterAbanks2 --> CheckRegister2{Registro<br/>Exitoso?}
+    CheckRegister2 -->|No| ReverseDeposit[Reversar Transacción]
+    ReverseDeposit --> EndError15([Response Error])
+    CheckRegister2 -->|Sí| BuildResponse2[Construir Response]
+    
+    %% OTHER_BANK_CHEQUE - ABANKS
+    ValidateFields3 --> CheckFields3{Campos<br/>Completos?}
+    CheckFields3 -->|No| ErrorFields3[REQUIRED FIELDS<br/>NOT SUPPLIED]
+    ErrorFields3 --> EndError16([Response Error])
+    CheckFields3 -->|Sí| ConsultLoan2[Consultar Préstamo]
+    
+    ConsultLoan2 --> CheckLoan2{Préstamo<br/>Válido?}
+    CheckLoan2 -->|No| EndError17([Response Error])
+    CheckLoan2 -->|Sí| GetParamsCheque[Obtener Parametrización<br/>T24T032.HNLOBCHQACCTNO<br/>T24T032.USDOBCHQACCTNO]
+    
+    GetParamsCheque --> CheckParamsCheque{Parámetros<br/>OK?}
+    CheckParamsCheque -->|No| EndError18([Response Error])
+    CheckParamsCheque -->|Sí| GenUUID3[Generar UUID]
+    
+    GenUUID3 --> CheckCurrencyCheque{Moneda?}
+    CheckCurrencyCheque -->|HNL| DepositChequeLocal[Depósito Combinado Local<br/>Depositocombinado]
+    CheckCurrencyCheque -->|USD| DepositChequeForeign[Depósito Combinado Extranjera<br/>Depositocombinado]
+    
+    DepositChequeLocal --> CheckDepositCheque{Depósito<br/>Exitoso?}
+    DepositChequeForeign --> CheckDepositCheque
+    
+    CheckDepositCheque -->|No| EndError19([Response Error])
+    CheckDepositCheque -->|Sí| RegisterAbanks3[Registrar Pago<br/>pagoPrestamoT24]
+    
+    RegisterAbanks3 --> CheckRegister3{Registro<br/>Exitoso?}
+    CheckRegister3 -->|No| ReverseCheque[Reversar Transacción]
+    ReverseCheque --> EndError20([Response Error])
+    CheckRegister3 -->|Sí| BuildResponse3[Construir Response]
+    
+    %% Flujo HN01 - T24
+    CheckLoanType -->|T24| ConsultAccount[Consultar Cuenta<br/>Consultadedetallesdelacuenta]
+    ConsultAccount --> PayLoanT24[Pagar Préstamo<br/>PagoaprestamoAA]
+    
+    PayLoanT24 --> CheckPayT24{Pago<br/>Exitoso?}
+    CheckPayT24 -->|No| BuildResponseT24Error[Construir Response Error]
+    BuildResponseT24Error --> EndError21([Response Error])
+    CheckPayT24 -->|Sí| ConsultPayment[Consultar Pago<br/>ConsultadepagodeprestamoAA]
+    
+    ConsultPayment --> BuildResponseT24[Construir Response<br/>pagoPrestamoT24Out.xq]
+    
+    %% Flujo GT01
+    FlowGT --> CheckPaymentTypeGT{Tipo de<br/>Pago?}
+    CheckPaymentTypeGT -->|ACCOUNT_DEBIT| ValidateFieldsGT[Validar Campos]
+    CheckPaymentTypeGT -->|Otro| ErrorPaymentGT[PAYMENT TYPE<br/>NOT SUPPORTED]
+    ErrorPaymentGT --> EndError22([Response Error])
+    
+    ValidateFieldsGT --> CheckFieldsGT{Campos<br/>Completos?}
+    CheckFieldsGT -->|No| ErrorFieldsGT[REQUIRED FIELDS<br/>NOT SUPPLIED]
+    ErrorFieldsGT --> EndError23([Response Error])
+    CheckFieldsGT -->|Sí| CallSPGT[Llamar SP<br/>OSB_P_PAGO_PRESTAMO<br/>ConnectionProxyAbanksGT]
+    
+    CallSPGT --> CheckSPGT{SP<br/>Exitoso?}
+    CheckSPGT -->|No| BuildResponseGTError[Construir Response Error<br/>pagoPtmoGTHeaderOut.xq]
+    BuildResponseGTError --> EndError24([Response Error])
+    CheckSPGT -->|Sí| BuildResponseGT[Construir Response<br/>pagoPtmoGTOut.xq]
+    
+    %% Flujo PA01
+    FlowPA --> CheckPaymentTypePA{Tipo de<br/>Pago?}
+    CheckPaymentTypePA -->|ACCOUNT_DEBIT| ValidateFieldsPA[Validar Campos]
+    CheckPaymentTypePA -->|Otro| ErrorPaymentPA[PAYMENT TYPE<br/>NOT SUPPORTED]
+    ErrorPaymentPA --> EndError25([Response Error])
+    
+    ValidateFieldsPA --> CheckFieldsPA{Campos<br/>Completos?}
+    CheckFieldsPA -->|No| ErrorFieldsPA[REQUIRED FIELDS<br/>NOT SUPPLIED]
+    ErrorFieldsPA --> EndError26([Response Error])
+    CheckFieldsPA -->|Sí| CallSPPA[Llamar SP<br/>OSB_P_PAGO_PRESTAMO<br/>ConnectionProxyAbanksPA]
+    
+    CallSPPA --> CheckSPPA{SP<br/>Exitoso?}
+    CheckSPPA -->|No| BuildResponsePAError[Construir Response Error<br/>pagoPtmoPAHeaderOut.xq]
+    BuildResponsePAError --> EndError27([Response Error])
+    CheckSPPA -->|Sí| BuildResponsePA[Construir Response<br/>pagoPtmoPAOut.xq]
+    
+    %% Flujo NI01
+    FlowNI --> CheckPaymentTypeNI{Tipo de<br/>Pago?}
+    CheckPaymentTypeNI -->|ACCOUNT_DEBIT| ValidateFieldsNI[Validar Campos]
+    CheckPaymentTypeNI -->|Otro| ErrorPaymentNI[PAYMENT TYPE<br/>NOT SUPPORTED]
+    ErrorPaymentNI --> EndError28([Response Error])
+    
+    ValidateFieldsNI --> ValidateSchema[Validar Esquema COBIS<br/>services.xsd]
+    ValidateSchema --> CallCOBIS[Llamar COBIS<br/>OpPagarPrestamo<br/>SOAP 1.2]
+    
+    CallCOBIS --> CheckCOBIS{COBIS<br/>Exitoso?}
+    CheckCOBIS -->|No| BuildResponseNIError[Construir Response Error<br/>pagoPrestamoNIHeaderOut.xq]
+    BuildResponseNIError --> EndError29([Response Error])
+    CheckCOBIS -->|Sí| ConvertDate[Convertir Fecha<br/>yyyy-MM-dd → yyyyMMdd]
+    ConvertDate --> BuildResponseNI[Construir Response<br/>pagoPrestamoNIOut.xq]
+    
+    %% Respuestas Exitosas
+    BuildResponse1 --> CheckErrorMapping{Error en<br/>Flujo?}
+    BuildResponse2 --> CheckErrorMapping
+    BuildResponse3 --> CheckErrorMapping
+    BuildResponseT24 --> CheckErrorMapping
+    BuildResponseGT --> CheckErrorMapping
+    BuildResponsePA --> CheckErrorMapping
+    BuildResponseNI --> CheckErrorMapping
+    
+    CheckErrorMapping -->|Sí| MapError2[Mapear Error<br/>MapeoErrores]
+    MapError2 --> EndError30([Response Error])
+    CheckErrorMapping -->|No| EndSuccess([SOAP Response<br/>SUCCESS])
+    
+    style Start fill:#90EE90
+    style EndSuccess fill:#90EE90
+    style EndError1 fill:#FFB6C1
+    style EndError2 fill:#FFB6C1
+    style EndError3 fill:#FFB6C1
+    style EndError4 fill:#FFB6C1
+    style EndError5 fill:#FFB6C1
+    style EndError6 fill:#FFB6C1
+    style EndError7 fill:#FFB6C1
+    style EndError8 fill:#FFB6C1
+    style EndError9 fill:#FFB6C1
+    style EndError10 fill:#FFB6C1
+    style EndError11 fill:#FFB6C1
+    style EndError12 fill:#FFB6C1
+    style EndError13 fill:#FFB6C1
+    style EndError14 fill:#FFB6C1
+    style EndError15 fill:#FFB6C1
+    style EndError16 fill:#FFB6C1
+    style EndError17 fill:#FFB6C1
+    style EndError18 fill:#FFB6C1
+    style EndError19 fill:#FFB6C1
+    style EndError20 fill:#FFB6C1
+    style EndError21 fill:#FFB6C1
+    style EndError22 fill:#FFB6C1
+    style EndError23 fill:#FFB6C1
+    style EndError24 fill:#FFB6C1
+    style EndError25 fill:#FFB6C1
+    style EndError26 fill:#FFB6C1
+    style EndError27 fill:#FFB6C1
+    style EndError28 fill:#FFB6C1
+    style EndError29 fill:#FFB6C1
+    style EndError30 fill:#FFB6C1

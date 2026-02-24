@@ -112,11 +112,61 @@ sequenceDiagram
     ThetaRayApi->>Wrapper: Response API ThetaRay 
     Note over ThetaRayApi: result {}
 
-    Wrapper->>Wrapper: Construye Response Wrapper
-    Note over Wrapper: success true or false, <br> data {// respuesta ThetaRay}
+    Wrapper->>Wrapper: Evalúa Response Thetaray
+    
+    alt If response API Thetaray == HTTP 401 Unauthorized
 
-    Wrapper->>API: Response Exitoso
-    Note left of Wrapper: HTTP 200: success, data 
+        Wrapper->>Wrapper: Construye endpoint API ThetaRay Access Token 
+        Note over Wrapper: concat(param.basePath|lambda.path-token)
+
+        Wrapper->>Wrapper: Construye Headers API ThetaRay Access Token 
+        Note over Wrapper: Content-Type = lambda.Content-Type <br> Cookie = lambda.Cookie
+
+        Wrapper->>Wrapper: Consruye Body API Token ThetaRay Access Token 
+        Note over Wrapper: Body = clientSecret = secretManager.clientSecret
+
+        Wrapper->>ThetaRayToken: Consume Enpoint ThetaRay Access Token 
+        Note right of Wrapper: endpoint, headers, body
+
+        ThetaRayToken->>Wrapper: Retorna Token Authorización para consumir APis ThetaRay
+        Note left of ThetaRayToken: token
+
+        Wrapper->>Wrapper: Extraer caducidad token
+        Note over Wrapper: Abrir token y extraer "exp"
+
+        Wrapper->>Redis: Guarda token en Redis Caché
+        Note right of Wrapper: Key: <br> consumer = "Wrapper_ThetaRay" <br> TTL = "exp" - 1 seg
+
+        Wrapper->>Wrapper: Construye endpoint API ThetaRay
+        Note over Wrapper: concat(param.basePath|request.path)
+
+        Wrapper->>Wrapper: Construye Headers API ThetaRay
+        Note over Wrapper: Content-Type = lambda.Content-Type <br> Cookie = lambda.Cookie
+
+        Wrapper->>Wrapper: Consruye Body API ThetaRay (Si es requerido)
+        Note over Wrapper: Body = request.data{}
+
+        Wrapper->>ThetaRayApi: Consume API ThetaRay
+        Note right of Wrapper: token, operation, endpoint, headers, body
+
+        ThetaRayApi->>Wrapper: Response API ThetaRay 
+        Note over ThetaRayApi: result {}
+
+        Wrapper->>Wrapper: Construye Response Wrapper
+        Note over Wrapper: success true or false, <br> data {// respuesta ThetaRay}
+
+        Wrapper->>API: Response Exitoso / Error
+        Note left of Wrapper: success, data 
+
+    else If response API Thetaray != HTTP 401 Unauthorized
+
+        Wrapper->>Wrapper: Construye Response Wrapper
+        Note over Wrapper: success true or false, <br> data {// respuesta ThetaRay}
+
+        Wrapper->>API: Response Exitoso / Error
+        Note left of Wrapper: success, data 
+
+    end
 
     Note over API, Errors: Flujo Alternativo - Error
     activate Wrapper

@@ -1,0 +1,73 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service<br/>PagoPrestamo
+    participant ValidaSvc as ValidaServicioRegional<br/>(DB)
+    participant MapeoErr as MapeoErrores<br/>(Proxy)
+    participant COBIS as prestamo<br/>(COBIS SOAP)
+
+    Note over Client, COBIS: Flujo Nicaragua (NI01) - ACCOUNT_DEBIT
+
+    Client->>OSB: SOAP Request<br/>LOAN_NUMBER: NI1234567890<br/>PAYMENT_AMOUNT: 3000.00<br/>PAYMENT_TYPE: ACCOUNT_DEBIT<br/>DEBIT_ACCOUNT: NI1001234567
+    Note right of Client: Header: SourceBank=NI01<br/>DestinationBank=NI01<br/>UserName/Password
+
+    OSB->>OSB: Validar Esquema XSD
+    Note right of OSB: Valida pagoPrestamoTypes.xsd<br/>Campos obligatorios:<br/>LOAN_NUMBER, PAYMENT_AMOUNT, PAYMENT_TYPE
+
+    alt Validación XSD Fallida
+        OSB->>MapeoErr: Mapear Error BEA-382505
+        MapeoErr-->>OSB: Error Mapeado
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>ValidaSvc: ValidaServicioRegional
+    Note right of OSB: PV_REGION: NI01<br/>PV_SERVICE_ID: FICBCO0076<br/>XQuery: validaServicioRegionalIn.xq
+
+    ValidaSvc-->>OSB: PV_CODIGO_ERROR: SUCCESS<br/>PV_MENSAJE_ERROR: OK
+
+    alt Validación Regional Fallida
+        ValidaSvc-->>OSB: PV_CODIGO_ERROR: ERROR
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Aplicar Valores Por Defecto Región
+    Note right of OSB: XQuery: aplicarValoresPorDefectoRegion.xq
+
+    OSB->>OSB: Validar Cruce País-Empresa
+    Note right of OSB: XQuery: validarCrucePaisEmpresa.xq<br/>Variable: areSameSourceAndDestination = "YES"
+
+    OSB->>OSB: Validar Tipo de Pago
+    Note right of OSB: PAYMENT_TYPE = "ACCOUNT_DEBIT"
+
+    alt Tipo de Pago No Soportado
+        OSB->>OSB: validationMessage = "PAYMENT TYPE NOT SUPPORTED"
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Asignar validationMessage = ""
+
+    OSB->>COBIS: OpPagarPrestamo (SOAP 1.2)
+    Note right of OSB: XQuery: pagoPrestamoNIIn.xq<br/>Endpoint: http://10.235.53.145:9080<br/>/GerenciaProductoPrestamo<br/>/SrvAplCobisPrestamoService<br/><br/>contextoTransaccional:<br/>  identificadorTransaccional: REFNI20240101001<br/>  codCanalOriginador: 1<br/>  ipConsumidor: OMNICANAL<br/>transaccion:<br/>  valMonto: 3000.00<br/>prestamo/producto:<br/>  valNumeroProducto: NI1234567890<br/>cuenta:<br/>  codCuentaHabiente: NI1001234567<br/>oficina:<br/>  codOficina: 1<br/>moneda:<br/>  multimoneda: N<br/>canal:<br/>  servicio: 10
+
+    OSB->>OSB: Validar Esquema COBIS
+    Note right of OSB: Schema: services.xsd<br/>Element: opPagarPrestamoSolicitud
+
+    COBIS-->>OSB: opPagarPrestamoRespuesta<br/>pagoPrestamo:<br/>  transaccion:<br/>    valMonto: 3000.00<br/>    fecAplicacion: 2024-01-01<br/>  prestamo/producto:<br/>    valNumeroProducto: NI1234567890
+
+    alt COBIS Fallido
+        COBIS-->>OSB: Error en COBIS
+        OSB->>OSB: Construir Response Error
+        Note right of OSB: XQuery: pagoPrestamoNIHeaderOut.xq<br/>successIndicator: Error
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: XQuery: pagoPrestamoNIOut.xq<br/>Convertir Fecha:<br/>  2024-01-01 → 20240101<br/>  (yyyy-MM-dd → yyyyMMdd)<br/><br/>XQuery: pagoPrestamoNIHeaderOut.xq<br/>successIndicator: SUCCESS
+
+    alt Error en Flujo
+        OSB->>MapeoErr: mapeoErrores
+        Note right of OSB: XQuery: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: ERROR<br/>MENSAJE_ERROR: FICBCO0076$#$mensaje
+        MapeoErr-->>OSB: Error Mapeado
+        Note right of OSB: XQuery: mapeoErroresUsageOut.xq
+    end
+
+    OSB->>Client: SOAP Response<br/>successIndicator: SUCCESS<br/>DATE_TIME: 20240101<br/>LOAN_NUMBER: NI1234567890<br/>DUE_ID: (vacío)<br/>PAYMENT_AMOUNT: 3000.00

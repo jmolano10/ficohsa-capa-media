@@ -1,0 +1,133 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service<br/>PagoPrestamo
+    participant ValidaSvc as ValidaServicioRegional<br/>(DB)
+    participant MapeoErr as MapeoErrores<br/>(Proxy)
+    participant ConsProductos as sjConsultaProductos<br/>(ABANKS)
+    participant ObtParam as ObtenerParametrizacion<br/>(DB)
+    participant TransfBS as transferenciasBS<br/>(ABANKS)
+    participant PagoAbanks as pagoPrestamoT24BS<br/>(DB)
+    participant ReversaTx as ReversarTransaccion<br/>(Proxy)
+
+    Note over Client, ReversaTx: Flujo Honduras (HN01) - ACCOUNT_DEBIT - ABANKS
+
+    Client->>OSB: SOAP Request<br/>LOAN_NUMBER: 1234567890<br/>PAYMENT_AMOUNT: 5000.00<br/>PAYMENT_TYPE: ACCOUNT_DEBIT<br/>DEBIT_ACCOUNT: 1001234567
+    Note right of Client: Header: SourceBank=HN01<br/>DestinationBank=HN01<br/>UserName/Password
+
+    OSB->>OSB: Validar Esquema XSD
+    Note right of OSB: Valida pagoPrestamoTypes.xsd<br/>Campos obligatorios:<br/>LOAN_NUMBER, PAYMENT_AMOUNT, PAYMENT_TYPE
+
+    alt Validación XSD Fallida
+        OSB->>MapeoErr: Mapear Error BEA-382505
+        MapeoErr-->>OSB: Error Mapeado
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>ValidaSvc: ValidaServicioRegional
+    Note right of OSB: PV_REGION: HN01<br/>PV_SERVICE_ID: FICBCO0076<br/>XQuery: validaServicioRegionalIn.xq
+
+    ValidaSvc-->>OSB: PV_CODIGO_ERROR: SUCCESS<br/>PV_MENSAJE_ERROR: OK
+
+    alt Validación Regional Fallida
+        ValidaSvc-->>OSB: PV_CODIGO_ERROR: ERROR
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Aplicar Valores Por Defecto Región
+    Note right of OSB: XQuery: aplicarValoresPorDefectoRegion.xq
+
+    OSB->>OSB: Validar Tipo Préstamo
+    Note right of OSB: XQuery: validarTipoPrestamo.xq<br/>Resultado: ABANKS o T24<br/>Variable: loanType = "ABANKS"
+
+    OSB->>OSB: Validar Cruce País-Empresa
+    Note right of OSB: XQuery: validarCrucePaisEmpresa.xq<br/>Variable: areSameSourceAndDestination = "YES"
+
+    OSB->>OSB: Asignar Variables
+    Note right of OSB: paymentAmount = 5000.00<br/>loanNumber = 1234567890<br/>PaymentType = ACCOUNT_DEBIT<br/>debitAccount = 1001234567
+
+    OSB->>ConsProductos: consultaProductos
+    Note right of OSB: XQuery: pagoPtmoConsProductosIn.xq<br/>ldapUsername: USUARIO_OSB<br/>ldapPassword: ****<br/>accountNumber: 1001234567<br/>loanNumber: 1234567890
+
+    ConsProductos-->>OSB: PRODUCTS<br/>PRODUCT[TYPE=PTM]: SUCCESS<br/>PRODUCT[TYPE=CTA]: SUCCESS<br/>loanCurrency: HNL<br/>accountCurrency: HNL
+
+    alt Validación Productos Fallida
+        ConsProductos-->>OSB: SUCCESS_INDICATOR: ERROR
+        OSB->>OSB: Asignar message
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>ObtParam: obtenerParametrizacion
+    Note right of OSB: XQuery: obtenerParametrizacionIn.xq<br/>nombreParametros:<br/>T24T134.HNLCREDITACCTNO<br/>T24T133.TXNTYPELOANPYMT<br/>T24T057.INTACCOUNT.USERS
+
+    ObtParam-->>OSB: ERROR_CODE: SUCCESS<br/>creditAccount: 9999999999<br/>trxType: ACPY<br/>intAccountUsers: USERS
+
+    alt Parametrización Fallida
+        ObtParam-->>OSB: ERROR_CODE: ERROR
+        OSB->>OSB: Asignar message
+        OSB->>Client: Response con Error (skip)
+    end
+
+    OSB->>OSB: Generar UUID
+    Note right of OSB: XQuery: obtenerUUID.xq<br/>uuid: 550e8400-e29b-41d4-a716-446655440000
+
+    OSB->>OSB: Asignar authParametro = '0'
+
+    alt Monedas Iguales (HNL = HNL)
+        OSB->>TransfBS: Transfmodelbankentrecuentas
+        Note right of OSB: XQuery: debitoPrestamoCuentaIn.xq<br/>transactionType: ACPY<br/>accountCurrency: HNL<br/>creditAccount: 9999999999<br/>uuid: 550e8400-e29b-41d4-a716-446655440000<br/>DEBIT_ACCOUNT: 1001234567<br/>PAYMENT_AMOUNT: 5000.00
+
+        TransfBS-->>OSB: Status/successIndicator: SUCCESS<br/>Status/transactionId: FT2401010001<br/>DEBITVALUEDATE: 20240101
+    end
+
+    alt Monedas Diferentes y DEBIT_CREDIT=CREDIT
+        OSB->>TransfBS: Transfentrecuentasinstrcredito
+        Note right of OSB: XQuery: debitoPrestamoCuentaAuthIn.xq<br/>auth: 0<br/>Otros parámetros similares
+        TransfBS-->>OSB: Status/successIndicator: SUCCESS<br/>Status/transactionId: FT2401010001
+    end
+
+    alt Monedas Diferentes y DEBIT_CREDIT!=CREDIT
+        OSB->>TransfBS: Transferenciaentrecuentas
+        Note right of OSB: XQuery: pagoPrestamoAuthIn.xq<br/>auth: 0<br/>Otros parámetros similares
+        TransfBS-->>OSB: Status/successIndicator: SUCCESS<br/>Status/transactionId: FT2401010001
+    end
+
+    OSB->>OSB: Asignar Variables
+    Note right of OSB: successIndicator: SUCCESS<br/>transactionId: FT2401010001<br/>valueDate: 20240101
+
+    alt Transferencia Fallida
+        TransfBS-->>OSB: Status/successIndicator: ERROR
+        OSB->>OSB: Asignar message
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>PagoAbanks: pagoPrestamoT24
+    Note right of OSB: XQuery: pagoPrestamoIn.xq<br/>SP: OSB_PAG_PRESTAMO_T24<br/>DB: eis/DB/ConnectionInterbanca<br/>LOAN_NUMBER: 1234567890<br/>PAYMENT_AMOUNT: 5000.00<br/>DEBIT_ACCOUNT: 1001234567<br/>USERNAME: USUARIO_OSB<br/>TRANSACTIONID: FT2401010001
+
+    PagoAbanks-->>OSB: ERROR_CODE: SUCCESS<br/>LOAN_NUMBER: 1234567890<br/>PAYMENT_AMOUNT: 5000.00<br/>DATE_TIME: 20240101120000<br/>DUE_ID: 001
+
+    OSB->>OSB: Asignar successIndicatorAbanks: SUCCESS
+
+    alt Registro ABANKS Fallido
+        PagoAbanks-->>OSB: ERROR_CODE: ERROR<br/>ERROR_MESSAGE: Error en registro
+        OSB->>OSB: Asignar successIndicatorAbanks: ERROR
+        
+        OSB->>ReversaTx: reversarTransaccion
+        Note right of OSB: XQuery: reversarTransaccionIn.xq<br/>transactionId: FT2401010001
+        
+        ReversaTx-->>OSB: Reversión Completada
+        
+        OSB->>OSB: Asignar message: Error en ABANKS
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: XQuery: pagoPrestamoOut.xq<br/>XQuery: pagoPrestamoHeaderOut.xq
+
+    alt Error en Flujo
+        OSB->>MapeoErr: mapeoErrores
+        Note right of OSB: XQuery: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: ERROR<br/>MENSAJE_ERROR: FICBCO0076$#$mensaje
+        MapeoErr-->>OSB: Error Mapeado
+        Note right of OSB: XQuery: mapeoErroresUsageOut.xq
+    end
+
+    OSB->>Client: SOAP Response<br/>successIndicator: SUCCESS<br/>DATE_TIME: 20240101120000<br/>LOAN_NUMBER: 1234567890<br/>DUE_ID: 001<br/>PAYMENT_AMOUNT: 5000.00

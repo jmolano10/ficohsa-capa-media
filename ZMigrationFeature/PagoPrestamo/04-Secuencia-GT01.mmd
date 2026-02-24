@@ -1,0 +1,79 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service<br/>PagoPrestamo
+    participant ValidaSvc as ValidaServicioRegional<br/>(DB)
+    participant MapeoErr as MapeoErrores<br/>(Proxy)
+    participant PagoGT as PagoPrestamo_db<br/>(ABANKS GT)
+
+    Note over Client, PagoGT: Flujo Guatemala (GT01) - ACCOUNT_DEBIT
+
+    Client->>OSB: SOAP Request<br/>LOAN_NUMBER: GT1234567890<br/>PAYMENT_AMOUNT: 10000.00<br/>PAYMENT_TYPE: ACCOUNT_DEBIT<br/>DEBIT_ACCOUNT: GT1001234567
+    Note right of Client: Header: SourceBank=GT01<br/>DestinationBank=GT01<br/>UserName/Password
+
+    OSB->>OSB: Validar Esquema XSD
+    Note right of OSB: Valida pagoPrestamoTypes.xsd<br/>Campos obligatorios:<br/>LOAN_NUMBER, PAYMENT_AMOUNT, PAYMENT_TYPE
+
+    alt Validación XSD Fallida
+        OSB->>MapeoErr: Mapear Error BEA-382505
+        MapeoErr-->>OSB: Error Mapeado
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>ValidaSvc: ValidaServicioRegional
+    Note right of OSB: PV_REGION: GT01<br/>PV_SERVICE_ID: FICBCO0076<br/>XQuery: validaServicioRegionalIn.xq
+
+    ValidaSvc-->>OSB: PV_CODIGO_ERROR: SUCCESS<br/>PV_MENSAJE_ERROR: OK
+
+    alt Validación Regional Fallida
+        ValidaSvc-->>OSB: PV_CODIGO_ERROR: ERROR
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Aplicar Valores Por Defecto Región
+    Note right of OSB: XQuery: aplicarValoresPorDefectoRegion.xq
+
+    OSB->>OSB: Validar Cruce País-Empresa
+    Note right of OSB: XQuery: validarCrucePaisEmpresa.xq<br/>Variable: areSameSourceAndDestination = "YES"
+
+    OSB->>OSB: Asignar Variables
+    Note right of OSB: paymentAmount = 10000.00<br/>loanNumber = GT1234567890<br/>PaymentType = ACCOUNT_DEBIT
+
+    OSB->>OSB: Validar Campos Requeridos
+    Note right of OSB: PAYMENT_TYPE != ""<br/>LOAN_NUMBER != ""<br/>PAYMENT_AMOUNT != ""
+
+    alt Campos Requeridos Faltantes
+        OSB->>OSB: message = "REQUIRED FIELDS NOT SUPPLIED"
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Validar Tipo de Pago
+    Note right of OSB: PAYMENT_TYPE = "ACCOUNT_DEBIT"
+
+    alt Tipo de Pago No Soportado
+        OSB->>OSB: message = "PAYMENT TYPE NOT SUPPORTED"
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>PagoGT: PagoPrestamo (SP)
+    Note right of OSB: XQuery: pagoPtmoGTIn.xq<br/>SP: OSB_P_PAGO_PRESTAMO<br/>DB: eis/DB/ConnectionProxyAbanksGT<br/>LOAN_NUMBER: GT1234567890<br/>PAYMENT_AMOUNT: 10000.00<br/>DEBIT_ACCOUNT: GT1001234567<br/>INTERFACE_REFERENCE_NO: REFGT20240101001<br/>USERNAME: USUARIO_OSB_GT
+
+    PagoGT-->>OSB: ERROR_CODE: SUCCESS<br/>LOAN_NUMBER: GT1234567890<br/>PAYMENT_AMOUNT: 10000.00<br/>DATE_TIME: 20240101120000<br/>DUE_ID: 001<br/>TRANSACCION_ID: TXN001<br/>VALUEDATE: 20240101<br/>ERROR_MESSAGE: OK
+
+    alt Stored Procedure Fallido
+        PagoGT-->>OSB: ERROR_CODE: ERROR<br/>ERROR_MESSAGE: Error en SP
+        OSB->>OSB: Construir Response Error
+        Note right of OSB: XQuery: pagoPtmoGTHeaderOut.xq
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: XQuery: pagoPtmoGTOut.xq<br/>XQuery: pagoPtmoGTHeaderOut.xq
+
+    alt Error en Flujo
+        OSB->>MapeoErr: mapeoErrores
+        Note right of OSB: XQuery: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: ERROR<br/>MENSAJE_ERROR: FICBCO0076$#$mensaje
+        MapeoErr-->>OSB: Error Mapeado
+        Note right of OSB: XQuery: mapeoErroresUsageOut.xq
+    end
+
+    OSB->>Client: SOAP Response<br/>successIndicator: SUCCESS<br/>DATE_TIME: 20240101120000<br/>LOAN_NUMBER: GT1234567890<br/>DUE_ID: 001<br/>PAYMENT_AMOUNT: 10000.00
