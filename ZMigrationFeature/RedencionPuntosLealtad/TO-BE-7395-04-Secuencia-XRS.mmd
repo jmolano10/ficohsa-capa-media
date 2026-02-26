@@ -35,15 +35,11 @@ sequenceDiagram
         CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
         Note left of CL: ObtenerParametrizacion Parámetros: <br> method.key = {sourceBank}, method.value = ban-{countryISO3}-lc-canje-puntos-efectivo-param-wsdl-<env> <br> method.key = "INSTITUTIONNAME", method.value = banficohsahnd <br> method.key = "confirmationEmailSw", method.value = false <br> method.key = "confirmationEmailAddr", method.value = info@ficohsa.com <br> method.key = "newShippingAddressSw", method.value = true <br> method.key = "poBoxAddressSw", method.value = false <br> method.key = "language", method.value = en_US
 
-        alt Consulta Parámetros de conexión backend en caché local
+        API->>CL: Consultar parámetros Parameter Store caché local
+        Note right of API: Param Name: <br> ban-xrs-lc-mastercard-ws-param-wsdl-<env>
 
-            API->>CL: Consultar parámetros Parameter Store caché local
-            Note right of API: Param Name: <br> ban-xrs-lc-mastercard-ws-param-wsdl-<env>
-
-            CL->>API: Obtiene parámetros Parameter Store Caché Local
-            Note left of CL: ObtenerParametrizacion 3 Campos: <br> ip, port, basePath
-
-        end 
+        CL->>API: Obtiene parámetros Parameter Store Caché Local
+        Note left of CL: ObtenerParametrizacion 3 Campos: <br> ip, port, basePath
 
     else Consulta  parametros en Lambda Parámetros / Parameter Store
 
@@ -51,23 +47,19 @@ sequenceDiagram
         Note right of API: Domain: REWARD_POINTS_ACCOUNT_ADMIN <br> name: PARAM <br> methods: initiate-loyalty-points
 
         Lambda->>API: Obtiene parámetros Lambda Parámetros
-        Note left of Lambda: ObtenerParametrizacion Parámetros: <br> method.key = {sourceBank}, method.value = ban-{countryISO3}-lc-canje-puntos-efectivo-param-wsdl-<env> <br> method.key = "INSTITUTIONNAME", method.value = banficohsahnd <br> method.key = "confirmationEmailSw", method.value = false <br> method.key = "confirmationEmailAddr", method.value = info@ficohsa.com <br> method.key = "newShippingAddressSw", method.value = true <br> method.key = "poBoxAddressSw", method.value = false <br> method.key = "language", method.value = en_US
+        Note left of Lambda: ObtenerParametrizacion Parámetros: <br> method.key = {sourceBank}, method.value = "param-name" <br> method.key = "INSTITUTIONNAME", method.value = banficohsahnd <br> method.key = "confirmationEmailSw", method.value = false <br> method.key = "confirmationEmailAddr", method.value = info@ficohsa.com <br> method.key = "newShippingAddressSw", method.value = true <br> method.key = "poBoxAddressSw", method.value = false <br> method.key = "language", method.value = en_US
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
         Note right of API: key, value
 
-        alt Consulta Parámetros de conexión backend en parameter store
+        API->>Parameter: Consultar parámetros Parameter Store
+        Note right of API: Param Name: <br> ban-xrs-lc-mastercard-ws-param-wsdl-<env>
 
-            API->>Parameter: Consultar parámetros Parameter Store
-            Note right of API: Param Name: <br> ban-xrs-lc-mastercard-ws-param-wsdl-<env>
+        Parameter->>API: Obtiene parámetros Parameter Store
+        Note left of Parameter: ObtenerParametrizacion 3 Campos: <br> ip, port, basePath
 
-            Parameter->>API: Obtiene parámetros Parameter Store
-            Note left of Parameter: ObtenerParametrizacion 3 Campos: <br> ip, port, basePath
-
-            API->>CL: Guarda parámetros Parameter Store en caché local
-            Note right of API: connection, connectionType, operationType, catalogueName, procedureName
-
-        end 
+        API->>CL: Guarda parámetros Parameter Store en caché local
+        Note right of API: ip, port, basePath
 
     end
 
@@ -85,10 +77,10 @@ sequenceDiagram
         Note over API: InstitutionName = param.key(INSTITUTIONNAME) =  <br> AppID = request.customerLegalReference 
 
         API->>API: Construye Request WS Mastercard - doItemRedemption (body)
-        Note over API: confirmationEmailSw = param.key(confirmationEmailIndicator) <br> confirmationEmailAddr = param.key(confirmationEmailAddr) <br> rewardMatrixItemId = request.rewardMatrixItemId <br> quantity = request.loyaltyPointsAmount <br> newShippingAddressSw = param.key(newShippingAddressSw) <br> poBoxAddressSw = param.key(poBoxAddressSw) <br> language = param.key(language)
+        Note over API: URL: concat(ip|port|basePath|const.operationMastercard) <br> confirmationEmailSw = param.key(confirmationEmailIndicator) <br> confirmationEmailAddr = param.key(confirmationEmailAddr) <br> rewardMatrixItemId = request.rewardMatrixItemId <br> quantity = request.loyaltyPointsAmount <br> newShippingAddressSw = param.key(newShippingAddressSw) <br> poBoxAddressSw = param.key(poBoxAddressSw) <br> language = param.key(language)
 
         API->>MRS: Consume WS Mastercard - doItemRedemption
-        Note right of API: Conecction: parameterStore {param.key(HN01 | NI01-1)} <br> Header: InstitutionName, AppID <br> Body : <br> confirmationEmailSw, confirmationEmailAddr, <br> rewardMatrixItemId, quantity, <br> newShippingAddressSw, poBoxAddressSw, language
+        Note right of API: URL: concat(ip|port|basePath|const.operationMastercard) <br> Header: InstitutionName, AppID <br> Body : <br> confirmationEmailSw, confirmationEmailAddr, <br> rewardMatrixItemId, quantity, <br> newShippingAddressSw, poBoxAddressSw, language
 
         MRS->>API: Response WS Mastercard - doItemRedemptionResponse
         Note left of MRS: householdId, pointTotalRemaining, redemptionDate <br> redemptionNumber, redemptionId, orderInformation, <br> voucherId, referenceNumber, redemptionItemDesc <br> sourceItemId, sourceItemCode
@@ -105,7 +97,7 @@ sequenceDiagram
     else IF (header.sourceBank == "HN01" AND request.loyaltyProgramReference == 2) or (header.sourceBank == "PA01" | "GT01") or (header.sourceBank == "NI01" and request.rewardItemReference != "" and programCode == 2)
 
         API->>API: Construye Request Wrapper Vision Plus - PointsRedeemResponse
-        Note over API: Mapeo Campos : <br> operation = param.operationVisa <br> payload.data = { <br> GPXARI-ORG = request.organizationReference (int), <br> GPXRAI-CARD-NBR = request.creditCardId, <br> GPXRAI-ACCT-NBR = request.accountNumber, <br> GPXRAI-SCHEME-ID = request.schemeReference, <br> GPXRAI-REWARD-ITEM = request.rewardItemReference <br> GPXRAI-PREPAID-CARD-NBR = request.prepaidCardReference <br> GPXRAI-POINTS = request.loyaltyPointsAmount <br> GPXRAI-REASON-CODE = request.reasonCode <br> GPXRAI-USER-DATA = request.userContextData <br> GPXRAI-COUPON-DENOM = request.couponAmount <br> GPXRAI-COUPON-NBR = request.couponReference <br> GPXRAI-NAME-1 = request.cardholderNameLine1 <br> GPXRAI-NAME-2 = request.cardholderNameLine2 <br> } <br> paramName = methods.key(GT01 | PA01 | NI01-2)
+        Note over API: Mapeo Campos : <br> operation = const.operationVisa <br> payload.data = { <br> GPXARI-ORG = request.organizationReference (int), <br> GPXRAI-CARD-NBR = request.creditCardId, <br> GPXRAI-ACCT-NBR = request.accountNumber, <br> GPXRAI-SCHEME-ID = request.schemeReference, <br> GPXRAI-REWARD-ITEM = request.rewardItemReference <br> GPXRAI-PREPAID-CARD-NBR = request.prepaidCardReference <br> GPXRAI-POINTS = request.loyaltyPointsAmount <br> GPXRAI-REASON-CODE = request.reasonCode <br> GPXRAI-USER-DATA = request.userContextData <br> GPXRAI-COUPON-DENOM = request.couponAmount <br> GPXRAI-COUPON-NBR = request.couponReference <br> GPXRAI-NAME-1 = request.cardholderNameLine1 <br> GPXRAI-NAME-2 = request.cardholderNameLine2 <br> } <br> paramName = methods.key(HN01-2 | GT01 | PA01 | NI01-2)
 
         API->>WVPLUS: Consume Wrapper Vision Plus - PointsRedeem
         Note right of API: Body: operation, payload.data, paramName
