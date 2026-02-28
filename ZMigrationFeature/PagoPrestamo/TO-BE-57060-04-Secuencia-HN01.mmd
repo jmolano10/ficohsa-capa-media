@@ -1,0 +1,163 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Depósito Cheque <br> Epica 2267: PagoPrestamo <br> HU 57060:  POST - /loans-and-deposits/current-account-mgmt/v1/initiate-check-deposit
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
+    participant wrapper as Wrapper T24 <br/> OP: Depositocombinado 
+    participant event as AWS EventBridge <br> Componente de Idempotencia 
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - ConsultaPuntosTransaccion Alcance
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: "chequeNumber", "bankCode", "loanCurrency", paymentAmount, noOfAuth, gTransaction, mTransaction, transaction
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "CURRENT_ACCOUNT_MGMT" <br> name: "INITIATE_CHECK_DEPOSIT" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "CURRENT_ACCOUNT_MGMT" <br> name: "INITIATE_CHECK_DEPOSIT" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> operationHnl <br> operationUsd  <br> caller-service-hnl <br> caller-service-usd
+
+    API->>API: Evaluar request.loanCurrency
+
+    alt If request.loanCurrency == "HNL" 
+
+        API->>API: Selecciona Cuenta de Depósito Lempiras
+        Note over API: $depositAccount = lambda.t24ChqAccountHNL
+
+        API->>API: Selecciona caller-service
+        Note over API: $caller-service = const.caller-service-hnl
+
+        API->>API: Selecciona operation
+        Note over API: $operation = const.operationHnl
+
+    else  If request.loanCurrency == "USD"
+
+        API->>API: Selecciona Cuenta de Depósito Dólares
+        Note over API: $depositAccount = lambda.t24ChqAccountUSD
+
+        API->>API: Selecciona caller-service
+        Note over API: $caller-service = const.caller-service-usd
+
+        API->>API: Selecciona operation
+        Note over API: $operation = const.operationUsd
+
+    else If request.loanCurrency != "HNL" o "USD"
+
+        API->> Errors: Mapear código de error
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 422: Tipo de moneda no soportado
+
+    end 
+
+    API->>Idempotencia: Consume API Idempotencia 
+    Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: $caller-service <br> "methodVersion": "1.0" <br> dataPayload: {request}
+
+    Idempotencia->>API: Response API Idempotencia 
+    Note left of Idempotencia: Response: 
+
+    API->>API: Evalua response API Idempotencia
+
+    alt If data.success == false
+
+        API->> Errors: Mapear código de error
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 422: Tipo de moneda no soportado
+
+    else If data.success == true
+
+        API->>API: Construye Request Wrapper T24 - OP: Depositocombinado
+        Note over API: Mapeo: <br> header:  caller-service = $caller-service <br> body: <br> operation = $operation <br> OfsFunction.messageId = header.Correlation-Id <br> OfsFunction.noOfAuth = request.noOfAuth <br> DepositAccount = $depositAccount <br> gTRANSACTION.atribute.g = request.gTransaction <br> mTRANSACTION.atribute.m = request.mTransaction <br>TRANSACTION = request.transaction <br> CURRENCY = request.loanCurrency,  <br> AMOUNT = request.paymentAmount <br> SORTCODE = request.bankCode <br> CHEQUENUMBER = request.chequeNumber
+
+        API->>wrapper: Consume Wrapper T24 - OP: Depositocombinado
+        Note right of API: header: caller-service <br> body: <br> OfsFunction.messageId, OfsFunction.noOfAuth, DepositAccount <br> gTRANSACTION, mTRANSACTION, TRANSACTION, CURRENCY <br> AMOUNT, SORTCODE, CHEQUENUMBER
+
+        wrapper->>API: Response Wrapper T24 - OP: Depositocombinado
+        Note over wrapper: Response: <br> success, data
+
+        API->>API: Evalúa Response Wrapper T24 - OP: Depositocombinado
+
+        alt If success == true 
+
+            API->>API: Construye response API
+            Note over API: Mapeo uno a uno campos del response Wrapper
+
+            API->>event: Envía envento al eventBridge API Idempotencia 
+            Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: success 
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+
+        else If success != false 
+
+            API->>event: Envía envento al eventBridge API Idempotencia 
+            Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: TimeOut
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: Retorna error
+            Note left of API: HTTP 422 + wrapper.mensajeError
+
+        end
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
