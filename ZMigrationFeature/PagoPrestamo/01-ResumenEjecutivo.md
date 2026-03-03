@@ -155,11 +155,18 @@ El servicio está diseñado para operar en un entorno multiregional, soportando 
    - GT01, PA01 y NI01 solo soportan ACCOUNT_DEBIT
    - OWN_CHEQUE no está implementado en ninguna región
 
+5. **Errores del Core T24 (Honduras):**
+   - **Timeout de Sistema:** Transacciones pueden quedar en estado pendiente
+   - **Errores de Validación:** Cuentas inválidas, fondos insuficientes, préstamos cerrados
+   - **Errores de Autorización:** Usuarios no autorizados, permisos insuficientes
+   - **Indisponibilidad del Sistema:** T24 puede estar offline temporalmente
+
 ### 4.2. Limitaciones Técnicas
 
 1. **Timeout:**
    - No se especifican timeouts explícitos en la mayoría de servicios
    - Puede causar bloqueos en transacciones largas
+   - **T24 Timeout:** Mensaje específico "TRANSACCION EN ESPERA. REVISE SU CUENTA EN 5 MINUTOS"
 
 2. **Manejo de Concurrencia:**
    - No se identifican mecanismos de bloqueo optimista/pesimista
@@ -172,6 +179,35 @@ El servicio está diseñado para operar en un entorno multiregional, soportando 
 4. **Monitoreo:**
    - Logging habilitado en nivel DEBUG
    - Puede generar gran volumen de logs en producción
+
+### 4.3. Códigos de Error Críticos del Core T24
+
+#### 4.3.1. Errores de Cuenta
+- **AC-INVALID.ACCOUNT:** Número de cuenta inválido
+- **AC-ACCOUNT.CLOSED:** Cuenta cerrada
+- **AC-INSUFFICIENT.FUNDS:** Fondos insuficientes
+- **AC-ACCOUNT.BLOCKED:** Cuenta bloqueada
+
+#### 4.3.2. Errores de Préstamo
+- **AA-INVALID.ARRANGEMENT:** Número de préstamo inválido
+- **AA-ARRANGEMENT.CLOSED:** Préstamo cerrado
+- **AA-PAYMENT.EXCEEDS.BALANCE:** Pago excede saldo pendiente
+- **AA-ARRANGEMENT.SUSPENDED:** Préstamo suspendido
+
+#### 4.3.3. Errores de Sistema
+- **SYS-DATABASE.ERROR:** Error de base de datos
+- **SYS-SYSTEM.UNAVAILABLE:** Sistema temporalmente no disponible
+- **SYS-TIMEOUT:** Timeout del sistema
+- **SYS-COMMUNICATION.ERROR:** Error de comunicación
+
+#### 4.3.4. Estados de Respuesta T24
+- **Success:** Transacción exitosa
+- **TWSError:** Error en T24 Web Services
+- **T24Error:** Error en aplicación T24
+- **T24Override:** Requiere autorización adicional
+- **T24Offline:** T24 no disponible
+- **TIMEOUT:** Timeout en la transacción
+- **ERROR:** Error genérico
 
 ---
 
@@ -291,12 +327,40 @@ Las siguientes métricas deberían ser monitoreadas pero no se encontraron en el
 
 ### 8.2. Recomendaciones
 
-1. Migrar región por región
-2. Implementar pruebas exhaustivas de reversión
-3. Validar integración con sistemas core
-4. Establecer métricas y SLAs claros
-5. Implementar monitoreo robusto
-6. Documentar diferencias regionales
+1. **Migración Gradual:**
+   - Migrar región por región
+   - Comenzar con regiones menos complejas (GT01, PA01, NI01)
+   - HN01 al final debido a su complejidad (T24 + ABANKS)
+
+2. **Manejo de Errores T24:**
+   - Implementar manejo robusto de timeouts
+   - Establecer mecanismos de retry para errores temporales
+   - Crear mapeo completo de códigos de error T24
+   - Implementar notificaciones para errores críticos
+
+3. **Pruebas Exhaustivas:**
+   - Probar todos los códigos de error del core T24
+   - Validar mecanismos de reversión
+   - Simular indisponibilidad de sistemas
+   - Probar escenarios de timeout
+
+4. **Monitoreo y Alertas:**
+   - Establecer métricas y SLAs claros
+   - Implementar alertas para errores T24 críticos
+   - Monitorear tasas de timeout y reversiones
+   - Dashboard de salud de sistemas core
+
+5. **Documentación:**
+   - Documentar todos los códigos de error T24
+   - Crear runbooks para resolución de errores
+   - Mantener matriz de compatibilidad regional
+   - Documentar procedimientos de reversión
+
+6. **Contingencias:**
+   - Plan de contingencia para indisponibilidad de T24
+   - Mecanismos de failover entre sistemas
+   - Procedimientos de recuperación de transacciones
+   - Comunicación con clientes en caso de errores
 
 ---
 

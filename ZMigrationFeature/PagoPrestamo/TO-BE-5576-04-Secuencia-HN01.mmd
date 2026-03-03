@@ -1,0 +1,172 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Ejectuar Pago Prestamo HN <br> Epica 2267: PagoPrestamo <br> HU 5576:  POST - /payments/payment-execution-maintenance/v1/execute-loan-repayment
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
+    participant wrapper as Wrapper ProxyAbanks Multiconexión <br/> SP: TOPLEVEL$OSB_PAG_PRESTAMO_CAJ <br/> SP: OSB_PAG_PRESTAMO_T24
+    participant event as AWS EventBridge <br> Componente de Idempotencia 
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - ConsultaPuntosTransaccion Alcance
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: "loanId", <br> "paymentAmount", <br> "currencyCode", <br> "paymentType", <br> "accountNumber", <br> "interfaceReferenceNumber", <br> "transactionReference", <br> "transactionReferenceBC", <br> "paymentDescription", <br> "repaymentType"
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Valida Combinación de campos
+    Note over API: If paymentMethod = "ACCOUNT_DEBIT" <br> then repaymentAccountDebit es obligatorio
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "PAYMENT_EXECUTION_MAINTENANCE" <br> name: "execute-loan-repayment" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "PAYMENT_EXECUTION_MAINTENANCE" <br> name: "execute-loan-repayment" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> catalogueName <br> packageCB <br> procedureNameCB <br> procedureNameT24 <br> caller-service
+
+    API->>Idempotencia: Consume API Idempotencia 
+    Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> "methodVersion": "1.0" <br> dataPayload: {request}
+
+    Idempotencia->>API: Response API Idempotencia 
+    Note left of Idempotencia: Response: 
+
+    API->>API: Evalua response API Idempotencia
+
+    alt If If data.code != 0
+
+        API->> Errors: Mapear código de error
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 422: Tipo de moneda no soportado
+
+    else If data.code == 0
+
+        alt If request.transactionReferenceBC != vacío (Significa que la transacción viene de un corresponsal bancario)
+
+            API->>API: Construye Request Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
+            Note over API: Mapeo: <br> connection { <br> parm = lambda.param-name <br> secm = lambda.secret-name } <br> connectionType = const.connectionType <br> operationType  = const.operationType <br> catalogueName = const.catalogeName <br> procedureName = const.procedureNameCB <br> package = const.packageCB <br> params : { <br> LOAN_NUMBER = request.loanId <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.accountNumber <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> DESCRIPTION = request.paymentDescription <br> USERNAME = header.application-user <br> TRANSACTIONID = request.transactionReference <br> PAYMENT_METHOD = request.paymentType  <br> PAYMENT_TYPE = request.transactionReferenceBC <br> }
+
+            API->>wrapper: Consume Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
+            Note right of API: connection, connectionType <br> operationType, catalogueName <br> params: { <br> LOAN_NUMBER, PAYMENT_AMOUNT, <br> DEBIT_ACCOUNT, INTERFACE_REFERENCE_NO, <br> DESCRIPTION, USERNAME <br> TRANSACTIONID, PAYMENT_METHOD, PAYMENT_TYPE }
+
+            wrapper->>API: Response Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
+            Note over wrapper: Response: <br> success, data
+
+            API->>API: Evalúa Response Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
+
+            alt If success == true 
+
+                API->>API: Construye response API
+                Note over API: Mapeo uno a uno campos del response Wrapper
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {transactionReference, transactionType} <br> Transaccion: Success  
+
+                API->>Consumidor: Response Exitoso
+                Note left of API: HTTP 200: Response Body 
+
+            else If success != true 
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {transactionReference, transactionType} <br> Transaccion: TimeOut <br> CODIGOERROR
+
+                API->> Errors: Mapear código de error
+
+                Errors ->> API: Retorna código mapeado
+
+                API->> Consumidor: Retorna error
+                Note left of API: HTTP 422 + mensajeError
+
+            end
+
+        else If request.transactionReferenceBC == vacío o no presente (Significa que la transacción la transacción viene de un canal diferente a corresponsal bancario)
+
+            API->>API: Construye Request Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
+            Note over API: Mapeo: <br> connection { <br> parm = lambda.param-name <br> secm = lambda.secret-name } <br> connectionType = const.connectionType <br> operationType  = const.operationType <br> catalogueName = const.catalogeName <br> procedureName = const.procedureNameT24 <br> params : { <br> LOAN_NUMBER = request.loanId <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.accountNumber <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> USERNAME = header.application-user <br> TRANSACTIONID = request.transactionReference <br> }
+
+            API->>wrapper: Consume Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
+            Note right of API: connection, connectionType <br> operationType, catalogueName <br> params: { <br> LOAN_NUMBER, PAYMENT_AMOUNT, <br> DEBIT_ACCOUNT, INTERFACE_REFERENCE_NO, <br> USERNAME, TRANSACTIONID }
+
+            wrapper->>API: Response Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
+            Note over wrapper: Response: <br> success, data
+
+            API->>API: Evalúa Response Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
+
+            alt alt If success == true 
+
+                API->>API: Construye response API
+                Note over API: Mapeo uno a uno campos del response Wrapper
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: $caller-service <br> payload: {request} <br> transactionStatus: success 
+
+                API->>Consumidor: Response Exitoso
+                Note left of API: HTTP 200: Response Body 
+
+            else If success != true 
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: $caller-service <br> payload: {request} <br> transactionStatus: timeOut
+
+                API->> Errors: Mapear código de error
+                
+                Errors ->> API: Retorna código mapeado
+                
+                API->> Consumidor: Retorna error
+                Note left of API: HTTP 422 + mensajeError
+
+            end
+
+        end
+
+    end 
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

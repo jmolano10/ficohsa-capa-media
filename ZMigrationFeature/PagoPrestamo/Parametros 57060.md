@@ -72,7 +72,8 @@
 
 ```json
 {
-  "operation": "Depositocombinado"
+  "operation": "Depositocombinado",
+  "caller-service": "CURRENT_ACCOUNT_MGMT-product-INITIATE_CHECK_DEPOSIT"
 }
 ```
 ##### Registro en Dynamo Wrapper T24
@@ -101,7 +102,7 @@
   "effective_to": "",
   "status": "active",
   "updated_at": "2025-10-25T18:10:00Z",
-  "updated_by": "alejandro@ficohsa.com"
+  "updated_by": "david.j.molano@ficohsa.com"
 }
 ```
 
@@ -119,7 +120,9 @@
     "domain": "current-account",
     "typeUsage": "IDEM",
     "hashFields": [
-        "campos_del_request_para_calcular_hash"
+        "depositAccountReference",
+        "transactionReference"
+
     ],
     "cache": {
         "enabled": true,
@@ -129,7 +132,7 @@
     "updated_at": "2025-11-05T21:32:45.237-06:00",
     "updated_by": "david.j.molano@ficohsa.com",
     "tags": [
-        "abanks",
+        "check-deposit",
         "loanPayment"
     ],
     "integrity": {
@@ -149,6 +152,114 @@
         ]
     }
 }  
+```
+
+##### Ejemplo del request para consumo API Idempotencia
+
+```json
+curl --location 'http://internal-ban-xrs-ic-elb-alb-master-dev-548527349.us-east-1.elb.amazonaws.com:17396/integrity-handler/v1/idempotency/generate' \
+--header 'Caller-Service: CURRENT_ACCOUNT_MGMT-product-INITIATE_CHECK_DEPOSIT' \
+--header 'Correlation-Id: b1f6f6f5-d611-4c1f-843f-89a1c8aaaaee' \
+--header 'Authorization: Bearer my.token.loko' \
+--header 'Source-Bank: HN01' \
+--header 'Application-Id: 123456789' \
+--header 'Channel: my-channel' \
+--header 'Content-Type: application/json' \
+--data '{
+    "methodVersion": "1.0",
+    "dataPayload": {
+        "transactionAccountReference": "string",
+        "depositAccountReference": "string",
+        "transactionGroup": {
+        "groupAttribute": "string",
+        "transactionMultiGroup": [
+            {
+            "multiGroupAttribute": "string",
+            "transactionReference": "string",
+            "surrogateAccountReference": "string",
+            "currencyCode": "string",
+            "transactionAmount": "string",
+            "exchangeRate": "string",
+            "sortCode": "string",
+            "checkNumber": "string",
+            "checkType": "string"
+            }
+        ]
+        },
+        "consolidatedTransactionIndicator": "string",
+        "loanRepayCurrencyCode": "string",
+        "loanRepayConsolidatedTransactionGroup": {
+        "groupAttribute": "string",
+        "loanRepayConsolidatedTransactionMultiGroup": [
+            {
+            "multiGroupAttribute": "string",
+            "loanRepayConsolidatedTransactionReference": "string",
+            "loanRepayConsolidatedAmount": "string"
+            }
+        ]
+        },
+        "loanRepayConsolidatedTotal": "string",
+        "loanReference": "string",
+        "loanRepayDestinationAccountReference": "string",
+        "loanRepayDestinationCurrencyCode": "string",
+        "loanRepayMultipleSoftwareTransactionReference": "string"
+    }
+}'
+```
+
+##### Ejemplo mensaje en Event Brigde para componente de Idempotencia
+```json
+{
+    "Source": "microservice.response",
+    "DetailType": "provider.response ",
+    "Detail": {
+        "correlation-id": "header.correlation-id",
+        "callerService": "CURRENT_ACCOUNT_MGMT-product-INITIATE_CHECK_DEPOSIT",
+        "channel": "rest-api",
+        "transactionStatus": "success", // || "timeout" ||  "error" || "fault",
+        "payload": { 
+            "host": "http://abanks-url",
+            "headers": {}, // headers etc
+            "body": {
+                "transactionAccountReference": "string",
+                "depositAccountReference": "string",
+                "transactionGroup": {
+                "groupAttribute": "string",
+                "transactionMultiGroup": [
+                    {
+                    "multiGroupAttribute": "string",
+                    "transactionReference": "string",
+                    "surrogateAccountReference": "string",
+                    "currencyCode": "string",
+                    "transactionAmount": "string",
+                    "exchangeRate": "string",
+                    "sortCode": "string",
+                    "checkNumber": "string",
+                    "checkType": "string"
+                    }
+                ]
+                },
+                "consolidatedTransactionIndicator": "string",
+                "loanRepayCurrencyCode": "string",
+                "loanRepayConsolidatedTransactionGroup": {
+                "groupAttribute": "string",
+                "loanRepayConsolidatedTransactionMultiGroup": [
+                    {
+                    "multiGroupAttribute": "string",
+                    "loanRepayConsolidatedTransactionReference": "string",
+                    "loanRepayConsolidatedAmount": "string"
+                    }
+                ]
+                },
+                "loanRepayConsolidatedTotal": "string",
+                "loanReference": "string",
+                "loanRepayDestinationAccountReference": "string",
+                "loanRepayDestinationCurrencyCode": "string",
+                "loanRepayMultipleSoftwareTransactionReference": "string"
+            }
+        }
+    }
+}
 ```
 
 ##### Ejemplo de request Wrapper T24

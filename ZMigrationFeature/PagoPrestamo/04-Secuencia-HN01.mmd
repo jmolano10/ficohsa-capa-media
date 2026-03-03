@@ -7,9 +7,12 @@ sequenceDiagram
     participant ObtParam as ObtenerParametrizacion<br/>(DB)
     participant TransfBS as transferenciasBS<br/>(ABANKS)
     participant PagoAbanks as pagoPrestamoT24BS<br/>(DB)
+    participant ConsDetCta as consultaCuentasBS<br/>(T24)
+    participant PagoT24 as PrestamosT24BS<br/>(T24)
+    participant ConsPagoT24 as ConsultadepagodeprestamoAA<br/>(T24)
     participant ReversaTx as ReversarTransaccion<br/>(Proxy)
 
-    Note over Client, ReversaTx: Flujo Honduras (HN01) - ACCOUNT_DEBIT - ABANKS
+    Note over Client, ReversaTx: Flujo Honduras (HN01) - ACCOUNT_DEBIT - ABANKS/T24
 
     Client->>OSB: SOAP Request<br/>LOAN_NUMBER: 1234567890<br/>PAYMENT_AMOUNT: 5000.00<br/>PAYMENT_TYPE: ACCOUNT_DEBIT<br/>DEBIT_ACCOUNT: 1001234567
     Note right of Client: Header: SourceBank=HN01<br/>DestinationBank=HN01<br/>UserName/Password
@@ -37,93 +40,152 @@ sequenceDiagram
     Note right of OSB: XQuery: aplicarValoresPorDefectoRegion.xq
 
     OSB->>OSB: Validar Tipo Préstamo
-    Note right of OSB: XQuery: validarTipoPrestamo.xq<br/>Resultado: ABANKS o T24<br/>Variable: loanType = "ABANKS"
+    Note right of OSB: XQuery: validarTipoPrestamo.xq<br/>Resultado: ABANKS o T24<br/>Variable: loanType
 
     OSB->>OSB: Validar Cruce País-Empresa
     Note right of OSB: XQuery: validarCrucePaisEmpresa.xq<br/>Variable: areSameSourceAndDestination = "YES"
 
-    OSB->>OSB: Asignar Variables
-    Note right of OSB: paymentAmount = 5000.00<br/>loanNumber = 1234567890<br/>PaymentType = ACCOUNT_DEBIT<br/>debitAccount = 1001234567
+    alt Flujo ABANKS (loanType = "ABANKS")
+        OSB->>OSB: Asignar Variables ABANKS
+        Note right of OSB: paymentAmount = 5000.00<br/>loanNumber = 1234567890<br/>PaymentType = ACCOUNT_DEBIT<br/>debitAccount = 1001234567
 
-    OSB->>ConsProductos: consultaProductos
-    Note right of OSB: XQuery: pagoPtmoConsProductosIn.xq<br/>ldapUsername: USUARIO_OSB<br/>ldapPassword: ****<br/>accountNumber: 1001234567<br/>loanNumber: 1234567890
+        OSB->>ConsProductos: consultaProductos
+        Note right of OSB: XQuery: pagoPtmoConsProductosIn.xq<br/>ldapUsername: USUARIO_OSB<br/>ldapPassword: ****<br/>accountNumber: 1001234567<br/>loanNumber: 1234567890
 
-    ConsProductos-->>OSB: PRODUCTS<br/>PRODUCT[TYPE=PTM]: SUCCESS<br/>PRODUCT[TYPE=CTA]: SUCCESS<br/>loanCurrency: HNL<br/>accountCurrency: HNL
+        ConsProductos-->>OSB: PRODUCTS<br/>PRODUCT[TYPE=PTM]: SUCCESS<br/>PRODUCT[TYPE=CTA]: SUCCESS<br/>loanCurrency: HNL<br/>accountCurrency: HNL
 
-    alt Validación Productos Fallida
-        ConsProductos-->>OSB: SUCCESS_INDICATOR: ERROR
-        OSB->>OSB: Asignar message
-        OSB->>Client: Response con Error
+        alt Validación Productos Fallida
+            ConsProductos-->>OSB: SUCCESS_INDICATOR: ERROR
+            OSB->>OSB: Asignar message: HN-LOAN-001
+            OSB->>Client: Response con Error
+        end
+
+        OSB->>ObtParam: obtenerParametrizacion
+        Note right of OSB: XQuery: obtenerParametrizacionIn.xq<br/>nombreParametros:<br/>T24T134.HNLCREDITACCTNO<br/>T24T133.TXNTYPELOANPYMT<br/>T24T057.INTACCOUNT.USERS
+
+        ObtParam-->>OSB: ERROR_CODE: SUCCESS<br/>creditAccount: 9999999999<br/>trxType: ACPY<br/>intAccountUsers: USERS
+
+        alt Parametrización Fallida
+            ObtParam-->>OSB: ERROR_CODE: ERROR
+            OSB->>OSB: Asignar message: HN-PARAM-001
+            OSB->>Client: Response con Error (skip)
+        end
+
+        OSB->>OSB: Generar UUID
+        Note right of OSB: XQuery: obtenerUUID.xq<br/>uuid: 550e8400-e29b-41d4-a716-446655440000
+
+        OSB->>OSB: Asignar authParametro = '0'
+
+        alt Monedas Iguales (HNL = HNL)
+            OSB->>TransfBS: Transfmodelbankentrecuentas
+            Note right of OSB: XQuery: debitoPrestamoCuentaIn.xq<br/>transactionType: ACPY<br/>accountCurrency: HNL<br/>creditAccount: 9999999999<br/>uuid: 550e8400-e29b-41d4-a716-446655440000<br/>DEBIT_ACCOUNT: 1001234567<br/>PAYMENT_AMOUNT: 5000.00
+
+            TransfBS-->>OSB: Status/successIndicator: SUCCESS<br/>Status/transactionId: FT2401010001<br/>DEBITVALUEDATE: 20240101
+        end
+
+        alt Monedas Diferentes y DEBIT_CREDIT=CREDIT
+            OSB->>TransfBS: Transfentrecuentasinstrcredito
+            Note right of OSB: XQuery: debitoPrestamoCuentaAuthIn.xq<br/>auth: 0<br/>Otros parámetros similares
+            TransfBS-->>OSB: Status/successIndicator: SUCCESS<br/>Status/transactionId: FT2401010001
+        end
+
+        alt Monedas Diferentes y DEBIT_CREDIT!=CREDIT
+            OSB->>TransfBS: Transferenciaentrecuentas
+            Note right of OSB: XQuery: pagoPrestamoAuthIn.xq<br/>auth: 0<br/>Otros parámetros similares
+            TransfBS-->>OSB: Status/successIndicator: SUCCESS<br/>Status/transactionId: FT2401010001
+        end
+
+        OSB->>OSB: Asignar Variables
+        Note right of OSB: successIndicator: SUCCESS<br/>transactionId: FT2401010001<br/>valueDate: 20240101
+
+        alt Transferencia Fallida
+            TransfBS-->>OSB: Status/successIndicator: ERROR<br/>messages: AC-INSUFFICIENT.FUNDS
+            OSB->>OSB: Asignar message: HN-INT-004
+            OSB->>Client: Response con Error
+        end
+
+        OSB->>PagoAbanks: pagoPrestamoT24
+        Note right of OSB: XQuery: pagoPrestamoIn.xq<br/>SP: OSB_PAG_PRESTAMO_T24<br/>DB: eis/DB/ConnectionInterbanca<br/>LOAN_NUMBER: 1234567890<br/>PAYMENT_AMOUNT: 5000.00<br/>DEBIT_ACCOUNT: 1001234567<br/>USERNAME: USUARIO_OSB<br/>TRANSACTIONID: FT2401010001
+
+        PagoAbanks-->>OSB: ERROR_CODE: SUCCESS<br/>LOAN_NUMBER: 1234567890<br/>PAYMENT_AMOUNT: 5000.00<br/>DATE_TIME: 20240101120000<br/>DUE_ID: 001
+
+        OSB->>OSB: Asignar successIndicatorAbanks: SUCCESS
+
+        alt Registro ABANKS Fallido
+            PagoAbanks-->>OSB: ERROR_CODE: ERROR<br/>ERROR_MESSAGE: HN-LOAN-002
+            OSB->>OSB: Asignar successIndicatorAbanks: ERROR
+            
+            OSB->>ReversaTx: reversarTransaccion
+            Note right of OSB: XQuery: reversarTransaccionIn.xq<br/>transactionId: FT2401010001
+            
+            ReversaTx-->>OSB: Reversión Completada
+            
+            OSB->>OSB: Asignar message: HN-INT-005
+            OSB->>Client: Response con Error
+        end
+
+        OSB->>OSB: Construir Response ABANKS
+        Note right of OSB: XQuery: pagoPrestamoOut.xq<br/>XQuery: pagoPrestamoHeaderOut.xq
     end
 
-    OSB->>ObtParam: obtenerParametrizacion
-    Note right of OSB: XQuery: obtenerParametrizacionIn.xq<br/>nombreParametros:<br/>T24T134.HNLCREDITACCTNO<br/>T24T133.TXNTYPELOANPYMT<br/>T24T057.INTACCOUNT.USERS
+    alt Flujo T24 (loanType = "T24")
+        OSB->>ConsDetCta: Consultadedetallesdelacuenta
+        Note right of OSB: XQuery: consultaDetalleCuentaIn.xq<br/>DEBIT_ACCOUNT: 1001234567
 
-    ObtParam-->>OSB: ERROR_CODE: SUCCESS<br/>creditAccount: 9999999999<br/>trxType: ACPY<br/>intAccountUsers: USERS
+        ConsDetCta-->>OSB: WSACCOUNTLISTType<br/>CURRENCY: HNL
+        OSB->>OSB: Asignar accountCurrency: HNL
 
-    alt Parametrización Fallida
-        ObtParam-->>OSB: ERROR_CODE: ERROR
-        OSB->>OSB: Asignar message
-        OSB->>Client: Response con Error (skip)
+        alt Error Consulta Cuenta T24
+            ConsDetCta-->>OSB: Status/successIndicator: T24Error<br/>messages: AC-INVALID.ACCOUNT
+            OSB->>Client: Response con Error T24
+        end
+
+        OSB->>PagoT24: PagoaprestamoAA
+        Note right of OSB: XQuery: pagoPrestamoT24In.xq<br/>LOAN_NUMBER: 1234567890<br/>PAYMENT_AMOUNT: 5000.00<br/>DEBIT_ACCOUNT: 1001234567<br/>accountCurrency: HNL
+
+        PagoT24-->>OSB: Status/successIndicator: Success<br/>Status/transactionId: T24240101001<br/>Status/messages: Payment processed
+
+        OSB->>OSB: Asignar successIndicatorT24: Success
+
+        alt Errores Específicos T24
+            PagoT24-->>OSB: Status/successIndicator: T24Error<br/>Status/messages: AC-INSUFFICIENT.FUNDS
+            OSB->>Client: Response Error: Fondos Insuficientes
+        else
+            PagoT24-->>OSB: Status/successIndicator: T24Error<br/>Status/messages: AA-INVALID.ARRANGEMENT
+            OSB->>Client: Response Error: Préstamo Inválido
+        else
+            PagoT24-->>OSB: Status/successIndicator: T24Error<br/>Status/messages: AA-PAYMENT.EXCEEDS.BALANCE
+            OSB->>Client: Response Error: Pago Excede Saldo
+        else
+            PagoT24-->>OSB: Status/successIndicator: T24Override<br/>Status/messages: EB-USER.NOT.AUTHORISED
+            OSB->>Client: Response Error: Usuario No Autorizado
+        else
+            PagoT24-->>OSB: Status/successIndicator: T24Offline<br/>Status/messages: SYS-SYSTEM.UNAVAILABLE
+            OSB->>Client: Response Error: Sistema No Disponible
+        else
+            PagoT24-->>OSB: Status/successIndicator: TIMEOUT<br/>Status/messages: SYS-TIMEOUT
+            OSB->>Client: Response: "TRANSACCION EN ESPERA. REVISE SU CUENTA EN 5 MINUTOS"
+        end
+
+        alt Pago T24 Exitoso
+            OSB->>ConsPagoT24: ConsultadepagodeprestamoAA
+            Note right of OSB: XQuery: consultaPagoPtmoT24In.xq<br/>numeroPrestamo: 1234567890<br/>transactionId: T24240101001
+
+            ConsPagoT24-->>OSB: WSFICOPAYMENTDETAILSAAType<br/>TRANSINDICATOR: SUCCESS<br/>TRANSID: T24240101001<br/>PAYMENTDATE: 20240101<br/>LOANNUMBER: 1234567890<br/>TOTALPAYMENT: 5000.00
+
+            OSB->>OSB: Asignar successIndicatorQry2: SUCCESS
+
+            alt Error Consulta Detalles T24
+                ConsPagoT24-->>OSB: TRANSINDICATOR: ERROR<br/>Error en consulta de detalles
+                OSB->>OSB: Asignar successIndicatorQry2: ERROR
+            end
+
+            OSB->>OSB: Construir Response T24
+            Note right of OSB: XQuery: pagoPrestamoT24Out.xq<br/>XQuery: pagoPrestamoT24HeaderOut.xq
+        end
     end
 
-    OSB->>OSB: Generar UUID
-    Note right of OSB: XQuery: obtenerUUID.xq<br/>uuid: 550e8400-e29b-41d4-a716-446655440000
-
-    OSB->>OSB: Asignar authParametro = '0'
-
-    alt Monedas Iguales (HNL = HNL)
-        OSB->>TransfBS: Transfmodelbankentrecuentas
-        Note right of OSB: XQuery: debitoPrestamoCuentaIn.xq<br/>transactionType: ACPY<br/>accountCurrency: HNL<br/>creditAccount: 9999999999<br/>uuid: 550e8400-e29b-41d4-a716-446655440000<br/>DEBIT_ACCOUNT: 1001234567<br/>PAYMENT_AMOUNT: 5000.00
-
-        TransfBS-->>OSB: Status/successIndicator: SUCCESS<br/>Status/transactionId: FT2401010001<br/>DEBITVALUEDATE: 20240101
-    end
-
-    alt Monedas Diferentes y DEBIT_CREDIT=CREDIT
-        OSB->>TransfBS: Transfentrecuentasinstrcredito
-        Note right of OSB: XQuery: debitoPrestamoCuentaAuthIn.xq<br/>auth: 0<br/>Otros parámetros similares
-        TransfBS-->>OSB: Status/successIndicator: SUCCESS<br/>Status/transactionId: FT2401010001
-    end
-
-    alt Monedas Diferentes y DEBIT_CREDIT!=CREDIT
-        OSB->>TransfBS: Transferenciaentrecuentas
-        Note right of OSB: XQuery: pagoPrestamoAuthIn.xq<br/>auth: 0<br/>Otros parámetros similares
-        TransfBS-->>OSB: Status/successIndicator: SUCCESS<br/>Status/transactionId: FT2401010001
-    end
-
-    OSB->>OSB: Asignar Variables
-    Note right of OSB: successIndicator: SUCCESS<br/>transactionId: FT2401010001<br/>valueDate: 20240101
-
-    alt Transferencia Fallida
-        TransfBS-->>OSB: Status/successIndicator: ERROR
-        OSB->>OSB: Asignar message
-        OSB->>Client: Response con Error
-    end
-
-    OSB->>PagoAbanks: pagoPrestamoT24
-    Note right of OSB: XQuery: pagoPrestamoIn.xq<br/>SP: OSB_PAG_PRESTAMO_T24<br/>DB: eis/DB/ConnectionInterbanca<br/>LOAN_NUMBER: 1234567890<br/>PAYMENT_AMOUNT: 5000.00<br/>DEBIT_ACCOUNT: 1001234567<br/>USERNAME: USUARIO_OSB<br/>TRANSACTIONID: FT2401010001
-
-    PagoAbanks-->>OSB: ERROR_CODE: SUCCESS<br/>LOAN_NUMBER: 1234567890<br/>PAYMENT_AMOUNT: 5000.00<br/>DATE_TIME: 20240101120000<br/>DUE_ID: 001
-
-    OSB->>OSB: Asignar successIndicatorAbanks: SUCCESS
-
-    alt Registro ABANKS Fallido
-        PagoAbanks-->>OSB: ERROR_CODE: ERROR<br/>ERROR_MESSAGE: Error en registro
-        OSB->>OSB: Asignar successIndicatorAbanks: ERROR
-        
-        OSB->>ReversaTx: reversarTransaccion
-        Note right of OSB: XQuery: reversarTransaccionIn.xq<br/>transactionId: FT2401010001
-        
-        ReversaTx-->>OSB: Reversión Completada
-        
-        OSB->>OSB: Asignar message: Error en ABANKS
-        OSB->>Client: Response con Error
-    end
-
-    OSB->>OSB: Construir Response
-    Note right of OSB: XQuery: pagoPrestamoOut.xq<br/>XQuery: pagoPrestamoHeaderOut.xq
-
-    alt Error en Flujo
+    alt Error en Flujo General
         OSB->>MapeoErr: mapeoErrores
         Note right of OSB: XQuery: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: ERROR<br/>MENSAJE_ERROR: FICBCO0076$#$mensaje
         MapeoErr-->>OSB: Error Mapeado
@@ -131,3 +193,12 @@ sequenceDiagram
     end
 
     OSB->>Client: SOAP Response<br/>successIndicator: SUCCESS<br/>DATE_TIME: 20240101120000<br/>LOAN_NUMBER: 1234567890<br/>DUE_ID: 001<br/>PAYMENT_AMOUNT: 5000.00
+
+    Note over Client, ReversaTx: Errores Posibles del Core T24:
+    Note over Client, ReversaTx: • AC-INVALID.ACCOUNT - Cuenta inválida
+    Note over Client, ReversaTx: • AC-INSUFFICIENT.FUNDS - Fondos insuficientes
+    Note over Client, ReversaTx: • AA-INVALID.ARRANGEMENT - Préstamo inválido
+    Note over Client, ReversaTx: • AA-PAYMENT.EXCEEDS.BALANCE - Pago excede saldo
+    Note over Client, ReversaTx: • EB-USER.NOT.AUTHORISED - Usuario no autorizado
+    Note over Client, ReversaTx: • SYS-SYSTEM.UNAVAILABLE - Sistema no disponible
+    Note over Client, ReversaTx: • SYS-TIMEOUT - Timeout del sistema

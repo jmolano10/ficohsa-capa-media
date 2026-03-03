@@ -63,9 +63,9 @@
 ```
 
 ```json
-"ban-pan-ic-consumo-wrapper-abanks-db-<env>"
+"ban-nic-ic-consumo-wrapper-abanks-db-<env>"
 {
-  "connection": "",
+  "connection": "ConnectionProxyNI",
   "connectionType": "jca",
   "operationType": "query", 
   "catalogueName": "proxynicaragua"

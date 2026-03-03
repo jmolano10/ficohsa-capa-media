@@ -1,0 +1,163 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>PagoPrestamoCB
+    participant Validator as Validador<br/>Esquema XML
+    participant RegionalDB as BD Middleware<br/>MW_P_VALIDA_SERVICIO_REGIONAL
+    participant CorrespDB as BD Middleware<br/>MW_P_VALIDA_CORBAN
+    participant UsageDB as BD Middleware<br/>MW_P_REGISTRAR_USO_SERVICIO
+    participant TxnDB as BD Collections<br/>OSB_P_MANEJO_TRANSACCIONES
+    participant LDAP as Servicio LDAP<br/>Credenciales
+    participant Caja as MiddlewareCaja<br/>PagoPrestamoCaja
+    participant ErrorMapper as MapeoErrores<br/>Proxy Service
+
+    Note over Client, ErrorMapper: Flujo Honduras (HN01) - PagoPrestamoCB
+
+    Client->>OSB: SOAP Request (HTTPS)
+    Note right of Client: Header: SourceBank=HN01<br/>BankingCorrespondent/Id=CB001<br/>Body: LOAN_NUMBER, PAYMENT_AMOUNT<br/>PAYMENT_CURRENCY=HNL, PAYMENT_TYPE=CASH<br/>TRANSACTION_ID_BC
+
+    OSB->>Validator: Validar Esquema XML
+    Note right of Validator: Schema: XMLSchema_-541390746.xsd<br/>Element: pagoPrestamo<br/>Validar campos obligatorios
+
+    alt Validación Fallida
+        Validator->>OSB: Error BEA-382505
+        OSB->>TxnDB: Actualizar Estado Transacción
+        Note right of TxnDB: SP: ACTUALIZA_ESTADO_TRANSACCION<br/>Estado: Error de validación
+        OSB->>ErrorMapper: Mapear Error
+        Note right of ErrorMapper: Código: BEA-382505<br/>Servicio: FICBCO0211
+        ErrorMapper->>OSB: Error Mapeado
+        OSB->>Client: SOAP Fault (Error de validación)
+    end
+
+    Validator->>OSB: Validación Exitosa
+
+    OSB->>TxnDB: Registrar Transacción
+    Note right of TxnDB: SP: REGISTRA_TRANSACCION_CANAL<br/>Tipo: 4 (Pago Préstamo)<br/>Estado: REGISTRADO<br/>Monto: PAYMENT_AMOUNT<br/>Moneda: PAYMENT_CURRENCY<br/>País: HN01<br/>Clave: TRANSACTION_ID_BC<br/>Préstamo: LOAN_NUMBER
+
+    alt Error en Registro
+        TxnDB->>OSB: Error de BD
+        Note right of OSB: Resume ejecución<br/>(Error Handler secundario)
+    end
+
+    TxnDB->>OSB: Transacción Registrada
+
+    OSB->>RegionalDB: Validar Servicio Regional
+    Note right of RegionalDB: SP: MW_P_VALIDA_SERVICIO_REGIONAL<br/>ServiceId: FICBCO0211<br/>País: HN01
+
+    alt Región No Válida
+        RegionalDB->>OSB: PV_CODIGO_ERROR != SUCCESS
+        OSB->>TxnDB: Actualizar Estado
+        Note right of TxnDB: Estado: ERROR_OBTENIENDO_SERVICIO_REGIONAL
+        OSB->>Client: Response con Error Regional
+    end
+
+    RegionalDB->>OSB: PV_CODIGO_ERROR = SUCCESS
+    Note right of OSB: Estado: VALIDACION_REGIONAL_EXITOSA
+
+    OSB->>OSB: Aplicar Valores por Defecto Región CB
+    Note right of OSB: XQuery: aplicarValoresPorDefectoRegionCB.xq
+
+    OSB->>CorrespDB: Consultar Corresponsal
+    Note right of CorrespDB: SP: MW_P_VALIDA_CORBAN<br/>Corresponsal: CB001<br/>Tipo Transacción: 2<br/>País: HN01
+
+    alt Corresponsal No Válido
+        CorrespDB->>OSB: PV_CODIGO_MENSAJE != SUCCESS
+        OSB->>TxnDB: Actualizar Estado
+        Note right of TxnDB: Estado: ERROR_OBTENIENDO_PARAMETRIZACION_CORRESPONSAL
+        OSB->>Client: Response con Error Corresponsal
+    end
+
+    CorrespDB->>OSB: Parametrización Corresponsal
+    Note right of OSB: PV_CUENTA_DEBITO: Cuenta del corresponsal<br/>PV_MONEDA_PERMITIDA: HNL<br/>PV_TIPO_TRANSACCION: 2<br/>Estado: PARAMETRIA_OBTENIDA_CORRECTAMENTE
+
+    OSB->>OSB: Validar Moneda
+    Note right of OSB: PAYMENT_CURRENCY == PV_MONEDA_PERMITIDA
+
+    alt Moneda Inválida
+        OSB->>TxnDB: Actualizar Estado
+        Note right of TxnDB: Estado: ERROR_MONEDA_INVALIDA
+        OSB->>Client: Response Error Moneda
+    end
+
+    OSB->>UsageDB: Registrar Uso Servicio (Tomar Cuota)
+    Note right of UsageDB: SP: MW_P_REGISTRAR_USO_SERVICIO<br/>Servicio: FICBCO0211<br/>Usuario: CORRESPONSAL_001<br/>País: HN01<br/>Operación: 1 (Tomar)
+
+    alt Cuota Excedida
+        UsageDB->>OSB: PN_CODIGO_ERROR != 0
+        OSB->>OSB: Error MW-0001
+        Note right of OSB: No se actualiza estado<br/>No se libera cuota
+        OSB->>Client: Response Error Cuota Excedida
+    end
+
+    UsageDB->>OSB: Cuota Tomada (PN_CODIGO_ERROR = 0)
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'HN01'<br/>Pipeline: HN01_PagoPrestamo
+
+    OSB->>OSB: Validar Tipo de Pago
+    Note right of OSB: PAYMENT_TYPE = 'CASH'
+
+    alt Tipo de Pago No es CASH
+        OSB->>TxnDB: Actualizar Estado
+        Note right of TxnDB: Estado: TIPO_DE_PAGO_NO_ES_CASH
+        OSB->>UsageDB: Liberar Cuota
+        Note right of UsageDB: Operación: 2 (Liberar)
+        OSB->>ErrorMapper: Mapear Error MW-0002
+        ErrorMapper->>OSB: Error Mapeado
+        OSB->>Client: Response Error Tipo Pago
+    end
+
+    OSB->>LDAP: Buscar Credenciales
+    Note right of LDAP: Path: Middleware/Security/CORRESPONSAL_001<br/>XQuery: PagoPrestamoCBHdrIn.xq
+
+    alt Credenciales No Encontradas
+        LDAP->>OSB: No encontrado
+        Note right of OSB: Fail-over: Usar credenciales del request
+    end
+
+    LDAP->>OSB: Credenciales LDAP
+    Note right of OSB: UserName, Password
+
+    OSB->>OSB: Formatear Número de Préstamo
+    Note right of OSB: Java Callout:<br/>ficohsa.utilities.Utilities.FormatearPrestamo<br/>Input: 1234567890<br/>Output: Préstamo formateado
+
+    OSB->>OSB: Transformar Request
+    Note right of OSB: XQuery: PagoPrestamoCBIn.xq<br/>LOAN_NUMBER → Formateado<br/>PAYMENT_TYPE → ACCOUNT_DEBIT<br/>DEBIT_ACCOUNT → Cuenta corresponsal<br/>DESCRIPTION → "CODIGO_CORRESPONSAL"<br/>REPAY_TYPE → TRANSACTION_ID_BC
+
+    OSB->>TxnDB: Actualizar Estado
+    Note right of TxnDB: Estado: REALIZANDO_LLAMADO_PAGO_PRESTAMO_CAJA
+
+    OSB->>Caja: Invocar Pago Préstamo
+    Note right of Caja: Endpoint: http://mwinterbanca:8003<br/>/MiddlewareCaja/PagoPrestamoCaja<br/>Operación: pagoPrestamo<br/>Header: AutenticacionRequestHeader<br/>Body: pagoPrestamo (transformado)
+
+    alt Error en Servicio de Caja
+        Caja->>OSB: Error de Caja
+        OSB->>TxnDB: Actualizar Estado Transacción
+        Note right of TxnDB: Estado: Error del servicio<br/>FT: vacío
+        OSB->>UsageDB: Liberar Cuota
+        Note right of UsageDB: Operación: 2 (Liberar)
+        OSB->>ErrorMapper: Mapear Error
+        Note right of ErrorMapper: Código: Error de Caja<br/>Mensaje: FICBCO0211$#$ErrorMessage
+        ErrorMapper->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    Caja->>OSB: Response Exitoso
+    Note right of OSB: ResponseHeader:<br/>successIndicator=SUCCESS<br/>transactionId=FT24015001234<br/>Body: pagoPrestamoResponse
+
+    OSB->>TxnDB: Actualizar Estado Final
+    Note right of TxnDB: SP: ACTUALIZA_ESTADO_TRANSACCION<br/>Tipo: PAGO_PRESTAMO<br/>Estado: TRANSACCION_EXITOSA<br/>Código: TRANSACTION_ID_BC<br/>FT: FT24015001234<br/>Tipo Actualización: TENGO
+
+    OSB->>UsageDB: Liberar Cuota
+    Note right of UsageDB: SP: MW_P_REGISTRAR_USO_SERVICIO<br/>Operación: 2 (Liberar)
+
+    alt Error en Response (successIndicator != SUCCESS)
+        OSB->>ErrorMapper: Mapear Error
+        Note right of ErrorMapper: Código: successIndicator<br/>Mensaje: FICBCO0211$#$messages
+        ErrorMapper->>OSB: Error Mapeado
+    end
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: Header: ResponseHeader<br/>Body: pagoPrestamoResponse
+
+    OSB->>Client: SOAP Response (HTTPS)
+    Note right of Client: successIndicator: SUCCESS<br/>transactionId: FT24015001234<br/>Detalles del pago procesado

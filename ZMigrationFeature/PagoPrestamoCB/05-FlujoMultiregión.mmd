@@ -1,0 +1,120 @@
+flowchart TD
+    Start([Cliente envía Request SOAP]) --> ValidateSchema{Validar<br/>Esquema XML}
+    
+    ValidateSchema -->|Error BEA-382505| UpdateTxnError1[Actualizar Estado BD:<br/>Error Validación]
+    UpdateTxnError1 --> MapError1[Mapear Error<br/>MapeoErrores]
+    MapError1 --> ErrorResponse1[Response Error<br/>Validación]
+    
+    ValidateSchema -->|Válido| RegisterTxn[Registrar Transacción BD<br/>SP: REGISTRA_TRANSACCION_CANAL<br/>Estado: REGISTRADO]
+    
+    RegisterTxn -->|Error BD| LogError[Log Error<br/>Resume Ejecución]
+    LogError --> ValidateRegion
+    
+    RegisterTxn -->|Exitoso| ValidateRegion{Validar Servicio<br/>Regional<br/>SP: MW_P_VALIDA_SERVICIO_REGIONAL<br/>ServiceId: FICBCO0211}
+    
+    ValidateRegion -->|Error| UpdateTxnError2[Actualizar Estado:<br/>ERROR_OBTENIENDO_SERVICIO_REGIONAL]
+    UpdateTxnError2 --> ErrorResponse2[Response Error<br/>Regional]
+    
+    ValidateRegion -->|SUCCESS| ApplyDefaults[Aplicar Valores<br/>por Defecto Región CB<br/>Estado: VALIDACION_REGIONAL_EXITOSA]
+    
+    ApplyDefaults --> ValidateCorresp{Validar Corresponsal<br/>SP: MW_P_VALIDA_CORBAN<br/>Tipo Transacción: 2}
+    
+    ValidateCorresp -->|Error| UpdateTxnError3[Actualizar Estado:<br/>ERROR_OBTENIENDO_PARAMETRIZACION_CORRESPONSAL]
+    UpdateTxnError3 --> ErrorResponse3[Response Error<br/>Corresponsal]
+    
+    ValidateCorresp -->|SUCCESS| GetCorrespData[Obtener Datos Corresponsal:<br/>- Cuenta Débito<br/>- Moneda Permitida<br/>- Tipo Transacción<br/>Estado: PARAMETRIA_OBTENIDA_CORRECTAMENTE]
+    
+    GetCorrespData --> ValidateCurrency{Validar Moneda<br/>PAYMENT_CURRENCY ==<br/>MONEDA_PERMITIDA}
+    
+    ValidateCurrency -->|No| UpdateTxnError4[Actualizar Estado:<br/>ERROR_MONEDA_INVALIDA]
+    UpdateTxnError4 --> ErrorResponse4[Response Error<br/>Moneda Inválida]
+    
+    ValidateCurrency -->|Sí| TakeQuota{Tomar Cuota Uso<br/>SP: MW_P_REGISTRAR_USO_SERVICIO<br/>Operación: 1}
+    
+    TakeQuota -->|Error MW-0001| ErrorResponse5[Response Error<br/>Cuota Excedida<br/>No libera cuota]
+    
+    TakeQuota -->|Exitoso| RouteRegion{Enrutamiento<br/>Regional<br/>SourceBank}
+    
+    RouteRegion -->|HN01| ProcessHN01[Pipeline HN01]
+    RouteRegion -->|GT01| ProcessGT01[Pipeline GT01<br/>Vacío]
+    RouteRegion -->|PA01| ProcessPA01[Pipeline PA01<br/>Vacío]
+    RouteRegion -->|Otro| ProcessDefault[Pipeline Default]
+    
+    ProcessGT01 --> ErrorMW0008[Error MW-0008:<br/>SERVICE NOT IMPLEMENTED]
+    ProcessPA01 --> ErrorMW0008
+    ProcessDefault --> ErrorMW0008
+    
+    ErrorMW0008 --> ReleaseQuota1[Liberar Cuota<br/>Operación: 2]
+    ReleaseQuota1 --> ErrorResponse6[Response Error<br/>No Implementado]
+    
+    ProcessHN01 --> ValidatePaymentType{Validar<br/>Tipo de Pago<br/>PAYMENT_TYPE == CASH}
+    
+    ValidatePaymentType -->|No| UpdateTxnError5[Actualizar Estado:<br/>TIPO_DE_PAGO_NO_ES_CASH]
+    UpdateTxnError5 --> ReleaseQuota2[Liberar Cuota<br/>Operación: 2]
+    ReleaseQuota2 --> MapError2[Mapear Error MW-0002]
+    MapError2 --> ErrorResponse7[Response Error<br/>Tipo Pago Inválido]
+    
+    ValidatePaymentType -->|Sí| LookupLDAP[Buscar Credenciales LDAP<br/>Path: Middleware/Security/USERNAME]
+    
+    LookupLDAP -->|No encontrado| UseRequestCreds[Fail-over:<br/>Usar credenciales del Request]
+    LookupLDAP -->|Encontrado| UseLDAPCreds[Usar credenciales LDAP]
+    
+    UseRequestCreds --> FormatLoan
+    UseLDAPCreds --> FormatLoan[Formatear Número Préstamo<br/>Java Callout:<br/>Utilities.FormatearPrestamo]
+    
+    FormatLoan --> TransformRequest[Transformar Request<br/>XQuery: PagoPrestamoCBIn.xq<br/>- PAYMENT_TYPE → ACCOUNT_DEBIT<br/>- DEBIT_ACCOUNT → Cuenta Corresponsal<br/>- DESCRIPTION → CODIGO_CORRESPONSAL<br/>- REPAY_TYPE → TRANSACTION_ID_BC]
+    
+    TransformRequest --> UpdateTxnState[Actualizar Estado:<br/>REALIZANDO_LLAMADO_PAGO_PRESTAMO_CAJA]
+    
+    UpdateTxnState --> InvokeCaja[Invocar Servicio Caja<br/>Endpoint: mwinterbanca:8003<br/>Operación: pagoPrestamo<br/>Timeout: 0, Retry: 0]
+    
+    InvokeCaja -->|Error| UpdateTxnError6[Actualizar Estado:<br/>Error del Servicio]
+    UpdateTxnError6 --> ReleaseQuota3[Liberar Cuota<br/>Operación: 2]
+    ReleaseQuota3 --> MapError3[Mapear Error]
+    MapError3 --> ErrorResponse8[Response Error<br/>Servicio Caja]
+    
+    InvokeCaja -->|Exitoso| UpdateTxnSuccess[Actualizar Estado Final<br/>SP: ACTUALIZA_ESTADO_TRANSACCION<br/>Estado: TRANSACCION_EXITOSA<br/>FT: transactionId]
+    
+    UpdateTxnSuccess --> ReleaseQuota4[Liberar Cuota<br/>Operación: 2]
+    
+    ReleaseQuota4 --> CheckSuccess{successIndicator<br/>== SUCCESS}
+    
+    CheckSuccess -->|No| MapError4[Mapear Error<br/>MapeoErrores]
+    MapError4 --> BuildResponse
+    
+    CheckSuccess -->|Sí| BuildResponse[Construir Response<br/>Header: ResponseHeader<br/>Body: pagoPrestamoResponse]
+    
+    BuildResponse --> SuccessResponse([Response SOAP<br/>al Cliente])
+    
+    ErrorResponse1 --> End([Fin])
+    ErrorResponse2 --> End
+    ErrorResponse3 --> End
+    ErrorResponse4 --> End
+    ErrorResponse5 --> End
+    ErrorResponse6 --> End
+    ErrorResponse7 --> End
+    ErrorResponse8 --> End
+    SuccessResponse --> End
+    
+    style Start fill:#90EE90
+    style End fill:#FFB6C1
+    style ValidateSchema fill:#FFE4B5
+    style ValidateRegion fill:#FFE4B5
+    style ValidateCorresp fill:#FFE4B5
+    style ValidateCurrency fill:#FFE4B5
+    style TakeQuota fill:#FFE4B5
+    style ValidatePaymentType fill:#FFE4B5
+    style CheckSuccess fill:#FFE4B5
+    style RouteRegion fill:#87CEEB
+    style ProcessHN01 fill:#98FB98
+    style ProcessGT01 fill:#FFA07A
+    style ProcessPA01 fill:#FFA07A
+    style ProcessDefault fill:#FFA07A
+    style InvokeCaja fill:#DDA0DD
+    style ErrorMW0008 fill:#FF6347
+    style UpdateTxnError1 fill:#FF6347
+    style UpdateTxnError2 fill:#FF6347
+    style UpdateTxnError3 fill:#FF6347
+    style UpdateTxnError4 fill:#FF6347
+    style UpdateTxnError5 fill:#FF6347
+    style UpdateTxnError6 fill:#FF6347
