@@ -2,19 +2,19 @@
 sequenceDiagram
     autonumber
     participant Consumidor as Consumidore/Aplicación
-    participant API as API Depósito Cheque <br> Epica 2267: PagoPrestamo <br> HU 57060:  POST - /loans-and-deposits/current-account-mgmt/v1/initiate-check-deposit
+    participant API as API Retiro Efectivo Tengo <br> Epica 2267: PagoPrestamo <br> HU 57119:  POST - /loans-and-deposits/loan-admin/v1/initiate-transaction
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
     participant Lib as Librería Pipeline (ConfigMap)
     participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
-    participant wrapper as Wrapper T24 V2 <br/> OP: Depositocombinado 
+    participant wrapper as Wrapper T24 V2 <br/> OP: RetiroEfectivoTengo 
     participant event as AWS EventBridge <br> Componente de Idempotencia 
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
     Note over Consumidor, Errors: Flujo Honduras (HN01) - Realiza Depósito en Cheque
 
     Consumidor->>API: REST Request
-    Note right of Consumidor: body: <br> chequeNumber, <br> bankCode, <br> loanCurrency, <br> paymentAmount, <br> noOfAuth, <br> groupAttribute, <br> multiGroupAttribute, <br> transactionReference
+    Note right of Consumidor: body: <br> transactionType, <br> debitAccountNumber, <br> debitCurrencyCode, <br> debitAmount, <br> creditAccountNumber, <br> groupAttribute, <br> paymentDetailsDescription, <br> tengoReference
 
     API->>API: Validar Request
     Note over API: Valida campos obligatorios según contrato OpenAPI 
@@ -24,7 +24,7 @@ sequenceDiagram
     alt Consulta parametros en caché local
 
         API->>CL: Consultar parámetros Lambda Parámetros caché local
-        Note right of API: Domain: "CURRENT_ACCOUNT_MGMT" <br> name: "INITIATE_CHECK_DEPOSIT" <br> country: XRS 
+        Note right of API: Domain: "LOAN_ADMIN" <br> name: "INITIATE_TRANSACTION" <br> country: XRS 
 
         CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
@@ -32,7 +32,7 @@ sequenceDiagram
     else Consulta  parametros en Lambda Parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
-        Note right of API: Domain: "CURRENT_ACCOUNT_MGMT" <br> name: "INITIATE_CHECK_DEPOSIT" <br> country: XRS 
+        Note right of API: Domain: "LOAN_ADMIN" <br> name: "INITIATE_TRANSACTION" <br> country: XRS 
 
         Lambda->>API: Obtiene parámetros Lambda Parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
@@ -53,29 +53,6 @@ sequenceDiagram
     Lib->>API: Retorna constantes necesarias
     Note left of Lib: Constantes: <br> operation  <br> caller-service
 
-    API->>API: Evaluar request.loanCurrency
-
-    alt If request.loanCurrency == "HNL" 
-
-        API->>API: Selecciona Cuenta de Depósito Lempiras
-        Note over API: $depositAccount = lambda.t24ChqAccountHNL
-
-    else  If request.loanCurrency == "USD"
-
-        API->>API: Selecciona Cuenta de Depósito Dólares
-        Note over API: $depositAccount = lambda.t24ChqAccountUSD
-
-    else If request.loanCurrency != "HNL" o "USD"
-
-        API->> Errors: Mapear código de error
-
-        Errors ->> API: Retorna código mapeado
-
-        API->> Consumidor: Retorna error
-        Note left of API: HTTP 422: Tipo de moneda no soportado
-
-    end 
-
     API->>Idempotencia: Consume API Idempotencia 
     Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> "methodVersion": "1.0" <br> dataPayload: {request}
 
@@ -95,16 +72,16 @@ sequenceDiagram
 
     else If data.code == 0
 
-        API->>API: Construye Request Wrapper T24 - OP: Depositocombinado
-        Note over API: Mapeo: <br> header:  caller-service = const.caller-service <br> body: <br> operation = const.operation <br> OfsFunction.messageId = header.Correlation-Id <br> OfsFunction.noOfAuth = request.noOfAuth <br> DepositAccount = $depositAccount <br> gTRANSACTION.atribute.g = request.groupAttribute <br> mTRANSACTION.atribute.m = request.multiGroupAttribute <br>TRANSACTION = request.transactionReference <br> CURRENCY = request.loanCurrency,  <br> AMOUNT = request.paymentAmount <br> SORTCODE = request.bankCode <br> CHEQUENUMBER = request.chequeNumber
+        API->>API: Construye Request Wrapper T24 - OP: RetiroEfectivoTengo
+        Note over API: Mapeo: <br> header:  caller-service = const.caller-service <br> body: <br> operation = const.operation <br> OfsFunction.messageId = header.Correlation-Id <br> TransactionType = request.TransactionType <br> DebitAccount = request.debitAccountNumber <br> DebitCurrency = request.debitCurrencyCode <br> DebitAmount = request.debitAmount <br> CreditAccount = request.creditAccountNumber, <br> gPAYMENTDETAILS.atribute.g = request.groupAttribute <br> PaymentDetails = concat("PTM-",request.paymentDetailsDescription) <br> LRREFTENGO = request.bankCtengoReferenceode
 
-        API->>wrapper: Consume Wrapper T24 - OP: Depositocombinado
-        Note right of API: header: caller-service <br> body: <br> OfsFunction.messageId, OfsFunction.noOfAuth, DepositAccount <br> gTRANSACTION, mTRANSACTION, TRANSACTION, CURRENCY <br> AMOUNT, SORTCODE, CHEQUENUMBER
+        API->>wrapper: Consume Wrapper T24 - OP: RetiroEfectivoTengo
+        Note right of API: header: caller-service <br> body: <br> operation <br> OfsFunction.messageId <br> TransactionType <br> DebitAccount <br> DebitCurrency <br> DebitAmount <br> CreditAccount <br> gPAYMENTDETAILS.atribute.g <br> PaymentDetails <br> LRREFTENGO
 
-        wrapper->>API: Response Wrapper T24 - OP: Depositocombinado
+        wrapper->>API: Response Wrapper T24 - OP: RetiroEfectivoTengo
         Note over wrapper: Response: <br> success, data
 
-        API->>API: Evalúa Response Wrapper T24 - OP: Depositocombinado
+        API->>API: Evalúa Response Wrapper T24 - OP: RetiroEfectivoTengo
 
         alt If success == true 
 

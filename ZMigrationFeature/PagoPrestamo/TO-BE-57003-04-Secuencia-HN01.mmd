@@ -5,17 +5,16 @@ sequenceDiagram
     participant API as API Ejectuar Crédito Cuenta Contable <br> Epica 2267: PagoPrestamo <br> HU 57003:  POST -  /loans-and-deposits/loan-admin/v1/execute-repayment
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
-    participant Parameter as Parameter Store
     participant Lib as Librería Pipeline (ConfigMap)
     participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
-    participant wrapper as Wrapper T24 <br/> OP: Depositoenefectivofase11 <br/> OP: Depositoenefectivofase12
+    participant wrapper as Wrapper T24 V2 <br/> OP: Depositoenefectivofase11 <br/> OP: Depositoenefectivofase12
     participant event as AWS EventBridge <br> Componente de Idempotencia 
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
     Note over Consumidor, Errors: Flujo Honduras (HN01) - Ejecutar crédito cuenta contable
 
     Consumidor->>API: REST Request
-    Note right of Consumidor: body: currencyCode, paymentAmount, authorizationsNumber, accountGroup, accountMultiple, transactionReference
+    Note right of Consumidor: body: <br> currencyCode, <br> paymentAmount, <br> authorizationsNumber, <br> accountGroup, <br> accountMultiple, <br> transactionReference
 
     API->>API: Validar Request
     Note over API: Valida campos obligatorios según contrato OpenAPI 
@@ -86,6 +85,9 @@ sequenceDiagram
     API->>Idempotencia: Consume API Idempotencia 
     Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: LOAN_ADMIN-product-EXECUTE REPAYMENT <br> "methodVersion": "1.0" <br> dataPayload: {request}
 
+    Idempotencia->>API: Response API Idempotencia 
+    Note left of Idempotencia: Response: data {status, code, tittle, detail, correlation-id}
+    
     API->>API: Evalua response API Idempotencia
 
     alt If data.code != 0
@@ -97,7 +99,7 @@ sequenceDiagram
         API->> Consumidor: Retorna error
         Note left of API: HTTP 422: Transacción efectuada previamente
 
-    else If If data.code == 0
+    else If data.code == 0
 
         alt If request.loanCurrency == "HNL" 
 
@@ -105,7 +107,7 @@ sequenceDiagram
             Note over API: Mapeo: <br> header:  caller-service = $caller-service <br> body: <br> operation = $operation <br> OfsFunction.messageId = header.Correlation-Id <br> OfsFunction.noOfAuth = request.noOfAuth <br> gTRANSACTION.atribute.g = request.accountGroup <br> mTRANSACTION.atribute.m = request.accountMultiple <br> DepositAmount = request.paymentAmount
 
             API->>wrapper: Consume Wrapper T24 - OP: Depositoenefectivofase11
-            Note right of API:  header: caller-service, <br> body: operation, OfsFunction.messageId, OfsFunction.noOfAuth, gTRANSACTION.atribute.g, mTRANSACTION.atribute.m, DepositAmount
+            Note right of API:  header: caller-service, <br> body: operation, OfsFunction.messageId, <br> OfsFunction.noOfAuth, gTRANSACTION.atribute.g, <br> mTRANSACTION.atribute.m, DepositAmount
 
             wrapper->>API: Response Wrapper T24 - OP: Depositoenefectivofase11
             Note over wrapper: Response: <br> success, data
@@ -143,14 +145,14 @@ sequenceDiagram
             Note over API: Mapeo: <br> header:  caller-service = $caller-service <br> body: <br> operation = $operation <br> OfsFunction.messageId = header.Correlation-Id <br> OfsFunction.noOfAuth = request.noOfAuth <br> CurrencyDeposited = request.loanCurrency <br> gTRANSACTION.atribute.g = request.accountGroup <br> mTRANSACTION.atribute.m = request.accountMultiple <br> DepositAmount = request.paymentAmount 
 
             API->>wrapper: Consume Wrapper T24 - OP: Depositoenefectivofase12
-            Note right of API: header: caller-service, <br> body: operation, OfsFunction.messageId, OfsFunction.noOfAuth, CurrencyDeposited, gTRANSACTION.atribute.g, mTRANSACTION.atribute.m, DepositAmount
+            Note right of API: header: caller-service, <br> body: operation, OfsFunction.messageId, <br> OfsFunction.noOfAuth, CurrencyDeposited, <br> gTRANSACTION.atribute.g, mTRANSACTION.atribute.m, <br> DepositAmount
 
             wrapper->>API: Response Wrapper T24 - OP: Depositoenefectivofase12
             Note over wrapper: Response: <br> success, data
 
             API->>API: Evalúa Response Wrapper T24 - OP: Depositoenefectivofase12
 
-            alt alt If success == true 
+            alt If success == true 
 
                 API->>API: Construye response API
                 Note over API: Mapeo uno a uno campos del response Wrapper

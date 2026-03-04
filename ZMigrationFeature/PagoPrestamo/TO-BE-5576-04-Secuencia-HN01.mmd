@@ -5,7 +5,6 @@ sequenceDiagram
     participant API as API Ejectuar Pago Prestamo HN <br> Epica 2267: PagoPrestamo <br> HU 5576:  POST - /payments/payment-execution-maintenance/v1/execute-loan-repayment
     participant CL as Caché Local
     participant Lambda as Lambda de parámetros
-    participant Parameter as Parameter Store
     participant Lib as Librería Pipeline (ConfigMap)
     participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
     participant wrapper as Wrapper ProxyAbanks Multiconexión <br/> SP: TOPLEVEL$OSB_PAG_PRESTAMO_CAJ <br/> SP: OSB_PAG_PRESTAMO_T24
@@ -61,18 +60,18 @@ sequenceDiagram
     Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> "methodVersion": "1.0" <br> dataPayload: {request}
 
     Idempotencia->>API: Response API Idempotencia 
-    Note left of Idempotencia: Response: 
+    Note left of Idempotencia: Response: data {status, code, tittle, detail, correlation-id}
 
     API->>API: Evalua response API Idempotencia
 
-    alt If If data.code != 0
+    alt If data.code != 0
 
         API->> Errors: Mapear código de error
 
         Errors ->> API: Retorna código mapeado
 
         API->> Consumidor: Retorna error
-        Note left of API: HTTP 422: Tipo de moneda no soportado
+        Note left of API: HTTP 422: Transacción efectuada previamente
 
     else If data.code == 0
 
@@ -127,7 +126,7 @@ sequenceDiagram
 
             API->>API: Evalúa Response Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
 
-            alt alt If success == true 
+            alt If success == true 
 
                 API->>API: Construye response API
                 Note over API: Mapeo uno a uno campos del response Wrapper

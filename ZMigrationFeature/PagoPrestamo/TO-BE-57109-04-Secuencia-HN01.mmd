@@ -1,0 +1,267 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Depósito Cheque <br> Epica 2267: PagoPrestamo <br> HU 57109:  POST - /payments/payment-execution-transfer/v1/initiate-loan-payment
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
+    participant wrappergt as Wrapper Abanks Guatemala <br/> SP: OSB_P_PAGO_PRESTAMO 
+    participant wrapperpa as Wrapper Abanks Panamá <br/> SP: OSB_P_PAGO_PRESTAMO 
+    participant wrappercts as Wrapper CTS Cobis <br/> OP: OpPagarPrestamo 
+    participant event as AWS EventBridge <br> Componente de Idempotencia 
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujos Guatemaña, Nicaragua y Panamá (GT01 | NI01 | PA01) - Pago préstamo
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> paymentAmount, <br> loanId, <br> debitAccountReference, <br> currencyCode, <br> branchReference, <br> serviceReference, <br> interfaceReferenceNumber, <br> consumerIPAddress
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "PAYMENT_EXECUTION_TRANSFER" <br> name: "INITIATE_LOAN_PAYMENT" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "PAYMENT_EXECUTION_TRANSFER" <br> name: "INITIATE_LOAN_PAYMENT" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para GT01 | PA01 | NI01 
+
+    API->>API: Aplica Patrón Strategy
+    Note over API: Implementa lógica según el país (header.sourceBank)
+
+    alt header.sourceBank == GT01 
+
+        API->>Lib: Consulta Constantes
+    
+        Lib->>API: Retorna constantes necesarias
+        Note left of Lib: Constantes: <br> connectionTypeGT <br> operationTypeGT <br> catalogueNameGT  <br> procedureNameGT <br> caller-service 
+
+        API->>Idempotencia: Consume API Idempotencia 
+        Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> "methodVersion": "1.0" <br> dataPayload: {request}
+
+        Idempotencia->>API: Response API Idempotencia 
+        Note left of Idempotencia: Response: data {status, code, tittle, detail, correlation-id}
+
+        API->>API: Evalua response API Idempotencia
+
+        alt If If data.code != 0
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: Retorna error
+            Note left of API: HTTP 422: Transacción efectuada previamente
+
+        else If If data.code == 0
+
+            API->>API: Construye Request Wrapper Proxy Abanks GT - SP: OSB_P_PAGO_PRESTAMO
+            Note over API: Mapeo: <br> header:  caller-service = const.caller-service <br> body: <br> connectionType = const.connectionTypeGT <br> operationType = const.operationTypeGT <br> catalogueName = const.catalogueNameGT <br> procedureName = const.procedureNameGT <br> params { <br> LOAN_NUMBER = request.loanID <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.debitAccountReference <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> USERNAME = header.application-user <br> }
+
+            API->>wrappergt: Consume Wrapper Proxy Abanks GT - SP: OSB_P_PAGO_PRESTAMO
+            Note right of API: header: caller-service <br> body: <br> connectionType, operationType, catalogueName, procedureName, params
+
+            wrappergt->>API: Response Wrapper Proxy Abanks GT - SP: OSB_P_PAGO_PRESTAMO
+            Note over wrappergt: Response: <br> success, data
+
+            API->>API: Evalúa Response Wrapper Proxy Abanks GT - SP: OSB_P_PAGO_PRESTAMO
+
+            alt If success == true 
+
+                API->>API: Construye response API
+                Note over API: Mapeo: <br> transactionDateTime = DATE_TIME <br> loanId = request.loanId <br> installmentReference = DUE_ID <br> TRANSACTION_ID <br> VALUEDATE <br> paymentAmount = request.paymentAmount
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: success 
+
+                API->>Consumidor: Response Exitoso
+                Note left of API: HTTP 200: Response Body 
+
+            else If success != false 
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: TimeOut
+
+                API->> Errors: Mapear código de error
+
+                Errors ->> API: Retorna código mapeado
+
+                API->> Consumidor: Retorna error
+                Note left of API: HTTP 422 + Wrapper.mensajeError
+
+            end
+        
+        end
+
+    end
+
+    alt header.sourceBank == PA01
+
+        API->>Lib: Consulta Constantes
+    
+        Lib->>API: Retorna constantes necesarias
+        Note left of Lib: Constantes: <br> connectionTypePA <br> operationTypePA <br> catalogueNamePA  <br> procedureNamePA <br> caller-service 
+
+        API->>Idempotencia: Consume API Idempotencia 
+        Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> "methodVersion": "1.0" <br> dataPayload: {request}
+
+        Idempotencia->>API: Response API Idempotencia 
+        Note left of Idempotencia: Response: data {status, code, tittle, detail, correlation-id}
+
+        API->>API: Evalua response API Idempotencia
+
+        alt If If data.code != 0
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: Retorna error
+            Note left of API: HTTP 422: Transacción efectuada previamente
+
+        else If If data.code == 0
+
+            API->>API: Construye Request Wrapper Proxy Abanks PA - SP: OSB_P_PAGO_PRESTAMO
+            Note over API: Mapeo: <br> header:  caller-service = const.caller-service <br> body: <br> connectionType = const.connectionTypePA <br> operationType = const.operationTypePA <br> catalogueName = const.catalogueNamePA <br> procedureName = const.procedureNamePA <br> params { <br> LOAN_NUMBER = request.loanID <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.debitAccountReference <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> USERNAME = header.application-user <br>}
+
+            API->>wrapperpa: Consume Wrapper Proxy Abanks PA - SP: OSB_P_PAGO_PRESTAMO
+            Note right of API: header: caller-service <br> body: <br> connectionType, operationType, catalogueName, procedureName, params
+
+            wrapperpa->>API: Response Wrapper Proxy Abanks PA - SP: OSB_P_PAGO_PRESTAMO
+            Note over wrapperpa: Response: <br> success, data
+
+            API->>API: Evalúa Response Wrapper Proxy Abanks PA - SP: OSB_P_PAGO_PRESTAMO
+
+            alt If success == true 
+
+                API->>API: Construye response API
+                Note over API: Mapeo: <br> transactionDateTime = DATE_TIME <br> loanId = request.loanId <br> installmentReference = DUE_ID <br> TRANSACTION_ID <br> VALUEDATE <br> paymentAmount = request.paymentAmount
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: success 
+
+                API->>Consumidor: Response Exitoso
+                Note left of API: HTTP 200: Response Body 
+
+            else If success != false 
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: TimeOut
+
+                API->> Errors: Mapear código de error
+
+                Errors ->> API: Retorna código mapeado
+
+                API->> Consumidor: Retorna error
+                Note left of API: HTTP 422 + Wrapper.mensajeError
+
+            end
+        
+        end
+
+    end
+
+    alt header.sourceBank == NI01
+
+        API->>Lib: Consulta Constantes
+    
+        Lib->>API: Retorna constantes necesarias
+        Note left of Lib: Constantes: <br> operationNameNI  <br> caller-service
+
+        API->>Idempotencia: Consume API Idempotencia 
+        Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> "methodVersion": "1.0" <br> dataPayload: {request}
+
+        Idempotencia->>API: Response API Idempotencia 
+        Note left of Idempotencia: Response: 
+
+        API->>API: Evalua response API Idempotencia
+
+        alt If If data.code != 0
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: Retorna error
+            Note left of API: HTTP 422: Transacción efectuada previamente
+
+        else If If data.code == 0
+
+            API->>API: Construye Request Wrapper CTS Cobis - OP: OpPagarPrestamo
+            Note over API: Mapeo: <br> body: <br> operation = const.operationNI <br> flagcache = false <br> payload [ <br> { type = "contextoTransaccional" <br> identificadorTransaccional, = request.interfaceReferenceNumber <br> codCanalOriginador = header.Channel <br> ipConsumidor = request.consumerIPAddress } <br> { type = transaccion, <br> valMonto = request.paymentAmount } <br> { type = "prestamo", <br> producto.valNumeroProducto = request.loanId } <br> { type = "cuenta", <br> codCuentaHabiente = debitAccountReference } <br> { type = oficina, <br> codOficina = request.branchReference } <br> { type = "moneda", <br> multimoneda = request.currencyCode } <br> { type = "canal", <br> servicio = request.serviceReference } ] 
+            
+            API->>wrappercts: Consume Wrapper CTS Cobis - OP: OpPagarPrestamo
+            Note right of API: body: <br> operation, flagcache, payload
+
+            wrappercts->>API: Response Wrapper CTS Cobis - OP: OpPagarPrestamo
+            Note over wrappercts: Response: <br> success, data
+
+            API->>API: Evalúa Response Wrapper CTS Cobis - OP: OpPagarPrestamo
+
+            alt If success == true 
+
+                API->>API: Construye response API
+                Note over API: Mapeo: <br> transactionDateTime = fecPago <br> loanId = request.loanId <br> installmentReference = Transaccion.idAutorizacion  <br> paymentAmount = request.paymentAmount
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: success 
+
+                API->>Consumidor: Response Exitoso
+                Note left of API: HTTP 200: Response Body 
+
+            else If success != false 
+
+                API->>event: Envía envento al eventBridge API Idempotencia 
+                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: TimeOut
+
+                API->> Errors: Mapear código de error
+
+                Errors ->> API: Retorna código mapeado
+
+                API->> Consumidor: Retorna error
+                Note left of API: HTTP 422 + Wrapper.mensajeError
+
+            end
+        
+        end
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

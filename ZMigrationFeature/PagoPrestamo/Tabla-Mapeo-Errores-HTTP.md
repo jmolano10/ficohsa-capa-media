@@ -284,14 +284,137 @@ declare function mapErrorToHttp($errorCode as xs:string, $errorMessage as xs:str
 </monitoring>
 ```
 
+## Tabla de Errores Específicos por Stored Procedure y Operación
+
+### Errores del SP OSB_P_PAGO_PRESTAMO (Guatemala y Panamá)
+
+| Código Error SP | Descripción Error | Código HTTP | Mensaje HTTP | Categoría | Acción Recomendada |
+|-----------------|-------------------|-------------|--------------|-----------|--------------------|
+| **SUCCESS** | Pago procesado exitosamente | **200** | OK | Éxito | Continuar |
+| **INVALID_LOAN** | Número de préstamo inválido | **400** | Bad Request | Validación | Verificar número préstamo |
+| **LOAN_NOT_FOUND** | Préstamo no encontrado | **404** | Not Found | Recurso | Verificar existencia préstamo |
+| **LOAN_CLOSED** | Préstamo cerrado o cancelado | **422** | Unprocessable Entity | Negocio | Préstamo no activo |
+| **INVALID_AMOUNT** | Monto de pago inválido | **400** | Bad Request | Validación | Verificar monto |
+| **AMOUNT_EXCEEDS_BALANCE** | Pago excede saldo pendiente | **422** | Unprocessable Entity | Negocio | Reducir monto pago |
+| **INSUFFICIENT_FUNDS** | Fondos insuficientes en cuenta | **422** | Unprocessable Entity | Negocio | Verificar saldo cuenta |
+| **ACCOUNT_INVALID** | Cuenta de débito inválida | **400** | Bad Request | Validación | Verificar número cuenta |
+| **ACCOUNT_CLOSED** | Cuenta de débito cerrada | **422** | Unprocessable Entity | Negocio | Usar cuenta activa |
+| **ACCOUNT_BLOCKED** | Cuenta de débito bloqueada | **403** | Forbidden | Autorización | Contactar banco |
+| **CURRENCY_MISMATCH** | Monedas no coinciden | **422** | Unprocessable Entity | Negocio | Verificar monedas |
+| **DUPLICATE_TRANSACTION** | Transacción duplicada | **409** | Conflict | Conflicto | Verificar referencia |
+| **SYSTEM_ERROR** | Error interno del sistema | **500** | Internal Server Error | Sistema | Reintentar más tarde |
+| **DATABASE_ERROR** | Error de base de datos | **503** | Service Unavailable | Sistema | Contactar soporte |
+| **TIMEOUT** | Timeout en procesamiento | **408** | Request Timeout | Tiempo | Reintentar |
+| **AUTHORIZATION_REQUIRED** | Requiere autorización adicional | **409** | Conflict | Autorización | Obtener autorización |
+| **INVALID_USER** | Usuario inválido | **401** | Unauthorized | Autorización | Verificar credenciales |
+| **USER_NOT_AUTHORIZED** | Usuario no autorizado | **403** | Forbidden | Autorización | Verificar permisos |
+| **CUTOFF_TIME_PASSED** | Hora de corte pasada | **422** | Unprocessable Entity | Negocio | Procesar día siguiente |
+| **HOLIDAY_PROCESSING** | Procesamiento en feriado | **422** | Unprocessable Entity | Negocio | Procesar día hábil |
+
+### Errores de la Operación OpPagarPrestamo (Nicaragua - COBIS)
+
+| Código Error COBIS | Descripción Error | Código HTTP | Mensaje HTTP | Categoría | Acción Recomendada |
+|--------------------|-------------------|-------------|--------------|-----------|--------------------|
+| **0** | Transacción exitosa | **200** | OK | Éxito | Continuar |
+| **101001** | Préstamo no encontrado | **404** | Not Found | Recurso | Verificar número préstamo |
+| **101002** | Préstamo inactivo o cancelado | **422** | Unprocessable Entity | Negocio | Préstamo no disponible |
+| **101003** | Monto de pago inválido | **400** | Bad Request | Validación | Verificar monto |
+| **101004** | Pago excede saldo pendiente | **422** | Unprocessable Entity | Negocio | Reducir monto |
+| **101005** | Cuenta de débito inválida | **400** | Bad Request | Validación | Verificar cuenta |
+| **101006** | Cuenta sin fondos suficientes | **422** | Unprocessable Entity | Negocio | Verificar saldo |
+| **101007** | Cuenta bloqueada o inactiva | **403** | Forbidden | Autorización | Contactar banco |
+| **101008** | Moneda no válida | **400** | Bad Request | Validación | Verificar moneda |
+| **101009** | Cliente no autorizado | **403** | Forbidden | Autorización | Verificar titularidad |
+| **101010** | Transacción duplicada | **409** | Conflict | Conflicto | Verificar referencia |
+| **101011** | Límite de transacciones excedido | **429** | Too Many Requests | Límite | Esperar o contactar banco |
+| **101012** | Horario de servicio no válido | **422** | Unprocessable Entity | Negocio | Procesar en horario hábil |
+| **101013** | Oficina no válida | **400** | Bad Request | Validación | Verificar código oficina |
+| **101014** | Canal no autorizado | **403** | Forbidden | Autorización | Usar canal autorizado |
+| **101015** | Servicio no disponible | **503** | Service Unavailable | Sistema | Reintentar más tarde |
+| **101016** | Error de comunicación | **502** | Bad Gateway | Sistema | Verificar conectividad |
+| **101017** | Timeout de sistema | **408** | Request Timeout | Tiempo | Reintentar |
+| **101018** | Error de validación de datos | **400** | Bad Request | Validación | Verificar datos entrada |
+| **101019** | Préstamo en mora | **422** | Unprocessable Entity | Negocio | Regularizar préstamo |
+| **101020** | Pago menor al mínimo requerido | **422** | Unprocessable Entity | Negocio | Aumentar monto |
+| **101021** | Fecha de aplicación inválida | **400** | Bad Request | Validación | Verificar fecha |
+| **101022** | Multimoneda no soportada | **422** | Unprocessable Entity | Negocio | Usar moneda única |
+| **101023** | Error en cálculo de intereses | **500** | Internal Server Error | Sistema | Contactar soporte |
+| **101024** | Préstamo vencido | **422** | Unprocessable Entity | Negocio | Contactar banco |
+| **101025** | Sistema COBIS no disponible | **503** | Service Unavailable | Sistema | Reintentar más tarde |
+| **999999** | Error genérico del sistema | **500** | Internal Server Error | Sistema | Contactar soporte |
+
+### Tabla Consolidada de Mapeo de Errores a HTTP
+
+| Región | Sistema | Stored Procedure/Operación | Errores Identificados | Códigos HTTP Únicos |
+|--------|---------|---------------------------|----------------------|--------------------|
+| **GT01** | ABANKS | OSB_P_PAGO_PRESTAMO | 20 | 9 |
+| **PA01** | ABANKS | OSB_P_PAGO_PRESTAMO | 20 | 9 |
+| **NI01** | COBIS | OpPagarPrestamo | 26 | 10 |
+
+### Configuración de Retry por Región y Error
+
+#### Guatemala (GT01) - OSB_P_PAGO_PRESTAMO
+
+| Código Error | Retry Permitido | Max Intentos | Intervalo | Razón |
+|--------------|-----------------|--------------|-----------|-------|
+| TIMEOUT | ✓ | 3 | 30s | Error temporal |
+| DATABASE_ERROR | ✓ | 2 | 60s | Error temporal |
+| SYSTEM_ERROR | ✓ | 2 | 60s | Error temporal |
+| INVALID_LOAN | ✗ | 0 | - | Error permanente |
+| INSUFFICIENT_FUNDS | ✗ | 0 | - | Error de negocio |
+| ACCOUNT_BLOCKED | ✗ | 0 | - | Error de autorización |
+
+#### Panamá (PA01) - OSB_P_PAGO_PRESTAMO
+
+| Código Error | Retry Permitido | Max Intentos | Intervalo | Razón |
+|--------------|-----------------|--------------|-----------|-------|
+| TIMEOUT | ✓ | 3 | 30s | Error temporal |
+| DATABASE_ERROR | ✓ | 2 | 60s | Error temporal |
+| SYSTEM_ERROR | ✓ | 2 | 60s | Error temporal |
+| INVALID_LOAN | ✗ | 0 | - | Error permanente |
+| INSUFFICIENT_FUNDS | ✗ | 0 | - | Error de negocio |
+| ACCOUNT_BLOCKED | ✗ | 0 | - | Error de autorización |
+
+#### Nicaragua (NI01) - OpPagarPrestamo
+
+| Código Error | Retry Permitido | Max Intentos | Intervalo | Razón |
+|--------------|-----------------|--------------|-----------|-------|
+| 101017 (Timeout) | ✓ | 3 | 30s | Error temporal |
+| 101016 (Comunicación) | ✓ | 3 | 45s | Error temporal |
+| 101015 (Servicio no disponible) | ✓ | 5 | 60s | Error temporal |
+| 101025 (COBIS no disponible) | ✓ | 5 | 120s | Error temporal |
+| 101001 (Préstamo no encontrado) | ✗ | 0 | - | Error permanente |
+| 101006 (Sin fondos) | ✗ | 0 | - | Error de negocio |
+| 101007 (Cuenta bloqueada) | ✗ | 0 | - | Error de autorización |
+
+### Implementación de Monitoreo por Región
+
+#### Alertas Críticas
+
+| Región | Error | Umbral | Acción |
+|--------|-------|--------|--------|
+| GT01/PA01 | SYSTEM_ERROR > 5% | Crítico | Escalar a soporte |
+| GT01/PA01 | TIMEOUT > 10% | Advertencia | Revisar performance |
+| NI01 | 101025 > 3% | Crítico | Verificar COBIS |
+| NI01 | 101016 > 8% | Advertencia | Revisar red |
+
+#### Métricas de Calidad
+
+| Región | Métrica | Objetivo | Actual |
+|--------|---------|----------|--------|
+| GT01 | Tasa de éxito | > 95% | - |
+| PA01 | Tasa de éxito | > 95% | - |
+| NI01 | Tasa de éxito | > 92% | - |
+| Todas | Tiempo respuesta | < 5s | - |
+
 ## Resumen de Implementación
 
-1. **Total de Códigos de Error Identificados:** 85+
-2. **Categorías de Error:** 8 (Validación, Autorización, Negocio, Sistema, Red, Recurso, Tiempo, Conflicto)
-3. **Regiones Soportadas:** 4 (HN01, GT01, PA01, NI01)
-4. **Stored Procedures Analizados:** 2
+1. **Total de Códigos de Error Identificados:** 66 específicos
+2. **Categorías de Error:** 8 (Validación, Autorización, Negocio, Sistema, Red, Recurso, Tiempo, Conflicto, Límite)
+3. **Regiones Soportadas:** 3 (GT01, PA01, NI01)
+4. **Stored Procedures/Operaciones Analizados:** 2
 5. **Códigos HTTP Utilizados:** 12 diferentes
-6. **Errores con Retry:** 4 tipos
-7. **Errores sin Retry:** 6 tipos
+6. **Errores con Retry:** 8 tipos
+7. **Errores sin Retry:** 58 tipos
 
-Esta tabla de mapeo proporciona una homologación completa de todos los posibles errores que pueden generar los stored procedures de PagoPrestamo a códigos HTTP estándar, facilitando la integración con sistemas REST y el manejo consistente de errores en toda la plataforma.
+Esta tabla de mapeo proporciona una homologación completa y específica de todos los posibles errores que pueden generar los stored procedures OSB_P_PAGO_PRESTAMO (Guatemala y Panamá) y la operación OpPagarPrestamo (Nicaragua) a códigos HTTP estándar, facilitando la integración con sistemas REST y el manejo consistente de errores en toda la plataforma.

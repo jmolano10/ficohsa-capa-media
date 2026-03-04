@@ -21,20 +21,37 @@ sequenceDiagram
 
         API->>API: Validación Regional Exitosa
 
-        API->>API: Constuir Request Wrapper FICOPEN
-        Note over API: Trasnformar initiationDate y terminationDate al formato YYYYMMDD
+        API->>API: Validación de fechas
+        Note over API: Validar que initiationDate <= terminationDate 
 
-        API->>WFP: CALL Wrapper FICOPEN
-        Note over API: investmentProductReference <br> initiationDate <br> terminationDate
+        alt If initiationDate <= terminationDate  
 
-        WFP->>API: Response Exitoso
-        Note left of WFP: Datos de cliente, cuenta, contrato<br/>Array de balances
+            API->>API: Constuir Request Wrapper FICOPEN
+            Note over API: Trasnformar initiationDate y terminationDate al formato YYYYMMDD
 
-        API->>API: Transformar Response
-         Note over API: Aplicar transfornación en response campo ACCOUNT_CURRENCY: <br> 1 = "HNL"  <br> 2 = "USD" <br> 3 = "EUR" 
+            API->>WFP: CALL Wrapper FICOPEN
+            Note over API: investmentProductReference <br> initiationDate <br> terminationDate
 
-        API->>Consumidor: REST Response exitoso
-        Note right of Consumidor: body.data
+            WFP->>API: Response Exitoso
+            Note left of WFP: Datos de cliente, cuenta, contrato<br/>Array de balances
+
+            API->>API: Transformar Response
+            Note over API: Aplicar transfornación en response campo ACCOUNT_CURRENCY: <br> 1 = "HNL"  <br> 2 = "USD" <br> 3 = "EUR" 
+
+            API->>Consumidor: REST Response exitoso
+            Note right of Consumidor: body.data
+
+        else initiationDate > terminationDate 
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: Retorna error
+            Note left of API: HTTP 422: Fecha de inicio es mayor a la fecha fin
+
+        end
+        
     end
 
     activate API

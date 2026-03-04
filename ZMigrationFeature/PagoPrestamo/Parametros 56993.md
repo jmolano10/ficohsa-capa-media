@@ -1,4 +1,5 @@
 ##### DynamoDB Parameter - Lambda Parámetros
+
 ```json
 //REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO
 {
@@ -16,16 +17,22 @@
       },
       "hu57003": {
         "noOfAuth": "0",
-        "gAccount": "1", 
-        "mAccount": "1",
+        "accountGroup": "1", 
+        "accountMultiple": "1",
         "currencyCode": "USD En este campo se debe enviar el valor del tipo de moneda "
       },
       "hu57060": {
         "noOfAuth": "0",
-        "gTransaction": "1",
-        "mTransaction": "1",
+        "groupAttribute": "1",
+        "multiGroupAttribute": "1",
         "transaction": "CLEARING"
-      }      
+      },
+      "hu57119": {
+        "groupAttribute": "1",
+        "t24CreditAccountHNL": "HNL160150055",
+        "t24CreditAccountUSD": "USD160150057",
+        "t24TxnLoanPayment": "ACPH"
+      }       
     },
     {
       "region": "GT01-GT01",
@@ -33,7 +40,13 @@
     },
     {
       "region": "NI01-NI01",
-      "enabled": false
+      "enabled": false,
+      "channelOr": "1",
+      "ipAddress": "OMNICANAL",
+      "branchReference": "1",
+      "currencyCode": "N",
+      "serviceReference": "10"
+
     },
     {
       "region": "PA01-PA01",
@@ -53,6 +66,7 @@
   "updated_by": "david.j.molano@ficohsa.com"
 }
 ```
+
 ##### AWS Systems Manager Parameter Store
 
 ```json
@@ -64,8 +78,8 @@
   "catalogueName": "ORA_BANK"
 }
 ```
-##### AWS Systems Manager SecretManager
 
+##### AWS Systems Manager SecretManager
 
 ##### Constantes para almacenar en ConfigMap
 
@@ -76,8 +90,8 @@
   "procedureNameT24": "OSB_PAG_PRESTAMO_T24",
 }
 ```
-##### Registro en Dynamo Librería Homologación de datos
 
+##### Registro en Dynamo Librería Homologación de datos
 
 ##### Registro en Dynamo Componente de idempotencia
 
