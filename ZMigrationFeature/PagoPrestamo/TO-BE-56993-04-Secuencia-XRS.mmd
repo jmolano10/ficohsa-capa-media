@@ -1,0 +1,116 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Pago Préstamo <br> Epica 2267: PagoPrestamo <br> HU 56993:  POST -  /loan-payment/v1/execution
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant executePayment as API Ejecutar Pago Prestamo <br> HU 57109 <br> POST: /payments/payment-execution-transfer/v1/initiate-loan-payment
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Guatemala, Panamá, Nicaragua (GT01 | PA01 | NI01) - Realizar Pago Préstamo
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> loanId, <br> paymentAmount, <br> paymentType, <br> accountNumber, <br> chequeNumber <br> bankCode, <br> interfaceReferenceNumber, <br> debitCreditIndicator, <br> transactionReferenceBC, <br> currencyCode
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "LOAN_PAYMENT" <br> name: "EXECUTION" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "LOAN_PAYMENT" <br> name: "EXECUTION" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 
+
+    API->>API: Evaluar request.paymentType
+
+    alt If request.paymentType != "ACCOUNT_DEBIT"
+
+        API->> Errors: Mapear código de error
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 422: Tipo de pago no soportado
+    
+    else If request.paymentType == "ACCOUNT_DEBIT" 
+
+        alt If header.sourceBank == GT01 | PA01
+
+            API->>API: Constrye Request API initiate-loan-payment
+            Note over API: body: <br> paymentAmount = request.paymentAmount, <br> loanId = request.loanId, <br> debitAccountReference = request.accountNumber,  <br> interfaceReferenceNumber = request.interfaceReferenceNumber
+        
+        else If header.sourceBank == NI01
+
+            API->>API: Constrye Request API initiate-loan-payment
+            Note over API: body: <br> interfaceReferenceNumber = request.interfaceReferenceNumber,  <br> consumerIPAddress = lambda.ipAddress, <br> paymentAmount = request.paymentAmount, <br> loanId  = request.loanId, <br> debitAccountReference = request.accountNumber,  <br> branchReference = lambda.branchReference, <br> currencyCode = lambda.currencyCode <br> serviceReference = lambda.serviceReference
+
+        end 
+
+        API->>executePayment: Consume API Producto initiate-loan-payment
+        Note right of API: body: <br> interfaceReferenceNumber, <br> consumerIPAddress, <br> paymentAmount, <br> loanId, <br> debitAccountReference, <br> branchReference, <br> currencyCode, <br> serviceReference
+
+        executePayment->>API: Response API Producto initiate-loan-payment
+        Note left of executePayment: responseBody: <br>  transactionDateTime, <br> loanId, <br> installmentReference, <br> paymentAmount
+        
+        API->>API: Evaluar Response API initiate-loan-payment
+
+        alt If  Response.initiate-loan-payment HTTP CODE != 200 
+
+            API->> Errors: Mapear código de error
+
+            Errors ->> API: Retorna código mapeado
+
+            API->> Consumidor: Retorna error
+            Note left of API: Se mapea código de error de la API de producto initiate-loan-payment
+
+        else If response.initiate-loan-payment HTTP CODE == 200 
+
+            API->>API: Construye response API
+            Note over API: Mapeo: <br> paymentExecutionDateTime = response.initiate-loan-payment.transactionDateTime, <br> loanId = response.initiate-loan-payment.loanId, <br> installmentReference = response.initiate-loan-payment.installmentReference <br> paymentAmount = response.initiate-loan-payment.paymentAmount
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+
+        end
+
+    end
+
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
