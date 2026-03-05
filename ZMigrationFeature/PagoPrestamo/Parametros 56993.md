@@ -3,14 +3,16 @@
 ```json
 //REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO
 {
-  "pk": "COUNTRY#XRS#DOMAIN#XXXX#PARAM#MMMM",
+  "pk": "COUNTRY#XRS#DOMAIN#LOAN_PAYMENT#PARAM#EXECUTION",
   "sk": "V#0001",
-  "name": "MMMM",
+  "name": "EXECUTION",
   "value": [
     {
       "region": "HN01-HN01",
       "enabled": true,
       "param-name": "ban-hnd-xx-connection-interbanca-param-db-<env>",
+      "T24T057.INTACCOUNT.USERS": "SRV-ITPEUS||SRV-ITSABF||SRV-ITUTSP||SRV-ITUSAC||SRV-ITVHUR||SRV-ITSIAF||SRV-ITPMS2||HNBNINTTSP||SRV-ITUT24||SRV-ITLBTR||HNBNSVCSAP||HNBNSVCOMNRBT||HNBNSVCDSRFACT||HNBNSVCQAFACT||SRV-ITALCN||HNBNQASCORE||HNBNQAONBASE||SRV-ITPMSV||HNBNAQABTPRESTA||HNBNDSRLBTRPWS", // Validar uso de este parámetro, no se evidencia en el flujo
+      "orderingbank": "999999",
       "hu5576": {
         "desciption-cb": "CODIGO_CORRESPONSAL",
         "paymentType": "ACCOUNT_DEBIT"
@@ -18,20 +20,19 @@
       "hu57003": {
         "noOfAuth": "0",
         "accountGroup": "1", 
-        "accountMultiple": "1",
-        "currencyCode": "USD En este campo se debe enviar el valor del tipo de moneda "
+        "accountMultiple": "1"
       },
       "hu57060": {
-        "noOfAuth": "0",
+        "chequeNoOfAuth": "0",
         "groupAttribute": "1",
         "multiGroupAttribute": "1",
         "transaction": "CLEARING"
       },
       "hu57119": {
-        "groupAttribute": "1",
-        "t24CreditAccountHNL": "HNL160150055",
-        "t24CreditAccountUSD": "USD160150057",
-        "t24TxnLoanPayment": "ACPH"
+        "paymentGroupAttribute": "1",
+        "T24T134.HNLCREDITACCTNO": "HNL160150055",
+        "T24T134.USDCREDITACCTNO": "USD160150057",
+        "T24T133.TXNTYPELOANPYMT": "ACPH"
       }       
     },
     {
@@ -54,9 +55,9 @@
     }
   ],
   "type": "JSON",
-  "description": "CONFIG OF XXXX BY METHOD",
+  "description": "CONFIG OF LOAN_PAYMENT BY METHOD",
   "country": "XRS",
-  "domain": "XXXX",
+  "domain": "LOAN_PAYMENT",
   "tags": [],
   "precedence": 10,
   "effective_from": "",
@@ -101,10 +102,10 @@
     "SK": "1.0|ACTIVE",
     "version": "1.0",
     "stage": "ACTIVE",
-    "callerService": "customer_loan_fulfill-product-MMMM",
+    "callerService": "customer_loan_fulfill-product-EXECUTION",
     "service": "customer_loan_fulfill-product",
-    "method": "MMMM",
-    "domain": "XXXX",
+    "method": "EXECUTION",
+    "domain": "LOAN_PAYMENT",
     "typeUsage": "IDEM",
     "hashFields": [
         "campos_del_request_para_calcular_hash"
@@ -145,7 +146,7 @@
     "DetailType": "provider.response",
     "Detail": {
         "correlation-id": "header.correlation-id",
-        "callerService": "customer_loan_fulfill-product-MMMM",
+        "callerService": "customer_loan_fulfill-product-EXECUTION",
         "channel": "rest-api",
         "transactionStatus": "success", // || "timeout" ||  "error" || "fault",
         "payload": { // Validar con JOE

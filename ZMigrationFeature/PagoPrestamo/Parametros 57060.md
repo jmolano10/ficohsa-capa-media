@@ -9,8 +9,8 @@
     {
       "region": "HN01-HN01",
       "enabled": true,
-      "t24ChqAccountHNL": "HNL160150057",
-      "t24ChqAccountUSD": "USD160150058",
+      "T24T032.HNLOBCHQACCTNO": "HNL160150057",
+      "T24T032.USDOBCHQACCTNO": "USD160150058",
     },
     {
       "region": "GT01-GT01",

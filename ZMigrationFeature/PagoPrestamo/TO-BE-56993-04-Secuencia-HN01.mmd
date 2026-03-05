@@ -1,0 +1,465 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Pago Préstamo <br> Epica 2267: PagoPrestamo <br> HU 56993:  POST -  /loan-payment/v1/execution
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant retriveTransactionDetails as API Consulta Detalles Cuenta <br> HU 3319 <br> GET: /loans-and-deposits/customer-account-retrieves/v1/product/accountIdentification/retrieve-transaction-details
+    participant retrieveLoan as API Consulta Detalles Préstamo <br> HU 3239 <br> GET: /loans-and-deposits/loan-retrieves/v1/product/loanReference/retrieve
+    participant tengo as API Retiro Efectivo Tengo <br> HU 57119 <br> POST: /loans-and-deposits/loan-admin/v1/initiate-transaction
+    participant transfer1 as API Transferencia Entre Cuentas Misma Moneda <br> HU 55274 <br> POST: /payments/payment-execution-transfer/v1/initiate-transfers-between-accounts
+    participant transfer2 as API Transferencia Entre Cuentas Credito <br> HU 4368 <br> POST: /payments/payment-execution-transfer/v1/payment-execution-apply
+    participant transfer3 as API Transferencia Entre Cuentas <br> HU 7837 <br> POST: /payments/payment-execution-admin/v1/initiate-transfers-between-accounts
+    participant loanPayment as API Ejectuar Pago Prestamo HN <br> HU 5576:  POST: /payments/payment-execution-maintenance/v1/execute-loan-repayment
+    participant reverse as API Reverse Loan Payment <br> HU 33776:  POST: /loan-payment-mgmt/v1/reverse-transaction
+    participant cashCreditAccount as API Ejectuar Crédito Cuenta Contable <br> HU 57003:  POST: /loans-and-deposits/loan-admin/v1/execute-repayment
+    participant cheque as API Depósito Cheque <br> HU 57060:  POST: /loans-and-deposits/current-account-mgmt/v1/initiate-check-deposit
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Realizar Pago Préstamo
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> loanId, <br> paymentAmount, <br> paymentType, <br> accountNumber, <br> chequeNumber <br> bankCode, <br> interfaceReferenceNumber, <br> debitCreditIndicator, <br> transactionReferenceBC, <br> currencyCode
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "LOAN_PAYMENT" <br> name: "EXECUTION" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "LOAN_PAYMENT" <br> name: "EXECUTION" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 
+
+    API->>API: Evaluar request.paymentType
+
+    alt If request.paymentType == "ACCOUNT_DEBIT" 
+        rect rgb(235, 243, 214)
+        Note over API, Errors: Flujo para paymentType == "ACCOUNT_DEBIT" 
+            alt if accountNumber == vacío
+
+                API->> Errors: Mapear código de error
+
+                Errors ->> API: Retorna código mapeado
+
+                API->> Consumidor: Retorna error
+                Note left of API: HTTP 400: accountNumber debe ser diferente de vacío
+
+            else If accountNumber != vacío
+                
+                Note over API, retrieveLoan: Consumo en paralelo a las APIs de producto retriveTransactionDetails y retrieveLoan
+
+                API->>API: Constrye Request API retriveTransactionDetails
+                Note over API: pathParam: <br> accountIdentification = request.accountNumber
+
+                API->>retriveTransactionDetails: Consume API Producto retriveTransactionDetails
+                Note right of API: pathParam: <br> accountIdentification
+
+                retriveTransactionDetails->>API: Response API Producto retriveTransactionDetails
+                Note left of retriveTransactionDetails: responseBody: <br>  accountCurrency <br> ++ Campos
+
+                API->>API: Constrye Request API retrieveLoan
+                Note over API: pathParam: <br> loanReference = request.loanId
+
+                API->>retrieveLoan: Consume API Producto retrieveLoan
+                Note right of API: pathParam: <br> loanReference
+
+                retrieveLoan->>API: Response API Producto retrieveLoan
+                Note left of retrieveLoan: responseBody: <br>  currency <br> ++ Campos
+                
+                API->>API: Evaluar Response APIs retriveTransactionDetails y retrieveLoan
+
+                alt If Response.retriveTransactionDetails or Response.retrieveLoan HTTP CODE != 200 
+
+                    API->> Errors: Mapear código de error
+
+                    Errors ->> API: Retorna código mapeado
+
+                    API->> Consumidor: Retorna error
+                    Note left of API: HTTP 422: No existe información para la cuenta y el préstamo
+
+                else If response.retriveTransactionDetails and response.retrieveLoan HTTP CODE == 200 (Los dos response deben ser exitosos)
+                    rect rgb(242, 242, 242)
+                    Note over API, transfer3: Ejecutar la trasnferencia entre cuentas
+                        alt If request.transactionReferenceBC != Vacío (Significa que la transacción viene de un corresponsal bancario)
+
+                            API->>API: Constrye Request API inititateTransactionTengo
+                            Note over API: body: <br> transactionType = lamda.T24T133.TXNTYPELOANPYMT, <br> debitAccountNumber = request.accountNumber, <br> debitCurrencyCode = request.currencyCode, <br> debitAmount = paymentAmount, <br> creditAccountNumber = lambda.T24T134.HNLCREDITACCTNO, <br> groupAttribute = lamda.paymentGroupAttribute, <br> paymentDetailsDescription = request.loanId, <br> tengoReference = request.transactionReferenceBC
+
+                            API->>tengo: Consume API Producto inititateTransactionTengo
+                            Note right of API: body: <br> transactionType, <br> debitAccountNumber, <br> debitCurrencyCode, <br> debitAmount, <br> creditAccountNumber, <br> groupAttribute, <br> paymentDetailsDescription, <br> tengoReference
+
+                            tengo->>API: Response API Producto inititateTransactionTengo
+                            Note left of tengo: responseBody: <br>  transactionReference <br> ++ Campos
+
+                            API->>API: Asigna Variables
+                            Note over API: $transactionReference = response.transactionReference
+
+                        else If response.retriveTransactionDetails.accountCurrency == response.retrieveLoan.currency 
+
+                            API->>API: Constrye Request API trasnferBetweemAccounsSameCurrency
+                            Note over API: body: <br> paymentTransactionType = lamda.T24T133.TXNTYPELOANPYMT, <br> debtorAccountReference = request.accountNumber , <br> currencyCode = request.currencyCode, <br> paymentAmount = request.paymentAmount, <br> creditorAccountReference = lambda.T24T134.HNLCREDITACCTNO, <br> businessUnitReference = lambda.orderingBank <br> transactionDescription = concat("PTM-", request.loanId)
+
+                            API->>transfer1: Consume API Producto trasnferBetweemAccounsSameCurrency
+                            Note right of API: body: <br> paymentTransactionType, <br> debtorAccountReference, <br> currencyCode, <br> paymentAmount, <br> creditorAccountReference, <br> businessUnitReference <br> transactionDescription
+
+                            transfer1->>API: Response API Producto trasnferBetweemAccounsSameCurrency
+                            Note left of transfer1: responseBody: <br> transactionReference <br> ++ Campos
+
+                            API->>API: Asigna Variables
+                            Note over API: $transactionReference = response.transactionReference 
+
+                        else If request.debitCreditIndicator == "CREDIT"
+
+                            API->>API: Constrye Request API trasnferCredit
+                            Note over API: body: paymentTransactionType = lamda.T24T133.TXNTYPELOANPYMT <br>  debtorAccountReference = request.accountNumber, <br> creditorAccountReference = lambda.T24T134.HNLCREDITACCTNO, <br> creditorAmount = request.paymentAmount
+
+                            API->>transfer2: Consume API Producto trasnferCredit
+                            Note right of API: body: <br> paymentTransactionType, <br> debtorAccountReference, <br> creditorAccountReference, <br> creditorAmount
+
+                            transfer2->>API: Response API Producto trasnferCredit
+                            Note left of transfer2: responseBody: <br>  transactionReference <br> ++ Campos
+
+                            API->>API: Asigna Variables
+                            Note over API: $transactionReference = response.transactionReference 
+
+                        else
+
+                            API->>API: Constrye Request API trasnferAccount
+                            Note over API: body: transactionType = lamda.T24T133.TXNTYPELOANPYMT <br>  debitAccountReference = request.accountNumber, <br> creditAccountReference = lambda.T24T134.HNLCREDITACCTNO, <br> debitAmount = request.paymentAmount
+
+                            API->>transfer3: Consume API Producto trasnferAccount
+                            Note right of API: body: <br> paymentTransactionType, <br> debitAccountReference, <br> creditAccountReference, <br> debitAmount
+
+                            transfer3->>API: Response API Producto trasnferAccount
+                            Note left of transfer3: responseBody: <br>  transactionReference <br> ++ Campos
+
+                            API->>API: Asigna Variables
+                            Note over API: $transactionReference = response.transactionReference 
+
+                        end
+
+                    end 
+
+                    API->>API: Evaluar Response APIs Trasnferencia
+
+                    alt If response APIs transferencia != HTTP CODE 200
+
+                        API->> Errors: Mapear código de error
+
+                        Errors ->> API: Retorna código mapeado
+
+                        API->> Consumidor: Retorna error
+                        Note left of API: Se mapea código de error de la API de producto consumida para la transferencia
+
+                    else 
+
+                        alt If request.transactionReferenceBC != Vacío (Significa que la transacción viene de un corresponsal bancario)
+
+                            API->>API: Constrye Request API executeLoanPayment
+                            Note over API: body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentAmount, <br> paymentType = request.paymentType, <br> accountNumber = request.accountNumber, <br> interfaceReferenceNumber = request.interfaceReferenceNumber, <br> transactionReference = $transactionReference, <br> transactionReferenceBC = request.transactionReferenceBC, <br> paymentDescription = lambda.desciption-cb
+
+                            API->>loanPayment: Consume API Producto executeLoanPayment
+                            Note right of API: body: <br> loanId, <br> paymentAmount, <br> paymentType, <br> accountNumber, <br> interfaceReferenceNumber, <br> transactionReference, <br> transactionReferenceBC, <br> paymentDescription
+
+                            loanPayment->>API: Response API Producto executeLoanPayment
+                            Note left of loanPayment: responseBody: <br>  paymentExecutionDateTime, installmentReference <br> ++ Campos
+
+                            alt If response API executeLoanPayment != HTTP CODE 200 (No se efectua reverso de la transferencia)
+
+                                API->> Errors: Mapear código de error
+
+                                Errors ->> API: Retorna código mapeado
+
+                                API->> Consumidor: Retorna error
+                                Note left of API: Se mapea código de error de la API de producto executeLoanPayment
+                            
+                            else
+
+                                API->>API: Construye response API
+                                Note over API: Mapeo: <br> paymentExecutionDateTime = responseExecuteLoanPayment.paymentExecutionDateTime, <br> loanId = request.loanId, <br> installmentReference = responseExecuteLoanPayment.installmentReference <br> paymentAmount = request.paymentAmount
+
+                                API->>Consumidor: Response Exitoso
+                                Note left of API: HTTP 200: Response Body 
+
+                            end
+
+                        else 
+
+                            API->>API: Constrye Request API executeLoanPayment
+                            Note over API: body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentAmount, <br> accountNumber = request.accountNumber, <br> interfaceReferenceNumber = request.interfaceReferenceNumber, <br> transactionReference = $transactionReference
+
+                            API->>loanPayment: Consume API Producto executeLoanPayment
+                            Note right of API: body: <br> loanId, <br> paymentAmount, <br> paymentType, <br> accountNumber, <br> interfaceReferenceNumber, <br> transactionReference, <br> transactionReferenceBC, <br> paymentDescription
+
+                            loanPayment->>API: Response API Producto executeLoanPayment
+                            Note left of loanPayment: responseBody: <br>  paymentExecutionDateTime, installmentReference <br> ++ Campos
+
+                            API->>API: Evaluar Response API executeLoanPayment
+
+                            alt If response API executeLoanPayment != HTTP CODE 200
+
+                                API->>API: Constrye Request API reverseTransaction
+                                Note over API: body: <br> transactionReference = $transactionReference <br> transactionType = " "
+
+                                API->>reverse: Consume API Producto reverseTransaction
+                                Note right of API: body: transactionReference, <br> transactionType
+
+                                reverse->>API: Response API Producto reverseTransaction
+                                Note left of reverse: responseBody: <br>  transactionDate
+
+                                API->> Errors: Mapear código de error
+
+                                Errors ->> API: Retorna código mapeado
+
+                                API->> Consumidor: Retorna error
+                                Note left of API: Se mapea código de error de la API de producto executeLoanPayment
+                            
+                            else
+
+                                API->>API: Construye response API
+                                Note over API: Mapeo: <br> paymentExecutionDateTime = responseExecuteLoanPayment.paymentExecutionDateTime, <br> loanId = request.loanId, <br> installmentReference = responseExecuteLoanPayment.installmentReference <br> paymentAmount = request.paymentAmount
+
+                                API->>Consumidor: Response Exitoso
+                                Note left of API: HTTP 200: Response Body 
+
+                            end
+
+                        end 
+                    
+                    end
+
+                end
+
+            end
+
+        end
+    end 
+
+    alt If request.paymentType == "CASH" 
+        rect rgb(243, 238, 214)
+        Note over API, Errors: Flujo para paymentType == "CASH"
+
+            API->>API: Constrye Request API retrieveLoan
+            Note over API: pathParam: <br> loanReference = request.loanId
+
+            API->>retrieveLoan: Consume API Producto retrieveLoan
+            Note right of API: pathParam: <br> loanReference
+
+            retrieveLoan->>API: Response API Producto retrieveLoan
+            Note left of retrieveLoan: responseBody: <br>  currency
+            
+            API->>API: Evaluar Response API retrieveLoan
+
+            alt If  Response.retrieveLoan HTTP CODE != 200 
+
+                API->> Errors: Mapear código de error
+
+                Errors ->> API: Retorna código mapeado
+
+                API->> Consumidor: Retorna error
+                Note left of API: Se mapea código de error de la API de producto retrieveLoan
+
+            else If response.retrieveLoan HTTP CODE == 200 
+
+                API->>API: Constrye Request API cashCreditAccount
+                Note over API: body: <br> currencyCode = request.currencyCode, <br> paymentAmount = request.paymentAmount, <br> authorizationsNumber = lambda.noOfAuth, <br> accountGroup = lambda.accountGroup, <br> accountMultiple = lambda.accountMultiple
+
+                API->>cashCreditAccount: Consume API Producto cashCreditAccount
+                Note right of API: body: <br> currencyCode, <br> paymentAmount, <br> authorizationsNumber, <br> accountGroup, <br> accountMultiple
+
+                cashCreditAccount->>API: Response API Producto cashCreditAccount
+                Note left of cashCreditAccount: responseBody: <br> loanRepaymentTransactionId, <br> ++ Campos
+                
+                API->>API: Evaluar Response API cashCreditAccount
+                
+                alt If  Response.cashCreditAccount HTTP CODE != 200 
+
+                    API->> Errors: Mapear código de error
+
+                    Errors ->> API: Retorna código mapeado
+
+                    API->> Consumidor: Retorna error
+                    Note left of API: Se mapea código de error de la API de producto cashCreditAccount
+
+                else If response.cashCreditAccount HTTP CODE == 200 
+
+                    API->>API: Constrye Request API executeLoanPayment
+                    Note over API: body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentAmount, <br> accountNumber = request.accountNumber, <br> interfaceReferenceNumber = request.interfaceReferenceNumber, <br> transactionReference = responseCashCreditAccount.loanRepaymentTransactionId
+
+                    API->>loanPayment: Consume API Producto executeLoanPayment
+                    Note right of API: body: <br> loanId, <br> paymentAmount, <br> accountNumber, <br> interfaceReferenceNumber, <br> transactionReference
+
+                    loanPayment->>API: Response API Producto executeLoanPayment
+                    Note left of loanPayment: responseBody: <br>  paymentExecutionDateTime, installmentReference <br> ++ Campos
+
+                    API->>API: Evaluar Response API executeLoanPayment
+
+                    alt If response API executeLoanPayment != HTTP CODE 200
+
+                        API->>API: Constrye Request API reverseTransaction
+                        Note over API: body: <br> transactionReference = $transactionReference <br> transactionType = " "
+
+                        API->>reverse: Consume API Producto reverseTransaction
+                        Note right of API: body: transactionReference, <br> transactionType
+
+                        reverse->>API: Response API Producto reverseTransaction
+                        Note left of reverse: responseBody: <br>  transactionDate
+
+                        API->> Errors: Mapear código de error
+
+                        Errors ->> API: Retorna código mapeado
+
+                        API->> Consumidor: Retorna error
+                        Note left of API: Se mapea código de error de la API de producto executeLoanPayment
+                    
+                    else
+
+                        API->>API: Construye response API
+                        Note over API: Mapeo: <br> paymentExecutionDateTime = responseExecuteLoanPayment.paymentExecutionDateTime, <br> loanId = request.loanId, <br> installmentReference = responseExecuteLoanPayment.installmentReference <br> paymentAmount = request.paymentAmount
+
+                        API->>Consumidor: Response Exitoso
+                        Note left of API: HTTP 200: Response Body 
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+
+    alt If request.paymentType == "OTHER_BANK_CHEQUE" 
+        rect rgb(233, 228, 248)
+        Note over API, Errors: Flujo para paymentType == "OTHER_BANK_CHEQUE"
+
+            API->>API: Constrye Request API retrieveLoan
+            Note over API: pathParam: <br> loanReference = request.loanId
+
+            API->>retrieveLoan: Consume API Producto retrieveLoan
+            Note right of API: pathParam: <br> loanReference
+
+            retrieveLoan->>API: Response API Producto retrieveLoan
+            Note left of retrieveLoan: responseBody: <br>  currency
+            
+            API->>API: Evaluar Response API retrieveLoan
+
+            alt If  Response.retrieveLoan HTTP CODE != 200 
+
+                API->> Errors: Mapear código de error
+
+                Errors ->> API: Retorna código mapeado
+
+                API->> Consumidor: Retorna error
+                Note left of API: Se mapea código de error de la API de producto retrieveLoan
+
+            else If response.retrieveLoan HTTP CODE == 200 
+
+                API->>API: Constrye Request API checkDeposit
+                Note over API: body: <br> chequeNumber = request.chequeNumber, <br> bankCode = request.bankCode, <br> loanCurrency = request.currencyCode, <br> paymentAmount = request.paymentAmount, <br> noOfAuth = lambda.chequeNoOfAuth, <br> groupAttribute = lambda.groupAttribute, <br> multiGroupAttribute = lambda.multiGroupAttribute, <br> transactionReference = lambda.transaction
+
+                API->>cheque: Consume API Producto checkDeposit
+                Note right of API: body: <br> chequeNumber, <br> bankCode, <br> loanCurrency, <br> paymentAmount, <br> noOfAuth, <br> groupAttribute, <br> multiGroupAttribute, <br> transactionReference
+
+                cheque->>API: Response API Producto checkDeposit
+                Note left of cheque: responseBody: <br> transactionReference, <br> ++ Campos
+                
+                API->>API: Evaluar Response API checkDeposit
+                
+                alt If  Response.checkDeposit HTTP CODE != 200 
+
+                    API->> Errors: Mapear código de error
+
+                    Errors ->> API: Retorna código mapeado
+
+                    API->> Consumidor: Retorna error
+                    Note left of API: Se mapea código de error de la API de producto checkDeposit
+
+                else If response.checkDeposit HTTP CODE == 200 
+
+                    API->>API: Constrye Request API executeLoanPayment
+                    Note over API: body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentAmount, <br> accountNumber = request.accountNumber, <br> interfaceReferenceNumber = request.interfaceReferenceNumber, <br> transactionReference = responseCheckDeposit.transactionReference
+
+                    API->>loanPayment: Consume API Producto executeLoanPayment
+                    Note right of API: body: <br> loanId, <br> paymentAmount, <br> accountNumber, <br> interfaceReferenceNumber, <br> transactionReference
+
+                    loanPayment->>API: Response API Producto executeLoanPayment
+                    Note left of loanPayment: responseBody: <br>  paymentExecutionDateTime, installmentReference <br> ++ Campos
+
+                    API->>API: Evaluar Response API executeLoanPayment
+
+                    alt If response API executeLoanPayment != HTTP CODE 200
+
+                        API->>API: Constrye Request API reverseTransaction
+                        Note over API: body: <br> transactionReference = $transactionReference <br> transactionType = " "
+
+                        API->>reverse: Consume API Producto reverseTransaction
+                        Note right of API: body: transactionReference, <br> transactionType
+
+                        reverse->>API: Response API Producto reverseTransaction
+                        Note left of reverse: responseBody: <br>  transactionDate
+
+                        API->> Errors: Mapear código de error
+
+                        Errors ->> API: Retorna código mapeado
+
+                        API->> Consumidor: Retorna error
+                        Note left of API: Se mapea código de error de la API de producto executeLoanPayment
+                    
+                    else
+
+                        API->>API: Construye response API
+                        Note over API: Mapeo: <br> paymentExecutionDateTime = responseExecuteLoanPayment.paymentExecutionDateTime, <br> loanId = request.loanId, <br> installmentReference = responseExecuteLoanPayment.installmentReference <br> paymentAmount = request.paymentAmount
+
+                        API->>Consumidor: Response Exitoso
+                        Note left of API: HTTP 200: Response Body 
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
