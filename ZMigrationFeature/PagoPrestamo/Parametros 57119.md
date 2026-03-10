@@ -2,9 +2,9 @@
 ```json
 //REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO
 {
-  "pk": "COUNTRY#HND#DOMAIN#LOAN_ADMIN#PARAM#INITIATE_TRANSACTION",
+  "pk": "COUNTRY#HND#DOMAIN#LOAN_ADMIN#PARAM#EXECUTE_LOAN_REPAYMENT",
   "sk": "V#0001",
-  "name": "INITIATE_TRANSACTION",
+  "name": "EXECUTE_LOAN_REPAYMENT",
   "value": [
     {
       "region": "HN01-HN01",
@@ -71,7 +71,7 @@
 ```json
 {
   "operation": "RetiroEfectivoTengo",
-  "caller-service": "LOAN_ADMIN-product-INITIATE_TRANSACTION"
+  "caller-service": "LOAN_ADMIN-product-EXECUTE_LOAN_REPAYMENT"
 }
 ```
 ##### Registro en Dynamo Wrapper T24
@@ -80,15 +80,15 @@
 
 ```json
 {
-  "pk": "COUNTRY#HND#DOMAIN#WRAPPER_T24#PARAM#srv-itintb|LOAN_ADMIN-product-INITIATE_TRANSACTION",
+  "pk": "COUNTRY#HND#DOMAIN#WRAPPER_T24#PARAM#srv-itintb|LOAN_ADMIN-product-EXECUTE_LOAN_REPAYMENT",
   "sk": "V#0001",
-  "name": "srv-itintb|LOAN_ADMIN-product-INITIATE_TRANSACTION",
+  "name": "srv-itintb|LOAN_ADMIN-product-EXECUTE_LOAN_REPAYMENT",
   "value": {
     "secret-name": "ban-hnd-ic-comp-secm-t24-tengo-transactions-wsdl-dev",
     "param-name": "ban-hnd-ic-comp-param-t24-tengo-transactions-wsdl-dev"
   },
   "type": "json",
-  "description": "Credenciales de la operación ConsultaFinanciamientosCliente del LOAN_ADMIN-product-INITIATE_TRANSACTION",
+  "description": "Credenciales de la operación ConsultaFinanciamientosCliente del LOAN_ADMIN-product-EXECUTE_LOAN_REPAYMENT",
   "country": "HND",
   "domain": "WRAPPER_T24",
   "tags": [
@@ -107,11 +107,11 @@
 
 ```json
 {
-  "PK": "loan_admin-product-initiate_transaction",
+  "PK": "loan_admin-product-EXECUTE_LOAN_REPAYMENT",
   "SK": "1.0|ACTIVE",
   "version": "1.0",
   "stage": "ACTIVE",
-  "callerService": "loan_admin-product-initiate_transaction",
+  "callerService": "loan_admin-product-EXECUTE_LOAN_REPAYMENT",
   "service": "current-account-mgmt-product",
   "method": "initiate-check-deposit",
   "domain": "current-account",
@@ -159,7 +159,7 @@
 
 ```json
 curl --location 'http://internal-ban-xrs-ic-elb-alb-master-dev-548527349.us-east-1.elb.amazonaws.com:17396/integrity-handler/v1/idempotency/generate' \
---header 'Caller-Service: LOAN_ADMIN-product-INITIATE_TRANSACTION' \
+--header 'Caller-Service: LOAN_ADMIN-product-EXECUTE_LOAN_REPAYMENT' \
 --header 'Correlation-Id: b1f6f6f5-d611-4c1f-843f-89a1c8aaaaee' \
 --header 'Authorization: Bearer my.token.loko' \
 --header 'Source-Bank: HN01' \
@@ -242,7 +242,7 @@ curl --location 'http://internal-ban-xrs-ic-elb-alb-master-dev-548527349.us-east
   "DetailType": "provider.response",
   "Detail": {
     "correlation-id": "header.correlation-id",
-    "callerService": "LOAN_ADMIN-product-INITIATE_TRANSACTION",
+    "callerService": "LOAN_ADMIN-product-EXECUTE_LOAN_REPAYMENT",
     "channel": "rest-api",
     "transactionStatus": "success", // || "timeout" || "error" || "fault"
     "payload": {
@@ -323,7 +323,7 @@ postman request POST 'http://localhost:8080/t24-wrapper-hnd/v2/RetiroEfectivoTen
   --header 'Correlation-Id: de957188-87a4-4808-a97e-d5da44a7798f' \
   --header 'Accept-Language: es' \
   --header 'Authorization: Bearer token.ok.ok' \
-  --header 'Caller-Service: LOAN_ADMIN-product-INITIATE_TRANSACTION' \
+  --header 'Caller-Service: LOAN_ADMIN-product-EXECUTE_LOAN_REPAYMENT' \
   --header 'Channel: C001' \
   --header 'APP_CONTEXTUAL: 1' \
   --header 'Destination-Bank: test' \

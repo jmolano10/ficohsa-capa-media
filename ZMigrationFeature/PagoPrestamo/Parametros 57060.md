@@ -2,9 +2,9 @@
 ```json
 //REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO
 {
-  "pk": "COUNTRY#HND#DOMAIN#CURRENT_ACCOUNT_MGMT#PARAM#INITIATE_CHECK_DEPOSIT",
+  "pk": "COUNTRY#HND#DOMAIN#CURRENT_ACCOUNT_MGMT#PARAM#INITIATE_CHEQUE_DEPOSIT",
   "sk": "V#0001",
-  "name": "INITIATE_CHECK_DEPOSIT",
+  "name": "INITIATE_CHEQUE_DEPOSIT",
   "value": [
     {
       "region": "HN01-HN01",
@@ -73,7 +73,7 @@
 ```json
 {
   "operation": "Depositocombinado",
-  "caller-service": "CURRENT_ACCOUNT_MGMT-product-INITIATE_CHECK_DEPOSIT"
+  "caller-service": "CURRENT_ACCOUNT_MGMT-product-INITIATE_CHEQUE_DEPOSIT"
 }
 ```
 ##### Registro en Dynamo Wrapper T24
@@ -82,15 +82,15 @@
 
 ```json
 {
-  "pk": "COUNTRY#HND#DOMAIN#WRAPPER_T24#PARAM#srv-itintb|CURRENT_ACCOUNT_MGMT-product-INITIATE_CHECK_DEPOSIT",
+  "pk": "COUNTRY#HND#DOMAIN#WRAPPER_T24#PARAM#srv-itintb|CURRENT_ACCOUNT_MGMT-product-INITIATE_CHEQUE_DEPOSIT",
   "sk": "V#0001",
-  "name": "srv-itintb|CURRENT_ACCOUNT_MGMT-product-INITIATE_CHECK_DEPOSIT",
+  "name": "srv-itintb|CURRENT_ACCOUNT_MGMT-product-INITIATE_CHEQUE_DEPOSIT",
   "value": {
     "secret-name": "ban-hnd-ic-comp-secm-t24-cheque-deposit-wsdl-dev",
     "param-name": "ban-hnd-ic-comp-param-t24-cheque-deposit-wsdl-dev"
   },
   "type": "json",
-  "description": "Credenciales de la operación ConsultaFinanciamientosCliente del CURRENT_ACCOUNT_MGMT-product-INITIATE_CHECK_DEPOSIT",
+  "description": "Credenciales de la operación ConsultaFinanciamientosCliente del CURRENT_ACCOUNT_MGMT-product-INITIATE_CHEQUE_DEPOSIT",
   "country": "HND",
   "domain": "WRAPPER_T24",
   "tags": [
@@ -158,7 +158,7 @@
 
 ```json
 curl --location 'http://internal-ban-xrs-ic-elb-alb-master-dev-548527349.us-east-1.elb.amazonaws.com:17396/integrity-handler/v1/idempotency/generate' \
---header 'Caller-Service: CURRENT_ACCOUNT_MGMT-product-INITIATE_CHECK_DEPOSIT' \
+--header 'Caller-Service: CURRENT_ACCOUNT_MGMT-product-INITIATE_CHEQUE_DEPOSIT' \
 --header 'Correlation-Id: b1f6f6f5-d611-4c1f-843f-89a1c8aaaaee' \
 --header 'Authorization: Bearer my.token.loko' \
 --header 'Source-Bank: HN01' \
@@ -214,7 +214,7 @@ curl --location 'http://internal-ban-xrs-ic-elb-alb-master-dev-548527349.us-east
     "DetailType": "provider.response ",
     "Detail": {
         "correlation-id": "header.correlation-id",
-        "callerService": "CURRENT_ACCOUNT_MGMT-product-INITIATE_CHECK_DEPOSIT",
+        "callerService": "CURRENT_ACCOUNT_MGMT-product-INITIATE_CHEQUE_DEPOSIT",
         "channel": "rest-api",
         "transactionStatus": "success", // || "timeout" ||  "error" || "fault",
         "payload": { 
