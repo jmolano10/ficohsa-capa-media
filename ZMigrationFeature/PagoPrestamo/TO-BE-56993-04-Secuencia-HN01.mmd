@@ -104,6 +104,7 @@ sequenceDiagram
                 else If response.retriveTransactionDetails and response.retrieveLoan HTTP CODE == 200 (Los dos response deben ser exitosos)
                     rect rgb(242, 242, 242)
                     Note over API, transfer3: Ejecutar la trasnferencia entre cuentas
+
                         alt If request.transactionReferenceBC != Vacío (Significa que la transacción viene de un corresponsal bancario)
 
                             API->>API: Constrye Request API inititateTransactionTengo
@@ -188,8 +189,17 @@ sequenceDiagram
                             loanPayment->>API: Response API Producto executeLoanPayment
                             Note left of loanPayment: responseBody: <br>  paymentExecutionDateTime, installmentReference <br> ++ Campos
 
-                            alt If response API executeLoanPayment != HTTP CODE 200 (No se efectua reverso de la transferencia)
+                            alt If response API executeLoanPayment != HTTP CODE 200
 
+                                API->>API: Constrye Request API reverseTransaction
+                                Note over API: body: <br> transactionReference = $transactionReference <br> transactionType = " "
+
+                                API->>reverse: Consume API Producto reverseTransaction
+                                Note right of API: body: transactionReference, <br> transactionType
+
+                                reverse->>API: Response API Producto reverseTransaction
+                                Note left of reverse: responseBody: <br>  transactionDate
+                                
                                 API->> Errors: Mapear código de error
 
                                 Errors ->> API: Retorna código mapeado
@@ -197,7 +207,7 @@ sequenceDiagram
                                 API->> Consumidor: Retorna error
                                 Note left of API: Se mapea código de error de la API de producto executeLoanPayment
                             
-                            else
+                            else If response API executeLoanPayment == HTTP CODE 200
 
                                 API->>API: Construye response API
                                 Note over API: Mapeo uno a uno con los campos response API Prod executeLoanPayment
@@ -207,8 +217,8 @@ sequenceDiagram
 
                             end
 
-                        else 
-
+                        else If request.transactionReferenceBC == Vacío o no presente (Significa que la transacción viene de un canal diferente a corresponsal bancario)
+                            
                             API->>API: Constrye Request API executeLoanPayment
                             Note over API: body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentAmount, <br> accountNumber = request.accountNumber, <br> interfaceReferenceNumber = request.interfaceReferenceNumber, <br> transactionReference = $transactionReference
 
@@ -237,8 +247,8 @@ sequenceDiagram
 
                                 API->> Consumidor: Retorna error
                                 Note left of API: Se mapea código de error de la API de producto executeLoanPayment
-                            
-                            else
+                             
+                            else If response API executeLoanPayment == HTTP CODE 200
 
                                 API->>API: Construye response API
                                 Note over API: Mapeo uno a uno con los campos response API Prod executeLoanPayment
