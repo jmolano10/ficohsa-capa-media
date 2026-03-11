@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Migración a AWS - Corresponsales Bancarios</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 40px;
+            color: #333;
+        }
+        h1 {
+            color: #232F3E;
+            border-bottom: 3px solid #FF9900;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #232F3E;
+            margin-top: 30px;
+            border-bottom: 2px solid #FF9900;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #FF9900;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        th {
+            background-color: #232F3E;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .ventaja {
+            color: #28a745;
+        }
+        .desventaja {
+            color: #dc3545;
+        }
+        .recomendacion {
+            background-color: #fff3cd;
+            border-left: 4px solid #FF9900;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .mejor-opcion {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        ul {
+            margin: 10px 0;
+        }
+        .arquitectura {
+            background-color: #e7f3ff;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Análisis de Migración a AWS - Sistema de Corresponsales Bancarios</h1>
+    
+    <h2>1. Análisis de Datos Actuales</h2>
+    
+    <h3>1.1 Tabla MW_CORRESPONSALES_BANCARIOS</h3>
+    <p><strong>Estructura:</strong></p>
+    <ul>
+        <li>CODIGO_CORRESPONSAL (PK)</li>
+        <li>NOMBRE_CORRESPONSAL</li>
+        <li>ESTADO</li>
+        <li>CUENTA_CREDITO</li>
+        <li>CUENTA_DEBITO</li>
+        <li>MONEDA_PERMITIDA</li>
+        <li>CODIGO_PAIS</li>
+        <li>CUENTA_COMISION</li>
+    </ul>
+    <p><strong>Características:</strong> Tabla de configuración con 3 registros. Datos maestros de baja frecuencia de cambio.</p>
+    
+    <h3>1.2 Tabla MW_TRANSACCIONES_CORBAN</h3>
+    <p><strong>Estructura:</strong></p>
+    <ul>
+        <li>CODIGO_CORRESPONSAL (FK)</li>
+        <li>CODIGO_TRANSACCION</li>
+        <li>DESCRIPCION</li>
+        <li>ESTADO</li>
+        <li>MONTO_MAX_X_TRN</li>
+        <li>TIPO_TRANSACCION</li>
+        <li>CODIGO_PAIS</li>
+        <li>MONTO_COMISION</li>
+        <li>MONEDA_COMISION</li>
+        <li>TIPO_TRANSACCION_COMISION</li>
+    </ul>
+    <p><strong>Características:</strong> Tabla de configuración con 27 registros. Define tipos de transacciones permitidas por corresponsal.</p>
+    
+    <h3>1.3 Stored Procedure MW_P_VALIDA_CORBAN</h3>
+    <p><strong>Funcionalidad:</strong></p>
+    <ul>
+        <li>Valida existencia y estado del corresponsal bancario</li>
+        <li>Recupera configuración de cuentas (crédito, débito, comisión)</li>
+        <li>Valida tipo de transacción permitida</li>
+        <li>Retorna información de comisiones y monedas</li>
+        <li>Manejo de errores con códigos y mensajes descriptivos</li>
+    </ul>
+    <p><strong>Patrón:</strong> Consulta de validación y configuración (READ-ONLY), sin lógica de negocio compleja.</p>
+
+    <h2>2. Comparativa de Servicios AWS para Almacenamiento de Datos</h2>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Servicio AWS</th>
+                <th>Ventajas</th>
+                <th>Desventajas</th>
+                <th>Caso de Uso Ideal</th>
+                <th>Costo Estimado</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Amazon RDS (Oracle/PostgreSQL/MySQL)</strong></td>
+                <td class="ventaja">
+                    • Migración directa desde Oracle<br>
+                    • Soporte completo de SQL<br>
+                    • Backups automáticos<br>
+                    • Multi-AZ para HA<br>
+                    • Compatibilidad con SPs existentes<br>
+                    • Herramientas de migración (DMS)
+                </td>
+                <td class="desventaja">
+                    • Mayor costo operativo<br>
+                    • Requiere gestión de instancias<br>
+                    • Escalabilidad vertical limitada<br>
+                    • Licenciamiento Oracle costoso
+                </td>
+                <td>Migración lift-and-shift con mínimos cambios</td>
+                <td>$$$ - $$$$ (Oracle más costoso)</td>
+            </tr>
+            <tr>
+                <td><strong>Amazon Aurora Serverless v2</strong></td>
+                <td class="ventaja">
+                    • Auto-escalado automático<br>
+                    • Compatible con PostgreSQL/MySQL<br>
+                    • Pago por uso (ACU)<br>
+                    • Alta disponibilidad nativa<br>
+                    • Mejor rendimiento que RDS<br>
+                    • Escalado en segundos
+                </td>
+                <td class="desventaja">
+                    • Requiere refactorización desde Oracle<br>
+                    • Curva de aprendizaje<br>
+                    • Limitaciones en algunas features de Oracle
+                </td>
+                <td>Cargas variables con necesidad de escalado automático</td>
+                <td>$$ - $$$ (según uso)</td>
+            </tr>
+            <tr>
+                <td><strong>Amazon DynamoDB</strong></td>
+                <td class="ventaja">
+                    • Totalmente serverless<br>
+                    • Latencia de milisegundos<br>
+                    • Escalado ilimitado<br>
+                    • Pago por request<br>
+                    • Cero administración<br>
+                    • Global Tables para multi-región<br>
+                    • Ideal para datos de configuración
+                </td>
+                <td class="desventaja">
+                    • No soporta SQL nativo<br>
+                    • Requiere rediseño completo<br>
+                    • Consultas complejas limitadas<br>
+                    • Curva de aprendizaje NoSQL
+                </td>
+                <td>Datos de configuración con alta disponibilidad y bajo volumen</td>
+                <td>$ - $$ (muy económico para este volumen)</td>
+            </tr>
+            <tr>
+                <td><strong>Amazon S3 + Athena</strong></td>
+                <td class="ventaja">
+                    • Costo muy bajo<br>
+                    • Almacenamiento ilimitado<br>
+                    • Consultas SQL con Athena<br>
+                    • Integración con Lambda<br>
+                    • Versionamiento de datos
+                </td>
+                <td class="desventaja">
+                    • No es base de datos transaccional<br>
+                    • Latencia mayor<br>
+                    • No apto para escrituras frecuentes<br>
+                    • Requiere arquitectura diferente
+                </td>
+                <td>Datos históricos o de solo lectura con consultas ocasionales</td>
+                <td>$ (muy económico)</td>
+            </tr>
+            <tr>
+                <td><strong>Amazon ElastiCache (Redis)</strong></td>
+                <td class="ventaja">
+                    • Latencia sub-milisegundo<br>
+                    • Ideal para caché<br>
+                    • Estructuras de datos avanzadas<br>
+                    • Alta disponibilidad<br>
+                    • Perfecto para datos de configuración
+                </td>
+                <td class="desventaja">
+                    • No es base de datos primaria<br>
+                    • Requiere persistencia adicional<br>
+                    • Costo por hora de instancia<br>
+                    • Gestión de memoria
+                </td>
+                <td>Caché de configuración con DynamoDB o RDS como respaldo</td>
+                <td>$$ (instancias pequeñas suficientes)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="mejor-opcion">
+        <h2>3. Mejor Opción Recomendada: Amazon DynamoDB</h2>
+        
+        <h3>Justificación:</h3>
+        <ul>
+            <li><strong>Naturaleza de los datos:</strong> Son tablas de configuración pequeñas (30 registros totales) con baja frecuencia de cambios</li>
+            <li><strong>Patrón de acceso:</strong> Consultas simples por clave primaria (CODIGO_CORRESPONSAL + CODIGO_PAIS + CODIGO_TRANSACCION)</li>
+            <li><strong>Escalabilidad:</strong> DynamoDB escala automáticamente sin intervención</li>
+            <li><strong>Costo:</strong> Para este volumen de datos, el costo mensual sería < $5 USD</li>
+            <li><strong>Disponibilidad:</strong> 99.99% SLA sin configuración adicional</li>
+            <li><strong>Latencia:</strong> Respuestas en milisegundos, ideal para validaciones en tiempo real</li>
+            <li><strong>Mantenimiento:</strong> Cero administración de infraestructura</li>
+            <li><strong>Multi-región:</strong> Global Tables permite replicación automática entre regiones</li>
+        </ul>
+
+        <h3>Diseño de Tablas en DynamoDB:</h3>
+        
+        <p><strong>Tabla 1: CorresponsalesBancarios</strong></p>
+        <ul>
+            <li>Partition Key: CODIGO_CORRESPONSAL#CODIGO_PAIS (ej: "101#HN01")</li>
+            <li>Atributos: nombre_corresponsal, estado, cuenta_credito, cuenta_debito, moneda_permitida, cuenta_comision</li>
+        </ul>
+        
+        <p><strong>Tabla 2: TransaccionesCorban</strong></p>
+        <ul>
+            <li>Partition Key: CODIGO_CORRESPONSAL#CODIGO_PAIS (ej: "101#HN01")</li>
+            <li>Sort Key: CODIGO_TRANSACCION (ej: "2")</li>
+            <li>Atributos: descripcion, estado, monto_max_x_trn, tipo_transaccion, monto_comision, moneda_comision, tipo_transaccion_comision</li>
+        </ul>
+
+        <h3>Alternativa Híbrida (Recomendada para Producción):</h3>
+        <p><strong>DynamoDB + ElastiCache (Redis)</strong></p>
+        <ul>
+            <li>DynamoDB como fuente de verdad persistente</li>
+            <li>Redis como caché de primer nivel para latencia ultra-baja</li>
+            <li>TTL de 1 hora en caché (datos cambian raramente)</li>
+            <li>Costo adicional mínimo (~$15-20/mes para instancia t4g.micro)</li>
+            <li>Latencia < 1ms en el 99% de consultas</li>
+        </ul>
+    </div>
+
+    <h2>4. Arquitectura Recomendada para la Lógica del Stored Procedure</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Opción</th>
+                <th>Ventajas</th>
+                <th>Desventajas</th>
+                <th>Recomendación</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Mantener Stored Procedure (RDS/Aurora)</strong></td>
+                <td class="ventaja">
+                    • Migración más rápida<br>
+                    • Lógica centralizada en BD<br>
+                    • Menos cambios en aplicación
+                </td>
+                <td class="desventaja">
+                    • Acoplamiento a base de datos<br>
+                    • Difícil de versionar y testear<br>
+                    • No serverless<br>
+                    • Escalabilidad limitada
+                </td>
+                <td>❌ No recomendado para arquitectura moderna</td>
+            </tr>
+            <tr>
+                <td><strong>API REST (API Gateway + Lambda)</strong></td>
+                <td class="ventaja">
+                    • Desacoplamiento completo<br>
+                    • Serverless y auto-escalable<br>
+                    • Fácil versionamiento<br>
+                    • Testing unitario simple<br>
+                    • Integración con otros servicios<br>
+                    • Monitoreo con CloudWatch<br>
+                    • Autenticación con Cognito/IAM
+                </td>
+                <td class="desventaja">
+                    • Requiere desarrollo nuevo<br>
+                    • Cold start en Lambda<br>
+                    • Gestión de API Gateway
+                </td>
+                <td>✅ ALTAMENTE RECOMENDADO</td>
+            </tr>
+            <tr>
+                <td><strong>Lambda Directa (sin API Gateway)</strong></td>
+                <td class="ventaja">
+                    • Menor latencia<br>
+                    • Menor costo<br>
+                    • Invocación directa desde aplicación
+                </td>
+                <td class="desventaja">
+                    • No expone endpoint HTTP<br>
+                    • Requiere SDK de AWS<br>
+                    • Menos flexible
+                </td>
+                <td>⚠️ Solo si no necesitas HTTP</td>
+            </tr>
+            <tr>
+                <td><strong>Step Functions</strong></td>
+                <td class="ventaja">
+                    • Orquestación visual<br>
+                    • Manejo de errores robusto<br>
+                    • Auditoría completa
+                </td>
+                <td class="desventaja">
+                    • Overkill para lógica simple<br>
+                    • Mayor costo<br>
+                    • Mayor complejidad
+                </td>
+                <td>❌ No necesario para este caso</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="arquitectura">
+        <h2>5. Arquitectura Recomendada Final</h2>
+        
+        <h3>Opción Óptima: API REST Serverless con Caché</h3>
+        
+        <p><strong>Componentes:</strong></p>
+        <ol>
+            <li><strong>Amazon API Gateway (REST API)</strong>
+                <ul>
+                    <li>Endpoint: POST /api/v1/corresponsales/validar</li>
+                    <li>Autenticación: API Key + IAM</li>
+                    <li>Throttling: 1000 req/seg</li>
+                    <li>Caché de API Gateway: 5 minutos (opcional)</li>
+                </ul>
+            </li>
+            
+            <li><strong>AWS Lambda (Python 3.12 o Node.js 20)</strong>
+                <ul>
+                    <li>Función: ValidarCorresponsalFunction</li>
+                    <li>Memoria: 256 MB</li>
+                    <li>Timeout: 10 segundos</li>
+                    <li>Lógica: Réplica del SP actual</li>
+                </ul>
+            </li>
+            
+            <li><strong>Amazon ElastiCache (Redis) - Capa 1</strong>
+                <ul>
+                    <li>Instancia: cache.t4g.micro</li>
+                    <li>TTL: 3600 segundos (1 hora)</li>
+                    <li>Patrón: Cache-Aside</li>
+                </ul>
+            </li>
+            
+            <li><strong>Amazon DynamoDB - Capa 2</strong>
+                <ul>
+                    <li>Modo: On-Demand (pago por request)</li>
+                    <li>Tablas: CorresponsalesBancarios, TransaccionesCorban</li>
+                    <li>Backup: Point-in-time recovery habilitado</li>
+                </ul>
+            </li>
+            
+            <li><strong>Amazon CloudWatch</strong>
+                <ul>
+                    <li>Logs de Lambda</li>
+                    <li>Métricas personalizadas</li>
+                    <li>Alarmas de errores</li>
+                </ul>
+            </li>
+            
+            <li><strong>AWS X-Ray</strong>
+                <ul>
+                    <li>Trazabilidad end-to-end</li>
+                    <li>Análisis de latencia</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>Flujo de Ejecución:</h3>
+        <ol>
+            <li>Cliente invoca API Gateway con parámetros (codigo_corresponsal, codigo_pais, codigo_transaccion)</li>
+            <li>API Gateway valida autenticación y throttling</li>
+            <li>Lambda recibe request y genera cache key</li>
+            <li>Lambda consulta Redis (caché L1)
+                <ul>
+                    <li>Si existe: retorna inmediatamente (latencia ~1ms)</li>
+                    <li>Si no existe: continúa al paso 5</li>
+                </ul>
+            </li>
+            <li>Lambda consulta DynamoDB (caché L2)
+                <ul>
+                    <li>GetItem en CorresponsalesBancarios</li>
+                    <li>GetItem en TransaccionesCorban</li>
+                </ul>
+            </li>
+            <li>Lambda valida estado y construye respuesta</li>
+            <li>Lambda almacena resultado en Redis</li>
+            <li>Lambda retorna respuesta a API Gateway</li>
+            <li>API Gateway retorna al cliente</li>
+        </ol>
+
+        <h3>Ejemplo de Request/Response:</h3>
+        <p><strong>Request:</strong></p>
+        <code>
+POST /api/v1/corresponsales/validar<br>
+{<br>
+&nbsp;&nbsp;"codigo_corresponsal": "101",<br>
+&nbsp;&nbsp;"codigo_pais": "HN01",<br>
+&nbsp;&nbsp;"codigo_transaccion": "2"<br>
+}
+        </code>
+        
+        <p><strong>Response (Success):</strong></p>
+        <code>
+{<br>
+&nbsp;&nbsp;"codigo_mensaje": "SUCCESS",<br>
+&nbsp;&nbsp;"mensaje_error": "EXITO EN TRANSACCION",<br>
+&nbsp;&nbsp;"cuenta_credito": "HNL151450001",<br>
+&nbsp;&nbsp;"cuenta_debito": "HNL151450001",<br>
+&nbsp;&nbsp;"moneda_permitida": "HNL",<br>
+&nbsp;&nbsp;"tipo_transaccion": "",<br>
+&nbsp;&nbsp;"monto_comision": "",<br>
+&nbsp;&nbsp;"moneda_comision": "",<br>
+&nbsp;&nbsp;"tipo_transaccion_comision": "",<br>
+&nbsp;&nbsp;"cuenta_comision": "PL52280"<br>
+}
+        </code>
+    </div>
+
+    <h2>6. Estimación de Costos Mensuales (AWS)</h2>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Servicio</th>
+                <th>Configuración</th>
+                <th>Costo Mensual (USD)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>API Gateway</td>
+                <td>1M requests/mes</td>
+                <td>$3.50</td>
+            </tr>
+            <tr>
+                <td>Lambda</td>
+                <td>1M invocaciones, 256MB, 100ms avg</td>
+                <td>$0.20</td>
+            </tr>
+            <tr>
+                <td>DynamoDB</td>
+                <td>On-Demand, 1M reads, 10K writes</td>
+                <td>$0.50</td>
+            </tr>
+            <tr>
+                <td>ElastiCache Redis</td>
+                <td>cache.t4g.micro (1 nodo)</td>
+                <td>$11.52</td>
+            </tr>
+            <tr>
+                <td>CloudWatch Logs</td>
+                <td>5 GB logs/mes</td>
+                <td>$2.50</td>
+            </tr>
+            <tr>
+                <td>X-Ray</td>
+                <td>1M traces</td>
+                <td>$5.00</td>
+            </tr>
+            <tr>
+                <td><strong>TOTAL</strong></td>
+                <td></td>
+                <td><strong>~$23.22/mes</strong></td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <p><em>Nota: Costos estimados para 1 millón de transacciones mensuales. Incluye Free Tier de AWS.</em></p>
+
+    <h2>7. Plan de Migración Recomendado</h2>
+    
+    <h3>Fase 1: Preparación (1 semana)</h3>
+    <ul>
+        <li>Crear tablas en DynamoDB</li>
+        <li>Migrar datos desde Oracle usando script Python/boto3</li>
+        <li>Configurar ElastiCache Redis</li>
+        <li>Validar integridad de datos</li>
+    </ul>
+    
+    <h3>Fase 2: Desarrollo (2 semanas)</h3>
+    <ul>
+        <li>Desarrollar función Lambda con lógica del SP</li>
+        <li>Implementar caché Redis</li>
+        <li>Crear API Gateway con endpoints</li>
+        <li>Desarrollar tests unitarios e integración</li>
+        <li>Configurar CloudWatch y X-Ray</li>
+    </ul>
+    
+    <h3>Fase 3: Testing (1 semana)</h3>
+    <ul>
+        <li>Pruebas funcionales</li>
+        <li>Pruebas de carga (JMeter/Gatling)</li>
+        <li>Validación de latencia</li>
+        <li>Pruebas de failover</li>
+    </ul>
+    
+    <h3>Fase 4: Despliegue (1 semana)</h3>
+    <ul>
+        <li>Despliegue en ambiente de staging</li>
+        <li>Pruebas de aceptación</li>
+        <li>Despliegue en producción (Blue/Green)</li>
+        <li>Monitoreo intensivo 24/7</li>
+        <li>Rollback plan preparado</li>
+    </ul>
+
+    <h2>8. Ventajas de la Arquitectura Propuesta</h2>
+    
+    <ul>
+        <li>✅ <strong>Serverless:</strong> Cero gestión de servidores</li>
+        <li>✅ <strong>Auto-escalable:</strong> Maneja de 1 a 1M requests sin cambios</li>
+        <li>✅ <strong>Alta disponibilidad:</strong> Multi-AZ por defecto</li>
+        <li>✅ <strong>Bajo costo:</strong> ~$23/mes vs $200+/mes con RDS</li>
+        <li>✅ <strong>Baja latencia:</strong> < 10ms con caché, < 50ms sin caché</li>
+        <li>✅ <strong>Fácil mantenimiento:</strong> Código versionado en Git</li>
+        <li>✅ <strong>Testing:</strong> Tests unitarios y de integración simples</li>
+        <li>✅ <strong>Observabilidad:</strong> Logs, métricas y trazas completas</li>
+        <li>✅ <strong>Seguridad:</strong> IAM, API Keys, VPC (opcional)</li>
+        <li>✅ <strong>Multi-región:</strong> Fácil replicación con Global Tables</li>
+    </ul>
+
+    <h2>9. Consideraciones Adicionales</h2>
+    
+    <h3>Seguridad:</h3>
+    <ul>
+        <li>Implementar AWS WAF en API Gateway para protección DDoS</li>
+        <li>Usar AWS Secrets Manager para credenciales</li>
+        <li>Habilitar encryption at rest en DynamoDB</li>
+        <li>Usar VPC endpoints para comunicación privada</li>
+    </ul>
+    
+    <h3>Monitoreo:</h3>
+    <ul>
+        <li>Alarmas CloudWatch para errores > 1%</li>
+        <li>Alarmas para latencia p99 > 100ms</li>
+        <li>Dashboard con métricas clave</li>
+        <li>SNS para notificaciones a equipo</li>
+    </ul>
+    
+    <h3>Disaster Recovery:</h3>
+    <ul>
+        <li>Backups automáticos de DynamoDB (PITR)</li>
+        <li>Replicación cross-region con Global Tables</li>
+        <li>Versionamiento de código Lambda</li>
+        <li>Infraestructura como código (Terraform/CloudFormation)</li>
+    </ul>
+
+    <div class="recomendacion">
+        <h2>10. Conclusión</h2>
+        <p>
+            La migración de las tablas de corresponsales bancarios a <strong>Amazon DynamoDB</strong> 
+            combinado con <strong>ElastiCache Redis</strong> y la transformación del stored procedure 
+            a una <strong>API REST serverless con Lambda</strong> representa la mejor opción para este caso de uso.
+        </p>
+        <p>
+            Esta arquitectura ofrece el mejor balance entre <strong>costo</strong>, <strong>rendimiento</strong>, 
+            <strong>escalabilidad</strong> y <strong>mantenibilidad</strong>, con un costo operativo 
+            aproximado de <strong>$23 USD/mes</strong> y latencias inferiores a <strong>10ms</strong> 
+            en el 99% de las consultas.
+        </p>
+        <p>
+            El tiempo estimado de migración completa es de <strong>5 semanas</strong> con un equipo 
+            de 2 desarrolladores, y el ROI se alcanza en menos de 3 meses comparado con mantener 
+            infraestructura tradicional.
+        </p>
+    </div>
+
+    <footer style="margin-top: 50px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center; color: #666;">
+        <p>Documento generado para análisis de migración a AWS</p>
+        <p>Fecha: 2024 | Confidencial</p>
+    </footer>
+</body>
+</html>

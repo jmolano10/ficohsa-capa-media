@@ -1,0 +1,212 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant ProxySOAP as RollbackTaxesBulletinSoapPS
+    participant ProxyREST as RollbackTaxesBulletinRestPS
+    participant Pipeline as RollbackTaxesBulletinPP
+    participant Template as TransferHondurasFicohsaTemplate
+    participant LDAP as LDAP Security
+    participant ExtractCred as ExtractCredentials.xqy
+    participant TransformIn as RollbackTaxesBulletinToT24.xqy
+    participant LogService as LoggingRegionalRestBS
+    participant T24BS as ReversarTransaccionSoapT24BS
+    participant T24 as T24 Core Banking
+    participant TransformOut as T24ToRollbackTaxesBulletin.xqy
+    participant ErrorMapper as GetCustomErrorByStackTraceRegionalRestBS
+    participant TransformError as ErrorToRollbackTaxesBulletin.xqy
+
+    Note over Client, T24: Flujo Honduras (HN01) - RollbackTaxesBulletin
+
+    alt Invocación SOAP
+        Client->>ProxySOAP: SOAP Request
+        Note right of Client: Endpoint: /honduras/transfer/soap/<br/>rollbackTaxesBulletin/v1<br/>Header: Basic Auth<br/>Body: rollbackTaxesBullletin
+        ProxySOAP->>ProxySOAP: Validar Seguridad OWSM
+        Note right of ProxySOAP: Policy: oracle/http_basic_auth_over_ssl_service_policy<br/>Validar WSS Header
+        ProxySOAP->>Pipeline: Invocar Pipeline
+    else Invocación REST
+        Client->>ProxyREST: REST Request (JSON/XML)
+        Note right of Client: Endpoint: /honduras/transfer/rest/<br/>rollbackTaxesBulletin/v1<br/>Header: Basic Auth<br/>Body: rollbackTaxesBullletin
+        ProxyREST->>ProxyREST: Validar Seguridad OWSM
+        Note right of ProxyREST: Policy: oracle/http_basic_auth_over_ssl_service_policy<br/>Validar WSS Header
+        ProxyREST->>Pipeline: Invocar Pipeline
+    end
+
+    Pipeline->>Template: Ejecutar Template
+    Note right of Pipeline: Template: TransferHondurasFicohsaTemplate.ptx
+
+    Template->>Template: StageAssigment
+    Note right of Template: Asignar variables:<br/>service='Transfer/RollbackTaxesBulletin'<br/>version='v1'<br/>key='TransactionId'<br/>value=TransactionId del body<br/>method='SOAP'<br/>operationTargetSystem='Reversionpagorecaudorefdbcta'<br/>targetSystem='T24'<br/>security='Y'<br/>originalBody=$body<br/>user=ApplicationId del body
+
+    Template->>Template: PlaceholderID GetSecurity
+    Note right of Template: Placeholder para seguridad
+
+    Template->>Pipeline: StageSecurity
+    Pipeline->>Pipeline: Crear userName XML
+    Note right of Pipeline: <userLoginElement><br/>  <userLogin>{ApplicationId}</userLogin><br/></userLoginElement>
+
+    Pipeline->>ExtractCred: Invocar ExtractCredentials
+    Note right of Pipeline: Parámetro: userName XML
+
+    ExtractCred->>LDAP: lookupBasicCredentials
+    Note right of ExtractCred: Path: SB_Security/Common/{ApplicationId en mayúsculas}<br/>Ejemplo: SB_Security/Common/MOBILE_BANKING
+
+    alt Credenciales encontradas en LDAP
+        LDAP-->>ExtractCred: username y password
+        ExtractCred-->>Pipeline: connInfoElement con credenciales
+    else Credenciales no encontradas
+        LDAP-->>ExtractCred: null
+        ExtractCred-->>Pipeline: connInfoElement con ApplicationId como failover
+        Note left of ExtractCred: Failover: usa ApplicationId<br/>como username y password
+    end
+
+    Pipeline->>Pipeline: Almacenar responseUserLogin
+
+    Template->>Pipeline: PlaceholderID TransformRegionalToTargetSystem
+    Pipeline->>Pipeline: StageTransformRequest
+
+    Pipeline->>TransformIn: Invocar RollbackTaxesBulletinToT24.xqy
+    Note right of Pipeline: Parámetros:<br/>input=$body/rollbackTaxesBullletin<br/>userConnInfo=$responseUserLogin
+
+    TransformIn->>TransformIn: Mapear campos
+    Note right of TransformIn: TransactionId → transactionId<br/>username → userName<br/>password → password<br/>company → "" (vacío)
+
+    TransformIn-->>Pipeline: requestService (formato T24)
+    Pipeline->>Pipeline: Almacenar requestService
+
+    Template->>Template: StageLoggingInput
+    Template->>Template: Copiar requestService a requestServiceOri
+
+    alt security = 'Y'
+        Template->>Template: Ocultar requestServiceOri
+        Note right of Template: requestServiceOri = ''<br/>(por seguridad)
+    end
+
+    Template->>LogService: Invocar SaveLogInFileSystem
+    Note right of Template: Registrar REQUEST:<br/>GlobalId, service, version,<br/>targetSystem, endpoint,<br/>body (oculto si security='Y')
+    LogService-->>Template: Log guardado
+
+    Template->>Pipeline: PlaceholderID InvokeCountry
+    Pipeline->>Pipeline: StageInvokeCoreBanking
+
+    Pipeline->>T24BS: wsCallout rollbackTaxesBulletin
+    Note right of Pipeline: Service: ReversarTransaccionSoapT24BS<br/>Operation: rollbackTaxesBulletin<br/>Body: requestService
+
+    T24BS->>T24: SOAP Request
+    Note right of T24BS: URL: http://172.23.13.19:7003/<br/>RollbackTaxesBulletin/services<br/>Port: T24WebServicesImplPort<br/>Namespace: T24WebServicesImpl<br/>Timeout: 0 (sin límite)<br/>Retry: 0
+
+    alt Transacción encontrada y reversada
+        T24-->>T24BS: rollbackTaxesBulletinResponse
+        Note left of T24: Status/successIndicator='Success'<br/>Status/messages='Transaction reversed successfully'<br/>FUNDSTRANSFERType con datos
+        T24BS-->>Pipeline: responseService
+        
+        Pipeline->>Pipeline: Extraer statusService
+        Note right of Pipeline: statusService = $responseService/Status/successIndicator
+
+        Pipeline->>Pipeline: Extraer codeErrorService
+        Note right of Pipeline: codeErrorService = $responseService/Status/successIndicator
+
+        Pipeline->>Pipeline: Extraer messageErrorService
+        Note right of Pipeline: messageErrorService = $responseService/Status/messages
+
+    else Transacción no encontrada o error
+        T24-->>T24BS: rollbackTaxesBulletinResponse
+        Note left of T24: Status/successIndicator='T24Error'<br/>Status/messages='Transaction not found'
+        T24BS-->>Pipeline: responseService
+        
+        Pipeline->>Pipeline: Extraer statusService
+        Note right of Pipeline: statusService = 'T24Error'
+
+        Pipeline->>Pipeline: Extraer codeErrorService
+        Note right of Pipeline: codeErrorService = 'T24Error'
+
+        Pipeline->>Pipeline: Extraer messageErrorService
+        Note right of Pipeline: messageErrorService = 'Transaction not found'
+
+    else Error de conexión o timeout
+        T24BS-->>Pipeline: Fault
+        Note left of T24BS: Error de transporte,<br/>timeout o conexión
+        Pipeline->>Template: Propagar fault
+        Template->>Template: Error Handler activado
+        Note right of Template: Capturado por error-N53e8b9dc...
+    end
+
+    Template->>Template: StageLoggingOutput
+    Template->>LogService: Invocar SaveLogInFileSystem
+    Note right of Template: Registrar RESPONSE:<br/>GlobalId, statusService,<br/>codeErrorService, messageErrorService,<br/>responseService
+    LogService-->>Template: Log guardado
+
+    Template->>Pipeline: PlaceholderID TransformTargetSystemToRegional
+    Pipeline->>Pipeline: StageTargetSystemToRegional
+
+    alt codeErrorService = 'Success'
+        Pipeline->>TransformOut: Invocar T24ToRollbackTaxesBulletin.xqy
+        Note right of Pipeline: Parámetros:<br/>coreResponse=$responseService<br/>globalId=GlobalId del originalBody
+
+        TransformOut->>TransformOut: Mapear respuesta exitosa
+        Note right of TransformOut: Status=successIndicator<br/>ValueDate=substring(current-dateTime,0,11)<br/>DateTime=substring(current-dateTime,0,20)<br/>GlobalId=globalId parámetro
+
+        TransformOut-->>Pipeline: rollbackTaxesBullletinResponse
+        Pipeline->>Pipeline: Reemplazar body con respuesta
+
+    else codeErrorService != 'Success'
+        Pipeline->>Pipeline: Construir requestError
+        Note right of Pipeline: ServicesToError.xqy:<br/>systemApplication='T24'<br/>service='Transfer/RollbackTaxesBulletin'<br/>errorMessage=$messageErrorService<br/>errorCode=$codeErrorService<br/>language=Language del originalBody
+
+        Pipeline->>ErrorMapper: wsCallout GetCustomErrorByStackTraceRegionalRestBS
+        Note right of Pipeline: Operation: process<br/>Body: requestError
+        ErrorMapper-->>Pipeline: responseError
+        Note left of ErrorMapper: Retorna:<br/>code (código mapeado)<br/>error (tipo error)<br/>description (descripción completa)<br/>shortDescription (descripción corta)
+
+        Pipeline->>TransformError: Invocar ErrorToRollbackTaxesBulletin.xqy
+        Note right of Pipeline: Parámetros:<br/>responseError=$responseError<br/>globalId=GlobalId del originalBody<br/>codeError=$codeErrorService<br/>messageError=$messageErrorService<br/>targetSystem='T24'<br/>status=$statusService
+
+        TransformError->>TransformError: Mapear respuesta de error
+        Note right of TransformError: StatusInfo/Status=$status<br/>StatusInfo/TransactionId=''<br/>ErrorInfo/Code=$responseError/code<br/>ErrorInfo/Error=$responseError/error<br/>ErrorInfo/Description=$responseError/description<br/>ErrorInfo/Details/SystemId='T24'<br/>ErrorInfo/Details/Messages=$messageError
+
+        TransformError-->>Pipeline: rollbackTaxesBullletinResponse con error
+        Pipeline->>Pipeline: Reemplazar body con respuesta error
+    end
+
+    Pipeline-->>Template: Respuesta construida
+    Template-->>ProxySOAP: Respuesta
+    ProxySOAP-->>Client: SOAP Response
+
+    Note over Client, T24: Flujo de Error Handler (si ocurre excepción)
+
+    rect rgb(255, 200, 200)
+        Note over Template: Error Handler Pipeline
+        Template->>Template: StageIT
+        Template->>Template: Report error (logs)
+        Note right of Template: Registrar:<br/>code=$fault/errorCode<br/>reason=$fault/reason<br/>uuid=GlobalId
+
+        Template->>Template: StageMappingErrors
+        Template->>Template: Construir requestError
+        Note right of Template: ServicesToError.xqy:<br/>systemApplication='Vision+'<br/>service=$service<br/>errorMessage=$fault/reason<br/>errorCode=$fault/errorCode<br/>language=Language del body
+
+        Template->>ErrorMapper: wsCallout GetCustomErrorByStackTraceRegionalRestBS
+        ErrorMapper-->>Template: responseError
+
+        Template->>Pipeline: PlaceholderID TransformResponse
+        Pipeline->>Pipeline: ErrorToRespuesta
+        Pipeline->>TransformError: Invocar ErrorToRollbackTaxesBulletin.xqy
+        Note right of Pipeline: Parámetros:<br/>responseError=$responseError<br/>globalId=GlobalId del originalBody<br/>codeError=$fault/errorCode<br/>messageError=$fault/reason<br/>targetSystem='T24'<br/>status='Error'
+
+        TransformError-->>Pipeline: rollbackTaxesBullletinResponse con error
+        Pipeline->>Pipeline: Reemplazar body
+
+        Template->>Template: StageLoggingOutputError
+        Template->>LogService: Invocar SaveLogInFileSystem
+        Note right of Template: Registrar ERROR:<br/>errorFlowName=$fault/location/stage<br/>codeError=$fault/errorCode<br/>messageError=$fault/reason<br/>state='Error'<br/>errorDetails=serialize($fault)
+        LogService-->>Template: Log guardado
+
+        Template->>Template: StageRespuesta
+        Template->>Client: Reply con error
+    end
+
+    Note over Client, T24: Transformaciones Clave
+    Note over Client, T24: 1. Extracción credenciales: LDAP lookup con failover
+    Note over Client, T24: 2. Mapeo entrada: TransactionId + credenciales → T24
+    Note over Client, T24: 3. Evaluación éxito: codeErrorService = 'Success'
+    Note over Client, T24: 4. Mapeo salida exitosa: successIndicator + fechas generadas
+    Note over Client, T24: 5. Mapeo error: Traducción códigos T24 → códigos regionales
+    Note over Client, T24: 6. Logging condicional: Oculta request si security='Y'
+    Note over Client, T24: 7. Preservación GlobalId: Trazabilidad end-to-end

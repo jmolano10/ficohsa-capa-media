@@ -1,0 +1,136 @@
+flowchart TD
+    Start([Cliente invoca servicio]) --> CheckProtocol{Protocolo?}
+    
+    CheckProtocol -->|SOAP| ProxySOAP[RollbackTaxesBulletinSoapPS<br/>Endpoint: /honduras/transfer/soap/rollbackTaxesBulletin/v1]
+    CheckProtocol -->|REST| ProxyREST[RollbackTaxesBulletinRestPS<br/>Endpoint: /honduras/transfer/rest/rollbackTaxesBulletin/v1]
+    
+    ProxySOAP --> ValidateSecurity[Validar Seguridad OWSM<br/>Policy: http_basic_auth_over_ssl_service_policy]
+    ProxyREST --> ValidateSecurity
+    
+    ValidateSecurity --> ValidateSchema[Validar Esquema XML/JSON<br/>Schema: RollbackTaxesBulletinTypes.xsd]
+    
+    ValidateSchema -->|Válido| InvokePipeline[Invocar Pipeline<br/>RollbackTaxesBulletinPP]
+    ValidateSchema -->|Inválido| ErrorSchema[Error de Validación]
+    
+    ErrorSchema --> ErrorHandler
+    
+    InvokePipeline --> TemplateStart[Template: TransferHondurasFicohsaTemplate]
+    
+    TemplateStart --> StageAssignment[StageAssigment<br/>Asignar Variables de Contexto]
+    
+    StageAssignment --> AssignVars[Variables:<br/>service='Transfer/RollbackTaxesBulletin'<br/>version='v1'<br/>key='TransactionId'<br/>value=TransactionId<br/>method='SOAP'<br/>operationTargetSystem='Reversionpagorecaudorefdbcta'<br/>targetSystem='T24'<br/>security='Y'<br/>user=ApplicationId]
+    
+    AssignVars --> StageSecurity[StageSecurity<br/>Extracción de Credenciales]
+    
+    StageSecurity --> CreateUserXML[Crear userLoginElement<br/>con ApplicationId]
+    
+    CreateUserXML --> ExtractCred[Invocar ExtractCredentials.xqy]
+    
+    ExtractCred --> LDAPLookup[LDAP Lookup<br/>Path: SB_Security/Common/{ApplicationId}]
+    
+    LDAPLookup -->|Encontrado| GetCredentials[Obtener username y password]
+    LDAPLookup -->|No encontrado| Failover[Failover: usar ApplicationId<br/>como username y password]
+    
+    GetCredentials --> StoreCredentials[Almacenar en responseUserLogin]
+    Failover --> StoreCredentials
+    
+    StoreCredentials --> StageTransformRequest[StageTransformRequest<br/>Transformar Request Regional a T24]
+    
+    StageTransformRequest --> InvokeTransformIn[Invocar RollbackTaxesBulletinToT24.xqy]
+    
+    InvokeTransformIn --> MapFields[Mapeo de Campos:<br/>TransactionId → transactionId<br/>username → userName<br/>password → password<br/>company → '' vacío]
+    
+    MapFields --> StoreRequestService[Almacenar en requestService]
+    
+    StoreRequestService --> StageLoggingInput[StageLoggingInput<br/>Logging de Request]
+    
+    StageLoggingInput --> CheckSecurity{security = 'Y'?}
+    
+    CheckSecurity -->|Sí| HideRequest[Ocultar requestServiceOri<br/>por seguridad]
+    CheckSecurity -->|No| KeepRequest[Mantener requestServiceOri]
+    
+    HideRequest --> LogRequest[Invocar LoggingRegionalRestBS<br/>Registrar REQUEST]
+    KeepRequest --> LogRequest
+    
+    LogRequest --> StageInvokeCoreBanking[StageInvokeCoreBanking<br/>Invocar T24]
+    
+    StageInvokeCoreBanking --> WSCallout[wsCallout a ReversarTransaccionSoapT24BS<br/>URL: http://172.23.13.19:7003/RollbackTaxesBulletin/services<br/>Operation: rollbackTaxesBulletin<br/>Timeout: 0<br/>Retry: 0]
+    
+    WSCallout -->|Éxito| T24Response[Recibir responseService de T24]
+    WSCallout -->|Error Conexión| ErrorHandler[Error Handler Pipeline]
+    
+    T24Response --> ExtractStatus[Extraer de responseService:<br/>statusService = successIndicator<br/>codeErrorService = successIndicator<br/>messageErrorService = messages]
+    
+    ExtractStatus --> StageLoggingOutput[StageLoggingOutput<br/>Logging de Response]
+    
+    StageLoggingOutput --> LogResponse[Invocar LoggingRegionalRestBS<br/>Registrar RESPONSE]
+    
+    LogResponse --> StageTargetSystemToRegional[StageTargetSystemToRegional<br/>Transformar Response T24 a Regional]
+    
+    StageTargetSystemToRegional --> CheckSuccess{codeErrorService<br/>= 'Success'?}
+    
+    CheckSuccess -->|Sí| InvokeTransformOut[Invocar T24ToRollbackTaxesBulletin.xqy]
+    CheckSuccess -->|No| BuildErrorRequest[Construir requestError<br/>con ServicesToError.xqy]
+    
+    InvokeTransformOut --> MapSuccessResponse[Mapeo Respuesta Exitosa:<br/>Status = successIndicator<br/>ValueDate = substring current-dateTime 0,11<br/>DateTime = substring current-dateTime 0,20<br/>GlobalId = globalId del request]
+    
+    MapSuccessResponse --> ReplaceBodySuccess[Reemplazar body con<br/>rollbackTaxesBullletinResponse]
+    
+    ReplaceBodySuccess --> ReturnSuccess[Retornar Respuesta Exitosa]
+    
+    BuildErrorRequest --> InvokeErrorMapper[Invocar GetCustomErrorByStackTraceRegionalRestBS<br/>Mapear error T24 a regional]
+    
+    InvokeErrorMapper --> ReceiveErrorMapping[Recibir responseError:<br/>code, error, description, shortDescription]
+    
+    ReceiveErrorMapping --> InvokeTransformError[Invocar ErrorToRollbackTaxesBulletin.xqy]
+    
+    InvokeTransformError --> MapErrorResponse[Mapeo Respuesta Error:<br/>StatusInfo/Status = status<br/>StatusInfo/TransactionId = ''<br/>ErrorInfo/Code = responseError/code<br/>ErrorInfo/Error = responseError/error<br/>ErrorInfo/Description = responseError/description<br/>ErrorInfo/Details/SystemId = 'T24'<br/>ErrorInfo/Details/Messages = messageError]
+    
+    MapErrorResponse --> ReplaceBodyError[Reemplazar body con<br/>rollbackTaxesBullletinResponse con error]
+    
+    ReplaceBodyError --> ReturnError[Retornar Respuesta con Error]
+    
+    ReturnSuccess --> End([Fin])
+    ReturnError --> End
+    
+    ErrorHandler --> StageIT[StageIT<br/>Report error en logs]
+    
+    StageIT --> StageMappingErrors[StageMappingErrors<br/>Mapear errores de pipeline]
+    
+    StageMappingErrors --> BuildPipelineError[Construir requestError<br/>systemApplication='Vision+'<br/>errorCode=$fault/errorCode<br/>errorMessage=$fault/reason]
+    
+    BuildPipelineError --> InvokeErrorMapperPipeline[Invocar GetCustomErrorByStackTraceRegionalRestBS]
+    
+    InvokeErrorMapperPipeline --> ErrorToRespuesta[ErrorToRespuesta<br/>Invocar ErrorToRollbackTaxesBulletin.xqy]
+    
+    ErrorToRespuesta --> MapPipelineError[Mapeo Error Pipeline:<br/>codeError=$fault/errorCode<br/>messageError=$fault/reason<br/>targetSystem='T24'<br/>status='Error']
+    
+    MapPipelineError --> StageLoggingOutputError[StageLoggingOutputError<br/>Logging de Error]
+    
+    StageLoggingOutputError --> LogError[Invocar LoggingRegionalRestBS<br/>Registrar ERROR con errorDetails]
+    
+    LogError --> StageRespuesta[StageRespuesta<br/>Reply con error]
+    
+    StageRespuesta --> End
+    
+    style Start fill:#90EE90
+    style End fill:#FFB6C1
+    style ErrorHandler fill:#FF6B6B
+    style ErrorSchema fill:#FF6B6B
+    style ValidateSecurity fill:#87CEEB
+    style ValidateSchema fill:#87CEEB
+    style WSCallout fill:#FFD700
+    style T24Response fill:#98FB98
+    style CheckSuccess fill:#FFA500
+    style CheckProtocol fill:#FFA500
+    style CheckSecurity fill:#FFA500
+    style ReturnSuccess fill:#90EE90
+    style ReturnError fill:#FFB6C1
+    
+    classDef transformClass fill:#DDA0DD,stroke:#333,stroke-width:2px
+    classDef logClass fill:#F0E68C,stroke:#333,stroke-width:2px
+    classDef securityClass fill:#87CEEB,stroke:#333,stroke-width:2px
+    
+    class InvokeTransformIn,InvokeTransformOut,InvokeTransformError,MapFields,MapSuccessResponse,MapErrorResponse,MapPipelineError transformClass
+    class StageLoggingInput,StageLoggingOutput,StageLoggingOutputError,LogRequest,LogResponse,LogError logClass
+    class StageSecurity,ExtractCred,LDAPLookup,GetCredentials,Failover,ValidateSecurity securityClass
