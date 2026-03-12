@@ -1,0 +1,99 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Reverso Boletines <br> Epica 58123: SBRG_Transfer_rollbackTaxesBulletin <br> HU 58429:  POST - /payments/payment-execution-taxes/v1/initiate-reversal-bulletins
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant t24 as Wrapper T24 <br/> OP: rollbackTaxesBulletin 
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Reversar Pago Boletínes
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> transactionReverseReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "PAYMENT_EXECUTION_TAXES" <br> name: "INITIATE_RESERVAL_BULLTETINS" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "PAYMENT_EXECUTION_TAXES" <br> name: "INITIATE_RESERVAL_BULLTETINS" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01
+
+    API->>API: Aplica Patrón Strategy
+
+    API->>Lib: Consulta Constantes
+
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> opertaion <br> caller-service 
+
+    API->>API: Construye Request Wrapper T24 OP: rollbackTaxesBulletin
+    Note over API: Mapeo: <br> header:  caller-service = const.caller-service <br> body: <br> payload.transactionId = request.transactionReverseReference 
+
+    API->>t24: Consume Wrapper Proxy T24 OP: rollbackTaxesBulletin
+    Note right of API: header: caller-service <br> body: <br> operation, payload
+
+    t24->>API: Response Wrapper Proxy T24 OP: rollbackTaxesBulletin
+    Note over t24: Response: <br> success, data
+
+    API->>API: Evalúa Response Wrapper Proxy T24 OP: rollbackTaxesBulletin
+
+    alt If success == true 
+
+        API->>API: Construye response API
+        Note over API: Mapeo: <br> transactionReference = response.transactionId <br> valueDate = currentDate(YYYY-MM-DD) <br> dateTime = currentDateTime(YYYY-MM-DDTHH:MM:SS) 
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    else If success != false 
+
+        API->> Errors: Mapear código de error
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 422 + Wrapper.mensajeError
+
+    end
+    
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
