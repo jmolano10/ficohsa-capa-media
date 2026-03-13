@@ -1,0 +1,111 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Reverso Compra TC <br> Epica 2677: SBRG_Card_RollbackPurchase <br> HU 58396:  POST - /cards/credit-card-status-retrieve/v1/retrieve-purchase-ticket
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant wrapper as Wrapper Pagos WS TC <br/> Eschema: PAGOSWSTC <br> Paquete: OSB_K_RECAUDO_BROKER_HN <br> OSB_CONS_BROKER_RECAUDO_TICKET
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Regional (HN01 | GT01) - Consultar Ticket Compra TC
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> ticketReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "CREDIT_CARD_STATUS_RETRIEVE" <br> name: "RETRIEVE_PURCHASE_TICKET" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "CREDIT_CARD_STATUS_RETRIEVE" <br> name: "RETRIEVE_PURCHASE_TICKET" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 | GT01
+
+    API->>API: Aplica Patrón Strategy
+
+    API->>Lib: Consulta Constantes
+
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> "operationType", <br> "schemaHN", <br> "packageHN", <br> "procedureNameHN", <br> "schemaGT", <br> "packageGT", <br> "procedureNameGT"
+
+    API->>API: Evalúa header.sourceBank
+
+    alt If header.sourceBank == HN01
+
+        API->>API: Construye Request Wrapper Pagos WSTC
+        Note over API: Mapeo: <br> body: <br> connection.parm = lambda.param-name, <br> connection.secm = lambda.secret-name, <br> schema = const.schemaHN, <br> package = const.packageHN, <br> procedureName = const.procedureNameHN, <br> operationType = const.operationType, <br> parameters.PV_TICKET = request.ticketReference
+
+    else If header.sourceBank == GT01
+        
+        API->>API: Construye Request Wrapper Pagos WSTC
+        Note over API: Mapeo: <br> body: <br> connection.parm = lambda.param-name, <br> connection.secm = lambda.secret-name, <br> schema = const.schemaGT, <br> package = const.packageGT, <br> procedureName = const.procedureNameGT, <br> operationType = const.operationType, <br> parameters.PV_TICKET = request.ticketReference
+
+    end 
+
+    API->>wrapper: Consume Wrapper Wrapper Pagos WSTC
+    Note right of API: body: <br> connection.parm, <br> connection.secm, <br> schema, <br> package, <br> procedureName, <br> operationType, <br> parameters.PV_TICKET
+
+    wrapper->>API: Response Wrapper Wrapper Pagos WSTC
+    Note left of wrapper: Response: <br> success, data, metadata
+
+    API->>API: Evalúa Response Wrapper Wrapper Pagos WSTC
+
+    alt If success == true AND outputParameters.PV_SUCCESSINDICATOR == "SUCCESS" AND outputParameters.PV_MESSAGES == ""
+
+        API->>API: Construye response API
+        Note over API: Mapeo uno a uno según contrato Open API
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    else 
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo según tabla de mapeo de errores <br> OSB_CONS_BROKER_RECAUDO_TICKET
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    end
+    
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

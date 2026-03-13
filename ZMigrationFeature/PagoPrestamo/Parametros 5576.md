@@ -9,8 +9,8 @@
     {
       "region": "HN01-HN01",
       "enabled": true,
-      "param-name": "ban-hnd-ic-comp-param-connection-interbanca-param-db-<env>",
-      "secret-name": "ban-hnd-ic-comp-secm-connection-interbanca-param-db-<env>"
+      "param-name": "ban-hnd-ic-comp-parm-connection-interbanca-db-<env>",
+      "secret-name": "ban-hnd-ic-comp-secm-connection-interbanca-db-<env>"
     },
     {
       "region": "GT01-GT01",
@@ -41,7 +41,7 @@
 ##### AWS Systems Manager Parameter Store
 
 ```json
-"ban-hnd-ic-comp-param-connection-interbanca-param-db-<env>"
+"ban-hnd-ic-comp-parm-connection-interbanca-db-<env>"
 {
   "host": "172.23.176.46",
   "port": "1521",
@@ -52,7 +52,7 @@
 ##### AWS Systems Manager SecretManager
 
 ```json
-"ban-hnd-ic-comp-secm-connection-interbanca-param-db-<env>"
+"ban-hnd-ic-comp-secm-connection-interbanca-db-<env>"
 {
   "user": "ora_bank",
   "password": "desarrollo"
@@ -185,8 +185,8 @@ curl --location 'http://internal-ban-xrs-ic-elb-alb-master-dev-548527349.us-east
 ```json
 {
   "connection": {
-    "parm": "ban-hnd-ic-comp-param-connection-interbanca-param-db-<env>",
-    "secm": "ban-hnd-ic-comp-secm-connection-interbanca-param-db-<env>"
+    "parm": "ban-hnd-ic-comp-parm-connection-interbanca-db-<env>",
+    "secm": "ban-hnd-ic-comp-secm-connection-interbanca-db-<env>"
   },
   "connectionType": "jca",
   "operationType": "query",

@@ -1,0 +1,114 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Reverso Compra TC <br> Epica 2677: SBRG_Card_RollbackPurchase <br> HU 7543:  POST - /cards/credit-card-operation/v1/initiate-purchase-reversal
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant vplus as Vision Plus <br/> OP: OnlineUpdateCard 
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Regional (HN01 | GT01 | NI01 | PA01) - Actualización Tarjeta Crédito
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> transactionRequestType, <br> cardCardId <br> organizationReference, <br> merchantReference, <br> updateValue
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros en caché local
+        Note right of API: Domain: "CREDIT_CARD_OPERATIONS" <br> name: "INITIATE_PURCHASE_REVERSAL" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros en Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Consultar parámetros Parameter Store en caché local
+        Note right of API: Param-Name: lambda.param-name
+
+        CL->>API: Obtiene parámetros Parameter Store en caché local
+        Note left of CL: Obtiene ip, port, basepath
+ 
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "CREDIT_CARD_OPERATIONS" <br> name: "INITIATE_PURCHASE_REVERSAL" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+
+        API->>parameter: Consultar parámetros Parameter Store en caché local
+        Note right of API: Param-Name: lambda.param-name
+
+        parameter->>API: Obtiene parámetros Parameter Store en caché local
+        Note left of CL: Obtiene ip, port, basepath
+
+        API->>CL: Guarda parámetros del paramter store en caché local
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 | GT01 | NI01 | PA01
+
+    API->>API: Aplica Patrón Strategy
+
+    API->>Lib: Consulta Constantes
+
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> opertaion <br> caller-service 
+
+    API->>API: Construye Request Operacion Vision Plus OP: OnlineUpdateCard
+    Note over API: Mapeo: <br> body: <br> RequestType = request.transactionRequestType, <br> CardNumber = request.creditCardId, <br> OrgId = request.organizationReference, <br> MerchantNumber = request.merchantReference, <br> UpdateValue = request.updateValue
+
+    API->>vplus: Consume Wrapper Operacion Vision Plus OP: OnlineUpdateCard
+    Note right of API: body: <br> RequestType, <br> CardNumber, <br> OrgId, <br> MerchantNumber, <br> UpdateValue
+
+    vplus->>API: Response Wrapper Operacion Vision Plus OP: OnlineUpdateCard
+    Note left of vplus: Response: <br> UpdateResponseCode, UpdateResponseDescription
+
+    API->>API: Evalúa Response Wrapper Operacion Vision Plus OP: OnlineUpdateCard
+
+    alt If UpdateResponseCode == 0 
+
+        API->>API: Construye response API
+        Note over API: Mapeo: <br> updateResponseCode = updateResponseCode, <br> updateResponseMessage = UpdateResponseDescription
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    else If UpdateResponseCode != 0 
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo según tabla de mapeo de errore UpdateResponseCode
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    end
+    
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

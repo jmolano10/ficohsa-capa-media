@@ -1,0 +1,109 @@
+flowchart TD
+    Start([Cliente invoca servicio]) --> CheckProtocol{Protocolo?}
+    
+    CheckProtocol -->|REST| ProxyREST[RollbackPurchaseRestPS<br/>/honduras/card/rest/rollbackPurchase/v1<br/>HTTPS + Basic Auth]
+    CheckProtocol -->|SOAP| ProxySOAP[RollbackPurchaseSoapPS<br/>/honduras/card/soap/rollbackPurchase/v1<br/>HTTPS + Basic Auth]
+    
+    ProxyREST --> ValidateSchema[Validar Esquema XML/JSON]
+    ProxySOAP --> ValidateSchema
+    
+    ValidateSchema -->|Válido| Pipeline[RollbackPurchasePP Pipeline]
+    ValidateSchema -->|Inválido| ErrorSchema[Error: Schema Validation Failed]
+    ErrorSchema --> End([Retornar Error])
+    
+    Pipeline --> ApplyTemplate[Aplicar HondurasCardTemplate]
+    
+    ApplyTemplate --> StageAssignment[StageAssigment:<br/>Asignar Variables]
+    
+    Note1[Variables asignadas:<br/>service = Card/RollbackPurchase<br/>version = v1<br/>key = Ticket<br/>value = data Ticket<br/>method = SOAP<br/>operationTargetSystem = ReversaPagoTarjeta<br/>targetSystem = Vision+]
+    StageAssignment -.-> Note1
+    
+    StageAssignment --> LogRequest[LoggingRegionalRestBS:<br/>SaveLogInFileSystem REQUEST]
+    
+    LogRequest --> TransformToDB[Transform:<br/>RollbackPurchaseToPagosWS.xqy<br/>Mapeo: Ticket → PV_TICKET]
+    
+    TransformToDB --> InvokeGetTicket[Invoke DBGetStatusTicketAdapter]
+    
+    InvokeGetTicket --> DBGetTicket[(Oracle DB: PagosWSTC<br/>Schema: PAGOSWSTC<br/>Package: OSB_K_RECAUDO_BROKER_HN<br/>SP: OSB_CONS_BROKER_RECAUDO_TICKET)]
+    
+    Note2[IN: PV_TICKET<br/>OUT: 29 campos<br/>- PV_SUCCESSINDICATOR<br/>- PV_MESSAGES<br/>- PV_NUMEROTARJETA<br/>- PN_ORGANIZACION<br/>- PV_MERCHANTNUMBER<br/>- PN_VALOREFECTIVO<br/>- PV_FECHAEXPTC<br/>- PV_SECUENCIAMOVIMIENTO<br/>- etc.]
+    DBGetTicket -.-> Note2
+    
+    DBGetTicket --> CheckTicketExists{PV_SUCCESSINDICATOR<br/>= SUCCESS<br/>AND<br/>PV_MESSAGES = ''}
+    
+    CheckTicketExists -->|No| ErrorTicketNotFound[Error: Ticket no encontrado<br/>o con errores]
+    ErrorTicketNotFound --> MapError1[GetCustomErrorByStackTraceRegionalRestBS]
+    MapError1 --> TransformError1[Transform:<br/>ErrorToRollbackPurchase.xqy]
+    TransformError1 --> LogError1[LoggingRegionalRestBS:<br/>SaveLogInFileSystem ERROR]
+    LogError1 --> End
+    
+    CheckTicketExists -->|Sí| TransformToVision[Transform:<br/>RollbackPurchaseToOnlinePayment.xqy]
+    
+    Note3[Mapeo Ticket → Vision+:<br/>POSUserData = ATX<br/>RRN37 = YYDDDHHMMssssss generado<br/>NumberOfInstallments = 00<br/>MCCType = 6010<br/>RequestType = R Reversal<br/>CardNumber = PV_NUMEROTARJETA<br/>OrgId = PN_ORGANIZACION<br/>MerchantNumber = PV_MERCHANTNUMBER<br/>CardExpirationDate = PV_FECHAEXPTC<br/>TotalSalesAmount = PN_VALOREFECTIVO<br/>Track2Length = 0000<br/>Track2Data = 0000<br/>CardValidationValue = 000]
+    TransformToVision -.-> Note3
+    
+    TransformToVision --> GenerateRRN37[Generar RRN37:<br/>YY = último dígito año<br/>DDD = día del año 001-366<br/>HH = hora 00-23<br/>MM = minutos 00-59<br/>ssssss = secuencia movimiento]
+    
+    GenerateRRN37 --> InvokeVision[Invoke onlineTransactions_v4]
+    
+    InvokeVision --> VisionPlus[Vision+ OnlineTransactions<br/>http://172.28.1.145:7802/OTWS/v4<br/>Operation: OnlineUpdateCard<br/>Timeout: 70s<br/>Connection Timeout: 65s]
+    
+    Note4[Request Vision+:<br/>OnlinePaymentV4Request<br/>con RequestType=R]
+    VisionPlus -.-> Note4
+    
+    VisionPlus --> CheckVisionApproved{trim ActionDescription<br/>= APPROVED}
+    
+    CheckVisionApproved -->|No| ErrorVisionRejected[Error: Reversión rechazada<br/>por Vision+]
+    ErrorVisionRejected --> MapError2[GetCustomErrorByStackTraceRegionalRestBS]
+    MapError2 --> TransformError2[Transform:<br/>ErrorToRollbackPurchase.xqy<br/>messaggeOnlinePayment = ActionDescription]
+    TransformError2 --> LogError2[LoggingRegionalRestBS:<br/>SaveLogInFileSystem ERROR]
+    LogError2 --> End
+    
+    CheckVisionApproved -->|Sí| TransformToActTicket[Transform:<br/>RollbackPurchaseToActTicket.xqy<br/>Mapeo: Ticket → PV_TICKET<br/>statusTicket = R → PV_ESTADO_TICKET]
+    
+    TransformToActTicket --> InvokeActTicket[Invoke DBActTicketAdapter]
+    
+    InvokeActTicket --> DBActTicket[(Oracle DB: PagosWSTC<br/>Schema: PAGOSWSTC<br/>Package: OSB_K_RECAUDO_BROKER_HN<br/>SP: OSB_ACT_BROKER_RECAUDO_TICKET)]
+    
+    Note5[IN:<br/>- PV_TICKET<br/>- PV_ESTADO_TICKET = R<br/>OUT:<br/>- PV_SUCCESSINDICATOR<br/>- PV_MESSAGES]
+    DBActTicket -.-> Note5
+    
+    DBActTicket --> CheckUpdateSuccess{PV_SUCCESSINDICATOR<br/>= SUCCESS}
+    
+    CheckUpdateSuccess -->|No| ErrorUpdateFailed[Error: Actualización<br/>de ticket fallida]
+    ErrorUpdateFailed --> MapError3[GetCustomErrorByStackTraceRegionalRestBS]
+    MapError3 --> TransformError3[Transform:<br/>ErrorToRollbackPurchase.xqy]
+    TransformError3 --> LogError3[LoggingRegionalRestBS:<br/>SaveLogInFileSystem ERROR]
+    LogError3 --> End
+    
+    CheckUpdateSuccess -->|Sí| TransformSuccess[Transform:<br/>PagosWSToRollbackPurchase.xqy]
+    
+    Note6[Construir response exitoso:<br/>StatusInfo/Status = SUCCESS<br/>StatusInfo/ValueDate = current-date<br/>StatusInfo/DateTime = current-dateTime<br/>StatusInfo/GlobalId = del request]
+    TransformSuccess -.-> Note6
+    
+    TransformSuccess --> LogResponse[LoggingRegionalRestBS:<br/>SaveLogInFileSystem RESPONSE]
+    
+    LogResponse --> ReturnSuccess[Retornar Response Exitoso]
+    
+    ReturnSuccess --> End
+    
+    style Start fill:#90EE90
+    style End fill:#FFB6C1
+    style ProxyREST fill:#87CEEB
+    style ProxySOAP fill:#87CEEB
+    style Pipeline fill:#DDA0DD
+    style DBGetTicket fill:#FFD700
+    style VisionPlus fill:#FFA500
+    style DBActTicket fill:#FFD700
+    style ErrorSchema fill:#FF6B6B
+    style ErrorTicketNotFound fill:#FF6B6B
+    style ErrorVisionRejected fill:#FF6B6B
+    style ErrorUpdateFailed fill:#FF6B6B
+    style ReturnSuccess fill:#90EE90
+    style CheckProtocol fill:#F0E68C
+    style CheckTicketExists fill:#F0E68C
+    style CheckVisionApproved fill:#F0E68C
+    style CheckUpdateSuccess fill:#F0E68C
+    
+    classDef noteStyle fill:#FFFACD,stroke:#333,stroke-width:1px
+    class Note1,Note2,Note3,Note4,Note5,Note6 noteStyle

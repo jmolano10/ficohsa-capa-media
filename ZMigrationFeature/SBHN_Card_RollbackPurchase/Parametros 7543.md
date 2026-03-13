@@ -1,0 +1,82 @@
+##### DynamoDB Parameter - Lambda Parámetros
+```json
+//REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO
+{
+  "pk": "COUNTRY#HND#DOMAIN#CREDIT_CARD_OPERATIONS#PARAM#INITIATE_PURCHASE_REVERSAL",
+  "sk": "V#0001",
+  "name": "INITIATE_PURCHASE_REVERSAL",
+  "value": [
+    {
+      "region": "HN01-HN01",
+      "enabled": true,
+      "param-name": "ban-hnd-lc-ccard-parm-initiate-purchase-reversal-wsdl-<env>"
+    },
+    {
+      "region": "GT01-GT01",
+      "enabled": true
+    },
+    {
+      "region": "NI01-NI01",
+      "enabled": true
+    },
+    {
+      "region": "PA01-PA01",
+      "enabled": true
+    }
+  ],
+  "type": "JSON",
+  "description": "CONFIG OF CREDIT_CARD_OPERATIONS BY METHOD",
+  "country": "HND",
+  "domain": "CREDIT_CARD_OPERATIONS",
+  "tags": [],
+  "precedence": 10,
+  "effective_from": "",
+  "effective_to": "",
+  "status": "active",
+  "updated_at": "2025-12-19T18:10:00Z",
+  "updated_by": "david.j.molano@ficohsa.com"
+}
+```
+##### AWS Systems Manager Parameter Store
+
+```json
+"ban-hnd-lc-ccard-parm-vision-plus-initiate-purchase-reversal-wsdl-dev"
+{
+  "ip": "http://172.28.1.146",
+  "port": "7802",
+  "basePath": "/OTWS/v4 "
+}
+```
+
+```json
+"ban-hnd-lc-ccard-parm-vision-plus-initiate-purchase-reversal-wsdl-qa"
+{
+  "ip": "172.28.1.146",
+  "port": "7802",
+  "basePath": "/OTWS/v4 "
+}
+```
+
+##### AWS Systems Manager SecretManager
+
+
+##### Constantes para almacenar en ConfigMap
+
+```json
+{
+  "operation": "OnlineUpdateCard",
+  "caller-service": "credit-card-operations-product-initiate-purchase-reversal"
+}
+```
+
+##### Registro en Dynamo Componente de idempotencia
+
+##### Ejemplo del request para consumo API Idempotencia
+
+##### Ejemplo mensaje en Event Brigde para componente de Idempotencia
+
+##### Ejemplo request consumo operacion OnlineUpdateCard Vision Plus
+```xml
+
+```
+

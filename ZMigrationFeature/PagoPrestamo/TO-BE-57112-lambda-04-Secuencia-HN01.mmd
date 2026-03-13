@@ -1,0 +1,35 @@
+sequenceDiagram
+    autonumber
+    participant API as API Consumidora
+    participant Lambda as Lambda Validación Corresponsales<br/>ban-xrs-ic-lam-validate-bank-correspondent-{env}
+    participant SP as SP sp_validate_correspondent_bank<br/>ban-xrs-ic-sp-validate-bank-correspondent-{env}
+    participant Aurora as AWS Aurora Serverless<br/>ban-xrs-ic-rds-aurora-postgresql-{env}
+
+    Note over API, Aurora: Flujo Honduras (HN01) — Validación Corresponsales Bancarios
+
+    API->>Lambda: POST /v1/correspondent-bank/validate
+    Note right of API: { correspondentPartyReference,<br/> country, transactionType }
+
+    Lambda->>Lambda: Validar campos de entrada
+
+    Lambda->>Lambda: Construir parámetros SP
+    Note over Lambda:Mapeo: p_correspondentPartyReference = request.correspondentPartyReference, <br> p_countryCode = request.country, <br> p_transactionTypeCode = request.transactionType
+
+    Lambda->>SP: CALL sp_validate_correspondent_bank(...)
+    Note right of Lambda: p_correspondentPartyReference,<br/> p_countryCode, p_transactionTypeCode
+
+    SP->>Aurora: SELECT FROM correspondent_bank WHERE status='A'
+
+    Aurora->>SP: credit_account_reference, debit_account_reference,<br/> permitted_currency_code, commission_account_reference
+
+    SP->>Aurora: SELECT FROM correspondent_bank_transaction WHERE status='A'
+
+    Aurora->>SP: transaction_type, commission_amount,<br/> commission_currency_code, commission_transaction_type
+
+    SP->>Lambda: p_response_code = 'SUCCESS' + datos
+    Note left of SP: creditAccountReference,<br/> debitAccountReference,<br/> permittedCurrencyCode,<br/> transactionType, commissionAmount,<br/> commissionCurrencyCode,<br/> commissionTransactionType,<br/> commissionAccountReference
+
+    Lambda->>Lambda: Construir respuesta Lambda 
+    Note over lambda:  If p_response_code = 'SUCCESS' then success = true <br> else success = false
+
+    Lambda->>API: HTTP 200 + { success, correlationId, data }

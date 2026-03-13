@@ -1,0 +1,161 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant ProxyREST as RollbackPurchaseRestPS
+    participant ProxySoap as RollbackPurchaseSoapPS
+    participant Pipeline as RollbackPurchasePP
+    participant Template as HondurasCardTemplate
+    participant LogService as LoggingRegionalRestBS
+    participant DBGetTicket as DBGetStatusTicketAdapter
+    participant OracleDB as Oracle DB (PagosWSTC)
+    participant VisionPlus as Vision+ OnlineTransactions
+    participant DBActTicket as DBActTicketAdapter
+    participant ErrorService as GetCustomErrorByStackTraceRegionalRestBS
+
+    Note over Client, ErrorService: Flujo Honduras (HN01) - RollbackPurchase
+
+    alt Request REST
+        Client->>ProxyREST: POST /honduras/card/rest/rollbackPurchase/v1
+        Note right of Client: Content-Type: application/json<br/>Authorization: Basic Auth<br/>HTTPS
+        ProxyREST->>Pipeline: Invoke Pipeline
+    else Request SOAP
+        Client->>ProxySoap: POST /honduras/card/soap/rollbackPurchase/v1
+        Note right of Client: SOAP 1.1<br/>Authorization: Basic Auth<br/>HTTPS
+        ProxySoap->>Pipeline: Invoke Pipeline
+    end
+
+    Pipeline->>Pipeline: Validar Esquema XML/JSON
+    Note right of Pipeline: Validar campos obligatorios:<br/>- GeneralInfo<br/>- Ticket<br/>- TransactionType
+
+    Pipeline->>Template: Apply HondurasCardTemplate
+    Template->>Template: StageAssigment
+    Note right of Template: Asignar variables:<br/>service = "Card/RollbackPurchase"<br/>version = "v1"<br/>key = "Ticket"<br/>value = data(Ticket)<br/>method = "SOAP"<br/>operationTargetSystem = "ReversaPagoTarjeta"<br/>targetSystem = "Vision+"
+
+    Template->>LogService: SaveLogInFileSystem (REQUEST)
+    Note right of Template: Transformación: ServiceToLog.xqy<br/>Registrar request de entrada<br/>GlobalId, SourceBank, Ticket
+    LogService-->>Template: Log guardado
+
+    Pipeline->>Pipeline: Transform: RollbackPurchaseToPagosWS.xqy
+    Note right of Pipeline: Mapeo OSB → BD:<br/>Ticket → PV_TICKET
+
+    Pipeline->>DBGetTicket: Invoke DBGetStatusTicketAdapter
+    Note right of Pipeline: Operation: DBGetStatusTicketAdapter
+
+    DBGetTicket->>OracleDB: CALL OSB_CONS_BROKER_RECAUDO_TICKET
+    Note right of DBGetTicket: Schema: PAGOSWSTC<br/>Package: OSB_K_RECAUDO_BROKER_HN<br/>IN: PV_TICKET<br/>OUT: 29 campos (estado, tarjeta, monto, etc.)
+
+    alt Ticket No Encontrado
+        OracleDB-->>DBGetTicket: PV_SUCCESSINDICATOR != 'SUCCESS'
+        DBGetTicket-->>Pipeline: Response con error
+        Pipeline->>Pipeline: Asignar codeErrorService = 'ERROR'
+        Pipeline->>ErrorService: GetCustomErrorByStackTrace
+        Note right of Pipeline: Transformación: ServicesToError.xqy<br/>systemApplication = 'PAGOSWSTC'<br/>errorCode = PV_SUCCESSINDICATOR<br/>errorMessage = PV_MESSAGES
+        ErrorService-->>Pipeline: Error mapeado
+        Pipeline->>Pipeline: Transform: ErrorToRollbackPurchase.xqy
+        Note right of Pipeline: Construir response de error<br/>con ErrorInfo completo
+        Pipeline->>LogService: SaveLogInFileSystem (ERROR)
+        LogService-->>Pipeline: Log guardado
+        Pipeline-->>Client: Response con Error
+    end
+
+    OracleDB-->>DBGetTicket: ResultSet con datos del ticket
+    Note left of OracleDB: PV_SUCCESSINDICATOR = 'SUCCESS'<br/>PV_MESSAGES = ''<br/>PV_ESTADO_TICKET<br/>PV_NUMEROTARJETA<br/>PN_ORGANIZACION<br/>PV_MERCHANTNUMBER<br/>PN_VALOREFECTIVO<br/>PV_FECHAEXPTC<br/>PV_SECUENCIAMOVIMIENTO<br/>(+ 22 campos más)
+
+    DBGetTicket-->>Pipeline: Response exitoso
+    Pipeline->>Pipeline: Validar respuesta
+    Note right of Pipeline: Condición:<br/>codeErrorGetTicket = 'SUCCESS'<br/>AND messageErrorService = ''
+
+    alt Validación Fallida
+        Pipeline->>Pipeline: Asignar codeErrorService = 'ERROR'
+        Pipeline->>ErrorService: GetCustomErrorByStackTrace
+        ErrorService-->>Pipeline: Error mapeado
+        Pipeline->>Pipeline: Transform: ErrorToRollbackPurchase.xqy
+        Pipeline->>LogService: SaveLogInFileSystem (ERROR)
+        LogService-->>Pipeline: Log guardado
+        Pipeline-->>Client: Response con Error
+    end
+
+    Pipeline->>Pipeline: Transform: RollbackPurchaseToOnlinePayment.xqy
+    Note right of Pipeline: Mapeo Ticket → Vision+:<br/>POSUserData = 'ATX'<br/>RRN37 = YYDDDHHMMssssss (generado)<br/>NumberOfInstallments = '00'<br/>MCCType = '6010'<br/>RequestType = 'R' (Reversal)<br/>CardNumber = PV_NUMEROTARJETA<br/>OrgId = PN_ORGANIZACION<br/>MerchantNumber = PV_MERCHANTNUMBER<br/>CardExpirationDate = PV_FECHAEXPTC<br/>TotalSalesAmount = PN_VALOREFECTIVO<br/>Track2Length = '0000'<br/>Track2Data = '0000'<br/>CardValidationValue = '000'
+
+    Pipeline->>VisionPlus: Invoke OnlineUpdateCard
+    Note right of Pipeline: Endpoint: http://172.28.1.145:7802/OTWS/v4<br/>Operation: OnlineUpdateCard<br/>Timeout: 70s<br/>Connection Timeout: 65s
+
+    VisionPlus->>VisionPlus: Procesar reversión de compra
+    Note right of VisionPlus: Validar tarjeta<br/>Validar monto<br/>Ejecutar reversión en Vision+
+
+    alt Reversión Rechazada por Vision+
+        VisionPlus-->>Pipeline: ActionDescription != 'APPROVED'
+        Note left of VisionPlus: Ejemplos:<br/>- DECLINED<br/>- INSUFFICIENT_FUNDS<br/>- INVALID_CARD
+        Pipeline->>Pipeline: Asignar statusService = 'ERROR'
+        Pipeline->>Pipeline: Asignar codeErrorService = 'ERROR'
+        Pipeline->>ErrorService: GetCustomErrorByStackTrace
+        ErrorService-->>Pipeline: Error mapeado
+        Pipeline->>Pipeline: Transform: ErrorToRollbackPurchase.xqy
+        Note right of Pipeline: messaggeOnlinePayment = ActionDescription
+        Pipeline->>LogService: SaveLogInFileSystem (ERROR)
+        LogService-->>Pipeline: Log guardado
+        Pipeline-->>Client: Response con Error
+    end
+
+    VisionPlus-->>Pipeline: Response exitoso
+    Note left of VisionPlus: POSUserData = 'ATX'<br/>RRN37 = (mismo enviado)<br/>VPrespCode = '00'<br/>SystemAction = 'APPROVE'<br/>ReasonActionCode = 0<br/>ActionDescription = 'APPROVED'<br/>CardValidationResult = 'PASS'<br/>AuthorizationCode = 'AUTH123456'
+
+    Pipeline->>Pipeline: Validar respuesta Vision+
+    Note right of Pipeline: Condición:<br/>fn-bea:trim(ActionDescription) = 'APPROVED'
+
+    Pipeline->>Pipeline: Transform: RollbackPurchaseToActTicket.xqy
+    Note right of Pipeline: Mapeo OSB → BD:<br/>Ticket → PV_TICKET<br/>statusTicket = 'R' → PV_ESTADO_TICKET
+
+    Pipeline->>DBActTicket: Invoke DBActTicketAdapter
+    Note right of Pipeline: Operation: DBActTicketAdapter
+
+    DBActTicket->>OracleDB: CALL OSB_ACT_BROKER_RECAUDO_TICKET
+    Note right of DBActTicket: Schema: PAGOSWSTC<br/>Package: OSB_K_RECAUDO_BROKER_HN<br/>IN: PV_TICKET, PV_ESTADO_TICKET='R'<br/>OUT: PV_SUCCESSINDICATOR, PV_MESSAGES
+
+    alt Actualización Fallida
+        OracleDB-->>DBActTicket: PV_SUCCESSINDICATOR != 'SUCCESS'
+        DBActTicket-->>Pipeline: Response con error
+        Pipeline->>Pipeline: Asignar statusService = 'ERROR'
+        Pipeline->>Pipeline: Asignar codeErrorService = 'ERROR'
+        Pipeline->>ErrorService: GetCustomErrorByStackTrace
+        ErrorService-->>Pipeline: Error mapeado
+        Pipeline->>Pipeline: Transform: ErrorToRollbackPurchase.xqy
+        Pipeline->>LogService: SaveLogInFileSystem (ERROR)
+        LogService-->>Pipeline: Log guardado
+        Pipeline-->>Client: Response con Error
+    end
+
+    OracleDB-->>DBActTicket: PV_SUCCESSINDICATOR = 'SUCCESS'
+    Note left of OracleDB: Ticket actualizado a estado 'R'<br/>PV_MESSAGES = ''
+
+    DBActTicket-->>Pipeline: Response exitoso
+
+    Pipeline->>Pipeline: Validar actualización
+    Note right of Pipeline: Condición:<br/>codeErrorService = 'SUCCESS'
+
+    Pipeline->>Pipeline: Transform: PagosWSToRollbackPurchase.xqy
+    Note right of Pipeline: Construir response exitoso:<br/>StatusInfo/Status = 'SUCCESS'<br/>StatusInfo/ValueDate = current-date<br/>StatusInfo/DateTime = current-dateTime<br/>StatusInfo/GlobalId = (del request)
+
+    Pipeline->>LogService: SaveLogInFileSystem (RESPONSE)
+    Note right of Pipeline: Registrar response exitoso
+    LogService-->>Pipeline: Log guardado
+
+    Pipeline-->>Client: Response exitoso
+    Note left of Client: StatusInfo/Status = 'SUCCESS'<br/>ErrorInfo vacío<br/>Datos del ticket reversado
+
+    Note over Client, ErrorService: Transformaciones Clave:
+    Note over Client, ErrorService: 1. RollbackPurchaseToPagosWS.xqy: OSB → Consulta BD
+    Note over Client, ErrorService: 2. RollbackPurchaseToOnlinePayment.xqy: Ticket → Vision+ (con RRN37 generado)
+    Note over Client, ErrorService: 3. RollbackPurchaseToActTicket.xqy: OSB → Actualización BD (estado='R')
+    Note over Client, ErrorService: 4. PagosWSToRollbackPurchase.xqy: BD → OSB Response (éxito)
+    Note over Client, ErrorService: 5. ErrorToRollbackPurchase.xqy: Error → OSB Response (error)
+
+    Note over Client, ErrorService: Validaciones Críticas:
+    Note over Client, ErrorService: 1. Ticket existe: PV_SUCCESSINDICATOR='SUCCESS' AND PV_MESSAGES=''
+    Note over Client, ErrorService: 2. Reversión aprobada: trim(ActionDescription)='APPROVED'
+    Note over Client, ErrorService: 3. Actualización exitosa: PV_SUCCESSINDICATOR='SUCCESS'
+
+    Note over Client, ErrorService: Retry Policies:
+    Note over Client, ErrorService: - DBGetTicket: 4 reintentos, 1-120s, backoff=2
+    Note over Client, ErrorService: - DBActTicket: 4 reintentos, 1-120s, backoff=2
+    Note over Client, ErrorService: - Vision+: 0 reintentos, timeout=70s

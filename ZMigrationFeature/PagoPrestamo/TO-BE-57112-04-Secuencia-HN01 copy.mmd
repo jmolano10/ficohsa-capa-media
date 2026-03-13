@@ -5,9 +5,9 @@ sequenceDiagram
     participant API as API Pago Prestamo Corresponsal Bancario <br> Epica 2267: PagoPrestamo <br> HU 57112:  POST - /correspondent-management/v1/execute-loan-repayment
     participant cloudWatch as AWS CloudWatch <br> Registro de logs
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
-    participant Lib as Librería Pipeline (ConfigMap)
-    participant aurora as AWS Aurora <br> SP MW_P_VALIDA_CORBAN
+    participant Lambda as Lambda de <br> parámetros
+    participant Lib as Librería Pipeline <br> (ConfigMap)
+    participant lambdaSP as Lambda Validación <br> Corresponsales 
     participant execute as API Comp Pago Préstamo <br> Epica 2267: PagoPrestamo <br> HU 56993:  POST -  /loan-payment/v1/execution
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
@@ -55,18 +55,18 @@ sequenceDiagram
     Lib->>API: Retorna constantes necesarias
     Note left of Lib: Constantes: <br> procedureNameValidaCB
 
-    API->>API: Construye campos entrada SP MW_P_VALIDA_CORBAN
-    Note over API: Mapeo: PV_CODIGO_CORRESPONSAL = request.correspondentPartyReference, <br> PV_CODIGO_PAIS = request.header.soruceBank, <br> PV_CODIGO_TRANSACCION = lambda.transactionType
+    API->>API: Construye request Lambda Valida Corresponsal
+    Note over API: Mapeo: <br> correspondentPartyReference = request.correspondentPartyReference, <br> country = request.header.soruceBank, <br> transactionType = lambda.transactionType
 
-    API->>aurora: Consume SP MW_P_VALIDA_CORBAN
-    Note right of API: Response: data {status, code, tittle, detail, correlation-id}
+    API->>lambdaSP: Consume Lambda Valida Corresponsal
+    Note right of API: correspondentPartyReference, soruceBank, transactionType
 
-    aurora->>API: Response SP MW_P_VALIDA_CORBAN
-    Note left of aurora: Response: <br> PV_CUENTA_CREDITO, <br> PV_CUENTA_DEBITO, <br> PV_MONEDA_PERMITIDA, <br> PV_TIPO_TRANSACCION, <br> PV_MONTO_COMISION, <br> Pv_MONEDA_COMISION, <br> PV_TIPO_TRANSACCION_COMISION, <br> PV_CUENTA_COMISION, <br> PV_CODIGO_MENSAJE, <br> PV_MENSAJE_ERROR 
+    lambdaSP->>API: Response Lambda Valida Corresponsal
+    Note left of lambdaSP: Response: <br> creditAccountReference, <br> debitAccountReference, <br> permittedCurrencyCode, <br> transactionType, <br> commissionAmount, <br> commissionCurrencyCode, <br> commissionTransactionType, <br> commissionAccountReference
 
-    API->>API: Evalua response SP MW_P_VALIDA_CORBAN
+    API->>API: Evalua response Lambda Valida Corresponsal
 
-    alt If PV_CODIGO_MENSAJE != "SUCCESS"
+    alt If lambdaValCorr.success == false
 
         API->> Errors: Mapear código de error
 
@@ -75,12 +75,12 @@ sequenceDiagram
         API->> Consumidor: Retorna error
         Note left of API: HTTP 422: Corresponsal Bancario no habilitado para la transacción
 
-    else If PV_CODIGO_MENSAJE == "SUCCESS"
+    else If lambdaValCorr.success == true
 
         API->>API: Evalúa Moneda
-        Note over API: request.paymentTransactionAmount == PV_MONEDA_PERMITIDA
+        Note over API: request.paymentTransactionAmount == lambdaValCorr.permittedCurrencyCode
 
-        alt If request.paymentTransactionAmount != PV_MONEDA_PERMITIDA
+        alt If request.paymentTransactionAmount != lambdaValCorr.permittedCurrencyCode
 
             API->> Errors: Mapear código de error
 
@@ -89,7 +89,7 @@ sequenceDiagram
             API->> Consumidor: Retorna error
             Note left of API: HTTP 422: Moneda inválida para la transacción
 
-        else If request.paymentTransactionAmount == PV_MONEDA_PERMITIDA
+        else If request.paymentTransactionAmount == lambdaValCorr.permittedCurrencyCode
 
             API->>API: Evalúa Método de Pago
             Note over API: paymentMechanismType == "CASH"
@@ -106,7 +106,7 @@ sequenceDiagram
             else If paymentMechanismType == "CASH"
 
                 API->>API: Construye Request API executePayment
-                Note over API: Mapeo: headers <br> body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentTransactionAmount, <br> paymentType = lambda.paymentType, <br> accountNumber = responseSP.PV_CUENTA_DEBITO, <br> chequeNumber = request.chequeInstrumentReference, <br> bankCode = request.bankPartyReference, <br> interfaceReferenceNumber = request.externalInterfaceReference, <br> transactionReferenceBC = request.correspondentTransactionReference, <br> currencyCode = request.paymentTransactionCurrency
+                Note over API: Mapeo: headers <br> body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentTransactionAmount, <br> paymentType = lambda.paymentType, <br> accountNumber = lambdaValCorr.debitAccountReference, <br> chequeNumber = request.chequeInstrumentReference, <br> bankCode = request.bankPartyReference, <br> interfaceReferenceNumber = request.externalInterfaceReference, <br> transactionReferenceBC = request.correspondentTransactionReference, <br> currencyCode = request.paymentTransactionCurrency
 
                 API->>wrapper: Consume API executePayment
                 Note right of API: loanId, paymentAmount, paymentType, <br> accountNumber, chequeNumber, bankCode, <br> interfaceReferenceNumber, transactionReferenceBC, currencyCode
