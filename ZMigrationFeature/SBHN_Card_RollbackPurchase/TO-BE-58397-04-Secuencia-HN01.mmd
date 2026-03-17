@@ -1,0 +1,143 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Reversar Compra TC <br> Epica 2677: SBRG_Card_RollbackPurchase <br> HU 58397:  POST - reversal-card-purchase/v1/execution
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant getTicket as API Get Ticket <br/> HU 58396:  POST - /cards/credit-card-status-retrieve/v1/retrieve-purchase-ticket
+    participant recordTicket as API Record Transaction <br/> HU 57727:  POST - /cards/credit-card-admin/v1/record-transaction
+    participant registerTicket as API Register Ticket <br/> HU 57729:  POST - /cards/credit-card-admin/v1/register-ticket-payment
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Regional (HN01 | GT01) - Consultar Ticket Compra TC
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> cardTransactionReference, <br> cardTransactionType
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "REVERSAL_CARD_PURCHASE" <br> name: "EXECUTION" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Lambda Parámetros
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "REVERSAL_CARD_PURCHASE" <br> name: "EXECUTION" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 | GT01
+
+    API->>API: Aplica Patrón Strategy
+
+    API->>API: Evalúa header.sourceBank
+
+    alt If header.sourceBank == HN01 | GT01
+
+        API->>API: Construye Request API Get Ticket
+        Note over API: Mapeo: <br> body: <br> ticketReference = request.cardTransactionReference
+
+        API->>getTicket: Consume (HTTPS) API Get Ticket 
+        Note right of  API: body: <br> ticketReference
+
+        getTicket->>API: Response API Get Ticket
+        Note left of getTicket: ticketStatus <br> ++ 25 campos
+
+        API->>API: Evalúa response API getTicket
+
+        alt If success == false
+
+            API->> Consumidor: Retorna error envíando por API Get Ticket
+            Note left of API: HTTP 4XX / 5XX
+
+        else If success == true
+
+            API->>API: Construye Request API Record Transaction - Campo transactionReference
+            Note over API: Mapeo: <br> transactionReference = lastDigit(YY) + dayOfYear(DDD) + HH + mm + sequence <br> ── <br> lastDigit(YY): substring(format(currentDate,"YY"), index=2) → 2026 → "26" → "6" | 2031 → "31" → "1" | 2019 → "19" → "9" <br> dayOfYear(DDD): padLeft(dayOfYear(currentDate), size=3, pad="0") → 1-Ene → "001" | 17-Mar → "076" | 31-Dic → "365" <br> HH: padLeft(hours(currentTime), size=2, pad="0") → medianoche → "00" | 9am → "09" | 11pm → "23" <br> mm: padLeft(minutes(currentTime), size=2, pad="0") → en punto → "00" | 5 min → "05" | 59 min → "59" <br> sequence: responseGetTicket.transactionSequenceNumber → "0001" | "0099" | "1000" <br> ── <br> Ej 1 (2026-03-17 09:05, seq=0001): "6"+"076"+"09"+"05"+"0001" = "607609050001" <br> Ej 2 (2031-01-01 00:00, seq=0099): "1"+"001"+"00"+"00"+"0099" = "100100000099" <br> Ej 3 (2019-12-31 23:59, seq=1000): "9"+"365"+"23"+"59"+"1000" = "936523591000"
+
+            API->>API: Construye Request API Record Transaction
+            Note over API: Mapeo: <br> posUserData = lambda.POSUserData, <br> numberOfInstallments = lambda.numberOfInstallments, <br> mccType = lambda.mCCType, <br> requestType = lambda.requestType, <br> creditId = responseGetTicket.creditCardId, <br> organizationReference = responseGetTicket.organizationReference, <br> merchantReference = responseGetTicket.merchantReference, <br> cardExpirationDate = responseGetTicket.cardExpiryDate, <br> transactionAmount = responseGetTicket.cashAmount, <br> trackDataLength = lambda.track2Length, <br> trackData = lambda.track2Data,  <br> validationValue = lambda.cardValidationValue
+
+            API->>recordTicket: Consume (HTTPS) API Record Transaction
+            Note right of API: body: <br> transactionReference, posUserData, <br> numberOfInstallments, mccType, <br> requestType, creditId, <br> organizationReference, merchantReference, <br> cardExpirationDate, transactionAmount, <br> trackDataLength, trackData, <br> validationValue
+
+            recordTicket->>API: Response API Record Transaction
+            Note left of recordTicket: response: <br> posUserData, transactionReference, <br> vpResponseCode, systemAction, <br> reasonCode, statusDescription, <br> validationResult, authorizationCode
+
+            API->>API: Evalúa response API Record Transaction
+
+            alt If responseRecordTransaction.statusDescription == "DECLINED"    
+
+                API->> Errors: Mapear código de error
+
+                Errors ->> API: Retorna código mapeado
+
+                API->> Consumidor: Retorna error homologado
+                Note left of API: HTTP 422: Reversión declinada por reglas de negocio 
+
+            else If responseRecordTransaction.statusDescription == "APPROVED" | "TRANSACTION_NOT_FOUND" | "ALREADY_REVERSED"
+
+                API->>API: Construye Request API Register Ticket
+                Note over API: Mapeo: <br> ticketReference = request.cardTransactionReference, <br> ticketStatus = lambda.requestType, <br> authorizationCode = responseRecordTransaction.authorizationCode
+
+                API->>registerTicket: Consume (HTTPS) API Register Ticket
+                Note right of API: body: <br> ticketReference, ticketStatus, authorizationCode
+
+                registerTicket->>API: Response API Register Ticket
+
+                API->>API: Evalúa response API Register Ticket
+
+                alt If HTTP Code response Register Ticket != 200
+
+                    API->> Consumidor: Retorna error envíando por API Register Ticket
+                    Note left of API: HTTP 4XX / 5XX
+
+                else If HTTP Code response Register Ticket != 200
+
+                    API->>API: Construye response API
+                    Note over API: Mapeo: <br> transactionReference = request.cardTransactionReference, <br> valueDate = currentDate(YYYY-MM-DD), <br> dateTime = currentDateTime(YYYY-MM-DDTHH:MM:SS), <br> ticketStatus = responseRecordTransaction.systemAction
+
+                    API->>Consumidor: Response Exitoso
+                    Note left of API: HTTP 200: Response Body 
+                
+                end
+            
+            end
+            
+        end
+
+    end
+    
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
