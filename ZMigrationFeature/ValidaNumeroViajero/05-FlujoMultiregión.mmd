@@ -1,0 +1,120 @@
+flowchart TD
+    subgraph "Clientes por Región"
+        ClientHN[Cliente Honduras<br/>HN01]
+        ClientGT[Cliente Guatemala<br/>GT01]
+        ClientPA[Cliente Panamá<br/>PA01]
+        ClientNI[Cliente Nicaragua<br/>NI01]
+    end
+
+    subgraph "OSB Proxy Service - Transversal"
+        ProxyService[ValidaNumeroViajero.proxy<br/>Endpoint: /Middleware/CreditCard/Customer/ValidaNumeroViajero<br/>Puerto: 8004 HTTPS]
+        
+        subgraph "Pipeline Request"
+            AuthValidation[Validación Autenticación<br/>Custom Token<br/>Username/Password en Header]
+            XSDValidation[Validación XSD<br/>validaNumeroViajeroTypes.xsd<br/>Type y FlyerNumber obligatorios]
+            RequestTransform[Transformación Request<br/>ValidaNumeroViajeroIn.xq<br/>Type → PV_TYPE<br/>FlyerNumber → PV_NUMERO_VIAJERO]
+        end
+        
+        subgraph "Pipeline Response"
+            ErrorEvaluation{Evaluar Código Error<br/>$errorCode = 'SUCCESS'?}
+            SuccessTransform[Transformación Exitosa<br/>ValidaNumeroViajeroOut.xq<br/>PV_RESULT → Result]
+            SuccessHeader[Header Exitoso<br/>successIndicator: Success]
+            ErrorHeader[Header Error<br/>successIndicator: $errorCode<br/>messages: $validationMessage]
+            EmptyBody[Body Vacío<br/>validaNumeroViajeroResponse]
+        end
+        
+        subgraph "Error Handler"
+            ErrorCapture[Captura Error Técnico<br/>$fault/ctx:errorCode<br/>$fault/ctx:reason]
+            ErrorResponse[Response Error<br/>successIndicator: ERROR<br/>messageId: errorCode<br/>messages: reason]
+        end
+    end
+
+    subgraph "Business Service - Único"
+        BusinessService[validaNumeroViajero_db.biz<br/>Conexión: ConnectionInterfazSFC<br/>Adapter: Database JCA<br/>Retry: 0, Interval: 30s]
+    end
+
+    subgraph "Base de Datos Centralizada"
+        SalesforceDB[(Salesforce Database<br/>Esquema: SALESFORCE<br/>SP: SFC_VALIDAR_NUMERO_VIAJERO)]
+        
+        subgraph "Stored Procedure"
+            SPInput[Input Parameters:<br/>PV_TYPE<br/>PV_NUMERO_VIAJERO]
+            SPLogic[Lógica de Validación<br/>Programas de Lealtad]
+            SPOutput[Output Parameters:<br/>PV_RESULT<br/>PV_ERROR_CODE<br/>PV_ERROR_MESAJE]
+        end
+    end
+
+    %% Flujo principal desde todas las regiones
+    ClientHN -->|SOAP Request| ProxyService
+    ClientGT -->|SOAP Request| ProxyService
+    ClientPA -->|SOAP Request| ProxyService
+    ClientNI -->|SOAP Request| ProxyService
+
+    %% Pipeline Request
+    ProxyService --> AuthValidation
+    AuthValidation -->|Auth OK| XSDValidation
+    AuthValidation -->|Auth Failed| ErrorCapture
+    XSDValidation -->|Valid| RequestTransform
+    XSDValidation -->|Invalid| ErrorCapture
+    RequestTransform --> BusinessService
+
+    %% Business Service a DB
+    BusinessService --> SPInput
+    SPInput --> SPLogic
+    SPLogic --> SPOutput
+    SPOutput -->|DB Response| ErrorEvaluation
+
+    %% Pipeline Response
+    ErrorEvaluation -->|SUCCESS| SuccessTransform
+    ErrorEvaluation -->|ERROR| ErrorHeader
+    SuccessTransform --> SuccessHeader
+    SuccessHeader -->|Response| ClientHN
+    SuccessHeader -->|Response| ClientGT
+    SuccessHeader -->|Response| ClientPA
+    SuccessHeader -->|Response| ClientNI
+    
+    ErrorHeader --> EmptyBody
+    EmptyBody -->|Error Response| ClientHN
+    EmptyBody -->|Error Response| ClientGT
+    EmptyBody -->|Error Response| ClientPA
+    EmptyBody -->|Error Response| ClientNI
+
+    %% Error Handler
+    ErrorCapture --> ErrorResponse
+    ErrorResponse -->|Fault Response| ClientHN
+    ErrorResponse -->|Fault Response| ClientGT
+    ErrorResponse -->|Fault Response| ClientPA
+    ErrorResponse -->|Fault Response| ClientNI
+
+    %% Conexión DB con error handling
+    BusinessService -.->|Connection Error| ErrorCapture
+
+    %% Estilos
+    classDef clientStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef proxyStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef businessStyle fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dbStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef errorStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef transformStyle fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+
+    class ClientHN,ClientGT,ClientPA,ClientNI clientStyle
+    class ProxyService proxyStyle
+    class BusinessService businessStyle
+    class SalesforceDB,SPInput,SPLogic,SPOutput dbStyle
+    class ErrorCapture,ErrorResponse,ErrorHeader errorStyle
+    class RequestTransform,SuccessTransform transformStyle
+
+    %% Notas importantes
+    note1["`**IMPORTANTE:**
+    • Servicio TRANSVERSAL - Sin diferencias regionales
+    • Una sola implementación para todas las regiones
+    • Base de datos centralizada (Salesforce)
+    • Misma lógica de validación para todos los países
+    • Sin configuraciones específicas por región`"]
+    
+    note2["`**CONFIGURACIÓN:**
+    • Endpoint único: /Middleware/CreditCard/Customer/ValidaNumeroViajero
+    • Puerto: 8004 HTTPS
+    • Autenticación: Custom token
+    • Retry: Deshabilitado (0)
+    • Logging: Debug habilitado
+    • Monitoring: SLA y Pipeline alerting`"]

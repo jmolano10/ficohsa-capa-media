@@ -1,0 +1,98 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Valida Número Viajero Frecuente <br> Epica 2452: ValidaNumeroViajero <br> HU 9404:  POST -  /system-party-reference-data/v1/validate-traveling-number
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant wrapper as Wrapper Abanks Multidestino <br> Schema: SALESFORCE <br> SP: SFC_VALIDAR_NUMERO_VIAJERO 
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Multiregion (HN01 | GT01 | PA01 | NI01) - Validar Número Viajero Frecuente
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> validationType, <br> frequentTravelerNumber
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "SYSTEM_PARTY_REFERENCE_DATA" <br> name: "VALIDATE_TRAVELING_NUMBER" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización, conexión y negocio
+
+    else Consulta  parametros en Lambda Parámetros 
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "SYSTEM_PARTY_REFERENCE_DATA" <br> name: "VALIDATE_TRAVELING_NUMBER" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización, conexión y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> connectionType <br> operationType  <br> catalogeName <br> procedureNameCB <br> caller-service
+
+    API->>API: Construye Request Wrapper Abanks Multidestino SP: SFC_VALIDAR_NUMERO_VIAJERO 
+    Note over API: Mapeo: <br> connection { <br> parm = lambda.param-name <br> secm = lambda.secret-name } <br> connectionType = const.connectionType <br> operationType  = const.operationType <br> catalogueName = const.catalogeName <br> procedureName = const.procedureNameCB <br> package = const.packageCB <br> params : { <br> PV_TYPE = request.validationType  <br> PV_NUMERO_VIAJERO = request.frequentTravelerNumber <br> }
+
+    API->>wrapper: Consume Wrapper Abanks Multidestino SP: SFC_VALIDAR_NUMERO_VIAJERO 
+    Note right of API: connection, connectionType <br> operationType, catalogueName <br> params: { <br> PV_TYPE, PV_NUMERO_VIAJERO <br> }
+
+    wrapper->>API: Response Wrapper Abanks Multidestino SP: SFC_VALIDAR_NUMERO_VIAJERO 
+    Note over wrapper: Response: <br> success, data
+
+    API->>API: Evalúa Response Wrapper Abanks Multidestino SP: SFC_VALIDAR_NUMERO_VIAJERO 
+
+    alt If data.PV_RESULT == true 
+
+        API->>API: Construye response API
+        Note over API: validationResult = "VALID"
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    else If data.PV_RESULT = false
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según tabla de homologación
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

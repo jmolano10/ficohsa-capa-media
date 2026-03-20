@@ -1,0 +1,86 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador XSD
+    participant DBAdapter as DB Adapter
+    participant SalesforceDB as Salesforce Database
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, SalesforceDB: Flujo ValidaNumeroViajero - Servicio Transversal (Todas las Regiones)
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: Authentication<br/>Body: Type, FlyerNumber
+
+    OSB->>OSB: Extraer Credenciales
+    Note right of OSB: Username/Password desde header<br/>Custom token authentication
+
+    alt Autenticación Fallida
+        OSB->>ErrorHandler: Error de Autenticación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault (401)
+    end
+
+    OSB->>Validator: Validar Esquema XML
+    Note right of Validator: Validar contra validaNumeroViajeroTypes.xsd<br/>Type y FlyerNumber obligatorios
+
+    alt Validación XSD Fallida
+        Validator->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault (400)
+    end
+
+    Validator->>OSB: Validación Exitosa
+
+    OSB->>OSB: Transformar Request (XQuery)
+    Note right of OSB: ValidaNumeroViajeroIn.xq<br/>Type → PV_TYPE<br/>FlyerNumber → PV_NUMERO_VIAJERO
+
+    OSB->>DBAdapter: Invocar Stored Procedure
+    Note right of DBAdapter: Connection: ConnectionInterfazSFC<br/>Schema: SALESFORCE<br/>SP: SFC_VALIDAR_NUMERO_VIAJERO
+
+    DBAdapter->>SalesforceDB: CALL SFC_VALIDAR_NUMERO_VIAJERO(PV_TYPE, PV_NUMERO_VIAJERO)
+    
+    alt Error de Conexión DB
+        SalesforceDB-->>DBAdapter: Connection Error
+        DBAdapter->>ErrorHandler: Database Error
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: Response con Error (500)
+    end
+
+    alt Número de Viajero Inválido
+        SalesforceDB->>DBAdapter: PV_ERROR_CODE != 'SUCCESS'
+        Note left of SalesforceDB: PV_RESULT: null<br/>PV_ERROR_CODE: 'INVALID_NUMBER'<br/>PV_ERROR_MESAJE: 'Número no válido'
+        DBAdapter->>OSB: Response con Error
+        OSB->>OSB: Procesar Error
+        Note right of OSB: successIndicator = PV_ERROR_CODE<br/>messages = PV_ERROR_MESAJE
+        OSB->>Client: Response con Error de Negocio
+    end
+
+    SalesforceDB->>DBAdapter: ResultSet Exitoso
+    Note left of SalesforceDB: PV_RESULT: 'VALID'<br/>PV_ERROR_CODE: 'SUCCESS'<br/>PV_ERROR_MESAJE: null
+
+    DBAdapter->>OSB: Response Exitoso
+
+    OSB->>OSB: Evaluar Código de Error
+    Note right of OSB: if ($errorCode = 'SUCCESS')
+
+    OSB->>OSB: Transformar Response (XQuery)
+    Note right of OSB: ValidaNumeroViajeroOut.xq<br/>PV_RESULT → Result
+
+    OSB->>OSB: Construir Header de Respuesta
+    Note right of OSB: successIndicator: 'Success'<br/>Sin mensajes de error
+
+    OSB->>Client: SOAP Response
+    Note left of Client: Header: successIndicator=Success<br/>Body: Result=VALID
+
+    Note over Client, SalesforceDB: Transformaciones Clave:
+    Note over Client, SalesforceDB: 1. Request: Type/FlyerNumber → PV_TYPE/PV_NUMERO_VIAJERO
+    Note over Client, SalesforceDB: 2. Response: PV_RESULT → Result
+    Note over Client, SalesforceDB: 3. Error Handling: PV_ERROR_CODE → successIndicator
+    Note over Client, SalesforceDB: 4. Autenticación: Custom token en header SOAP
+
+    Note over Client, SalesforceDB: Características del Servicio:
+    Note over Client, SalesforceDB: • Servicio transversal (sin diferencias regionales)
+    Note over Client, SalesforceDB: • Base de datos centralizada (Salesforce)
+    Note over Client, SalesforceDB: • Sin retry automático (retry-count=0)
+    Note over Client, SalesforceDB: • Logging debug habilitado
+    Note over Client, SalesforceDB: • Alerting SLA y Pipeline habilitado
