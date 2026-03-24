@@ -10,7 +10,9 @@
       "region": "HN01-HN01",
       "enabled": true,
       "transactionType": "9",
-      "algorithm": "AWS_ENCRYPTION_SDK"
+      "algorithm": "AWS_ENCRYPTION_SDK",
+      "param-name": "ban-xrs-ic-comp-parm-aurora-postgresql-db-<env>",
+      "arn-secret": "arn:aws:secretsmanager:us-east-1:628835453395:secret:rds!cluster-9b8b1d20-96c6-4fe4-9db7-ca1af021a7a8-pSFoon"
     },
     {
       "region": "GT01-GT01",
@@ -40,12 +42,22 @@
 ```
 ##### AWS Systems Manager Parameter Store
 
+```json
+"ban-xrs-ic-comp-parm-aurora-postgresql-db-<env>"
+{
+  "host": "ban-xrs-ic-rds-aurora-postgresql-dev.cluster-cexie6wsupzo.us-east-1.rds.amazonaws.com",
+  "port": "5432",
+  "dbname": "postgres"
+}
+```
+
 ##### AWS Systems Manager SecretManager
 
 ##### Constantes para almacenar en ConfigMap
 
 ```json
 {
+  "userDB": "dbadmin",
   "procedureName": "ban-xrs-ic-sp-register-remittance-{env}"
 }
 ```

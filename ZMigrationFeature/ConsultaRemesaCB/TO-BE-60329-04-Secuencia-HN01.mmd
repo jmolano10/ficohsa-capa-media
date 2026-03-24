@@ -5,6 +5,8 @@ sequenceDiagram
     participant cloudWatch as AWS CloudWatch <br> Registro de logs
     participant CL as Caché Local
     participant Lambda as Lambda de <br> parámetros
+    participant parameter as Parameter Store
+    participant Lib as Librería Pipeline (ConfigMap)
     participant lambdaSP as Lambda Validación Corresponsales<br/> HU 7761 - ban-xrs-ic-lam-validate-bank-correspondent-{env}
     participant decrypt as API Decifrado <br> Epica 2226: descifrarDatos <br> HU 5691:  POST -  /enterprise-services/security-assurance-admin/v1/decrypt-data
     participant query as API Comp Consulta Remesas <br> Epica 2322: ConsultaRemesasCB <br> HU 60320:  POST -  /correspondent-bank-remittances/v1/retrieve
@@ -25,11 +27,17 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros de Lambda Parámetros en caché local
         Note right of API: Domain: "CORRESPONDENT_BANK_OPERATIONS" <br> name: "RETRIEVE_REMITTANCES" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros de Lambda Parámetros en Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Consultar parámetros de Parameter Store en caché local
+        Note right of API: paramName = lambda.param-name
+
+        CL->>API: Obtiene parámetros de Parameter Store en caché local
+        Note left of CL: Obtiene parámetros de conexión a BD Aurora (host, port, dbName)
  
     else Consulta  parametros en Lambda Parámetros / Parameter Store
 
@@ -42,6 +50,15 @@ sequenceDiagram
         API->>CL: Guarda parámetros lambda Parámetros en caché local
         Note right of API: value.param-name 
 
+        API->>parameter: Consultar parámetros en Paramter Store
+        Note right of API: paramName = lambda.param-name
+
+        parameter->>API: Obtiene parámetros de Parameter Store
+        Note left of parameter: Obtiene parámetros de conexión a BD Aurora (host, port, dbName)
+
+        API->>CL: Guarda parámetros parameter store en caché local
+        Note right of API: (host, port, dbName)
+
     end
 
     API->>API: Validar Servicio Regional
@@ -49,6 +66,11 @@ sequenceDiagram
 
     API->>API: Validación Regional success
     Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> userDB <br> procedureName
 
     API->>API: Construye request Lambda Valida Corresponsal
     Note over API: Mapeo: <br> correspondentPartyReference = header.Branch-Id, <br> country = request.header.soruceBank, <br> transactionType = lambda.transactionType
@@ -119,7 +141,7 @@ sequenceDiagram
             Note over API: params: <br> p_customer_reference = request.additionalInformation.parameterValue where request.additionalInformation.parameterName == ID  <br> p_floating_amount = responseRetrieveRemittance.remittanceAmount  <br> p_exchange_rate = responseRetrieveRemittance.exchangeRate
 
             API->>query: Consume SP Register Remittance
-            Note right of API: p_customer_reference, p_floating_amount, p_exchange_rate
+            Note right of API: host, port, dbName, userDB, lambda.arn-secret <br> p_customer_reference, p_floating_amount, p_exchange_rate
 
             query->>API: Response SP Register Remittance
             Note left of query: Response: <br> p_response_code, p_response_message
