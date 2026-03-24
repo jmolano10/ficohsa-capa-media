@@ -2,7 +2,7 @@
 
 ##### AWS Systems Manager Parameter Store
 
-**Nombre**: `ban-hnd-ic-parm-connection-region-db-dev`
+**Nombre**: `ban-hnd-ic-comp-parm-connection-region-db-dev`
 ```json
 {
   "host": "172.23.177.182",
@@ -13,7 +13,7 @@
 
 ##### AWS Systems Manager SecretManager
 
-**Nombre**: `ban-hnd-ic-secm-connection-trx-asincrono-db-dev`
+**Nombre**: `ban-hnd-ic-comp-secm-connection-trx-asincrono-db-dev`
 ```json
 {
   "username": "TRX_BATCH_CB",
