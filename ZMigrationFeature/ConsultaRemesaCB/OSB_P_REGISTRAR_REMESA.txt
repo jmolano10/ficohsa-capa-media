@@ -1,0 +1,35 @@
+CREATE OR REPLACE PROCEDURE MIDDLEWARE.OSB_P_REGISTRAR_REMESA(
+  PV_ID_CLIENTE IN VARCHAR2,
+  PV_MONTO_FLOTANTE IN VARCHAR2,
+  PV_TASA_CAMBIO IN VARCHAR2,
+  PV_CODIGO_ERROR OUT VARCHAR2,
+  PV_MENSAJE_ERROR OUT VARCHAR2
+)
+AS
+  CONTAR_ID NUMBER;
+BEGIN
+  -- El siguiente bloque de código sirve para validar si el cliente se encuentra en la base de datos
+  SELECT COUNT(*) INTO CONTAR_ID
+  FROM MW_MONTOS_CLIENTES_REMESAS
+  WHERE ID_CLIENTE = PV_ID_CLIENTE;
+
+  -- Las siguientes líneas de código sirven para actualizar los datos de la remesa en caso de que exista el cliente en la base de datos
+  IF CONTAR_ID = 1 THEN
+    UPDATE MW_MONTOS_CLIENTES_REMESAS
+    SET MONTO_FLOTANTE = PV_MONTO_FLOTANTE,
+        TASA_CAMBIO = PV_TASA_CAMBIO,
+        ESTADO = 'PEN'
+    WHERE ID_CLIENTE = PV_ID_CLIENTE;
+  ELSE -- Si el cliente no se encuentra en la base de datos se insertará al nuevo cliente con los datos de la remesa
+    INSERT INTO MW_MONTOS_CLIENTES_REMESAS (ID_CLIENTE, MONTO_ACUMULADO, MONTO_FLOTANTE, TASA_CAMBIO, ESTADO)
+    VALUES (PV_ID_CLIENTE, '0', PV_MONTO_FLOTANTE, PV_TASA_CAMBIO, 'PEN');
+  END IF;
+
+  COMMIT;
+  PV_CODIGO_ERROR := 'SUCCESS';
+  PV_MENSAJE_ERROR := '';
+EXCEPTION
+  WHEN OTHERS THEN
+    PV_CODIGO_ERROR := 'ERROR';
+    PV_MENSAJE_ERROR := SQLERRM || ' ERROR';
+END OSB_P_REGISTRAR_REMESA;

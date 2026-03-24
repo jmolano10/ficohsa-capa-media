@@ -1,0 +1,150 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Exp Consulta Remesas CB <br> Epica 2322: ConsultaRemesasCB <br> HU 60329:  POST - /correspondent-management/v1/retrieve-remittances
+    participant cloudWatch as AWS CloudWatch <br> Registro de logs
+    participant CL as Caché Local
+    participant Lambda as Lambda de <br> parámetros
+    participant lambdaSP as Lambda Validación Corresponsales<br/> HU 7761 - ban-xrs-ic-lam-validate-bank-correspondent-{env}
+    participant decrypt as API Decifrado <br> Epica 2226: descifrarDatos <br> HU 5691:  POST -  /enterprise-services/security-assurance-admin/v1/decrypt-data
+    participant query as API Comp Consulta Remesas <br> Epica 2322: ConsultaRemesasCB <br> HU 60320:  POST -  /correspondent-bank-remittances/v1/retrieve
+    participant register as SP Registrar Remesas <br> Epica 2322: ConsultaRemesasCB <br> HU 60334:  SP -  ban-xrs-ic-sp-register-remittance-{env}
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Pago Prestamo Corresponsal Bancario
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> remittanceReference, <br> ++ 10 campos
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>cloudWatch: Registra log con request recibido
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        Note right of API: Domain: "CORRESPONDENT_BANK_OPERATIONS" <br> name: "RETRIEVE_REMITTANCES" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Lambda Parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "CORRESPONDENT_BANK_OPERATIONS" <br> name: "RETRIEVE_REMITTANCES" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>API: Construye request Lambda Valida Corresponsal
+    Note over API: Mapeo: <br> correspondentPartyReference = header.Branch-Id, <br> country = request.header.soruceBank, <br> transactionType = lambda.transactionType
+
+    API->>lambdaSP: Consume Lambda Valida Corresponsal
+    Note right of API: correspondentPartyReference, soruceBank, transactionType
+
+    lambdaSP->>API: Response Lambda Valida Corresponsal
+    Note left of lambdaSP: Response: <br> creditAccountReference, <br> debitAccountReference, <br> permittedCurrencyCode, <br> transactionType, <br> commissionAmount, <br> commissionCurrencyCode, <br> commissionTransactionType, <br> commissionAccountReference
+
+    API->>API: Evalua response Lambda Valida Corresponsal
+
+    alt If lambdaValCorr.success == false
+
+        API->> Consumidor: Retorna error generado por la lambda
+        Note left of API: HTTP 4XX / 5XX
+
+    else If lambdaValCorr.success == true
+
+        alt If request.additionalInformation.parameterName == LOGINUSER | LOGINPASS itera este ciclo para cada request.additionalInformation.parameterValue
+
+            API->>API: Construye Request API decifrado
+            Note over API: body: <br> encryptionAlgorithm = lambda.algorithm, <br> encryptedData = request.additionalInformation.parameterValue
+
+            API->>decrypt: Consume API decifrado
+            Note right of API: encryptionAlgorithm, encryptedData
+
+            decrypt->>API: Response API decifrado
+            Note left of decrypt: Response: <br> data.decryptedData
+
+            API->>API: Evalúa Response API decifrado
+
+            alt If Response API decifrado != 200
+
+                API->> Consumidor: Retorna error generado por la API Decifrar
+                Note left of API: HTTP 4XX / 5XX
+
+            else If Response API decifrado == 200   
+
+                API->>API: Obtiene valor decifrado
+                Note over API: $additionalInformation.parameterValue = data.decryptedData
+
+                API->>API: Continúa el flujo
+
+            end
+
+        end
+
+        API->>API: Construye Request API Comp retrieveRemittances
+        Note over API: body: <br> additionalInformation.parameterValue = $additionalInformation.parameterValue, <br> ++ 10 campos mapeo uno a uno
+
+        API->>query: Consume API retrieveRemittances
+        Note right of API: remittanceReference, ++ 10 campos
+
+        query->>API: Response API retrieveRemittances
+        Note left of query: Response: <br> remittanceReference <br> ++ 10 campos
+
+        API->>API: Evalúa Response API retrieveRemittances
+
+        alt If data.success == false 
+
+            API->> Consumidor: Retorna error generado por API Composición retrieveRemittances
+            Note left of API: HTTP 4XX / 5XX
+
+        else If data.success == true 
+
+            API->>API: Construye Request SP Register Remittance
+            Note over API: params: <br> p_customer_reference = request.additionalInformation.parameterValue where request.additionalInformation.parameterName == ID  <br> p_floating_amount = responseRetrieveRemittance.remittanceAmount  <br> p_exchange_rate = responseRetrieveRemittance.exchangeRate
+
+            API->>query: Consume SP Register Remittance
+            Note right of API: p_customer_reference, p_floating_amount, p_exchange_rate
+
+            query->>API: Response SP Register Remittance
+            Note left of query: Response: <br> p_response_code, p_response_message
+
+            API->>API: Construye response API Experiencia
+            Note over API: Mapeo uno a uno con response API Composición retrieveRemittances
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+
+        end
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

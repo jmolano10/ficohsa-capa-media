@@ -1,0 +1,114 @@
+flowchart TD
+    A[Cliente CB] --> B[ConsultaRemesaCB Proxy]
+    B --> C{Validar Esquema XML}
+    C -->|Error| Z1[SOAP Fault]
+    C -->|OK| D[Validar Corresponsal]
+    
+    D --> E{Corresponsal Válido?}
+    E -->|No| Z2[Error: Corresponsal no autorizado]
+    E -->|Sí| F{¿Credenciales Cifradas?}
+    
+    F -->|Sí| G[Descifrar LOGINUSER/LOGINPASS]
+    F -->|No| H[ConsultaRemesas Proxy]
+    G --> G1[OperacionesCriptograficas]
+    G1 --> G2{Descifrado OK?}
+    G2 -->|No| Z3[Error Descifrado]
+    G2 -->|Sí| H
+    
+    H --> I[Validar Servicio Regional]
+    I --> J{Región HN01 Válida?}
+    J -->|No| Z4[Error: Región no válida]
+    J -->|Sí| K[Obtener Parámetros Usuario]
+    
+    K --> L[Obtener Tipo Remesadora]
+    L --> M{Tipo de Remesadora}
+    
+    M -->|REMESALOCAL| N[Validar Tipo Remesa Local]
+    M -->|FICOREMESA| P[Consultar Ficohsa Remesas]
+    M -->|ONLINE| Q[Validar Permisos Usuario]
+    
+    N --> N1{REMITSOURCE = T24?}
+    N1 -->|Sí| N2[Consultar T24]
+    N1 -->|No| N3[Consultar FLink Local]
+    N2 --> N4{Estado = DISPONIBLE?}
+    N3 --> N4
+    N4 -->|Sí| N5[Registrar Relación]
+    N4 -->|No| Y[Preparar Response]
+    N5 --> Y
+    
+    P --> P1[ConsultarRemFRemXPagador]
+    P1 --> P2{Estado = DISPONIBLE?}
+    P2 -->|Sí| P3[Registrar Relación]
+    P2 -->|No| Y
+    P3 --> Y
+    
+    Q --> Q1{¿Tiene Permisos?}
+    Q1 -->|No| Z5[Error: Sin permisos]
+    Q1 -->|Sí| R[Consulta Múltiples Remesadoras]
+    
+    R --> R1[Armar Mensaje]
+    R1 --> R2[Enrutador Convenios]
+    R2 --> R3{errorCode?}
+    
+    R3 -->|0 DISPONIBLE| R4[Obtener Campos Relación]
+    R3 -->|2 PAGADA| R7[Continuar siguiente]
+    R3 -->|Otro| R7
+    
+    R4 --> R5{¿Evaluar Listas?}
+    R5 -->|Sí| R6[EvaluaListasCliente]
+    R5 -->|No| R8[Registrar Relación]
+    R6 --> R6A{¿Lista Restrictiva?}
+    R6A -->|Sí| Z6[Error: Lista restrictiva]
+    R6A -->|No| R8
+    R8 --> Y
+    
+    R7 --> R9{¿Más Remesadoras?}
+    R9 -->|Sí| R1
+    R9 -->|No| R10[Mapear Error]
+    R10 --> Y
+    
+    Y --> Y1[Transformar Response]
+    Y1 --> Y2{successIndicator = SUCCESS?}
+    Y2 -->|Sí| Y3[Registrar Límite Transaccional]
+    Y2 -->|No| Y4[Response Final]
+    Y3 --> Y4
+    Y4 --> Y5[Cliente CB]
+    
+    %% Estilos
+    classDef errorNode fill:#ffcccc,stroke:#ff0000,stroke-width:2px
+    classDef processNode fill:#cceeff,stroke:#0066cc,stroke-width:2px
+    classDef decisionNode fill:#ffffcc,stroke:#ffaa00,stroke-width:2px
+    classDef successNode fill:#ccffcc,stroke:#00aa00,stroke-width:2px
+    
+    class Z1,Z2,Z3,Z4,Z5,Z6 errorNode
+    class B,D,G,G1,H,I,K,L,N,N2,N3,P,P1,Q,R,R1,R2,R4,R6,R8,Y,Y1,Y3 processNode
+    class C,E,F,G2,J,M,N1,N4,P2,Q1,R3,R5,R6A,R9,Y2 decisionNode
+    class Y4,Y5 successNode
+    
+    %% Notas de regiones
+    subgraph "Región HN01 - Honduras"
+        direction TB
+        B
+        H
+        N
+        P
+        Q
+    end
+    
+    %% Notas de tipos de remesadora
+    subgraph "Tipos de Remesadora"
+        direction LR
+        N -.-> N_Label[REMESALOCAL<br/>FLink o T24]
+        P -.-> P_Label[FICOREMESA<br/>Tablas TERCEROS]
+        Q -.-> Q_Label[ONLINE<br/>Moneygram, Uniteller<br/>BTS, Pacific]
+    end
+    
+    %% Notas de validaciones
+    subgraph "Validaciones de Seguridad"
+        direction TB
+        D -.-> D_Label[Corresponsal autorizado<br/>para transacción tipo 9]
+        G -.-> G_Label[Descifrado RSA<br/>ONE-TIME-PASSWORD]
+        I -.-> I_Label[Servicio FICBCO0148<br/>habilitado para HN01]
+        Q1 -.-> Q1_Label[Usuario en lista<br/>REMITALLOW]
+        R6 -.-> R6_Label[Listas restrictivas<br/>si CHECKLISTS=Yes]
+    end

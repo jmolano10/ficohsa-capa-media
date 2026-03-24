@@ -1,0 +1,197 @@
+sequenceDiagram
+    participant Client as Cliente CB
+    participant OSB as ConsultaRemesaCB Proxy
+    participant Validator as Validador Corresponsal
+    participant Crypto as OperacionesCriptograficas
+    participant ConsultaRem as ConsultaRemesas Proxy
+    participant ValidadorReg as ValidadorRegional
+    participant TipoRem as ObtenerTipoRemesadora
+    participant ParamSvc as ObtenerParametrizacion
+    participant LocalDB as ConsultarRemLocalId
+    participant FicoremDB as ConsultarRemFRemXPagador
+    participant ArmarMsg as ArmarMensajeRecaudo
+    participant Enrutador as EnrutadorConvenios
+    participant ListasEval as EvaluaListasCliente
+    participant LimiteSvc as LimiteTrxRegistrar
+
+    Note over Client, LimiteSvc: Flujo Honduras (HN01) - ConsultaRemesaCB
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>BankingCorrespondent.Id<br/>Body: REMITTANCE_ID<br/>ADDITIONAL_INFO: ID, LOGINUSER, LOGINPASS
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar campos obligatorios<br/>consultaRemesasCBTypes.xsd
+
+    alt Validación Fallida
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Corresponsal
+    Note right of Validator: consultarCorresponsalB_db<br/>PV_TIPO_TRANSACCION=9<br/>PV_ID_CORRESPONSAL_BANCARIO<br/>PV_BANCO_ORIGEN=HN01
+
+    Validator->>OSB: Resultado Validación
+    
+    alt Corresponsal No Válido
+        OSB->>Client: Error Response
+        Note left of Client: successIndicator=ERROR<br/>messages=Corresponsal no autorizado
+    end
+
+    OSB->>OSB: Extraer Credenciales Cifradas
+    Note right of OSB: LOGINUSER y LOGINPASS<br/>de ADDITIONAL_INFO
+
+    alt Credenciales Cifradas Presentes
+        OSB->>Crypto: Descifrar LOGINUSER
+        Note right of Crypto: cifrarDatos operation<br/>KEY_ALIAS=ONE-TIME-PASSWORD<br/>CIPHER=RSA
+        Crypto->>OSB: Usuario Descifrado
+
+        OSB->>Crypto: Descifrar LOGINPASS
+        Crypto->>OSB: Password Descifrado
+
+        OSB->>OSB: Actualizar ADDITIONAL_INFO
+        Note right of OSB: Reemplazar valores cifrados<br/>con valores descifrados
+    end
+
+    OSB->>ConsultaRem: Invocar ConsultaRemesas
+    Note right of ConsultaRem: Transformar header y body<br/>consultaRemesaCBHeaderIn.xq<br/>consultaRemesaCBIn.xq
+
+    ConsultaRem->>ConsultaRem: Validar Esquema
+    Note right of ConsultaRem: consultaRemesasTypes.xsd
+
+    ConsultaRem->>ValidadorReg: Validar Servicio Regional
+    Note right of ValidadorReg: ValidaServicioRegional_db<br/>ServiceId=FICBCO0148<br/>Region=HN01
+
+    ValidadorReg->>ConsultaRem: Validación Exitosa
+
+    alt Región No Válida
+        ValidadorReg->>ConsultaRem: Error Regional
+        ConsultaRem->>OSB: Response con Error
+        OSB->>Client: Error Response
+    end
+
+    ConsultaRem->>ParamSvc: Obtener Parámetros Usuario
+    Note right of ParamSvc: obtenerParametrizacion<br/>T24C070.{USERNAME}.REMITALLOW<br/>T24C070.{USERNAME}.IDPAYERGUSER<br/>T24C070.{USERNAME}.CHECKLISTS<br/>T24C070.{USERNAME}.CHECKREMITTERID
+
+    ParamSvc->>ConsultaRem: Parámetros Usuario
+
+    ConsultaRem->>TipoRem: Obtener Tipo Remesadora
+    Note right of TipoRem: MW_P_OBTENER_TIPO_REMESADORA<br/>PV_CLAVE=REMITTANCE_ID<br/>PV_USUARIO_SERVICIO=USERNAME
+
+    TipoRem->>ConsultaRem: Tipo y Datos Remesadora
+    Note left of TipoRem: PV_TIPO_REMESADORA<br/>PV_ABREVIATURA_REMESADORA<br/>PN_ID_CONVENIO<br/>PV_ID_CONVENIO_T24<br/>PN_PRIORIDAD
+
+    alt Tipo = REMESALOCAL
+        ConsultaRem->>ConsultaRem: Validar Tipo Remesa Local
+        Note right of ConsultaRem: validarTipoRemesaLocal.xq
+
+        ConsultaRem->>ParamSvc: Obtener REMITSOURCE
+        Note right of ParamSvc: T24C070.{TIPO}.REMITSOURCE
+
+        alt REMITSOURCE = T24
+            ConsultaRem->>ConsultaRem: Consultar en T24
+            Note right of ConsultaRem: sjConsultaRemesaResiliencia<br/>Consultaderemesa operation
+        else REMITSOURCE != T24
+            ConsultaRem->>LocalDB: Consultar Remesa Local
+            Note right of LocalDB: CV_K_DATOS_REMESAS$CONSU_X_ID<br/>PV_REMESA=REMITTANCE_ID
+
+            LocalDB->>ConsultaRem: Datos Remesa Local
+            Note left of LocalDB: PV_CLAVE, PV_CODREMESADORA<br/>PV_BENEFICIARIO, PV_REMITENTE<br/>PV_AGENCIA_PAGO, PV_FECHA_PAGO<br/>PV_ESTADO, PN_TASACAMBIO<br/>PN_VALOR, PV_MONEDA, PV_ERROR
+
+            alt Estado = DISPONIBLE
+                ConsultaRem->>ConsultaRem: Registrar Relación Consulta-Pago
+                Note right of ConsultaRem: ingresoRelConsPagoRem_db
+            end
+        end
+
+    else Tipo = FICOREMESA
+        ConsultaRem->>FicoremDB: Consultar Ficohsa Remesas
+        Note right of FicoremDB: CV_K_DATOS_REMESAS_POR_PAGADOR<br/>PV_REMESA=REMITTANCE_ID<br/>PV_PAGADOR_DEST=IDPAYERGUSER
+
+        FicoremDB->>ConsultaRem: Datos Ficohsa Remesas
+        Note left of FicoremDB: Misma estructura que Local<br/>PV_CLAVE, PV_CODREMESADORA<br/>PV_BENEFICIARIO, etc.
+
+        alt Estado = DISPONIBLE
+            ConsultaRem->>ConsultaRem: Registrar Relación Consulta-Pago
+        end
+
+    else Tipo = ONLINE
+        ConsultaRem->>ConsultaRem: Validar Permisos Usuario
+        Note right of ConsultaRem: Verificar REMITALLOW<br/>contra PV_ABREVIATURA_REMESADORA
+
+        alt Sin Permisos
+            ConsultaRem->>OSB: Error Permisos
+            OSB->>Client: Error Response
+            Note left of Client: El usuario no tiene permisos<br/>para consultar este tipo de remesa
+        end
+
+        ConsultaRem->>ConsultaRem: Consulta Múltiples Remesadoras
+        Note right of ConsultaRem: sjConsultaMultipleRemesadoras<br/>BPEL Flow
+
+        loop Para cada Remesadora por Prioridad
+            ConsultaRem->>ArmarMsg: Armar Mensaje
+            Note right of ArmarMsg: OSB_ARMAR_MENSAJE<br/>CODIGO_CONTRATO=AGREEMENT_ID_T24<br/>TIPO_OPERACION=1, TIPO_PARAM=REQ
+
+            ArmarMsg->>ConsultaRem: Mensaje Armado
+
+            ConsultaRem->>Enrutador: Consultar Remesadora
+            Note right of Enrutador: HTTP POST<br/>http://192.9.200.176:8003/.../EnrutadorConvenios<br/>Cache TTL: 30 minutos
+
+            Enrutador->>ConsultaRem: Respuesta Remesadora
+            Note left of Enrutador: primaryKey, operationCode<br/>totalAmount, errorCode<br/>errorMessage, responseData
+
+            alt errorCode = 0 (DISPONIBLE)
+                ConsultaRem->>ConsultaRem: Obtener Campos Relación
+                Note right of ConsultaRem: obtenerCamposRemesasRel_db<br/>PN_ID_CONVENIO
+
+                alt CHECKLISTS = Yes
+                    ConsultaRem->>ListasEval: Evaluar Listas Cliente
+                    Note right of ListasEval: evaluaListasCliente<br/>Validar contra listas restrictivas
+
+                    ListasEval->>ConsultaRem: Resultado Evaluación
+
+                    alt Lista Restrictiva
+                        ConsultaRem->>OSB: Error Lista
+                        OSB->>Client: Error Response
+                    end
+                end
+
+                ConsultaRem->>ConsultaRem: Registrar Relación Consulta-Pago
+                Note right of ConsultaRem: ingRelConsPagoConv<br/>con datos del enrutador
+
+                ConsultaRem->>ConsultaRem: Salir del Loop
+                Note right of ConsultaRem: Remesa encontrada y disponible
+            else errorCode = 2 (PAGADA)
+                ConsultaRem->>ConsultaRem: Continuar con siguiente remesadora
+            else errorCode != 0,2
+                ConsultaRem->>ConsultaRem: Continuar con siguiente remesadora
+            end
+        end
+
+        alt Ninguna Remesadora Exitosa
+            ConsultaRem->>ConsultaRem: Mapear Error
+            Note right of ConsultaRem: MapeoErrores<br/>FICBCO0148
+        end
+    end
+
+    ConsultaRem->>OSB: Response Consulta
+    Note left of ConsultaRem: consultaRemesasResponse<br/>con datos de la remesa
+
+    OSB->>OSB: Transformar Response
+    Note right of OSB: consultaRemesaCBOut.xq<br/>Mapear a estructura CB
+
+    alt successIndicator = SUCCESS
+        OSB->>LimiteSvc: Registrar Límite Transaccional
+        Note right of LimiteSvc: limiteTrxRegistrar<br/>PV_ID_CLIENTE=ADDITIONAL_INFO[ID]<br/>PV_MONTO_FLOTANTE=REMITTANCE_AMOUNT<br/>PV_TASA_CAMBIO=EXCHANGE_RATE
+
+        LimiteSvc->>OSB: Límite Registrado
+    end
+
+    OSB->>Client: SOAP Response
+    Note left of Client: Header: successIndicator<br/>Body: consultaRemesasResponse<br/>con datos completos de remesa
+
+    Note over Client, LimiteSvc: Transformaciones Clave:
+    Note over Client, LimiteSvc: 1. Descifrado RSA de credenciales
+    Note over Client, LimiteSvc: 2. Enrutamiento por tipo de remesadora
+    Note over Client, LimiteSvc: 3. Selección por prioridad en ONLINE
+    Note over Client, LimiteSvc: 4. Mapeo de errorCode a estados de negocio
+    Note over Client, LimiteSvc: 5. Registro de límites transaccionales
+    Note over Client, LimiteSvc: 6. Evaluación opcional de listas restrictivas

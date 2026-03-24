@@ -9,26 +9,26 @@
     {
       "region": "HN01-HN01",
       "enabled": true,
-      "param-name": "ban-xrs-ic-wpr-parm-connection-interfazdev-db-dev",
-      "secret-name": "ban-xrs-ic-wpr-secm-connection-interfazdev-db-dev"
+      "param-name": "ban-xrs-ic-wpr-parm-connection-interfaz-sfc-db-dev",
+      "secret-name": "ban-xrs-ic-wpr-secm-connection-interfaz-sfc-db-dev"
     },
     {
       "region": "GT01-GT01",
       "enabled": true,
-      "param-name": "ban-xrs-ic-wpr-parm-connection-interfazdev-db-dev",
-      "secret-name": "ban-xrs-ic-wpr-secm-connection-interfazdev-db-dev"
+      "param-name": "ban-xrs-ic-wpr-parm-connection-interfaz-sfc-db-dev",
+      "secret-name": "ban-xrs-ic-wpr-secm-connection-interfaz-sfc-db-dev"
     },
     {
       "region": "NI01-NI01",
       "enabled": true,
-      "param-name": "ban-xrs-ic-wpr-parm-connection-interfazdev-db-dev",
-      "secret-name": "ban-xrs-ic-wpr-secm-connection-interfazdev-db-dev"
+      "param-name": "ban-xrs-ic-wpr-parm-connection-interfaz-sfc-db-dev",
+      "secret-name": "ban-xrs-ic-wpr-secm-connection-interfaz-sfc-db-dev"
     },
     {
       "region": "PA01-PA01",
       "enabled": true,
-      "param-name": "ban-xrs-ic-wpr-parm-connection-interfazdev-db-dev",
-      "secret-name": "ban-xrs-ic-wpr-secm-connection-interfazdev-db-dev"
+      "param-name": "ban-xrs-ic-wpr-parm-connection-interfaz-sfc-db-dev",
+      "secret-name": "ban-xrs-ic-wpr-secm-connection-interfaz-sfc-db-dev"
     }
   ],
   "type": "JSON",
@@ -47,7 +47,7 @@
 ##### AWS Systems Manager Parameter Store
 
 ```json
-"ban-xrs-ic-wpr-parm-connection-interfazdev-db-dev"
+"ban-xrs-ic-wpr-parm-connection-interfaz-sfc-db-dev"
 {
   "host": "172.23.176.20",
   "port": "1970",
@@ -58,9 +58,9 @@
 ##### AWS Systems Manager SecretManager
 
 ```json
-"ban-xrs-ic-wpr-secm-connection-interfazdev-db-dev"
+"ban-xrs-ic-wpr-secm-connection-interfaz-sfc-db-dev"
 {
-  "user": "servicio",
+  "user": "SALESFORCE",
   "password": "desarrollo"
 }
 ```
@@ -81,8 +81,8 @@
 ```json
 {
   "connection": {
-    "parm": "ban-xrs-ic-wpr-parm-connection-interfazdev-db-dev",
-    "secm": "ban-xrs-ic-wpr-secm-connection-interfazdev-db-dev"
+    "parm": "ban-xrs-ic-wpr-parm-connection-interfaz-sfc-db-dev",
+    "secm": "ban-xrs-ic-wpr-secm-connection-interfaz-sfc-db-dev"
   },
   "connectionType": "jca",
   "operationType": "query",

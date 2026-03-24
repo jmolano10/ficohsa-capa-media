@@ -1,0 +1,170 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant ValidadorRegional as Validador Regional
+    participant ObtenerTipo as ObtenerTipoRemesadora DB
+    participant SJS as SJS ConsultaMultipleRemesadoras
+    participant T24 as T24 Core Banking
+    participant FLink as FLink Database
+    participant EvaluaListas as EvaluaListasCliente
+    participant MapeoErrores as MapeoErrores
+    participant AuditoriaDB as Auditoria Database
+
+    Note over Client, AuditoriaDB: Flujo Honduras (HN01) - ConsultaRemesas
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: REMITTANCE_ID o Nombres
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar consultaRemesasTypes.xsd<br/>Campos obligatorios según tipo
+
+    alt Validación XSD Fallida
+        OSB->>MapeoErrores: Error de Validación
+        MapeoErrores->>OSB: Error Mapeado
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>ValidadorRegional: Validar Servicio Regional
+    Note right of ValidadorRegional: ServiceId: FICBCO0148<br/>Region: HN01
+
+    ValidadorRegional->>ValidadorRegional: Consultar BD Regional
+    
+    alt Región No Válida
+        ValidadorRegional->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    ValidadorRegional->>OSB: Validación Exitosa
+
+    OSB->>OSB: Determinar Tipo de Consulta
+    Note right of OSB: validarTipoConsulta.xq<br/>ID_BASED vs NAME_BASED
+
+    alt Tipo de Consulta Inválido
+        OSB->>Client: Error - Campos Requeridos
+    end
+
+    OSB->>OSB: Obtener Parametrización
+    Note right of OSB: T24C070.{USER}.REMITALLOW<br/>T24C070.{USER}.IDPAYERGUSER<br/>T24C070.{USER}.CHECKLISTS
+
+    OSB->>ObtenerTipo: Obtener Tipo Remesadora
+    Note right of ObtenerTipo: obtenerTipoRemesadoraIn.xq<br/>PV_CLAVE, PV_USUARIO_SERVICIO
+
+    ObtenerTipo->>ObtenerTipo: Ejecutar SP ObtenerTipoRemesadora
+    ObtenerTipo->>OSB: Tipo y Configuración
+    Note left of ObtenerTipo: PV_TIPO_REMESADORA<br/>PV_ABREVIATURA_REMESADORA<br/>PN_ID_CONVENIO<br/>PV_ID_CONVENIO_T24
+
+    alt Tipo Remesadora No Encontrado
+        OSB->>MapeoErrores: Error Tipo Remesadora
+        MapeoErrores->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Validar Permisos Usuario
+    Note right of OSB: Verificar REMITALLOW<br/>Validar acceso a tipo remesadora
+
+    alt Sin Permisos
+        OSB->>Client: Error - Sin Permisos
+    end
+
+    alt Tipo: REMESALOCAL
+        OSB->>OSB: Determinar Fuente Local
+        Note right of OSB: T24 vs FLink<br/>Según configuración
+
+        alt Fuente: T24
+            OSB->>T24: Consultar Remesa
+            Note right of T24: consultaRemesaT24In.xq<br/>Operación: Consultaderemesa
+            T24->>T24: Buscar en Core Banking
+            T24->>OSB: Datos Remesa T24
+            OSB->>OSB: Transformar Response T24
+            Note right of OSB: consultaRemesasOut.xq
+        else Fuente: FLink
+            OSB->>FLink: consultarRemLocalId
+            Note right of FLink: consultaRemLocalIdIn.xq<br/>SP: consultarRemLocalId
+            FLink->>FLink: Buscar en Tablas Locales
+            FLink->>OSB: Datos Remesa Local
+            Note left of FLink: PV_ESTADO, PV_REMITENTE<br/>PV_BENEFICIARIO, PV_MONTO
+
+            alt Estado: DISPONIBLE
+                OSB->>AuditoriaDB: Registrar Consulta
+                Note right of AuditoriaDB: ingresoRelConsPagoRem<br/>Auditoría de consulta
+                AuditoriaDB->>OSB: Registro Exitoso
+            end
+
+            OSB->>OSB: Transformar Response Local
+            Note right of OSB: consultaRemLocalIdOut.xq
+        end
+    else Tipo: FICOREMESA
+        OSB->>FLink: consultarRemFRemXPagador
+        Note right of FLink: consultaFRemPagIdIn.xq<br/>SP: consultarRemFRemXPagador
+        FLink->>FLink: Buscar Ficohsa Remesas
+        FLink->>OSB: Datos Ficohsa Remesa
+        Note left of FLink: PV_ESTADO, Datos remesa
+
+        alt Estado: DISPONIBLE
+            OSB->>AuditoriaDB: Registrar Consulta
+            Note right of AuditoriaDB: ingresoRelConsPagFRem<br/>Auditoría Ficohsa
+            AuditoriaDB->>OSB: Registro Exitoso
+        end
+
+        OSB->>OSB: Transformar Response Ficohsa
+        Note right of OSB: consultaRemFRemIdOut.xq
+    else Tipo: ONLINE
+        OSB->>SJS: Consultar Múltiples Remesadoras
+        Note right of SJS: sjconsultaMultipleRemesadorasIn.xq<br/>Operación: consultaRemesadoras
+
+        SJS->>SJS: Consultar Remesadoras Online
+        Note right of SJS: Moneygram, Western Union<br/>Uniteller, etc.
+        SJS->>OSB: Respuestas Múltiples
+        Note left of SJS: SUCCESS_INDICATOR<br/>ROUTER_RESPONSE con PRIORITY
+
+        alt Sin Respuestas Válidas
+            OSB->>MapeoErrores: Error Consulta Online
+            MapeoErrores->>OSB: Error Mapeado
+            OSB->>Client: Response con Error
+        end
+
+        OSB->>OSB: Seleccionar por Prioridad
+        Note right of OSB: min(PRIORITY)<br/>Mejor remesadora disponible
+
+        alt ErrorCode: 0 (Exitoso)
+            OSB->>FLink: Obtener Campos Relacionados
+            Note right of FLink: obtenerCamposRemesasRelIn.xq<br/>SP: obtenerCamposRemesasRel
+            FLink->>OSB: Campos Adicionales
+
+            alt Validar Listas Habilitado
+                OSB->>EvaluaListas: Validar Cliente en Listas
+                Note right of EvaluaListas: evaluaListasClienteConsultaRemesaIn.xq<br/>Validación restrictiva
+                EvaluaListas->>EvaluaListas: Consultar Listas Restrictivas
+                EvaluaListas->>OSB: Resultado Validación
+
+                alt Cliente en Lista Restrictiva
+                    OSB->>Client: Error - Cliente Restringido
+                end
+            end
+
+            OSB->>AuditoriaDB: Registrar Consulta Online
+            Note right of AuditoriaDB: ingRelConsPagoConv<br/>Auditoría online
+            AuditoriaDB->>OSB: Registro Exitoso
+
+            OSB->>OSB: Transformar Response Online
+            Note right of OSB: EnrutadorConveniosOut.xq<br/>Respuesta unificada
+        else ErrorCode: != 0
+            OSB->>MapeoErrores: Mapear Error Online
+            MapeoErrores->>OSB: Error HTTP Mapeado
+            OSB->>Client: Response con Error
+        end
+    end
+
+    OSB->>OSB: Construir Header de Respuesta
+    Note right of OSB: successIndicator: SUCCESS<br/>messages: Consulta exitosa
+
+    OSB->>Client: SOAP Response
+    Note left of Client: Header: successIndicator=SUCCESS<br/>Body: Datos de remesa<br/>REMITTANCE_ID, REMITTER_NAME<br/>BENEFICIARY_NAME, AMOUNT, STATUS
+
+    Note over Client, AuditoriaDB: Transformaciones Clave:
+    Note over Client, AuditoriaDB: 1. validarTipoConsulta.xq - Determina tipo consulta
+    Note over Client, AuditoriaDB: 2. obtenerTipoRemesadoraIn.xq - Entrada tipo remesadora
+    Note over Client, AuditoriaDB: 3. consultaRemesaT24In.xq - Entrada T24
+    Note over Client, AuditoriaDB: 4. sjconsultaMultipleRemesadorasIn.xq - Entrada SJS
+    Note over Client, AuditoriaDB: 5. EnrutadorConveniosOut.xq - Salida unificada
+    Note over Client, AuditoriaDB: 6. Mapeo de estados: AVAILABLE→DISPONIBLE, PAID→PAGADA

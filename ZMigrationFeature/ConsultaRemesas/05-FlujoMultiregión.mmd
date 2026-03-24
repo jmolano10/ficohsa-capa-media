@@ -1,0 +1,110 @@
+flowchart TD
+    A[Cliente SOAP Request] --> B{Validar Esquema XSD}
+    B -->|Error| C[MapeoErrores]
+    C --> D[SOAP Fault Response]
+    B -->|OK| E[Validar Servicio Regional]
+    
+    E --> F{Región Válida?}
+    F -->|No| G[Error Regional]
+    G --> H[Response Error]
+    F -->|Sí| I{Determinar Región}
+    
+    I -->|HN01| J[Flujo Honduras]
+    I -->|GT01| K[Flujo Guatemala - NO IMPLEMENTADO]
+    I -->|PA01| L[Flujo Panamá - NO IMPLEMENTADO]
+    I -->|NI01| M[Flujo Nicaragua - NO IMPLEMENTADO]
+    I -->|Otras| N[Flujo Vacío]
+    
+    K --> O[Response Vacío]
+    L --> O
+    M --> O
+    N --> O
+    
+    J --> P[Obtener Parametrización HN01]
+    P --> Q{Tipo de Consulta}
+    Q -->|ID_BASED| R[Consulta por ID]
+    Q -->|NAME_BASED| S[Consulta por Nombres - NO IMPLEMENTADO]
+    Q -->|Inválido| T[Error Campos Requeridos]
+    
+    S --> U[Error - Funcionalidad Pendiente]
+    T --> V[Response Error]
+    
+    R --> W[Obtener Tipo Remesadora]
+    W --> X{Tipo Remesadora}
+    
+    X -->|REMESALOCAL| Y[Flujo Remesa Local]
+    X -->|FICOREMESA| Z[Flujo Ficohsa Remesas]
+    X -->|ONLINE| AA[Flujo Remesadoras Online]
+    X -->|Desconocido| BB[Error Tipo No Reconocido]
+    
+    BB --> CC[Response Error]
+    
+    Y --> DD{Fuente Local}
+    DD -->|T24| EE[Consultar T24 Core]
+    DD -->|FLink| FF[Consultar Tablas FLink]
+    
+    EE --> GG[sjConsultaRemesaResiliencia]
+    GG --> HH[Transformar Response T24]
+    HH --> II[Response Exitoso]
+    
+    FF --> JJ[consultarRemLocalId SP]
+    JJ --> KK{Estado DISPONIBLE?}
+    KK -->|Sí| LL[Registrar Auditoría]
+    KK -->|No| MM[Response Sin Datos]
+    LL --> NN[Transformar Response Local]
+    NN --> II
+    
+    Z --> OO[consultarRemFRemXPagador SP]
+    OO --> PP{Estado DISPONIBLE?}
+    PP -->|Sí| QQ[Registrar Auditoría Ficohsa]
+    PP -->|No| RR[Response Sin Datos]
+    QQ --> SS[Transformar Response Ficohsa]
+    SS --> II
+    
+    AA --> TT[sjConsultaMultipleRemesadoras]
+    TT --> UU{Respuestas Válidas?}
+    UU -->|No| VV[Error Consulta Online]
+    VV --> WW[MapeoErrores Online]
+    WW --> XX[Response Error Online]
+    
+    UU -->|Sí| YY[Seleccionar por Prioridad]
+    YY --> ZZ{ErrorCode = 0?}
+    ZZ -->|No| AAA[MapeoErrores]
+    AAA --> BBB[Response Error]
+    
+    ZZ -->|Sí| CCC[Obtener Campos Relacionados]
+    CCC --> DDD{Validar Listas?}
+    DDD -->|Sí| EEE[EvaluaListasCliente]
+    DDD -->|No| FFF[Continuar Flujo]
+    
+    EEE --> GGG{Cliente Restringido?}
+    GGG -->|Sí| HHH[Error Cliente Restringido]
+    GGG -->|No| FFF
+    
+    FFF --> III[Registrar Auditoría Online]
+    III --> JJJ[Transformar Response Online]
+    JJJ --> II
+    
+    II --> KKK[Construir Header SUCCESS]
+    KKK --> LLL[SOAP Response Exitoso]
+    
+    style A fill:#e1f5fe
+    style J fill:#c8e6c9
+    style K fill:#ffcdd2
+    style L fill:#ffcdd2
+    style M fill:#ffcdd2
+    style N fill:#ffcdd2
+    style Y fill:#fff3e0
+    style Z fill:#fff3e0
+    style AA fill:#fff3e0
+    style LLL fill:#e8f5e8
+    
+    classDef implemented fill:#c8e6c9,stroke:#4caf50,stroke-width:2px
+    classDef notImplemented fill:#ffcdd2,stroke:#f44336,stroke-width:2px
+    classDef error fill:#ffebee,stroke:#e91e63,stroke-width:2px
+    classDef success fill:#e8f5e8,stroke:#4caf50,stroke-width:2px
+    
+    class J,Y,Z,AA,LLL implemented
+    class K,L,M,N,S notImplemented
+    class C,G,BB,VV,AAA,HHH error
+    class II,KKK,LLL success
