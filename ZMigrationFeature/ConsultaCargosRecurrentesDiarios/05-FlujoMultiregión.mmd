@@ -1,0 +1,90 @@
+flowchart TD
+    A[Cliente/Aplicación] --> B[OSB Proxy Principal<br/>ConsultaCargosRecurrentesDiarios]
+    
+    B --> C{Validar Esquema XML}
+    C -->|Error| D[Error Handler<br/>Respuesta de Error]
+    D --> Z[Cliente - Error Response]
+    
+    C -->|OK| E[Consultar Ruta Regional<br/>consultaRutaRegional_db]
+    E --> F{Validar Región}
+    F -->|Error| G[Mapear Error Regional]
+    G --> Z
+    
+    F -->|SUCCESS| H{Enrutamiento Dinámico<br/>Basado en SourceBank}
+    
+    H -->|HN01| I[OSB Proxy Honduras<br/>ConsultaCargosRecurrentesDiariosHN]
+    H -->|NI01| J[OSB Proxy Nicaragua<br/>ConsultaCargosRecurrentesDiariosNI]
+    
+    %% Flujo Honduras
+    I --> K[Obtener Parametrizacion HN01<br/>VISANET.*.HN01]
+    K --> L{Validar Parámetros HN}
+    L -->|Error| M[Error Configuración HN]
+    M --> Z
+    
+    L -->|OK| N[Transformar Request HN<br/>queryCardTransactionIn.xq]
+    N --> O[Validar XSD VisaNet HN]
+    O --> P[VisaNet Honduras<br/>https://192.168.125.188<br/>SOAP 1.1]
+    
+    %% Flujo Nicaragua  
+    J --> Q[Obtener Parametrizacion NI01<br/>VISANET.*.NI01]
+    Q --> R{Validar Parámetros NI}
+    R -->|Error| S[Error Configuración NI]
+    S --> Z
+    
+    R -->|OK| T[Transformar Request NI<br/>queryCardTransactionIn.xq]
+    T --> U[Validar XSD VisaNet NI<br/>Location: elemento raíz]
+    U --> V[VisaNet Nicaragua<br/>https://192.168.125.16:9443<br/>SOAP 1.2]
+    
+    %% Respuestas VisaNet
+    P --> W{Respuesta VisaNet HN<br/>strQueryCode}
+    V --> X{Respuesta VisaNet NI<br/>strQueryCode}
+    
+    W -->|000| Y1[Transformar Response HN<br/>consultaCargosRecurrentesDiariosOut.xq]
+    W -->|!= 000| Y2[Mapear Error VisaNet HN<br/>VisaNet-[código]]
+    
+    X -->|000| Y3[Transformar Response NI<br/>consultaCargosRecurrentesDiariosOut.xq]
+    X -->|!= 000| Y4[Mapear Error VisaNet NI<br/>VisaNet-[código]]
+    
+    %% Transformaciones de Header
+    Y1 --> Z1[Transformar Header HN<br/>consultaCargosRecurrentesDiariosHeaderOut.xq]
+    Y2 --> Z2[Header Error HN]
+    Y3 --> Z3[Transformar Header NI<br/>consultaCargosRecurrentesDiariosHeaderOut.xq]
+    Y4 --> Z4[Header Error NI]
+    
+    %% Retorno al proxy principal
+    Z1 --> AA[OSB Proxy Principal<br/>Response Processing]
+    Z2 --> AA
+    Z3 --> AA
+    Z4 --> AA
+    
+    AA --> BB{successIndicator<br/>== 'SUCCESS'?}
+    BB -->|No| CC[Mapeo de Errores<br/>MapeoErrores Proxy<br/>FICBCO0276]
+    BB -->|Sí| DD[Response Final]
+    
+    CC --> DD
+    DD --> EE[Cliente - Response Final]
+    
+    %% Estilos
+    classDef proxyMain fill:#e1f5fe
+    classDef proxyRegional fill:#f3e5f5
+    classDef external fill:#fff3e0
+    classDef transform fill:#e8f5e8
+    classDef error fill:#ffebee
+    classDef decision fill:#fff9c4
+    
+    class B proxyMain
+    class I,J proxyRegional
+    class P,V external
+    class N,T,Y1,Y3,Z1,Z3 transform
+    class D,G,M,S,Y2,Y4,Z2,Z4,CC error
+    class C,F,H,L,R,W,X,BB decision
+    
+    %% Notas de transformaciones
+    Y1 -.-> NOTE1[Códigos: 00→Aplicado, otros→Rechazado<br/>Fechas: M/dd/yyyy hh:mm:ss a → dateTime]
+    Y3 -.-> NOTE1
+    
+    Z1 -.-> NOTE2[Códigos: 000→Success, otros→VisaNet-código]
+    Z3 -.-> NOTE2
+    
+    N -.-> NOTE3[CARD_NUMBER → strCardNumber<br/>Fechas: current-date → strDateIn/Out<br/>Credenciales desde configuración]
+    T -.-> NOTE3

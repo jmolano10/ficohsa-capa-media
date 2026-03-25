@@ -1,0 +1,110 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSBMain as OSB Proxy Principal
+    participant RegionalDB as consultaRutaRegional_db
+    participant OSBRegional as OSB Proxy NI01
+    participant ConfigDB as ObtenerParametrizacion
+    participant VisaNetNI as VisaNet Nicaragua
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, VisaNetNI: Flujo Nicaragua (NI01) - ConsultaCargosRecurrentesDiarios
+
+    Client->>OSBMain: SOAP Request
+    Note right of Client: Header: SourceBank=NI01<br/>Body: CARD_NUMBER
+
+    OSBMain->>OSBMain: Validar Esquema XML
+    Note right of OSBMain: Validar campos obligatorios<br/>CARD_NUMBER (1-19 caracteres)
+
+    alt Validación Fallida
+        OSBMain->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSBMain: Respuesta de Error
+        OSBMain->>Client: SOAP Fault
+    end
+
+    OSBMain->>RegionalDB: Consultar Ruta Regional
+    Note right of OSBMain: ServiceId: FICBCO0276<br/>Region: NI01<br/>Operation: consultaCargosRecurrentesDiarios<br/>Version: V2
+
+    RegionalDB->>RegionalDB: Consultar BD Regional
+    
+    alt Región No Válida
+        RegionalDB->>OSBMain: PV_CODIGO_ERROR != SUCCESS
+        OSBMain->>ErrorHandler: Error Regional
+        ErrorHandler->>OSBMain: Error Mapeado
+        OSBMain->>Client: Response con Error
+    end
+
+    RegionalDB->>OSBMain: PV_UBICACION
+    Note left of RegionalDB: PV_CODIGO_ERROR: SUCCESS<br/>PV_UBICACION: ConsultaCargosRecurrentesDiariosNI
+
+    OSBMain->>OSBMain: Enrutamiento Dinámico
+    Note right of OSBMain: Route: ConsultaCargosRecurrentesDiariosNI
+
+    OSBMain->>OSBRegional: Enrutar Request
+    Note right of OSBMain: Proxy específico para Nicaragua
+
+    OSBRegional->>ConfigDB: Obtener Parametrizacion
+    Note right of OSBRegional: Parámetros:<br/>VISANET.STRUSER.NI01<br/>VISANET.STRPASSWORD.NI01<br/>VISANET.STRCARDACQMATRIZID.NI01<br/>VISANET.STRTERMINALMATRIZID.NI01
+
+    ConfigDB->>ConfigDB: Consultar Configuraciones
+    Note right of ConfigDB: Esquema: ORA_BANK<br/>SP: OSB_GET_CONFIG
+
+    alt Error en Configuración
+        ConfigDB->>OSBRegional: ERROR_MESSAGE != ""
+        OSBRegional->>OSBMain: Error de Configuración
+        OSBMain->>Client: Response con Error
+    end
+
+    ConfigDB->>OSBRegional: Parámetros VisaNet
+    Note left of ConfigDB: strUser, strPassword<br/>strCardacqMatrizId<br/>strTerminalMatrizId
+
+    OSBRegional->>OSBRegional: Transformar Request (XQuery)
+    Note right of OSBRegional: queryCardTransactionIn.xq<br/>Mapear CARD_NUMBER → strCardNumber<br/>Agregar credenciales VisaNet<br/>Fechas: strDateIn/Out = fecha actual
+
+    OSBRegional->>OSBRegional: Validar Request VisaNet
+    Note right of OSBRegional: Validación XSD contra<br/>WSVisaTransaction.wsdl<br/>Location: elemento raíz
+
+    OSBRegional->>VisaNetNI: QueryCardTransaction
+    Note right of OSBRegional: Endpoint: https://192.168.125.16:9443/<br/>WSVisaTransaction.asmx<br/>Protocolo: SOAP 1.2<br/>Puerto: 9443
+
+    VisaNetNI->>VisaNetNI: Procesar Consulta
+    Note right of VisaNetNI: Consultar transacciones<br/>de tarjeta para fecha actual<br/>Configuraciones específicas NI
+
+    alt Error en VisaNet
+        VisaNetNI->>OSBRegional: strQueryCode != "000"
+        OSBRegional->>OSBRegional: Mapear Header Error
+        Note right of OSBRegional: consultaCargosRecurrentesDiariosHeaderOut.xq<br/>successIndicator: VisaNet-[código]
+        OSBRegional->>OSBMain: Response con Error VisaNet
+        OSBMain->>Client: Response con Error
+    end
+
+    VisaNetNI->>OSBRegional: QueryCardTransactionResponse
+    Note left of VisaNetNI: strQueryCode: 000<br/>strQueryMessage: mensaje<br/>strResponseDetail: array de transacciones
+
+    OSBRegional->>OSBRegional: Transformar Header (XQuery)
+    Note right of OSBRegional: consultaCargosRecurrentesDiariosHeaderOut.xq<br/>strQueryCode "000" → "Success"<br/>Otros códigos → "VisaNet-[código]"
+
+    alt Respuesta Exitosa
+        OSBRegional->>OSBRegional: Transformar Response (XQuery)
+        Note right of OSBRegional: consultaCargosRecurrentesDiariosOut.xq<br/>Mapear ResponseDetail:<br/>strTransactionResponseCode "00" → "Aplicado"<br/>Otros códigos → "Rechazado"<br/>Convertir fechas: M/dd/yyyy hh:mm:ss a → dateTime
+    else
+        OSBRegional->>OSBRegional: Response Vacío
+        Note right of OSBRegional: consultaCargosRecurrentesDiariosResponse vacío
+    end
+
+    OSBRegional->>OSBMain: Response Transformado
+    Note left of OSBRegional: Header: successIndicator, messages<br/>Body: MOVEMENT_INFORMATION array
+
+    OSBMain->>OSBMain: Mapeo de Errores (si aplica)
+    Note right of OSBMain: Si successIndicator != 'SUCCESS'<br/>Llamar MapeoErrores proxy<br/>Código: FICBCO0276
+
+    OSBMain->>Client: SOAP Response
+    Note left of Client: Header: successIndicator, messages<br/>Body: Lista de movimientos con:<br/>COMMERCE_NAME, MOVEMENT_STATUS<br/>TRANSACTION_DATE, TRANSACTION_AMOUNT<br/>TRANSACTION_CURRENCY
+
+    Note over Client, VisaNetNI: Diferencias Específicas NI01:
+    Note over Client, VisaNetNI: 1. Protocolo SOAP 1.2 (vs SOAP 1.1 en HN01)
+    Note over Client, VisaNetNI: 2. Puerto 9443 en URL VisaNet
+    Note over Client, VisaNetNI: 3. Configuraciones de throttling (deshabilitado)
+    Note over Client, VisaNetNI: 4. Result caching configurado
+    Note over Client, VisaNetNI: 5. Delay interval configuration
+    Note over Client, VisaNetNI: 6. Validación XSD con location específica
+    Note over Client, VisaNetNI: 7. Error handler con ID único para NI01
