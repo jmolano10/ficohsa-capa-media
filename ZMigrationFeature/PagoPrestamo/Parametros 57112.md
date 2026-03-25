@@ -9,8 +9,14 @@
     {
       "region": "HN01-HN01",
       "enabled": true,
-      "transactionType": "2",
-      "paymentType": "ACCOUNT_DEBIT"
+      "transactionTypeValidate": "2",
+      "paymentType": "ACCOUNT_DEBIT",
+      "param-name": "ban-hnd-ic-comp-parm-connection-region-db-dev",
+      "secret-name": "ban-hnd-ic-comp-secm-connection-trx-asincrono-db-dev",
+      "transactionTypeRegister": "4",
+      "channelCode": 1,
+      "transactionState": "REGISTRADO",
+      "t24Reference": ""
     },
     {
       "region": "GT01-GT01",
@@ -40,13 +46,34 @@
 ```
 ##### AWS Systems Manager Parameter Store
 
+**Nombre**: `ban-hnd-ic-comp-parm-connection-region-db-dev`
+```json
+{
+  "host": "172.23.177.182",
+  "port": 1521,
+  "database": "regiondb"
+}
+```
+
 ##### AWS Systems Manager SecretManager
+
+**Nombre**: `ban-hnd-ic-comp-secm-connection-trx-asincrono-db-dev`
+```json
+{
+  "username": "TRX_BATCH_CB",
+  "password": "desarrollo"
+}
+```
 
 ##### Constantes para almacenar en ConfigMap
 
 ```json
 {
-  "procedureNameValidaCB": "MW_P_VALIDA_CORBAN"
+  "connectionType": "jdbc",
+  "operationType": "update",
+  "catalogueName": "TRX_BATCH_CB",
+  "packageName": "OSB_P_ATB_REGISTRAR_CB",
+  "procedureName": "REGISTRA_TRANSACCION_CANAL"
 }
 ```
 ##### Registro en Dynamo Wrapper T24
