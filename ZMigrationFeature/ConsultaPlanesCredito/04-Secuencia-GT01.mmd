@@ -1,0 +1,112 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant MainProxy as ConsultaPlanesCredito.proxy
+    participant RutaRegional as consultaRutaRegional_db
+    participant GTProxy as ConsultaPlanesCreditoGT.proxy
+    participant ConvertPais as convertirCodigoPais
+    parameter GTDatabase as MasterDataGT/conDatosPlanes_db
+    participant GTOracle as Oracle Database GT
+    participant MapeoErrores as MapeoErrores.proxy
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Guatemala (GT01) - ConsultaPlanesCredito
+
+    Client->>MainProxy: SOAP Request
+    Note right of Client: Header: SourceBank=GT01<br/>Body: ACCOUNT_NUMBER, ORG
+
+    MainProxy->>MainProxy: Validar Esquema XML
+    Note right of MainProxy: Validar campos obligatorios<br/>ACCOUNT_NUMBER no vacío
+
+    alt Validación Fallida
+        MainProxy->>ErrorHandler: Error de Validación
+        ErrorHandler->>MainProxy: Respuesta de Error
+        MainProxy->>Client: SOAP Fault
+    end
+
+    MainProxy->>RutaRegional: Consultar Ruta Regional
+    Note right of RutaRegional: ServiceId: FICBCO0321<br/>Region: GT01<br/>Version: V2
+
+    RutaRegional->>RutaRegional: Consultar BD Regional
+    
+    alt Región No Válida
+        RutaRegional->>MainProxy: PV_CODIGO_ERROR != SUCCESS
+        MainProxy->>MapeoErrores: Mapear Error Regional
+        MapeoErrores->>MainProxy: Error Mapeado
+        MainProxy->>Client: Response con Error
+    end
+
+    RutaRegional->>MainProxy: PV_UBICACION=ConsultaPlanesCreditoGT
+    Note left of RutaRegional: PV_CODIGO_ERROR=SUCCESS<br/>PV_UBICACION=Middleware/v2/ProxyServices/ConsultaPlanesCreditoGT
+
+    MainProxy->>MainProxy: Enrutamiento Dinámico
+    Note right of MainProxy: Router Dinámico:<br/>service=ConsultaPlanesCreditoGT
+
+    MainProxy->>GTProxy: Invocar Proxy GT
+    Note right of GTProxy: Transport: HTTP<br/>Endpoint: /Middleware/v2/ProxyServices/ConsultaPlanesCreditoGT
+
+    GTProxy->>ConvertPais: Convertir Código País
+    Note right of ConvertPais: Conversión: GT01 → GTM<br/>Sentido: OSB-ISO3
+
+    ConvertPais->>GTProxy: Código País Convertido
+    Note left of ConvertPais: Resultado: GTM
+
+    GTProxy->>GTProxy: Transformar Request (XQuery)
+    Note right of GTProxy: conDatosPlanesGTIn.xq<br/>Mapear ACCOUNT_NUMBER → PV_CUENTA<br/>Mapear ORG → PV_ORG<br/>Mapear GTM → PV_CODIGO_PAIS
+
+    GTProxy->>GTProxy: Validar Request DB
+    Note right of GTProxy: Validar esquema XSD<br/>MasterDataGT/conDatosPlanes/xsd/conDatosPlanes_sp
+
+    GTProxy->>GTDatabase: Invocar Stored Procedure
+    Note right of GTDatabase: Connection: eis/DB/ConnectionTarjetas<br/>SP: dbo.OSBConDatoPlanes
+
+    GTDatabase->>GTOracle: CALL dbo.OSBConDatoPlanes(PV_CUENTA, PV_ORG, PV_CODIGO_PAIS)
+    
+    alt Error en Base de Datos
+        GTOracle->>GTDatabase: CodigoError != -1
+        GTDatabase->>GTProxy: Response con Error
+        GTProxy->>GTProxy: Construir Error Response
+        GTProxy->>MainProxy: Response con Error
+        MainProxy->>MapeoErrores: Mapear Error
+        MapeoErrores->>MainProxy: Error Mapeado
+        MainProxy->>Client: Response con Error
+    end
+
+    GTOracle->>GTDatabase: ResultSet con Planes
+    Note left of GTOracle: CodigoError: -1<br/>MensajeError: vacío<br/>RowSet con datos:<br/>- org, cuenta, numseq<br/>- logo, numplan, total_due<br/>- tipo_plan, int_rate<br/>- int_rat1_base, balanceactual<br/>- fecplan, acrd_int<br/>- mora_acrd_int, d2ps_mora_int_per_diem
+
+    GTDatabase->>GTProxy: Response Exitoso
+
+    GTProxy->>GTProxy: Validar Response DB
+    Note right of GTProxy: Verificar errorCode != '-1'<br/>Si error: validationMessage = MensajeError<br/>Si éxito: validationMessage = ''
+
+    GTProxy->>GTProxy: Transformar Response (XQuery)
+    Note right of GTProxy: consultaPlanesCreditoGTOut.xq<br/>Mapear campos de BD a response:<br/>- org → ORG<br/>- cuenta → ACCOUNT<br/>- numseq → SEQ_NUMBER<br/>- logo → LOGO<br/>- numplan → PLAN_NUMBER<br/>- total_due → PAY_MINIMUM<br/>- tipo_plan → TYPE_PLAN<br/>- int_rate → INT_RATE<br/>- int_rat1_base → INT_RATE_BASE<br/>- balanceactual → CURRENT_BALANCE<br/>- fecplan → DATE_PLAN (yyyyMMdd)<br/>- acrd_int → ACRD_INT<br/>- mora_acrd_int → DELAYS_ACRD_INT<br/>- d2ps_mora_int_per_diem → ACCUMULATED_DELAYS_INT
+
+    GTProxy->>GTProxy: Construir Header de Respuesta
+    Note right of GTProxy: Si validationMessage vacío:<br/>successIndicator: Success<br/>Si error:<br/>successIndicator: ERROR<br/>messages: validationMessage
+
+    GTProxy->>MainProxy: SOAP Response
+    Note left of GTProxy: Header: successIndicator=Success<br/>Body: CREDIT_PLANS con array de CREDIT_PLAN
+
+    MainProxy->>MainProxy: Validar Response Final
+    Note right of MainProxy: Verificar successIndicator != SUCCESS
+
+    alt Response con Error
+        MainProxy->>MapeoErrores: Mapear Error Final
+        Note right of MapeoErrores: CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0321$#$messages
+        MapeoErrores->>MainProxy: Error Homologado
+        MainProxy->>MainProxy: Actualizar Header Response
+    end
+
+    MainProxy->>Client: SOAP Response Final
+    Note left of Client: Header: successIndicator, messages<br/>Body: Planes de crédito estructurados<br/>con información completa por plan
+
+    Note over Client, ErrorHandler: Transformaciones Clave GT01:
+    Note over Client, ErrorHandler: 1. Código País: GT01 → GTM (OSB-ISO3)
+    Note over Client, ErrorHandler: 2. Fecha: DateTime → yyyyMMdd
+    Note over Client, ErrorHandler: 3. Validación: errorCode != '-1' = éxito
+    Note over Client, ErrorHandler: 4. Conexión BD: eis/DB/ConnectionTarjetas
+    Note over Client, ErrorHandler: 5. SP: dbo.OSBConDatoPlanes (sin SchemaName)
+    Note over Client, ErrorHandler: 6. Transport: HTTP con endpoint específico
+    Note over Client, ErrorHandler: 7. SOAP Selector: SOAP body
+    Note over Client, ErrorHandler: 8. Enrutamiento: Dinámico vía consultaRutaRegional

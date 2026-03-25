@@ -1,0 +1,116 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant MainProxy as ConsultaPlanesCredito.proxy
+    participant RutaRegional as consultaRutaRegional_db
+    participant NIProxy as ConsultaPlanesCreditoNI.proxy
+    participant ConvertPais as convertirCodigoPais
+    participant NIDatabase as MasterData/conDatosPlanes_db
+    participant NIOracle as Oracle Database NI
+    participant MapeoErrores as MapeoErrores.proxy
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Nicaragua (NI01) - ConsultaPlanesCredito
+
+    Client->>MainProxy: SOAP Request
+    Note right of Client: Header: SourceBank=NI01<br/>Body: ACCOUNT_NUMBER, ORG
+
+    MainProxy->>MainProxy: Validar Esquema XML
+    Note right of MainProxy: Validar campos obligatorios<br/>ACCOUNT_NUMBER no vacío
+
+    alt Validación Fallida
+        MainProxy->>ErrorHandler: Error de Validación
+        ErrorHandler->>MainProxy: Respuesta de Error
+        MainProxy->>Client: SOAP Fault
+    end
+
+    MainProxy->>RutaRegional: Consultar Ruta Regional
+    Note right of RutaRegional: ServiceId: FICBCO0321<br/>Region: NI01<br/>Version: V2
+
+    RutaRegional->>RutaRegional: Consultar BD Regional
+    
+    alt Región No Válida
+        RutaRegional->>MainProxy: PV_CODIGO_ERROR != SUCCESS
+        MainProxy->>MapeoErrores: Mapear Error Regional
+        MapeoErrores->>MainProxy: Error Mapeado
+        MainProxy->>Client: Response con Error
+    end
+
+    RutaRegional->>MainProxy: PV_UBICACION=ConsultaPlanesCreditoNI
+    Note left of RutaRegional: PV_CODIGO_ERROR=SUCCESS<br/>PV_UBICACION=Middleware/v2/ProxyServices/ConsultaPlanesCreditoNI
+
+    MainProxy->>MainProxy: Enrutamiento Dinámico
+    Note right of MainProxy: Router Dinámico:<br/>service=ConsultaPlanesCreditoNI
+
+    MainProxy->>NIProxy: Invocar Proxy NI
+    Note right of NIProxy: Transport: LOCAL<br/>SOAP Selector: SOAP action<br/>(DIFERENTE a GT/HN)
+
+    NIProxy->>ConvertPais: Convertir Código País
+    Note right of ConvertPais: Conversión: NI01 → NIC<br/>Sentido: OSB-ISO3<br/>fn:string() explícito
+
+    ConvertPais->>NIProxy: Código País Convertido
+    Note left of ConvertPais: Resultado: NIC
+
+    NIProxy->>NIProxy: Transformar Request (XQuery)
+    Note right of NIProxy: conDatosPlanesIn.xq<br/>Mapear ACCOUNT_NUMBER → PV_CUENTA<br/>Mapear ORG → PV_ORG<br/>Mapear NIC → PV_CODIGO_PAIS
+
+    NIProxy->>NIProxy: Validar Request DB
+    Note right of NIProxy: Validar esquema XSD<br/>MasterData/conDatosPlanes/xsd/conDatosPlanes_sp<br/>Namespace: con4:InputParameters
+
+    NIProxy->>NIDatabase: Invocar Stored Procedure
+    Note right of NIDatabase: Connection: eis/DB/ConnectionTarjetas<br/>SP: OSB.dbo.OSBConDatoPlanes<br/>(ÚNICO con SchemaName=OSB)
+
+    NIDatabase->>NIOracle: CALL OSB.dbo.OSBConDatoPlanes(PV_CUENTA, PV_ORG, PV_CODIGO_PAIS)
+    
+    alt Error en Base de Datos
+        NIOracle->>NIDatabase: CodigoError != -1
+        NIDatabase->>NIProxy: Response con Error
+        NIProxy->>NIProxy: Construir Error Response
+        Note right of NIProxy: successIndicator: ERROR<br/>messages: validationMessage
+        NIProxy->>MainProxy: Response con Error
+        MainProxy->>MapeoErrores: Mapear Error
+        MapeoErrores->>MainProxy: Error Mapeado
+        MainProxy->>Client: Response con Error
+    end
+
+    NIOracle->>NIDatabase: ResultSet con Planes
+    Note left of NIOracle: CodigoError: -1<br/>MensajeError: vacío<br/>RowSet con datos:<br/>- org, cuenta, numseq<br/>- logo, numplan, total_due<br/>- tipo_plan, int_rate<br/>- int_rat1_base, balanceactual<br/>- fecplan, acrd_int<br/>- mora_acrd_int, d2ps_mora_int_per_diem
+
+    NIDatabase->>NIProxy: Response Exitoso
+
+    NIProxy->>NIProxy: Validar Response DB
+    Note right of NIProxy: Verificar errorCode != '-1'<br/>Si error: validationMessage = MensajeError<br/>Si éxito: validationMessage = ''
+
+    NIProxy->>NIProxy: Transformar Response (XQuery)
+    Note right of NIProxy: consultaPlanesCreditoOut.xq<br/>Mapear campos de BD a response:<br/>- org → ORG<br/>- cuenta → ACCOUNT<br/>- numseq → SEQ_NUMBER<br/>- logo → LOGO<br/>- numplan → PLAN_NUMBER<br/>- total_due → PAY_MINIMUM<br/>- tipo_plan → TYPE_PLAN<br/>- int_rate → INT_RATE<br/>- int_rat1_base → INT_RATE_BASE<br/>- balanceactual → CURRENT_BALANCE<br/>- fecplan → DATE_PLAN (yyyyMMdd)<br/>- acrd_int → ACRD_INT<br/>- mora_acrd_int → DELAYS_ACRD_INT<br/>- d2ps_mora_int_per_diem → ACCUMULATED_DELAYS_INT
+
+    NIProxy->>NIProxy: Construir Header de Respuesta
+    Note right of NIProxy: Si validationMessage vacío:<br/>successIndicator: Success<br/>Si error:<br/>successIndicator: ERROR<br/>messages: validationMessage
+
+    NIProxy->>MainProxy: SOAP Response
+    Note left of NIProxy: Header: successIndicator=Success<br/>Body: CREDIT_PLANS con array de CREDIT_PLAN<br/>Variable: $RSPconDatosPlanes (minúscula)
+
+    MainProxy->>MainProxy: Validar Response Final
+    Note right of MainProxy: Verificar successIndicator != SUCCESS
+
+    alt Response con Error
+        MainProxy->>MapeoErrores: Mapear Error Final
+        Note right of MapeoErrores: CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0321$#$messages
+        MapeoErrores->>MainProxy: Error Homologado
+        MainProxy->>MainProxy: Actualizar Header Response
+    end
+
+    MainProxy->>Client: SOAP Response Final
+    Note left of Client: Header: successIndicator, messages<br/>Body: Planes de crédito estructurados<br/>con información completa por plan
+
+    Note over Client, ErrorHandler: Transformaciones Clave NI01:
+    Note over Client, ErrorHandler: 1. Código País: NI01 → NIC (OSB-ISO3)
+    Note over Client, ErrorHandler: 2. Fecha: DateTime → yyyyMMdd
+    Note over Client, ErrorHandler: 3. Validación: errorCode != '-1' = éxito
+    Note over Client, ErrorHandler: 4. Conexión BD: eis/DB/ConnectionTarjetas
+    Note over Client, ErrorHandler: 5. SP: OSB.dbo.OSBConDatoPlanes (CON SchemaName=OSB)
+    Note over Client, ErrorHandler: 6. Transport: LOCAL (sin HTTP endpoint)
+    Note over Client, ErrorHandler: 7. SOAP Selector: SOAP action (no body)
+    Note over Client, ErrorHandler: 8. Error Handling: successIndicator=ERROR estándar
+    Note over Client, ErrorHandler: 9. Variable Response: $RSPconDatosPlanes (minúscula)
+    Note over Client, ErrorHandler: 10. Namespace: con4:InputParameters en validación
+    Note over Client, ErrorHandler: 11. Conversión País: fn:string() explícito

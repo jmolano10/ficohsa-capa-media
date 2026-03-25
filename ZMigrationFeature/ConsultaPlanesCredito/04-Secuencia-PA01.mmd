@@ -1,0 +1,117 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant MainProxy as ConsultaPlanesCredito.proxy
+    participant RutaRegional as consultaRutaRegional_db
+    participant PAProxy as ConsultaPlanesCreditoPA.proxy
+    participant ConvertPais as convertirCodigoPais
+    participant PADatabase as MasterDataPA/conDatosPlanes_db
+    participant PAOracle as Oracle Database PA
+    participant MapeoErrores as MapeoErrores.proxy
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, ErrorHandler: Flujo Panamá (PA01) - ConsultaPlanesCredito
+
+    Client->>MainProxy: SOAP Request
+    Note right of Client: Header: SourceBank=PA01<br/>Body: ACCOUNT_NUMBER, ORG
+
+    MainProxy->>MainProxy: Validar Esquema XML
+    Note right of MainProxy: Validar campos obligatorios<br/>ACCOUNT_NUMBER no vacío
+
+    alt Validación Fallida
+        MainProxy->>ErrorHandler: Error de Validación
+        ErrorHandler->>MainProxy: Respuesta de Error
+        MainProxy->>Client: SOAP Fault
+    end
+
+    MainProxy->>RutaRegional: Consultar Ruta Regional
+    Note right of RutaRegional: ServiceId: FICBCO0321<br/>Region: PA01<br/>Version: V2
+
+    RutaRegional->>RutaRegional: Consultar BD Regional
+    
+    alt Región No Válida
+        RutaRegional->>MainProxy: PV_CODIGO_ERROR != SUCCESS
+        MainProxy->>MapeoErrores: Mapear Error Regional
+        MapeoErrores->>MainProxy: Error Mapeado
+        MainProxy->>Client: Response con Error
+    end
+
+    RutaRegional->>MainProxy: PV_UBICACION=ConsultaPlanesCreditoPA
+    Note left of RutaRegional: PV_CODIGO_ERROR=SUCCESS<br/>PV_UBICACION=Middleware/v2/ProxyServices/ConsultaPlanesCreditoPA
+
+    MainProxy->>MainProxy: Enrutamiento Dinámico
+    Note right of MainProxy: Router Dinámico:<br/>service=ConsultaPlanesCreditoPA
+
+    MainProxy->>PAProxy: Invocar Proxy PA
+    Note right of PAProxy: Transport: LOCAL<br/>SOAP Selector: SOAP action<br/>(SIMILAR a NI01)
+
+    PAProxy->>ConvertPais: Convertir Código País
+    Note right of ConvertPais: Conversión: PA01 → PAN<br/>Sentido: OSB-ISO3<br/>string() explícito
+
+    ConvertPais->>PAProxy: Código País Convertido
+    Note left of ConvertPais: Resultado: PAN
+
+    PAProxy->>PAProxy: Transformar Request (XQuery)
+    Note right of PAProxy: conDatosPlanesPAIn.xq<br/>Mapear ACCOUNT_NUMBER → PV_CUENTA<br/>Mapear ORG → PV_ORG<br/>Mapear PAN → PV_CODIGO_PAIS
+
+    PAProxy->>PAProxy: Validar Request DB
+    Note right of PAProxy: Validar esquema XSD<br/>MasterDataPA/conDatosPlanes/xsd/conDatosPlanes_sp<br/>Namespace: con2:InputParameters
+
+    PAProxy->>PADatabase: Invocar Stored Procedure
+    Note right of PADatabase: Connection: eis/DB/ConnectionTarjetas<br/>SP: dbo.OSBConDatoPlanes<br/>(SIN SchemaName)
+
+    PADatabase->>PAOracle: CALL dbo.OSBConDatoPlanes(PV_CUENTA, PV_ORG, PV_CODIGO_PAIS)
+    
+    alt Error en Base de Datos
+        PAOracle->>PADatabase: CodigoError != -1
+        PADatabase->>PAProxy: Response con Error
+        PAProxy->>PAProxy: Construir Error Response
+        Note right of PAProxy: successIndicator: ERROR<br/>messages: validationMessage
+        PAProxy->>MainProxy: Response con Error
+        MainProxy->>MapeoErrores: Mapear Error
+        MapeoErrores->>MainProxy: Error Mapeado
+        MainProxy->>Client: Response con Error
+    end
+
+    PAOracle->>PADatabase: ResultSet con Planes
+    Note left of PAOracle: CodigoError: -1<br/>MensajeError: vacío<br/>RowSet con datos:<br/>- org, cuenta, numseq<br/>- logo, numplan, total_due<br/>- tipo_plan, int_rate<br/>- int_rat1_base, balanceactual<br/>- fecplan, acrd_int<br/>- mora_acrd_int, d2ps_mora_int_per_diem
+
+    PADatabase->>PAProxy: Response Exitoso
+
+    PAProxy->>PAProxy: Validar Response DB
+    Note right of PAProxy: Verificar errorCode != '-1'<br/>Si error: validationMessage = MensajeError<br/>Si éxito: validationMessage = ''
+
+    PAProxy->>PAProxy: Transformar Response (XQuery)
+    Note right of PAProxy: consultaPlanesCreditoPAOut.xq<br/>Variable intermedia: $OutputParameters<br/>Mapear campos de BD a response:<br/>- org → ORG<br/>- cuenta → ACCOUNT<br/>- numseq → SEQ_NUMBER<br/>- logo → LOGO<br/>- numplan → PLAN_NUMBER<br/>- total_due → PAY_MINIMUM<br/>- tipo_plan → TYPE_PLAN<br/>- int_rate → INT_RATE<br/>- int_rat1_base → INT_RATE_BASE<br/>- balanceactual → CURRENT_BALANCE<br/>- fecplan → DATE_PLAN (yyyyMMdd)<br/>- acrd_int → ACRD_INT<br/>- mora_acrd_int → DELAYS_ACRD_INT<br/>- d2ps_mora_int_per_diem → ACCUMULATED_DELAYS_INT
+
+    PAProxy->>PAProxy: Construir Header de Respuesta
+    Note right of PAProxy: Si validationMessage vacío:<br/>successIndicator: Success<br/>Si error:<br/>successIndicator: ERROR<br/>messages: validationMessage
+
+    PAProxy->>MainProxy: SOAP Response
+    Note left of PAProxy: Header: successIndicator=Success<br/>Body: CREDIT_PLANS con array de CREDIT_PLAN<br/>Variable: $RSPconDatosPlanes (minúscula)
+
+    MainProxy->>MainProxy: Validar Response Final
+    Note right of MainProxy: Verificar successIndicator != SUCCESS
+
+    alt Response con Error
+        MainProxy->>MapeoErrores: Mapear Error Final
+        Note right of MapeoErrores: CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0321$#$messages
+        MapeoErrores->>MainProxy: Error Homologado
+        MainProxy->>MainProxy: Actualizar Header Response
+    end
+
+    MainProxy->>Client: SOAP Response Final
+    Note left of Client: Header: successIndicator, messages<br/>Body: Planes de crédito estructurados<br/>con información completa por plan
+
+    Note over Client, ErrorHandler: Transformaciones Clave PA01:
+    Note over Client, ErrorHandler: 1. Código País: PA01 → PAN (OSB-ISO3)
+    Note over Client, ErrorHandler: 2. Fecha: DateTime → yyyyMMdd
+    Note over Client, ErrorHandler: 3. Validación: errorCode != '-1' = éxito
+    Note over Client, ErrorHandler: 4. Conexión BD: eis/DB/ConnectionTarjetas
+    Note over Client, ErrorHandler: 5. SP: dbo.OSBConDatoPlanes (SIN SchemaName)
+    Note over Client, ErrorHandler: 6. Transport: LOCAL (sin HTTP endpoint)
+    Note over Client, ErrorHandler: 7. SOAP Selector: SOAP action (no body)
+    Note over Client, ErrorHandler: 8. Error Handling: successIndicator=ERROR estándar
+    Note over Client, ErrorHandler: 9. Variable Response: $RSPconDatosPlanes (minúscula)
+    Note over Client, ErrorHandler: 10. Namespace: con2:InputParameters en validación
+    Note over Client, ErrorHandler: 11. XQuery: Variable intermedia $OutputParameters
+    Note over Client, ErrorHandler: 12. Conversión País: string() explícito

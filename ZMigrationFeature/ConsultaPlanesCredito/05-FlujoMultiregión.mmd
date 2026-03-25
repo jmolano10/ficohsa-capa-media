@@ -1,0 +1,99 @@
+flowchart TD
+    A[Cliente/Aplicación] --> B[ConsultaPlanesCredito.proxy]
+    
+    B --> C{Validar Esquema XML}
+    C -->|Error| D[Error Handler]
+    D --> E[MapeoErrores]
+    E --> F[Response Error]
+    F --> A
+    
+    C -->|OK| G[consultaRutaRegional_db]
+    G --> H{Validar Región}
+    H -->|Error| I[Error Regional]
+    I --> E
+    
+    H -->|SUCCESS| J{Enrutamiento Dinámico}
+    
+    J -->|GT01| K[ConsultaPlanesCreditoGT.proxy]
+    J -->|HN01| L[ConsultaPlanesCreditoHN.proxy]
+    J -->|NI01| M[ConsultaPlanesCreditoNI.proxy]
+    J -->|PA01| N[ConsultaPlanesCreditoPA.proxy]
+    
+    %% Flujo GT01
+    K --> K1[convertirCodigoPais<br/>GT01→GTM]
+    K1 --> K2[conDatosPlanesGTIn.xq]
+    K2 --> K3[Validar XSD GT]
+    K3 --> K4[MasterDataGT/conDatosPlanes_db]
+    K4 --> K5[Oracle DB GT<br/>dbo.OSBConDatoPlanes]
+    K5 --> K6{errorCode != -1?}
+    K6 -->|Error| K7[Error Response GT]
+    K6 -->|OK| K8[consultaPlanesCreditoGTOut.xq]
+    K8 --> K9[Response Header GT<br/>successIndicator: Success]
+    K7 --> K10[Response Header GT<br/>successIndicator: ERROR]
+    K9 --> O[Response Final]
+    K10 --> O
+    
+    %% Flujo HN01
+    L --> L1[convertirCodigoPais<br/>HN01→HND]
+    L1 --> L2[conDatosPlanesHNIn.xq]
+    L2 --> L3[Validar XSD HN]
+    L3 --> L4[MasterDataHN/conDatosPlanes_db]
+    L4 --> L5[Oracle DB HN<br/>dbo.OSBConDatoPlanes]
+    L5 --> L6{errorCode != -1?}
+    L6 -->|Error| L7[Error Response HN]
+    L6 -->|OK| L8[consultaPlanesCreditoHNOut.xq]
+    L8 --> L9[Response Header HN<br/>successIndicator: Success]
+    L7 --> L10[Response Header HN<br/>successIndicator: $errorCode]
+    L9 --> O
+    L10 --> O
+    
+    %% Flujo NI01
+    M --> M1[convertirCodigoPais<br/>NI01→NIC]
+    M1 --> M2[conDatosPlanesIn.xq]
+    M2 --> M3[Validar XSD NI]
+    M3 --> M4[MasterData/conDatosPlanes_db]
+    M4 --> M5[Oracle DB NI<br/>OSB.dbo.OSBConDatoPlanes]
+    M5 --> M6{errorCode != -1?}
+    M6 -->|Error| M7[Error Response NI]
+    M6 -->|OK| M8[consultaPlanesCreditoOut.xq]
+    M8 --> M9[Response Header NI<br/>successIndicator: Success]
+    M7 --> M10[Response Header NI<br/>successIndicator: ERROR]
+    M9 --> O
+    M10 --> O
+    
+    %% Flujo PA01
+    N --> N1[convertirCodigoPais<br/>PA01→PAN]
+    N1 --> N2[conDatosPlanesPAIn.xq]
+    N2 --> N3[Validar XSD PA]
+    N3 --> N4[MasterDataPA/conDatosPlanes_db]
+    N4 --> N5[Oracle DB PA<br/>dbo.OSBConDatoPlanes]
+    N5 --> N6{errorCode != -1?}
+    N6 -->|Error| N7[Error Response PA]
+    N6 -->|OK| N8[consultaPlanesCreditoPAOut.xq]
+    N8 --> N9[Response Header PA<br/>successIndicator: Success]
+    N7 --> N10[Response Header PA<br/>successIndicator: ERROR]
+    N9 --> O
+    N10 --> O
+    
+    %% Validación Final
+    O --> P{successIndicator != SUCCESS?}
+    P -->|Error| Q[MapeoErrores Final]
+    Q --> R[Error Homologado]
+    P -->|OK| S[Response Exitoso]
+    R --> A
+    S --> A
+    
+    %% Estilos
+    classDef proxyMain fill:#e1f5fe
+    classDef proxyRegional fill:#f3e5f5
+    classDef database fill:#e8f5e8
+    classDef transform fill:#fff3e0
+    classDef error fill:#ffebee
+    classDef decision fill:#f1f8e9
+    
+    class B proxyMain
+    class K,L,M,N proxyRegional
+    class K4,L4,M4,N4,K5,L5,M5,N5 database
+    class K1,L1,M1,N1,K2,L2,M2,N2,K8,L8,M8,N8 transform
+    class D,E,I,K7,L7,M7,N7,Q error
+    class C,H,J,K6,L6,M6,N6,P decision

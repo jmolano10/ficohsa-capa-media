@@ -1,0 +1,128 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Consulta Planes Crédito <br> Epica 2349: ConsultaPlanesCredito <br> HU 8508:  POST -  /cards/credit-card-transaction-retrieves/v1/retrieve-credit-plans
+    participant CL as Caché Local
+    participant Lambda as Lambda de parámetros
+    participant parameter as Paramter Store
+    participant secret as Secret Manager
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Homologador as Liberería de <br> Homologación
+    participant master as BD Masterdata <br> Schema: OSB <br> SP: OSBConDatoPlanes 
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Multiregion (HN01 | GT01 | PA01 | NI01) - Consulta Planes Crédito
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: header: <br> sourcebank <br> body: <br> accountNumber, <br> organizationReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Lambda Parámetros en caché local
+        Note right of API: Domain: "CREDIT_CARD_TRANSACTION_RETRIEVES" <br> name: "RETRIEVE_CREDIT_PLANS" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Lambda Parámetros en Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización, conexión y negocio
+
+        API->>CL: Consultar parámetros de Parameter Store en caché local
+        Note right of API: paranName = lambda.param-name
+
+        CL->>API: Obtiene parámetros de Parameter Store en Cahé Local
+        Note left of CL: Obtiene parámetros de conexión a BD: ip, port, database
+
+    else Consulta  parametros en Lambda Parámetros 
+
+        API->>Lambda: Consultar parámetros de lambda parámetros
+        Note right of API: Domain: "CREDIT_CARD_TRANSACTION_RETRIEVES" <br> name: "RETRIEVE_CREDIT_PLANS" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros de Lambda Parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización, conexión y negocio
+
+        API->>CL: Guarda parámetros de lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+        API->>parameter: Consultar parámetros del Parameter Store
+        Note right of API: paranName = lambda.param-name
+
+        parameter->>API: Obtiene parámetros del Parameter Store
+        Note left of parameter: Obtiene parámetros de conexión a BD: ip, port, database
+
+        API->>CL: Guarda parámetros del Parameter Store en caché local
+        Note right of API: ip, port, database
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | GT01 | PA01 | NI01
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> procedureNameHND <br> procedureNameGTM  <br> procedureNameNIC <br> procedureNamePAN
+
+    API->>secret: Consulta secretos para conexión a base de datos
+    Note right of API: secretName = lambda.secret-name
+    
+    secret->>API: Retorna secretos
+    Note left of secret: User, Password
+
+    API->>Homologador: Consulta Homologación sourceBank
+    Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
+
+    Homologador->>API: Retorna Valor Homologado 
+    Note left of Homologador: HN01 → HND 
+
+    API->>API: Construye Request SP: OSBConDatoPlanes - MasterData
+    Note over API: Conexión: <br> Valor de sourceBank.param-name <br> Valor de sourceBank.secret-name <br> Mapeo Campos: <br> PV_CUENTA = request.accountNumber <br> PV_ORG = request.organizationReference <br> PV_CODIGO_PAIS = header.sourceBank (Homologado)
+
+    API->>master: Consume SP: OSBConDatoPlanes - MasterData
+    Note right of API: Conexión: <br> ip, port, database <br> user, password <br> PV_CUENTA, PV_ORG, PV_CODIGO_PAIS
+
+    master->>API: Response SP: OSBConDatoPlanes - MasterData
+    Note over master: Response: CodigoError, MensajeError, RowSet
+
+    API->>API: Evalúa Response SP: OSBConDatoPlanes - MasterData
+
+    alt If CodigoError == -1 
+
+        API->>API: Construye response API
+        Note over API: Mapeo uno a uno de los campos del RowSet a los campos del response de la API
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    else If CodigoError != -1
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según tabla de homologación
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
