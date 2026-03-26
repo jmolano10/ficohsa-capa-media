@@ -2,9 +2,9 @@
 ```json
 //REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO
 {
-  "pk": "COUNTRY#XRS#DOMAIN#SYSTEM_PARTY_REFERENCE_DATA#PARAM#VALIDATE_FLYER_NUMBER",
+  "pk": "COUNTRY#XRS#DOMAIN#CUSTOMER_CASE_MGMT_RETRIEVE#PARAM#RETRIEVE_TRANSACTION_STATUS",
   "sk": "V#0001",
-  "name": "VALIDATE_FLYER_NUMBER",
+  "name": "RETRIEVE_TRANSACTION_STATUS",
   "value": [
     {
       "region": "HN01-HN01",
@@ -20,9 +20,7 @@
     },
     {
       "region": "NI01-NI01",
-      "enabled": true,
-      "param-name": "ban-xrs-ic-wpr-parm-connection-interfazdev-db-dev",
-      "secret-name": "ban-xrs-ic-wpr-secm-connection-interfaz-sfc-db-dev"
+      "enabled": false
     },
     {
       "region": "PA01-PA01",
@@ -32,9 +30,9 @@
     }
   ],
   "type": "JSON",
-  "description": "CONFIG OF SYSTEM_PARTY_REFERENCE_DATA BY METHOD",
+  "description": "CONFIG OF CUSTOMER_CASE_MGMT_RETRIEVE BY METHOD",
   "country": "XRS",
-  "domain": "SYSTEM_PARTY_REFERENCE_DATA",
+  "domain": "CUSTOMER_CASE_MGMT_RETRIEVE",
   "tags": [],
   "precedence": 10,
   "effective_from": "",
@@ -72,8 +70,8 @@
   "connectionType": "jca",
   "operationType": "update",
   "catalogeName": "SALESFORCE",
-  "procedureName": "SFC_VALIDAR_NUMERO_VIAJERO",
-  "caller-service": "system-party-reference-data-validate-flyer-number"
+  "procedureName": "SFC_P_CON_GESTIONES_MONETARIAS",
+  "caller-service": "customer-case-mgmt-retrieve-retrieve-transaction-status"
 
 }
 ```
@@ -87,10 +85,11 @@
   "connectionType": "jca",
   "operationType": "query",
   "catalogueName": "SALESFORCE",
-  "procedureName": "SFC_VALIDAR_NUMERO_VIAJERO",
+  "procedureName": "SFC_P_CON_GESTIONES_MONETARIAS",
   "params": {
-    "PV_TYPE": "AA",
-    "PV_NUMERO_VIAJERO": "123456789"
+    "PV_NUMUSU": "1234567",
+    "PV_PAIS": "HN01",
+    "PV_DETALLE": "PRESTAMO_PERSONAL" 
   }
 }
 ```

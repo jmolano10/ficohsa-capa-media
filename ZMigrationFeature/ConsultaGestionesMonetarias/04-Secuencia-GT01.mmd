@@ -1,0 +1,99 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSBProxy as OSB Proxy Service
+    participant ValidadorRegional as Validador Regional
+    participant DBValidacion as DB Validación Regional
+    participant DBAdapter as DB Adapter Salesforce
+    participant OracleDB as Oracle Database
+    participant MapeoErrores as Mapeo de Errores
+    participant ErrorHandler as Manejador de Errores
+
+    Note over Client, OracleDB: Flujo Guatemala (GT01) - ConsultaGestionesMonetarias
+
+    Client->>OSBProxy: SOAP Request
+    Note right of Client: Header: SourceBank=GT01<br/>Authentication: UserName/Password<br/>Body: NUMUSU, DETALLE_GESTION, PAIS
+
+    OSBProxy->>OSBProxy: Validar Esquema XML
+    Note right of OSBProxy: Validar campos obligatorios<br/>NUMUSU, DETALLE_GESTION, PAIS<br/>Esquema: consultaGestionesMonetariasTypes.xsd
+
+    alt Validación XSD Fallida
+        OSBProxy->>ErrorHandler: Error de Validación XSD
+        ErrorHandler->>MapeoErrores: Mapear Error
+        Note right of MapeoErrores: Código: FICBCO0287<br/>Mensaje: Error de validación
+        MapeoErrores->>ErrorHandler: Error Mapeado
+        ErrorHandler->>OSBProxy: Response con Error
+        OSBProxy->>Client: SOAP Fault
+    end
+
+    OSBProxy->>ValidadorRegional: Validar Servicio Regional
+    Note right of ValidadorRegional: ServiceId: FICBCO0287<br/>Region: GT01<br/>Usuario: usuario_guatemala
+
+    ValidadorRegional->>DBValidacion: Ejecutar ValidaServicioRegional
+    Note right of DBValidacion: SP: ValidaServicioRegional<br/>Parámetros: FICBCO0287, GT01, usuario
+
+    DBValidacion->>ValidadorRegional: Resultado Validación
+    Note left of DBValidacion: PV_CODIGO_ERROR<br/>PV_MENSAJE_ERROR
+
+    alt Región No Válida
+        ValidadorRegional->>OSBProxy: Error Regional
+        OSBProxy->>OSBProxy: Construir Header Error
+        Note right of OSBProxy: successIndicator: ERROR<br/>messages: Mensaje de error regional
+        OSBProxy->>Client: Response con Error Regional
+    end
+
+    ValidadorRegional->>OSBProxy: Validación Exitosa
+    OSBProxy->>OSBProxy: Aplicar Valores por Defecto Región
+    Note right of OSBProxy: Aplicar configuración regional<br/>para Guatemala (GT01)
+
+    OSBProxy->>OSBProxy: Enrutamiento Regional
+    Note right of OSBProxy: Branch: SourceBank = 'GT01'<br/>Pipeline: GT01_ConsultasGestionesMonetarias
+
+    OSBProxy->>OSBProxy: Transformar Request (XQuery)
+    Note right of OSBProxy: consultaGestionesMonetariasGTIn.xq<br/>Mapear NUMUSU → PN_NUMUSU<br/>Mapear PAIS → PV_PAIS<br/>Mapear DETALLE_GESTION → PV_DETALLE
+
+    OSBProxy->>DBAdapter: Invocar Stored Procedure
+    Note right of DBAdapter: Business Service:<br/>consultaGestionesMonetarias_db<br/>Operation: consultaGestionesMonetarias
+
+    DBAdapter->>OracleDB: CALL SFC_P_CON_GESTIONES_MONETARIAS
+    Note right of OracleDB: Esquema: SALESFORCE<br/>Parámetros IN:<br/>- PN_NUMUSU<br/>- PV_PAIS (GT)<br/>- PV_DETALLE
+
+    alt Error en Base de Datos
+        OracleDB->>DBAdapter: Error de BD
+        DBAdapter->>OSBProxy: Response con Error
+        OSBProxy->>ErrorHandler: Procesar Error BD
+        ErrorHandler->>MapeoErrores: Mapear Error BD
+        MapeoErrores->>ErrorHandler: Error Mapeado
+        ErrorHandler->>OSBProxy: Error Final
+        OSBProxy->>Client: Response con Error
+    end
+
+    OracleDB->>DBAdapter: ResultSet con Datos
+    Note left of OracleDB: Parámetros OUT:<br/>- PT_CAMPOS_RESULTADO (Array)<br/>- PV_CODIGOMENSAJE<br/>- PV_DESCRIPCIONMENSAJE<br/><br/>Datos por registro:<br/>- NUMUSU, DETALLE, OPERACION<br/>- IMP_M_LOCAL (Quetzales), IMP_M_USD<br/>- FECHA_ORIGEN, FECHA_LIQ<br/>- FECHA_VENCIMIENTO, FECHA_LIQ_PROX<br/>- FECHA_PAGO, PORCENTAJE<br/>- CATEGORIA, SUB_CATEGORIA<br/>- PAGO_MLOCAL (GTQ), PAGO_USD<br/>- SALDO_ACT_MLOCAL (GTQ), SALDO_ACT_USD
+
+    DBAdapter->>OSBProxy: Response Exitoso
+    OSBProxy->>OSBProxy: Extraer Success Indicator
+    Note right of OSBProxy: successIndicator = PV_CODIGOMENSAJE
+
+    alt Success Indicator != "SUCCESS"
+        OSBProxy->>OSBProxy: Construir Response Vacío
+        Note right of OSBProxy: Body: consultaGestionesMonetariasResponse vacío
+        OSBProxy->>OSBProxy: Construir Header Error
+        OSBProxy->>Client: Response con Error de Negocio
+    end
+
+    OSBProxy->>OSBProxy: Transformar Response (XQuery)
+    Note right of OSBProxy: consultaGestionesMonetariasGTOut.xq<br/>Iterar sobre PT_CAMPOS_RESULTADO<br/>Variable: $PT_CAMPOS_RESULTADO_ITEM<br/>Mapear cada registro a GestionesMonetariasResponseRecord<br/>Transformar todos los campos de salida
+
+    OSBProxy->>OSBProxy: Construir Header de Respuesta
+    Note right of OSBProxy: consultaGestionesMonetariasGTHeaderOut.xq<br/>successIndicator: PV_CODIGOMENSAJE<br/>messages: PV_DESCRIPCIONMENSAJE
+
+    OSBProxy->>Client: SOAP Response
+    Note left of Client: Header: successIndicator=SUCCESS<br/>messages: Consulta ejecutada exitosamente<br/><br/>Body: Array de GestionesMonetariasResponseRecord<br/>con datos financieros en Quetzales y USD<br/>de las gestiones monetarias
+
+    Note over Client, OracleDB: Transformaciones Clave Guatemala:
+    Note over Client, OracleDB: 1. Entrada: NUMUSU→PN_NUMUSU, PAIS→PV_PAIS (GT), DETALLE_GESTION→PV_DETALLE
+    Note over Client, OracleDB: 2. Salida: Mapeo directo usando $PT_CAMPOS_RESULTADO_ITEM
+    Note over Client, OracleDB: 3. Header: PV_CODIGOMENSAJE→successIndicator, PV_DESCRIPCIONMENSAJE→messages
+    Note over Client, OracleDB: 4. Iteración: for $PT_CAMPOS_RESULTADO_ITEM in PT_CAMPOS_RESULTADO
+    Note over Client, OracleDB: 5. Moneda: IMP_M_LOCAL en Quetzales (GTQ), IMP_M_USD en Dólares
+    Note over Client, OracleDB: 6. Archivos XQuery específicos para Guatemala (GT)

@@ -1,0 +1,97 @@
+flowchart TD
+    A[Cliente/Aplicación] --> B[OSB Proxy Service<br/>ConsultaGestionesMonetarias]
+    
+    B --> C{Validación XSD}
+    C -->|Error| D[Error Handler]
+    D --> E[Mapeo de Errores<br/>FICBCO0287]
+    E --> F[SOAP Fault Response]
+    F --> A
+    
+    C -->|Válido| G[Validación Servicio Regional]
+    G --> H[DB Validación Regional<br/>ValidaServicioRegional]
+    H --> I{¿Región Válida?}
+    
+    I -->|No| J[Construir Error Regional]
+    J --> K[Response Error Regional]
+    K --> A
+    
+    I -->|Sí| L[Aplicar Valores por Defecto Región]
+    L --> M{Enrutamiento Regional<br/>SourceBank}
+    
+    M -->|HN01| N[Pipeline Honduras<br/>HN01_ConsultasGestionesMonetarias]
+    M -->|GT01| O[Pipeline Guatemala<br/>GT01_ConsultasGestionesMonetarias]
+    M -->|PA01| P[Pipeline Panamá<br/>PA01_ConsultasGestionesMonetarias]
+    M -->|Otros| Q[Pipeline Default<br/>SERVICE NOT IMPLEMENTED]
+    
+    Q --> R[Error: Servicio No Implementado]
+    R --> A
+    
+    %% Flujo Honduras
+    N --> N1[Transformar Request<br/>consultaGestionesMonetariasIn.xq]
+    N1 --> N2[Invocar DB Adapter<br/>consultaGestionesMonetarias_db]
+    N2 --> N3[Oracle DB - Esquema SALESFORCE<br/>SFC_P_CON_GESTIONES_MONETARIAS]
+    N3 --> N4{¿Éxito DB?}
+    N4 -->|Error| N5[Error Base de Datos]
+    N5 --> D
+    N4 -->|Éxito| N6[Extraer Success Indicator]
+    N6 --> N7{¿SUCCESS?}
+    N7 -->|No| N8[Response Vacío + Header Error]
+    N8 --> A
+    N7 -->|Sí| N9[Transformar Response<br/>consultaGestionesMonetariasOut.xq]
+    N9 --> N10[Construir Header Response<br/>consultaGestionesMonetariasHeaderOut.xq]
+    N10 --> N11[SOAP Response HN01<br/>Moneda: Lempiras + USD]
+    N11 --> A
+    
+    %% Flujo Guatemala
+    O --> O1[Transformar Request<br/>consultaGestionesMonetariasGTIn.xq]
+    O1 --> O2[Invocar DB Adapter<br/>consultaGestionesMonetarias_db]
+    O2 --> O3[Oracle DB - Esquema SALESFORCE<br/>SFC_P_CON_GESTIONES_MONETARIAS]
+    O3 --> O4{¿Éxito DB?}
+    O4 -->|Error| O5[Error Base de Datos]
+    O5 --> D
+    O4 -->|Éxito| O6[Extraer Success Indicator]
+    O6 --> O7{¿SUCCESS?}
+    O7 -->|No| O8[Response Vacío + Header Error]
+    O8 --> A
+    O7 -->|Sí| O9[Transformar Response<br/>consultaGestionesMonetariasGTOut.xq]
+    O9 --> O10[Construir Header Response<br/>consultaGestionesMonetariasGTHeaderOut.xq]
+    O10 --> O11[SOAP Response GT01<br/>Moneda: Quetzales + USD]
+    O11 --> A
+    
+    %% Flujo Panamá
+    P --> P1[Transformar Request<br/>consultaGestionesMonetariasPAIn.xq]
+    P1 --> P2[Invocar DB Adapter<br/>consultaGestionesMonetarias_db]
+    P2 --> P3[Oracle DB - Esquema SALESFORCE<br/>SFC_P_CON_GESTIONES_MONETARIAS]
+    P3 --> P4{¿Éxito DB?}
+    P4 -->|Error| P5[Error Base de Datos]
+    P5 --> D
+    P4 -->|Éxito| P6[Extraer Success Indicator]
+    P6 --> P7{¿SUCCESS?}
+    P7 -->|No| P8[Response Vacío + Header Error]
+    P8 --> A
+    P7 -->|Sí| P9[Transformar Response<br/>consultaGestionesMonetariasPAOut.xq]
+    P9 --> P10[Construir Header Response<br/>consultaGestionesMonetariasPAHeaderOut.xq]
+    P10 --> P11[SOAP Response PA01<br/>Moneda: USD = USD<br/>Dolarización]
+    P11 --> A
+    
+    %% Estilos
+    classDef errorClass fill:#ffcccc,stroke:#ff0000,stroke-width:2px
+    classDef successClass fill:#ccffcc,stroke:#00ff00,stroke-width:2px
+    classDef processClass fill:#cceeff,stroke:#0066cc,stroke-width:2px
+    classDef dbClass fill:#ffffcc,stroke:#ffcc00,stroke-width:2px
+    classDef regionClass fill:#e6ccff,stroke:#9900cc,stroke-width:2px
+    
+    class D,E,F,J,K,R,N5,O5,P5,N8,O8,P8 errorClass
+    class N11,O11,P11 successClass
+    class B,G,L,N1,N9,N10,O1,O9,O10,P1,P9,P10 processClass
+    class H,N2,N3,O2,O3,P2,P3 dbClass
+    class N,O,P regionClass
+    
+    %% Notas adicionales
+    N3 -.->|Parámetros IN<br/>PN_NUMUSU<br/>PV_PAIS (HN)<br/>PV_DETALLE| N3
+    O3 -.->|Parámetros IN<br/>PN_NUMUSU<br/>PV_PAIS (GT)<br/>PV_DETALLE| O3
+    P3 -.->|Parámetros IN<br/>PN_NUMUSU<br/>PV_PAIS (PA)<br/>PV_DETALLE| P3
+    
+    N3 -.->|Parámetros OUT<br/>PT_CAMPOS_RESULTADO<br/>PV_CODIGOMENSAJE<br/>PV_DESCRIPCIONMENSAJE| N4
+    O3 -.->|Parámetros OUT<br/>PT_CAMPOS_RESULTADO<br/>PV_CODIGOMENSAJE<br/>PV_DESCRIPCIONMENSAJE| O4
+    P3 -.->|Parámetros OUT<br/>PT_CAMPOS_RESULTADO<br/>PV_CODIGOMENSAJE<br/>PV_DESCRIPCIONMENSAJE| P4
