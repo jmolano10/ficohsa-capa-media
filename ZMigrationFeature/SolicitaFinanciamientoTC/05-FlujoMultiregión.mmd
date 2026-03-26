@@ -1,0 +1,139 @@
+```mermaid
+flowchart TD
+    A[Cliente SOAP Request] --> B[OSB Proxy Service<br/>SolicitaFinanciamientoTC]
+    
+    B --> C{Validación XSD}
+    C -->|Error| D[Error Response<br/>Validación Fallida]
+    C -->|OK| E[Validar Servicio Regional<br/>ServiceId: FICBCO0269]
+    
+    E --> F{Región Válida?}
+    F -->|No| G[Error Response<br/>Región No Válida]
+    F -->|Sí| H[Registrar Bitácora Request<br/>UUID + Datos Transacción]
+    
+    H --> I{Enrutamiento por Región<br/>SourceBank}
+    
+    I -->|HN01| J[Pipeline HN01<br/>SolicitaFinanciamientoTC_request]
+    I -->|GT01| K[Pipeline GT01<br/>SolicitaFinanciamientoTCGT_request]
+    I -->|Otras| L[Pipeline Default<br/>Error MW-0008]
+    
+    L --> M[Error Response<br/>SERVICE NOT IMPLEMENTED]
+    
+    %% Flujo HN01
+    J --> N[Parametrización HN01<br/>DISBURSERATE<br/>PRODUCTQUANTIFY<br/>DISBURSEMENTYPE.TYPE]
+    
+    N --> O{Parámetros OK?}
+    O -->|No| P[Error Parametrización]
+    O -->|Sí| Q[Consulta Ofertas VASA<br/>consultaOferta_db<br/>ProcesosHN]
+    
+    Q --> R{Ofertas Disponibles?}
+    R -->|No| S[Error No Ofertas]
+    R -->|Sí| T[Validar Condiciones<br/>Plazo, Moneda, Monto]
+    
+    T --> U{Condiciones OK?}
+    U -->|No| V[Error Condiciones]
+    U -->|Sí| W[Calcular Tasa Interés<br/>Buscar en Ofertas]
+    
+    W --> X[Login Salesforce<br/>Obtener Sesión]
+    X --> Y[Crear Gestión Extra<br/>SalesforceHNIngresaGestionExtra<br/>País: Honduras]
+    
+    Y --> Z{Sesión Válida?}
+    Z -->|INVALID_SESSION_ID| AA[Nuevo Login<br/>createNewSession: true]
+    AA --> Y
+    Z -->|OK| BB[Procesar Response<br/>solicitaFinanciamientoTCOut.xq]
+    
+    %% Flujo GT01
+    K --> CC[Parametrización GT01<br/>DISBURSERATE.GT01<br/>PRODUCTQUANTIFY.GT01<br/>TipoDesembolso: Directo]
+    
+    CC --> DD{Parámetros OK?}
+    DD -->|No| EE[Error Parametrización]
+    DD -->|Sí| FF[Consulta Ofertas BLAZEGT<br/>consultaOferta_db<br/>BLAZEGT]
+    
+    FF --> GG{Ofertas Disponibles?}
+    GG -->|No| HH[Error No Ofertas]
+    GG -->|Sí| II[Validar Condiciones<br/>Plazo, Moneda GTQ, Monto]
+    
+    II --> JJ{Condiciones OK?}
+    JJ -->|No| KK[Error Condiciones]
+    JJ -->|Sí| LL[Calcular Tasa Interés<br/>Buscar en Ofertas GT]
+    
+    LL --> MM[Login Salesforce<br/>Obtener Sesión]
+    MM --> NN[Crear Gestión Extra<br/>SalesforceRGNIngresaGestionExtra<br/>País: Guatemala]
+    
+    NN --> OO{Sesión Válida?}
+    OO -->|INVALID_SESSION_ID| PP[Nuevo Login<br/>createNewSession: true]
+    PP --> NN
+    OO -->|OK| QQ[Procesar Response<br/>solicitaFinanciamientoTCRGNGTOut.xq]
+    
+    %% Convergencia de Respuestas Exitosas
+    BB --> RR[Mapear Estados<br/>EN PROCESO/INGRESADA → PENDING<br/>APROBADO → APPROVED<br/>Otros → REJECTED]
+    QQ --> RR
+    
+    RR --> SS[Calcular Campos Response<br/>TRANSACTION_ID = original + IdGestion<br/>AVAILABLE_AMOUNT = TOTAL - cargos<br/>CHARGES = valorDesembolso + valorSeguro]
+    
+    SS --> TT[Construir Header Success<br/>successIndicator: Success]
+    
+    %% Manejo de Errores
+    P --> UU[Mapeo de Errores<br/>MapeoErrores Service]
+    S --> UU
+    V --> UU
+    EE --> UU
+    HH --> UU
+    KK --> UU
+    
+    UU --> VV[Error Response<br/>successIndicator: ERROR<br/>messages: Descripción Error]
+    
+    %% Respuesta Final
+    TT --> WW[Registrar Bitácora Response<br/>UUID + Resultado]
+    VV --> WW
+    D --> WW
+    G --> WW
+    M --> WW
+    
+    WW --> XX[SOAP Response al Cliente]
+    
+    %% Estilos
+    classDef hnFlow fill:#e1f5fe
+    classDef gtFlow fill:#f3e5f5
+    classDef errorFlow fill:#ffebee
+    classDef successFlow fill:#e8f5e8
+    classDef decisionFlow fill:#fff3e0
+    
+    class J,N,O,Q,R,T,U,W,X,Y,Z,AA,BB hnFlow
+    class K,CC,DD,FF,GG,II,JJ,LL,MM,NN,OO,PP,QQ gtFlow
+    class D,G,M,P,S,V,EE,HH,KK,UU,VV errorFlow
+    class RR,SS,TT,WW,XX successFlow
+    class C,F,I,O,R,U,Z,DD,GG,JJ,OO decisionFlow
+```
+
+**Notas del Diagrama:**
+
+**Diferencias Clave por Región:**
+
+1. **Parametrización:**
+   - HN01: DISBURSERATE, PRODUCTQUANTIFY, DISBURSEMENTYPE.{TYPE}
+   - GT01: DISBURSERATE.GT01, PRODUCTQUANTIFY.GT01, TipoDesembolso directo
+
+2. **Base de Datos:**
+   - HN01: VASA/ProcesosHN
+   - GT01: BLAZEGT
+
+3. **Salesforce:**
+   - HN01: SalesforceHNIngresaGestionExtra, País: "Honduras"
+   - GT01: SalesforceRGNIngresaGestionExtra, País: "Guatemala"
+
+4. **Transformaciones:**
+   - HN01: consultaOfertaIn.xq, ingresaGestionExtraIn.xq, solicitaFinanciamientoTCOut.xq
+   - GT01: consultaOfertaGTIn.xq, ingresaGestionExtraRGNGTIn.xq, solicitaFinanciamientoTCRGNGTOut.xq
+
+5. **Monedas Típicas:**
+   - HN01: HNL (Lempiras)
+   - GT01: GTQ (Quetzales)
+
+**Puntos Comunes:**
+- Validación XSD idéntica
+- Validación regional idéntica
+- Lógica de validación de condiciones idéntica
+- Manejo de errores y retry de sesión idéntico
+- Mapeo de estados idéntico
+- Sistema de bitácora idéntico
+```

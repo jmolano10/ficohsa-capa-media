@@ -1,0 +1,149 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant Validator as Validador Regional
+    participant ParamService as Servicio Parametrización
+    participant VASADB as Base Datos VASA
+    participant SFLogin as Login Salesforce
+    participant SalesforceHN as Salesforce Honduras
+    participant ErrorHandler as Manejador de Errores
+    participant Bitacora as Bitácora OSB
+
+    Note over Client, Bitacora: Flujo Honduras (HN01) - SolicitaFinanciamientoTC
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Body: solicitaFinanciamientoTC<br/>CUSTOMER_ID, TOTAL_AMOUNT<br/>NUMBER_OF_PAYMENTS, CURRENCY<br/>DISBURSEMENT_INFO, EMAIL_ADDRESS
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar contra solicitudFinanciamientoTCTypes.xsd<br/>Campos obligatorios: CUSTOMER_ID, TOTAL_AMOUNT<br/>NUMBER_OF_PAYMENTS, CURRENCY, DISBURSEMENT_INFO
+
+    alt Validación XSD Fallida
+        OSB->>ErrorHandler: Error de Validación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>Validator: Validar Servicio Regional
+    Note right of Validator: ServiceId: FICBCO0269<br/>Region: HN01
+
+    Validator->>Validator: Consultar BD Regional
+    
+    alt Región No Válida
+        Validator->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    Validator->>OSB: Validación Exitosa
+    Note left of Validator: Aplicar valores por defecto región
+
+    OSB->>OSB: Generar UUID Bitácora
+    OSB->>Bitacora: Registrar Request
+    Note right of Bitacora: UUID, Usuario, Banco Origen/Destino<br/>Contenido Request, Fecha, Servicio FICBCO0269
+
+    OSB->>OSB: Enrutamiento Regional
+    Note right of OSB: Branch: SourceBank = 'HN01'<br/>Pipeline: SolicitaFinanciamientoTC_request
+
+    OSB->>ParamService: Obtener Parametrización
+    Note right of ParamService: FICBCO0269.DISBURSERATE<br/>FICBCO0269.PRODUCTQUANTIFY<br/>FICBCO0269.DISBURSEMENTYPE.{TYPE}
+
+    ParamService->>ParamService: Consultar BD Configuración
+    ParamService->>OSB: Parámetros Configurados
+    Note left of ParamService: tasaDesembolso: 2.0<br/>productoCuotificar: EXTRAFINANCIAMIENTO<br/>tipoDesembolso: CREDITO_CUENTA
+
+    alt Error Parametrización
+        ParamService->>OSB: Error Parámetros
+        OSB->>ErrorHandler: Mapear Error
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>VASADB: Consultar Ofertas
+    Note right of VASADB: consultaOfertaIn.xq<br/>Pv_Identidad: CUSTOMER_ID<br/>Pv_Linea: CREDIT_LINE
+
+    VASADB->>VASADB: CALL consultaOferta(Pv_Identidad, Pv_Linea)
+    
+    alt No Hay Ofertas
+        VASADB->>OSB: Pv_CodigoError != 'Success'
+        OSB->>ErrorHandler: Mapear Error
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    VASADB->>OSB: Ofertas Disponibles
+    Note left of VASADB: RowSet con ofertas:<br/>Pn_Plazo, Pv_Moneda<br/>Pn_Monto, Pn_Tasa
+
+    OSB->>OSB: Validar Condiciones Crédito
+    Note right of OSB: validaCondicionesCredito.xq<br/>Verificar: plazo, moneda, monto<br/>Buscar oferta que coincida
+
+    alt Condiciones No Válidas
+        OSB->>ErrorHandler: Error Condiciones
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Calcular Tasa Interés
+    Note right of OSB: XQuery: buscar tasa en ofertas<br/>WHERE plazo = NUMBER_OF_PAYMENTS<br/>AND moneda = CURRENCY<br/>AND monto >= TOTAL_AMOUNT
+
+    OSB->>SFLogin: Login Salesforce
+    Note right of SFLogin: createNewSession: false<br/>Obtener credenciales existentes
+
+    SFLogin->>SFLogin: Validar Sesión Existente
+    SFLogin->>OSB: Credenciales Salesforce
+    Note left of SFLogin: USERNAME, PASSWORD, SESSION
+
+    alt Error Login Salesforce
+        SFLogin->>OSB: Error Credenciales
+        OSB->>ErrorHandler: Mapear Error
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>SalesforceHN: Crear Gestión Extra
+    Note right of SalesforceHN: ingresaGestionExtraIn.xq<br/>Cliente, Plazo, Monto, TasaInteres<br/>Moneda, numTarjeta, TipoDesembolso<br/>CuentaCredito, Direccion, CorreoElectronico<br/>ComisionDesembolso, ProductoCuotificar<br/>Pais: "Honduras"
+
+    alt Sesión Inválida
+        SalesforceHN->>OSB: INVALID_SESSION_ID
+        Note over OSB: Error Handler Activado
+        OSB->>SFLogin: Nuevo Login Salesforce
+        Note right of SFLogin: createNewSession: true<br/>Generar nueva sesión
+        SFLogin->>OSB: Nueva Sesión
+        OSB->>SalesforceHN: Reintentar Crear Gestión
+        Note right of SalesforceHN: Mismo request con nueva sesión
+    end
+
+    SalesforceHN->>SalesforceHN: Procesar Solicitud Financiamiento
+    SalesforceHN->>OSB: Respuesta Gestión
+    Note left of SalesforceHN: CodigoError: SUCCESS<br/>IdGestion, cuotaMensual, tasaMensual<br/>valorDesembolso, valorSeguro<br/>estadoGestion
+
+    alt Error Salesforce
+        SalesforceHN->>OSB: CodigoError != SUCCESS
+        OSB->>ErrorHandler: Mapear Error
+        ErrorHandler->>OSB: Error Mapeado
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>OSB: Transformar Response
+    Note right of OSB: solicitaFinanciamientoTCOut.xq<br/>TRANSACTION_ID: concat(original, IdGestion)<br/>MONTHLY_PAYMENT: cuotaMensual<br/>MONTHLY_INTEREST_RATE: tasaMensual<br/>AVAILABLE_AMOUNT: TOTAL_AMOUNT - cargos<br/>CHARGES: valorDesembolso + valorSeguro<br/>STATUS: mapear estadoGestion
+
+    OSB->>OSB: Mapear Estados
+    Note right of OSB: getMessageStatus function:<br/>EN PROCESO/INGRESADA → PENDING<br/>APROBADO → APPROVED<br/>Otros → REJECTED
+
+    OSB->>OSB: Construir Header Respuesta
+    Note right of OSB: successIndicator: Success<br/>Sin mensajes de error
+
+    OSB->>Bitacora: Registrar Response
+    Note right of Bitacora: UUID Response, Resultado: Success<br/>Contenido Response, Usuario<br/>Banco Origen/Destino
+
+    OSB->>Client: SOAP Response
+    Note left of Client: Header: successIndicator=Success<br/>Body: solicitaFinanciamientoTCResponse<br/>TRANSACTION_ID, AMOUNT_REQUESTED<br/>MONTHLY_PAYMENT, AVAILABLE_AMOUNT<br/>CHARGES, STATUS
+
+    Note over Client, Bitacora: Transformaciones Clave HN01:
+    Note over Client, Bitacora: 1. Parametrización: DISBURSEMENTYPE.{TYPE} → TipoDesembolso
+    Note over Client, Bitacora: 2. Base Datos: VASA/ProcesosHN → consultaOferta
+    Note over Client, Bitacora: 3. Salesforce: SalesforceHNIngresaGestionExtra
+    Note over Client, Bitacora: 4. País: "Honduras" hardcodeado
+    Note over Client, Bitacora: 5. Cálculos: AVAILABLE_AMOUNT = TOTAL - (seguro + desembolso)
+    Note over Client, Bitacora: 6. Estados: EN PROCESO/INGRESADA/APROBADO → PENDING/APPROVED
+    Note over Client, Bitacora: 7. Retry: Automático en INVALID_SESSION_ID
+```
