@@ -4,7 +4,7 @@ sequenceDiagram
     participant API as API Exp Consulta Remesas CB <br> Epica 2322: ConsultaRemesasCB <br> HU 60329:  POST - /correspondent-management/v1/retrieve-remittances
     participant cloudWatch as AWS CloudWatch <br> Registro de logs
     participant CL as Caché Local
-    participant Lambda as Lambda de <br> parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant parameter as Parameter Store
     participant Lib as Librería Pipeline (ConfigMap)
     participant lambdaSP as Lambda Validación Corresponsales<br/> HU 7761 - ban-xrs-ic-lam-validate-bank-correspondent-{env}
@@ -27,31 +27,31 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros de Lambda Parámetros en caché local
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
         Note right of API: Domain: "CORRESPONDENT_BANK_OPERATIONS" <br> name: "RETRIEVE_REMITTANCES" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros de Lambda Parámetros en Cahé Local
+        CL->>API: Obtiene parámetros de Librería de parámetros en Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Consultar parámetros de Parameter Store en caché local
-        Note right of API: paramName = lambda.param-name
+        Note right of API: paramName = libparam.param-name
 
         CL->>API: Obtiene parámetros de Parameter Store en caché local
         Note left of CL: Obtiene parámetros de conexión a BD Aurora (host, port, dbName)
  
-    else Consulta  parametros en Lambda Parámetros / Parameter Store
+    else Consulta  parametros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "CORRESPONDENT_BANK_OPERATIONS" <br> name: "RETRIEVE_REMITTANCES" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
         Note right of API: value.param-name 
 
         API->>parameter: Consultar parámetros en Paramter Store
-        Note right of API: paramName = lambda.param-name
+        Note right of API: paramName = libparam.param-name
 
         parameter->>API: Obtiene parámetros de Parameter Store
         Note left of parameter: Obtiene parámetros de conexión a BD Aurora (host, port, dbName)
@@ -73,7 +73,7 @@ sequenceDiagram
     Note left of Lib: Constantes: <br> userDB <br> procedureName
 
     API->>API: Construye request Lambda Valida Corresponsal
-    Note over API: Mapeo: <br> correspondentPartyReference = header.Branch-Id, <br> country = request.header.soruceBank, <br> transactionType = lambda.transactionType
+    Note over API: Mapeo: <br> correspondentPartyReference = header.Branch-Id, <br> country = request.header.soruceBank, <br> transactionType = libparam.transactionType
 
     API->>lambdaSP: Consume Lambda Valida Corresponsal
     Note right of API: correspondentPartyReference, soruceBank, transactionType
@@ -93,7 +93,7 @@ sequenceDiagram
         alt If request.additionalInformation.parameterName == LOGINUSER | LOGINPASS itera este ciclo para cada request.additionalInformation.parameterValue
 
             API->>API: Construye Request API decifrado
-            Note over API: body: <br> encryptionAlgorithm = lambda.algorithm, <br> encryptedData = request.additionalInformation.parameterValue
+            Note over API: body: <br> encryptionAlgorithm = libparam.algorithm, <br> encryptedData = request.additionalInformation.parameterValue
 
             API->>decrypt: Consume API decifrado
             Note right of API: encryptionAlgorithm, encryptedData
@@ -141,7 +141,7 @@ sequenceDiagram
             Note over API: params: <br> p_customer_reference = request.additionalInformation.parameterValue where request.additionalInformation.parameterName == ID  <br> p_floating_amount = responseRetrieveRemittance.remittanceAmount  <br> p_exchange_rate = responseRetrieveRemittance.exchangeRate
 
             API->>query: Consume SP Register Remittance
-            Note right of API: host, port, dbName, userDB, lambda.arn-secret <br> p_customer_reference, p_floating_amount, p_exchange_rate
+            Note right of API: host, port, dbName, userDB, libparam.arn-secret <br> p_customer_reference, p_floating_amount, p_exchange_rate
 
             query->>API: Response SP Register Remittance
             Note left of query: Response: <br> p_response_code, p_response_message

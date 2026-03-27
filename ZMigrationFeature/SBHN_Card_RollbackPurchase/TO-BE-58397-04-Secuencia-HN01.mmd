@@ -4,7 +4,7 @@ sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
     participant API as API Reversar Compra TC <br> Epica 2677: SBRG_Card_RollbackPurchase <br> HU 58397:  POST - reversal-card-purchase/v1/execution
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Lib as Librería Pipeline (ConfigMap)
     participant getTicket as API Get Ticket <br/> HU 58396:  POST - /cards/credit-card-status-retrieve/v1/retrieve-purchase-ticket
     participant recordTicket as API Record Transaction <br/> HU 57727:  POST - /cards/credit-card-admin/v1/record-transaction
@@ -23,18 +23,18 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros Librería de parámetros caché local
         Note right of API: Domain: "REVERSAL_CARD_PURCHASE" <br> name: "EXECUTION" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
  
-    else Consulta  parametros en Lambda Parámetros
+    else Consulta  parametros en Librería de parámetros
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "REVERSAL_CARD_PURCHASE" <br> name: "EXECUTION" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
@@ -75,7 +75,7 @@ sequenceDiagram
             Note over API: Mapeo: <br> transactionReference = lastDigit(YY) + dayOfYear(DDD) + HH + mm + sequence <br> ── <br> lastDigit(YY): substring(format(currentDate,"YY"), index=2) → 2026 → "26" → "6" | 2031 → "31" → "1" | 2019 → "19" → "9" <br> dayOfYear(DDD): padLeft(dayOfYear(currentDate), size=3, pad="0") → 1-Ene → "001" | 17-Mar → "076" | 31-Dic → "365" <br> HH: padLeft(hours(currentTime), size=2, pad="0") → medianoche → "00" | 9am → "09" | 11pm → "23" <br> mm: padLeft(minutes(currentTime), size=2, pad="0") → en punto → "00" | 5 min → "05" | 59 min → "59" <br> sequence: responseGetTicket.transactionSequenceNumber → "0001" | "0099" | "1000" <br> ── <br> Ej 1 (2026-03-17 09:05, seq=0001): "6"+"076"+"09"+"05"+"0001" = "607609050001" <br> Ej 2 (2031-01-01 00:00, seq=0099): "1"+"001"+"00"+"00"+"0099" = "100100000099" <br> Ej 3 (2019-12-31 23:59, seq=1000): "9"+"365"+"23"+"59"+"1000" = "936523591000"
 
             API->>API: Construye Request API Record Transaction
-            Note over API: Mapeo: <br> posUserData = lambda.POSUserData, <br> numberOfInstallments = lambda.numberOfInstallments, <br> mccType = lambda.mCCType, <br> requestType = lambda.requestType, <br> creditId = responseGetTicket.creditCardId, <br> organizationReference = responseGetTicket.organizationReference, <br> merchantReference = responseGetTicket.merchantReference, <br> cardExpirationDate = responseGetTicket.cardExpiryDate, <br> transactionAmount = responseGetTicket.cashAmount, <br> trackDataLength = lambda.track2Length, <br> trackData = lambda.track2Data,  <br> validationValue = lambda.cardValidationValue
+            Note over API: Mapeo: <br> posUserData = libparam.POSUserData, <br> numberOfInstallments = libparam.numberOfInstallments, <br> mccType = libparam.mCCType, <br> requestType = libparam.requestType, <br> creditId = responseGetTicket.creditCardId, <br> organizationReference = responseGetTicket.organizationReference, <br> merchantReference = responseGetTicket.merchantReference, <br> cardExpirationDate = responseGetTicket.cardExpiryDate, <br> transactionAmount = responseGetTicket.cashAmount, <br> trackDataLength = libparam.track2Length, <br> trackData = libparam.track2Data,  <br> validationValue = libparam.cardValidationValue
 
             API->>recordTicket: Consume (HTTPS) API Record Transaction
             Note right of API: body: <br> transactionReference, posUserData, <br> numberOfInstallments, mccType, <br> requestType, creditId, <br> organizationReference, merchantReference, <br> cardExpirationDate, transactionAmount, <br> trackDataLength, trackData, <br> validationValue
@@ -97,7 +97,7 @@ sequenceDiagram
             else If responseRecordTransaction.statusDescription == "APPROVED" | "TRANSACTION_NOT_FOUND" | "ALREADY_REVERSED"
 
                 API->>API: Construye Request API Register Ticket
-                Note over API: Mapeo: <br> ticketReference = request.cardTransactionReference, <br> ticketStatus = lambda.requestType, <br> authorizationCode = responseRecordTransaction.authorizationCode
+                Note over API: Mapeo: <br> ticketReference = request.cardTransactionReference, <br> ticketStatus = libparam.requestType, <br> authorizationCode = responseRecordTransaction.authorizationCode
 
                 API->>registerTicket: Consume (HTTPS) API Register Ticket
                 Note right of API: body: <br> ticketReference, ticketStatus, authorizationCode

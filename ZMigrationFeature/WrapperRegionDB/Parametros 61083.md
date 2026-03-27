@@ -1,4 +1,4 @@
-##### DynamoDB Parameter - Lambda Parámetros
+##### DynamoDB Parameter - Librería de parámetros
 
 ##### AWS Systems Manager Parameter Store
 

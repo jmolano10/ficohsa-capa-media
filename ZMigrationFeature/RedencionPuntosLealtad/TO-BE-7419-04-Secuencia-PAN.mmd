@@ -4,7 +4,7 @@ sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
     participant API as API Redención de Puntos <br> Epica 7419: RedencionPuntosLealtad <br> POST - /redeem-loyalty-points/v1/initiate
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Homologador as Liberería de <br> Homologación
     participant accountDetails as API Account Details <br> HU 14137: GET - /cards/credit-card-detail-retrieves/v1/{creditCardNumber}/credit-card-details
     participant loyaltyProgram as API Retrieve Loyalty Program <br> HU 54358:  GET - /account-management/reward-points-account-retrieves/v1/retrieve-loyalty-program
@@ -24,18 +24,18 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros Librería de parámetros caché local
         Note right of API: Domain: "REDEEM_LOYALTY_POINTS" <br> name: "initiate" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
 
-    else Consulta  parametros en Lambda Parámetros
+    else Consulta  parametros en Librería de parámetros
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "REDEEM_LOYALTY_POINTS" <br> name: "initiate" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
@@ -140,7 +140,7 @@ sequenceDiagram
             alt If rewardRedemptionType == "CASH"
 
                 API ->> API: Construye Request API pointsConversion
-                Note over API: Mapeo: <br> "cardLogoReference" = responseAPIAccountDetails.accountBrandLogo, <br> "merchantReference" = request.merchantReference, <br> "merchantCategoryType" = request.merchantCategoryType, <br> "terminalReference" = request.terminalReference, <br> "conversionType" = lambda.conversionType, <br> "conversionPointsAmount" = request.rewardRedemptionAmount
+                Note over API: Mapeo: <br> "cardLogoReference" = responseAPIAccountDetails.accountBrandLogo, <br> "merchantReference" = request.merchantReference, <br> "merchantCategoryType" = request.merchantCategoryType, <br> "terminalReference" = request.terminalReference, <br> "conversionType" = libparam.conversionType, <br> "conversionPointsAmount" = request.rewardRedemptionAmount
 
                 API ->> conversion: Consume API pointsConversion
                 Note right of API: cardLogoReference, merchantReference, merchantCategoryType, terminalReference, conversionType, conversionPointsAmount
@@ -174,10 +174,10 @@ sequenceDiagram
             end
 
             API ->> API: Construye Request API Initiate Loyalty Points campo "rewardItemReference"
-            Note over API: "rewardItemReference" = lambda.rewardItem-{header.Application-User}, <br> si no existe parametrización para header.Application-User entonces <br> "rewardItemReference" = lambda.rewardItem-Default 
+            Note over API: "rewardItemReference" = libparam.rewardItem-{header.Application-User}, <br> si no existe parametrización para header.Application-User entonces <br> "rewardItemReference" = libparam.rewardItem-Default 
 
             API ->> API: Construye Request API Initiate Loyalty Points
-            Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference, <br> "organizationReference" = responseAPIAccountDetails.organizationType, <br> "creditCardId" = lambda.cardNumber, <br> "accountNumber" = responseAPIAccountDetails.loanManagementAccountNumber, <br> "schemeReference" = responseAPIAccountDetails.loanManagementScheme, <br> "loyaltyPointsAmount" = $totalPoints * 1000 , <br> "reasonCode" = lambda.reasonCode, <br> "userContextData" = lambda.userData <br> couponAmount = lambda.couponDenom,  <br> couponReference = lambda.couponNbr <br> loyaltyProgramReference = $loyaltyProgram
+            Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference, <br> "organizationReference" = responseAPIAccountDetails.organizationType, <br> "creditCardId" = libparam.cardNumber, <br> "accountNumber" = responseAPIAccountDetails.loanManagementAccountNumber, <br> "schemeReference" = responseAPIAccountDetails.loanManagementScheme, <br> "loyaltyPointsAmount" = $totalPoints * 1000 , <br> "reasonCode" = libparam.reasonCode, <br> "userContextData" = libparam.userData <br> couponAmount = libparam.couponDenom,  <br> couponReference = libparam.couponNbr <br> loyaltyProgramReference = $loyaltyProgram
 
             API ->> redeemPoints1: Consume API Initiate Loyalty Points
             Note right of API: Body: <br> customerLegalReference, organizationReference, creditCardId, <br> accountNumber, schemeReference, rewardItemReference, <br> loyaltyPointsAmount, loyaltyPointsAmount, reasonCode, <br> userContextData, couponAmount, couponReference, <br> loyaltyProgramReference

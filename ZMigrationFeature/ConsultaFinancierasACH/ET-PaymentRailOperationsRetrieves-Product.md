@@ -122,7 +122,7 @@ sequenceDiagram
     participant WPABGT as Wrapper Proxy Abanks GT <br> PKG: OSB_K_CONFINANCIERAS <br> SP: TOPLEVEL$OSB_P_CON_FINANCIERA
     participant WPABPA as Wrapper Proxy Abanks PA <br> PKG: OSB_K_CONFINANCIERAS <br> SP: TOPLEVEL$OSB_P_CON_FINANCIERA
     participant WCTS as Wrapper CTS NI <br> OpConsultaFinacierasACH
-    participant Lambda as Lambda Parámetros <br>
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
 
     Note over Consumidor, Errors: Flujo Honduras Core (HN01) - ConsultaFinancierasACH | HN02 - Ficopen <br> | GT01 - Proxy Abanks GT | PA01 - Proxy Abanks PA | NI01 - CTS Nicaragua

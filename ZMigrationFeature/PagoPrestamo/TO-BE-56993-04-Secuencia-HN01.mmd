@@ -3,7 +3,7 @@ sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
     participant API as API Pago Préstamo <br> Epica 2267: PagoPrestamo <br> HU 56993:  POST -  /loan-payment/v1/execution
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Lib as Librería Pipeline (ConfigMap)
     participant retriveTransactionDetails as API Consulta Detalles Cuenta <br> HU 3319 <br> GET: /loans-and-deposits/customer-account-retrieves/v1/product/accountIdentification/retrieve-transaction-details
     participant retrieveLoan as API Consulta Detalles Préstamo <br> HU 3239 <br> GET: /loans-and-deposits/loan-retrieves/v1/product/loanReference/retrieve
@@ -29,18 +29,18 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros Librería de parámetros caché local
         Note right of API: Domain: "LOAN_PAYMENT" <br> name: "EXECUTION" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
 
-    else Consulta  parametros en Lambda Parámetros / Parameter Store
+    else Consulta  parametros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "LOAN_PAYMENT" <br> name: "EXECUTION" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
@@ -108,7 +108,7 @@ sequenceDiagram
                         alt If request.transactionReferenceBC != Vacío (Significa que la transacción viene de un corresponsal bancario)
 
                             API->>API: Constrye Request API inititateTransactionTengo
-                            Note over API: body: <br> transactionType = lamda.T24T133.TXNTYPELOANPYMT, <br> debitAccountNumber = request.accountNumber, <br> debitCurrencyCode = request.currencyCode, <br> debitAmount = paymentAmount, <br> creditAccountNumber = lambda.T24T134.HNLCREDITACCTNO, <br> groupAttribute = lamda.paymentGroupAttribute, <br> paymentDetailsDescription = request.loanId, <br> tengoReference = request.transactionReferenceBC
+                            Note over API: body: <br> transactionType = libparam.T24T133.TXNTYPELOANPYMT, <br> debitAccountNumber = request.accountNumber, <br> debitCurrencyCode = request.currencyCode, <br> debitAmount = paymentAmount, <br> creditAccountNumber = libparam.T24T134.HNLCREDITACCTNO, <br> groupAttribute = libparam.paymentGroupAttribute, <br> paymentDetailsDescription = request.loanId, <br> tengoReference = request.transactionReferenceBC
 
                             API->>tengo: Consume API Producto inititateTransactionTengo
                             Note right of API: body: <br> transactionType, <br> debitAccountNumber, <br> debitCurrencyCode, <br> debitAmount, <br> creditAccountNumber, <br> groupAttribute, <br> paymentDetailsDescription, <br> tengoReference
@@ -122,7 +122,7 @@ sequenceDiagram
                         else If response.retriveTransactionDetails.accountCurrency == response.retrieveLoan.currency 
 
                             API->>API: Constrye Request API trasnferBetweemAccounsSameCurrency
-                            Note over API: body: <br> paymentTransactionType = lamda.T24T133.TXNTYPELOANPYMT, <br> debtorAccountReference = request.accountNumber , <br> currencyCode = request.currencyCode, <br> paymentAmount = request.paymentAmount, <br> creditorAccountReference = lambda.T24T134.HNLCREDITACCTNO, <br> businessUnitReference = lambda.orderingBank <br> transactionDescription = concat("PTM-", request.loanId)
+                            Note over API: body: <br> paymentTransactionType = libparam.T24T133.TXNTYPELOANPYMT, <br> debtorAccountReference = request.accountNumber , <br> currencyCode = request.currencyCode, <br> paymentAmount = request.paymentAmount, <br> creditorAccountReference = libparam.T24T134.HNLCREDITACCTNO, <br> businessUnitReference = libparam.orderingBank <br> transactionDescription = concat("PTM-", request.loanId)
 
                             API->>transfer1: Consume API Producto trasnferBetweemAccounsSameCurrency
                             Note right of API: body: <br> paymentTransactionType, <br> debtorAccountReference, <br> currencyCode, <br> paymentAmount, <br> creditorAccountReference, <br> businessUnitReference <br> transactionDescription
@@ -136,7 +136,7 @@ sequenceDiagram
                         else If request.debitCreditIndicator == "CREDIT"
 
                             API->>API: Constrye Request API trasnferCredit
-                            Note over API: body: paymentTransactionType = lamda.T24T133.TXNTYPELOANPYMT <br>  debtorAccountReference = request.accountNumber, <br> creditorAccountReference = lambda.T24T134.HNLCREDITACCTNO, <br> creditorAmount = request.paymentAmount
+                            Note over API: body: paymentTransactionType = libparam.T24T133.TXNTYPELOANPYMT <br>  debtorAccountReference = request.accountNumber, <br> creditorAccountReference = libparam.T24T134.HNLCREDITACCTNO, <br> creditorAmount = request.paymentAmount
 
                             API->>transfer2: Consume API Producto trasnferCredit
                             Note right of API: body: <br> paymentTransactionType, <br> debtorAccountReference, <br> creditorAccountReference, <br> creditorAmount
@@ -150,7 +150,7 @@ sequenceDiagram
                         else
 
                             API->>API: Constrye Request API trasnferAccount
-                            Note over API: body: transactionType = lamda.T24T133.TXNTYPELOANPYMT <br>  debitAccountReference = request.accountNumber, <br> creditAccountReference = lambda.T24T134.HNLCREDITACCTNO, <br> debitAmount = request.paymentAmount
+                            Note over API: body: transactionType = libparam.T24T133.TXNTYPELOANPYMT <br>  debitAccountReference = request.accountNumber, <br> creditAccountReference = libparam.T24T134.HNLCREDITACCTNO, <br> debitAmount = request.paymentAmount
 
                             API->>transfer3: Consume API Producto trasnferAccount
                             Note right of API: body: <br> paymentTransactionType, <br> debitAccountReference, <br> creditAccountReference, <br> debitAmount
@@ -181,7 +181,7 @@ sequenceDiagram
                         alt If request.transactionReferenceBC != Vacío (Significa que la transacción viene de un corresponsal bancario)
 
                             API->>API: Constrye Request API executeLoanPayment
-                            Note over API: body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentAmount, <br> paymentType = request.paymentType, <br> accountNumber = request.accountNumber, <br> interfaceReferenceNumber = request.interfaceReferenceNumber, <br> transactionReference = $transactionReference, <br> transactionReferenceBC = request.transactionReferenceBC, <br> paymentDescription = lambda.desciption-cb
+                            Note over API: body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentAmount, <br> paymentType = request.paymentType, <br> accountNumber = request.accountNumber, <br> interfaceReferenceNumber = request.interfaceReferenceNumber, <br> transactionReference = $transactionReference, <br> transactionReferenceBC = request.transactionReferenceBC, <br> paymentDescription = libparam.desciption-cb
 
                             API->>loanPayment: Consume API Producto executeLoanPayment
                             Note right of API: body: <br> loanId, <br> paymentAmount, <br> paymentType, <br> accountNumber, <br> interfaceReferenceNumber, <br> transactionReference, <br> transactionReferenceBC, <br> paymentDescription
@@ -296,7 +296,7 @@ sequenceDiagram
             else If response.retrieveLoan HTTP CODE == 200 
 
                 API->>API: Constrye Request API cashCreditAccount
-                Note over API: body: <br> currencyCode = request.currencyCode, <br> paymentAmount = request.paymentAmount, <br> authorizationsNumber = lambda.noOfAuth, <br> accountGroup = lambda.accountGroup, <br> accountMultiple = lambda.accountMultiple
+                Note over API: body: <br> currencyCode = request.currencyCode, <br> paymentAmount = request.paymentAmount, <br> authorizationsNumber = libparam.noOfAuth, <br> accountGroup = libparam.accountGroup, <br> accountMultiple = libparam.accountMultiple
 
                 API->>cashCreditAccount: Consume API Producto cashCreditAccount
                 Note right of API: body: <br> currencyCode, <br> paymentAmount, <br> authorizationsNumber, <br> accountGroup, <br> accountMultiple
@@ -391,7 +391,7 @@ sequenceDiagram
             else If response.retrieveLoan HTTP CODE == 200 
 
                 API->>API: Constrye Request API checkDeposit
-                Note over API: body: <br> chequeNumber = request.chequeNumber, <br> bankCode = request.bankCode, <br> loanCurrency = request.currencyCode, <br> paymentAmount = request.paymentAmount, <br> noOfAuth = lambda.chequeNoOfAuth, <br> groupAttribute = lambda.groupAttribute, <br> multiGroupAttribute = lambda.multiGroupAttribute, <br> transactionReference = lambda.transaction
+                Note over API: body: <br> chequeNumber = request.chequeNumber, <br> bankCode = request.bankCode, <br> loanCurrency = request.currencyCode, <br> paymentAmount = request.paymentAmount, <br> noOfAuth = libparam.chequeNoOfAuth, <br> groupAttribute = libparam.groupAttribute, <br> multiGroupAttribute = libparam.multiGroupAttribute, <br> transactionReference = libparam.transaction
 
                 API->>cheque: Consume API Producto checkDeposit
                 Note right of API: body: <br> chequeNumber, <br> bankCode, <br> loanCurrency, <br> paymentAmount, <br> noOfAuth, <br> groupAttribute, <br> multiGroupAttribute, <br> transactionReference

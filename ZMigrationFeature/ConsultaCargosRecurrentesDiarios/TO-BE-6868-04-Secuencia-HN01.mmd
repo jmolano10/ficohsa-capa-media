@@ -4,11 +4,11 @@ sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
     participant API as API Consulta Cargos Recurrentes Diarios <br> Epica 2376: ConsultaCargosRecurrentesDiarios <br> HU 6868:  POST -  /cards/credit-card-transaction-retrieves/v1/retrieve-recurring-charges
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant parameter as Paramter Store
     participant secret as Secret Manager
     participant Lib as Librería Pipeline (ConfigMap)
-    participant master as BD Masterdata <br> Schema: OSB <br> SP: OSBConDatoPlanes 
+    participant master as WS VisaNet <br> Operation: QueryCardTransaction
     participant Errors as Control de Errores <br> Librería de mapeo de errores
     
     Note over Consumidor, Errors: Flujo Multiregion (HN01 | NI01) - Consulta Cargos Recurrentes Diarios
@@ -23,31 +23,31 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros de Lambda Parámetros en caché local
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
         Note right of API: Domain: "CREDIT_CARD_TRANSACTION_RETRIEVES" <br> name: "RETRIEVE_RECURRING_CHARGES" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros de Lambda Parámetros en Cahé Local
+        CL->>API: Obtiene parámetros de Librería de parámetros en Cahé Local
         Note left of CL: Obtiene parámetros de regionalización, conexión y negocio
 
         API->>CL: Consultar parámetros de Parameter Store en caché local
-        Note right of API: paranName = lambda.param-name
+        Note right of API: paranName = libparam.param-name
 
         CL->>API: Obtiene parámetros de Parameter Store en Cahé Local
         Note left of CL: Obtiene parámetros de conexión a BD: ip, port, basePath
 
-    else Consulta  parametros en Lambda Parámetros 
+    else Consulta  parametros en Librería de parámetros 
 
         API->>Lambda: Consultar parámetros de lambda parámetros
         Note right of API: Domain: "CREDIT_CARD_TRANSACTION_RETRIEVES" <br> name: "RETRIEVE_RECURRING_CHARGES" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros de Lambda Parámetros
+        Lambda->>API: Obtiene parámetros de Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización, conexión y negocio
 
         API->>CL: Guarda parámetros de lambda Parámetros en caché local
         Note right of API: value.param-name 
 
         API->>parameter: Consultar parámetros del Parameter Store
-        Note right of API: paranName = lambda.param-name
+        Note right of API: paranName = libparam.param-name
 
         parameter->>API: Obtiene parámetros del Parameter Store
         Note left of parameter: Obtiene parámetros de conexión a BD: ip, port, basePath
@@ -69,23 +69,23 @@ sequenceDiagram
     Note left of Lib: Constantes: <br> operationHND <br> operationNIC
 
     API->>secret: Consulta secretos para conexión a base de datos
-    Note right of API: secretName = lambda.secret-name
+    Note right of API: secretName = libparam.secret-name
     
     secret->>API: Retorna secretos
     Note left of secret: User, Password
 
     API->>API: Aplica Patron Strategy
 
-    API->>API: Construye Request WS Visa Transaction
-    Note over API: Endpoint: <br> Valor de sourceBank.param-name (concat(host, port, basePath)) <br> Mapeo Campos: <br> strUser = secret.user <br> strPassword = secret.password <br> strCardacqMatrizId = lambda.matrix-afiliation <br> strTerminalMatrizId = lambda.matrix-terminal <br> strCardNumber = request.creditCardId <br> strDateIn = current-date(format("yyyy-MM-dd")) <br> strDateOut = current-date(format("yyyy-MM-dd"))
+    API->>API: Construye Request WS Visa Transaction - OP: QueryCardTransaction
+    Note over API: Endpoint: <br> Valor de sourceBank.param-name (concat(host, port, basePath)) <br> Mapeo Campos: <br> strUser = secret.user <br> strPassword = secret.password <br> strCardacqMatrizId = libparam.matrix-afiliation <br> strTerminalMatrizId = libparam.matrix-terminal <br> strCardNumber = request.creditCardId <br> strDateIn = current-date(format("yyyy-MM-dd")) <br> strDateOut = current-date(format("yyyy-MM-dd"))
 
-    API->>master: Consume WS Visa Transaction
+    API->>master: Consume WS Visa Transaction - OP: QueryCardTransaction
     Note right of API: Endpoint, strUser, <br> strPassword, strCardacqMatrizId, <br> strTerminalMatrizId, strCardNumber, <br> strDateIn, strDateOut
 
-    master->>API: Response WS Visa Transaction
+    master->>API: Response WS Visa Transaction - OP: QueryCardTransaction
     Note over master: Response: strQueryCode, strQueryMessage, <br> strResponseDetail (Complex)
 
-    API->>API: Evalúa Response WS Visa Transaction
+    API->>API: Evalúa Response WS Visa Transaction - OP: QueryCardTransaction
 
     alt If strQueryCode == '000'
 

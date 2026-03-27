@@ -1,4 +1,4 @@
-# DynamoDB Parameter - Lambda Parámetros
+# DynamoDB Parameter - Librería de parámetros
 
 ```json
 //REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO

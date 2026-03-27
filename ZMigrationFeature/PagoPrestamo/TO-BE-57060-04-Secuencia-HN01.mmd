@@ -4,7 +4,7 @@ sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
     participant API as API Depósito Cheque <br> Epica 2267: PagoPrestamo <br> HU 57060:  POST - /loans-and-deposits/current-account-mgmt/v1/initiate-cheque-deposit
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Lib as Librería Pipeline (ConfigMap)
     participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
     participant wrapper as Wrapper T24 V2 <br/> OP: Depositocombinado 
@@ -23,18 +23,18 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros Librería de parámetros caché local
         Note right of API: Domain: "CURRENT_ACCOUNT_MGMT" <br> name: "INITIATE_CHEQUE_DEPOSIT" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
  
-    else Consulta  parametros en Lambda Parámetros / Parameter Store
+    else Consulta  parametros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "CURRENT_ACCOUNT_MGMT" <br> name: "INITIATE_CHEQUE_DEPOSIT" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
@@ -58,12 +58,12 @@ sequenceDiagram
     alt If request.loanCurrency == "HNL" 
 
         API->>API: Selecciona Cuenta de Depósito Lempiras
-        Note over API: $depositAccount = lambda.T24T032.HNLOBCHQACCTNO
+        Note over API: $depositAccount = libparam.T24T032.HNLOBCHQACCTNO
 
     else  If request.loanCurrency == "USD"
 
         API->>API: Selecciona Cuenta de Depósito Dólares
-        Note over API: $depositAccount = lambda.T24T032.USDOBCHQACCTNO
+        Note over API: $depositAccount = libparam.T24T032.USDOBCHQACCTNO
 
     else If request.loanCurrency != "HNL" o "USD"
 
@@ -112,7 +112,7 @@ sequenceDiagram
             Note over API: Mapeo uno a uno campos del response Wrapper
 
             API->>event: Envía envento al eventBridge API Idempotencia 
-            Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: success 
+            Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: libparam.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: success 
 
             API->>Consumidor: Response Exitoso
             Note left of API: HTTP 200: Response Body 
@@ -120,7 +120,7 @@ sequenceDiagram
         else If success != false 
 
             API->>event: Envía envento al eventBridge API Idempotencia 
-            Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: lambda.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: TimeOut
+            Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: libparam.caller-service <br> detail-type: "provider.response" <br> request: {request} <br> Transaccion: TimeOut
 
             API->> Errors: Mapear código de error
 

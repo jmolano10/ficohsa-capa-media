@@ -108,7 +108,7 @@ sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
     participant API as API Consulta Estado Lote Pagos Masivos v1 <br> Epica 54856: ConsultaEstadoLotePagosMasivos <br> HU 55039:  GET - /payments/payment-execution-batch-retrieve/v1/retrieve-status
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Parameter as Parameter Store
     participant Lib as Librería Pipeline (ConfigMap)
     participant Abanks as Wrapper ProxyAbanks <br/> SP: SP: OSB_P_VALIDA_ACCESO_PMS o <br/> SP: PMS_P_CON_ESTADO_LOTE
@@ -128,31 +128,31 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros Librería de parámetros caché local
         Note right of API: Domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE" <br> name: "v1-retrieve-status" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
  
         API->>CL: Consultar parámetros Parameter Store caché local
-        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-hn o <br> lambda.param-name-cons-est-lote
+        Note right of API: Param Name: <br> libparam.param-name-wrapper-proxy-abanks-hn o <br> libparam.param-name-cons-est-lote
 
         CL->>API: Obtiene parámetros Parameter Store Caché Local
         Note left of CL: Obtiene parámetros de consumo a Wrapper ProxyAbanks
 
-    else Consulta  parametros en Lambda Parámetros / Parameter Store
+    else Consulta  parametros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE" <br> name: "v1-retrieve-status" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
         Note right of API: value.param-name 
 
         API->>Parameter: Consultar parámetros Parameter Store
-        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-hn o <br> lambda.param-name-cons-est-lote
+        Note right of API: Param Name: <br> libparam.param-name-wrapper-proxy-abanks-hn o <br> libparam.param-name-cons-est-lote
 
         Parameter->>API: Obtiene parámetros Parameter Store
         Note left of Parameter: Obtiene parámetros de consumo a Wrapper ProxyAbanks
@@ -176,7 +176,7 @@ sequenceDiagram
         Note left of Lib: Constantes: "procedureNameValidaAcceso", "procedureNameConsultaLote"
 
         API->>API: Construye Request Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
-        Note over API: Mapeo: <br> CUSTOMER_ID = request.customerReference <br> USER_NAME = header.Application-User <br> procedureName = const.procedureNameValidaAcceso <br> + Campos adicionales obtenidos lambda.param-name-wrapper-proxy-abanks-hn 
+        Note over API: Mapeo: <br> CUSTOMER_ID = request.customerReference <br> USER_NAME = header.Application-User <br> procedureName = const.procedureNameValidaAcceso <br> + Campos adicionales obtenidos libparam.param-name-wrapper-proxy-abanks-hn 
 
         API->>Abanks: Consume Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
         Note over API, Lambda: connectionType, operationType, catalogueName, procedureName, params(CUSTOMER_ID, USER_NAME)
@@ -189,7 +189,7 @@ sequenceDiagram
         alt Si response.ERROR_CODE = "SUCCESS" (Acceso válido)
 
             API->>API: Construye Request Wrapper ProxyAbanks - PMS_P_CON_ESTADO_LOTE
-            Note over API: Mapeo: <br> PV_CODIGOCLIENTE = request.customerReference <br> PN_NUMEROLOTE = request.bankBatchId <br> PD_FECINGRESO = request.batchUploadDate <br> procedureName = const.procedureNameConsultaLote <br> + Campos adicionales obtenidos lambda.param-name-wrapper-proxy-abanks-hn
+            Note over API: Mapeo: <br> PV_CODIGOCLIENTE = request.customerReference <br> PN_NUMEROLOTE = request.bankBatchId <br> PD_FECINGRESO = request.batchUploadDate <br> procedureName = const.procedureNameConsultaLote <br> + Campos adicionales obtenidos libparam.param-name-wrapper-proxy-abanks-hn
 
             API->>Abanks: Consume Wrapper ProxyAbanks - PMS_P_CON_ESTADO_LOTE
             Note over API, Lambda: connectionType, operationType, catalogueName, procedureName, params(PV_CODIGOCLIENTE, PN_NUMEROLOTE, PD_FECINGRESO)
@@ -230,7 +230,7 @@ sequenceDiagram
         Note left of Lib: operation = "consultarLote"
 
         API->>API: Construye Request Wrapper Pagos Msaivos OLD
-        Note over API: data(fechaRegistroLote = request.batchUploadDate, <br> idLote = lambda.queryValue, <br> idCliente = request.customerReference, <br> idBancoOrigen = header.sourceBanks) <br> + Campos adicionales"key": "param-name-cons-xrs"
+        Note over API: data(fechaRegistroLote = request.batchUploadDate, <br> idLote = libparam.queryValue, <br> idCliente = request.customerReference, <br> idBancoOrigen = header.sourceBanks) <br> + Campos adicionales"key": "param-name-cons-xrs"
 
         API->>pagosOLD: Consume Wrapper Pagos Masivos OLD - informacionTarjetas
         Note right of API: operation, data, paramName
@@ -279,7 +279,7 @@ Este diagrama de secuencia describe el flujo de la operación de consulta de est
 | Consumidor/Aplicación | Sistema o aplicación cliente que invoca la API |
 | API Consulta Estado Lote Pagos Masivos v1 | Microservicio principal que orquesta la consulta (Épica 54856: ConsultaEstadoLotePagosMasivos, HU 55039) |
 | Caché Local | Almacenamiento en caché local para parámetros de configuración y consumo |
-| Lambda de Parámetros | Función Lambda que provee parámetros de regionalización y negocio |
+| Librería de parámetros | Función Lambda que provee parámetros de regionalización y negocio |
 | Parameter Store | AWS Systems Manager Parameter Store con parámetros de consumo hacia los backends (Wrappers) |
 | Librería Pipeline (ConfigMap) | Librería que provee constantes de configuración almacenadas en ConfigMap |
 | Wrapper ProxyAbanks | Backend para Honduras que ejecuta los Stored Procedures: `OSB_P_VALIDA_ACCESO_PMS` (validación de acceso) y `PMS_P_CON_ESTADO_LOTE` (consulta estado del lote) |
@@ -298,16 +298,16 @@ Este diagrama de secuencia describe el flujo de la operación de consulta de est
 3. **Obtención de Parámetros — Caché Local vs Lambda/Parameter Store (pasos 4-11):**
 
    - **Escenario A — Parámetros disponibles en caché local:**
-     - Se consultan los parámetros de la Lambda de Parámetros desde el caché local utilizando: domain: `PAYMENT_EXCECUTION_BATCH_RETRIEVE`, name: `v1-retrieve-status`, country: `XRS`.
+     - Se consultan los parámetros de la Librería de parámetros desde el caché local utilizando: domain: `PAYMENT_EXCECUTION_BATCH_RETRIEVE`, name: `v1-retrieve-status`, country: `XRS`.
      - Se obtienen los parámetros de regionalización y negocio.
-     - Se consultan los parámetros de Parameter Store desde el caché local utilizando el Param Name obtenido: `lambda.param-name-wrapper-proxy-abanks-hn` (para Honduras) o `lambda.param-name-cons-est-lote` (para GT/NI/PA).
+     - Se consultan los parámetros de Parameter Store desde el caché local utilizando el Param Name obtenido: `libparam.param-name-wrapper-proxy-abanks-hn` (para Honduras) o `libparam.param-name-cons-est-lote` (para GT/NI/PA).
      - Se obtienen los parámetros de consumo hacia el Wrapper ProxyAbanks o Wrapper Pagos Masivos OLD.
 
    - **Escenario B — Parámetros NO disponibles en caché local:**
-     - Se consultan los parámetros directamente desde la Lambda de Parámetros con: domain: `PAYMENT_EXCECUTION_BATCH_RETRIEVE`, name: `v1-retrieve-status`, country: `XRS`.
+     - Se consultan los parámetros directamente desde la Librería de parámetros con: domain: `PAYMENT_EXCECUTION_BATCH_RETRIEVE`, name: `v1-retrieve-status`, country: `XRS`.
      - Se obtienen los parámetros de regionalización y negocio.
      - Se guardan los parámetros obtenidos en caché local (`value.param-name`).
-     - Se consultan los parámetros de Parameter Store con el Param Name correspondiente: `lambda.param-name-wrapper-proxy-abanks-hn` o `lambda.param-name-cons-est-lote`.
+     - Se consultan los parámetros de Parameter Store con el Param Name correspondiente: `libparam.param-name-wrapper-proxy-abanks-hn` o `libparam.param-name-cons-est-lote`.
      - Se obtienen los parámetros de consumo hacia el Wrapper ProxyAbanks.
      - Se guardan los parámetros de Parameter Store en caché local.
 
@@ -318,14 +318,14 @@ Este diagrama de secuencia describe el flujo de la operación de consulta de est
    - **Consulta de Constantes (pasos 14-15):** La API consulta la Librería Pipeline (ConfigMap) para obtener las constantes necesarias: `procedureNameValidaAcceso` y `procedureNameConsultaLote`.
 
    - **Validación de Acceso — SP `OSB_P_VALIDA_ACCESO_PMS` (pasos 16-19):**
-     - Se construye el request hacia el Wrapper ProxyAbanks con el mapeo: `CUSTOMER_ID` = `request.customerReference`, `USER_NAME` = `header.Application-User`, `procedureName` = `const.procedureNameValidaAcceso`, más campos adicionales obtenidos de `lambda.param-name-wrapper-proxy-abanks-hn`.
+     - Se construye el request hacia el Wrapper ProxyAbanks con el mapeo: `CUSTOMER_ID` = `request.customerReference`, `USER_NAME` = `header.Application-User`, `procedureName` = `const.procedureNameValidaAcceso`, más campos adicionales obtenidos de `libparam.param-name-wrapper-proxy-abanks-hn`.
      - Se consume el Wrapper ProxyAbanks enviando: `connectionType`, `operationType`, `catalogueName`, `procedureName`, `params(CUSTOMER_ID, USER_NAME)`.
      - Se obtiene un response con los campos: `ERROR_CODE` y `ERROR_MESSAGE`.
 
    - **Evaluación del response de Validación de Acceso (paso 20):**
 
      - **Si `ERROR_CODE` = "SUCCESS" (Acceso válido) (pasos 21-27):**
-       - Se construye el request hacia el Wrapper ProxyAbanks para ejecutar el SP `PMS_P_CON_ESTADO_LOTE` con el mapeo: `PV_CODIGOCLIENTE` = `request.customerReference`, `PN_NUMEROLOTE` = `request.bankBatchId`, `PD_FECINGRESO` = `request.batchUploadDate`, `procedureName` = `const.procedureNameConsultaLote`, más campos adicionales obtenidos de `lambda.param-name-wrapper-proxy-abanks-hn`.
+       - Se construye el request hacia el Wrapper ProxyAbanks para ejecutar el SP `PMS_P_CON_ESTADO_LOTE` con el mapeo: `PV_CODIGOCLIENTE` = `request.customerReference`, `PN_NUMEROLOTE` = `request.bankBatchId`, `PD_FECINGRESO` = `request.batchUploadDate`, `procedureName` = `const.procedureNameConsultaLote`, más campos adicionales obtenidos de `libparam.param-name-wrapper-proxy-abanks-hn`.
        - Se consume el Wrapper ProxyAbanks enviando: `connectionType`, `operationType`, `catalogueName`, `procedureName`, `params(PV_CODIGOCLIENTE, PN_NUMEROLOTE, PD_FECINGRESO)`.
        - Se obtiene un response con el campo `optimista` + 17 campos adicionales.
        - Se consulta la **Librería de Homologación** para el campo `result` (domain: `PAYMENT_EXCECUTION_BATCH_RETRIEVE_OPTIMISTA`, name: `CATALOGATE`, value.name: `request.result`), donde `"S"` se homologa a `YES` y `"N"` se homologa a `NO`.
@@ -342,7 +342,7 @@ Este diagrama de secuencia describe el flujo de la operación de consulta de est
    - **Consulta de Constantes (pasos 31-32):** La API consulta la Librería Pipeline (ConfigMap) para obtener las constantes necesarias, obteniendo `operation` = `"consultarLote"`.
 
    - **Consumo del Wrapper Pagos Masivos OLD (pasos 33-35):**
-     - Se construye el request hacia el Wrapper Pagos Masivos OLD con el mapeo: `fechaRegistroLote` = `request.batchUploadDate`, `idLote` = `lambda.queryValue`, `idCliente` = `request.customerReference`, `idBancoOrigen` = `header.sourceBanks`, más campos adicionales del parámetro `param-name-cons-xrs`.
+     - Se construye el request hacia el Wrapper Pagos Masivos OLD con el mapeo: `fechaRegistroLote` = `request.batchUploadDate`, `idLote` = `libparam.queryValue`, `idCliente` = `request.customerReference`, `idBancoOrigen` = `header.sourceBanks`, más campos adicionales del parámetro `param-name-cons-xrs`.
      - Se consume el Wrapper Pagos Masivos OLD (operación `consultarLote`) enviando: `operation`, `data`, `paramName`.
      - Se obtiene un response con el campo `optimista` + 17 campos adicionales.
 

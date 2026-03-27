@@ -4,7 +4,7 @@ sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
     participant API as API Ejectuar Pago Prestamo HN <br> Epica 2267: PagoPrestamo <br> HU 5576:  POST - /payments/payment-execution-maintenance/v1/execute-loan-repayment
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Lib as Librería Pipeline (ConfigMap)
     participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
     participant wrapper as Wrapper ProxyAbanks Multiconexión <br/> SP: TOPLEVEL$OSB_PAG_PRESTAMO_CAJ <br/> SP: OSB_PAG_PRESTAMO_T24
@@ -26,18 +26,18 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros Librería de parámetros caché local
         Note right of API: Domain: "PAYMENT_EXECUTION_MAINTENANCE" <br> name: "execute-loan-repayment" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
 
-    else Consulta  parametros en Lambda Parámetros / Parameter Store
+    else Consulta  parametros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "PAYMENT_EXECUTION_MAINTENANCE" <br> name: "execute-loan-repayment" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
@@ -78,7 +78,7 @@ sequenceDiagram
         alt If request.transactionReferenceBC != vacío (Significa que la transacción viene de un corresponsal bancario)
 
             API->>API: Construye Request Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
-            Note over API: Mapeo: <br> connection { <br> parm = lambda.param-name <br> secm = lambda.secret-name } <br> connectionType = const.connectionType <br> operationType  = const.operationType <br> catalogueName = const.catalogeName <br> procedureName = const.procedureNameCB <br> package = const.packageCB <br> params : { <br> LOAN_NUMBER = request.loanId <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.accountNumber <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> DESCRIPTION = request.paymentDescription <br> USERNAME = header.application-user <br> TRANSACTIONID = request.transactionReference <br> PAYMENT_METHOD = request.paymentType  <br> PAYMENT_TYPE = request.transactionReferenceBC <br> }
+            Note over API: Mapeo: <br> connection { <br> parm = libparam.param-name <br> secm = libparam.secret-name } <br> connectionType = const.connectionType <br> operationType  = const.operationType <br> catalogueName = const.catalogeName <br> procedureName = const.procedureNameCB <br> package = const.packageCB <br> params : { <br> LOAN_NUMBER = request.loanId <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.accountNumber <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> DESCRIPTION = request.paymentDescription <br> USERNAME = header.application-user <br> TRANSACTIONID = request.transactionReference <br> PAYMENT_METHOD = request.paymentType  <br> PAYMENT_TYPE = request.transactionReferenceBC <br> }
 
             API->>wrapper: Consume Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
             Note right of API: connection, connectionType <br> operationType, catalogueName <br> params: { <br> LOAN_NUMBER, PAYMENT_AMOUNT, <br> DEBIT_ACCOUNT, INTERFACE_REFERENCE_NO, <br> DESCRIPTION, USERNAME <br> TRANSACTIONID, PAYMENT_METHOD, PAYMENT_TYPE }
@@ -116,7 +116,7 @@ sequenceDiagram
         else If request.transactionReferenceBC == vacío o no presente (Significa que la transacción la transacción viene de un canal diferente a corresponsal bancario)
 
             API->>API: Construye Request Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
-            Note over API: Mapeo: <br> connection { <br> parm = lambda.param-name <br> secm = lambda.secret-name } <br> connectionType = const.connectionType <br> operationType  = const.operationType <br> catalogueName = const.catalogeName <br> procedureName = const.procedureNameT24 <br> params : { <br> LOAN_NUMBER = request.loanId <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.accountNumber <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> USERNAME = header.application-user <br> TRANSACTIONID = request.transactionReference <br> }
+            Note over API: Mapeo: <br> connection { <br> parm = libparam.param-name <br> secm = libparam.secret-name } <br> connectionType = const.connectionType <br> operationType  = const.operationType <br> catalogueName = const.catalogeName <br> procedureName = const.procedureNameT24 <br> params : { <br> LOAN_NUMBER = request.loanId <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.accountNumber <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> USERNAME = header.application-user <br> TRANSACTIONID = request.transactionReference <br> }
 
             API->>wrapper: Consume Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
             Note right of API: connection, connectionType <br> operationType, catalogueName <br> params: { <br> LOAN_NUMBER, PAYMENT_AMOUNT, <br> DEBIT_ACCOUNT, INTERFACE_REFERENCE_NO, <br> USERNAME, TRANSACTIONID }

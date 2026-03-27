@@ -4,7 +4,7 @@ sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
     participant API as API Consulta Estado Lote Pagos Masivos v1 <br> Epica 54856: ConsultaEstadoLotePagosMasivos <br> HU 55039:  GET - /payments/payment-execution-batch-retrieve/v1/retrieve-status
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Parameter as Parameter Store
     participant Lib as Librería Pipeline (ConfigMap)
     participant Abanks as Wrapper ProxyAbanks <br/> SP: SP: OSB_P_VALIDA_ACCESO_PMS o <br/> SP: PMS_P_CON_ESTADO_LOTE
@@ -25,31 +25,31 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros Librería de parámetros caché local
         Note right of API: Domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE" <br> name: "v1-retrieve-status" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
  
         API->>CL: Consultar parámetros Parameter Store caché local
-        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-hn o <br> lambda.param-name-cons-est-lote
+        Note right of API: Param Name: <br> libparam.param-name-wrapper-proxy-abanks-hn o <br> libparam.param-name-cons-est-lote
 
         CL->>API: Obtiene parámetros Parameter Store Caché Local
         Note left of CL: Obtiene parámetros de consumo a Wrapper ProxyAbanks
 
-    else Consulta  parametros en Lambda Parámetros / Parameter Store
+    else Consulta  parametros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "PAYMENT_EXCECUTION_BATCH_RETRIEVE" <br> name: "v1-retrieve-status" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
         Note right of API: value.param-name 
 
         API->>Parameter: Consultar parámetros Parameter Store
-        Note right of API: Param Name: <br> lambda.param-name-wrapper-proxy-abanks-hn o <br> lambda.param-name-cons-est-lote
+        Note right of API: Param Name: <br> libparam.param-name-wrapper-proxy-abanks-hn o <br> libparam.param-name-cons-est-lote
 
         Parameter->>API: Obtiene parámetros Parameter Store
         Note left of Parameter: Obtiene parámetros de consumo a Wrapper ProxyAbanks
@@ -73,7 +73,7 @@ sequenceDiagram
         Note left of Lib: Constantes: "procedureNameValidaAcceso", "procedureNameConsultaLote"
 
         API->>API: Construye Request Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
-        Note over API: Mapeo: <br> CUSTOMER_ID = request.customerReference <br> USER_NAME = header.Application-User <br> procedureName = const.procedureNameValidaAcceso <br> + Campos adicionales obtenidos lambda.param-name-wrapper-proxy-abanks-hn 
+        Note over API: Mapeo: <br> CUSTOMER_ID = request.customerReference <br> USER_NAME = header.Application-User <br> procedureName = const.procedureNameValidaAcceso <br> + Campos adicionales obtenidos libparam.param-name-wrapper-proxy-abanks-hn 
 
         API->>CW: Log Request Wrapper ProxyAbanks - OSB_P_VALIDA_ACCESO_PMS
         Note right of API: Logea todos los campos del request para monitoreo y trazabilidad
@@ -92,7 +92,7 @@ sequenceDiagram
         alt Si response.ERROR_MESSAGE == Vacío (Acceso válido)
 
             API->>API: Construye Request Wrapper ProxyAbanks - PMS_P_CON_ESTADO_LOTE
-            Note over API: Mapeo: <br> PV_CODIGOCLIENTE = request.customerReference <br> PN_NUMEROLOTE = request.bankBatchId <br> PD_FECINGRESO = request.batchUploadDate <br> procedureName = const.procedureNameConsultaLote <br> + Campos adicionales obtenidos lambda.param-name-wrapper-proxy-abanks-hn
+            Note over API: Mapeo: <br> PV_CODIGOCLIENTE = request.customerReference <br> PN_NUMEROLOTE = request.bankBatchId <br> PD_FECINGRESO = request.batchUploadDate <br> procedureName = const.procedureNameConsultaLote <br> + Campos adicionales obtenidos libparam.param-name-wrapper-proxy-abanks-hn
 
             API->>CW: Log Request Wrapper ProxyAbanks - OSB_P_CON_ESTADO_LOTE
             Note right of API: Logea todos los campos del request para monitoreo y trazabilidad

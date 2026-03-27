@@ -4,7 +4,7 @@ sequenceDiagram
     participant Consumidor as Consumidore/Aplicación
     participant API as API Redención de Puntos <br> Epica 7419: RedencionPuntosLealtad <br>  POST - /redeem-loyalty-points/v1/initiate
     participant CL as Caché Local
-    participant Lambda as Lambda de parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Parameter as Parameter Store
     participant creditCardInfo as API Retrieve Info Card <br> HU 55701: GET - /operational-services/issued-dev-admin-retrieves/v1/retrieve-info-card
     participant Homologador as Liberería de <br> Homologación
@@ -30,31 +30,31 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros Librería de parámetros caché local
         Note right of API: Domain: "REDEEM_LOYALTY_POINTS" <br> name: "initiate" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Consultar parámetros Parameter Store caché local
-        Note right of API: Param Name: lambda.param-name
+        Note right of API: Param Name: libparam.param-name
 
         CL->>API: Obtiene parámetros Parameter Store Caché Local
         Note left of CL: Obtiene parámetros de consumo a SP OSBINSTransaccionRedencion
 
-    else Consulta  parametros en Lambda Parámetros
+    else Consulta  parametros en Librería de parámetros
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "REDEEM_LOYALTY_POINTS" <br> name: "initiate" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
         Note right of API: Parámetros de regionalización y negocio
 
         API->>Parameter: Consultar parámetros Parameter Store
-        Note right of API: Param Name: lambda.param-name
+        Note right of API: Param Name: libparam.param-name
 
         Parameter->>API: Obtiene parámetros Parameter Store
         Note left of Parameter: Obtiene parámetros de consumo a SP OSBINSTransaccionRedencion
@@ -149,7 +149,7 @@ sequenceDiagram
 
                     API->>API: Evalúa Datos obtenidos
 
-                    alt If responseRetrieveInfoCard.cardLogoReference = lambda.logoInfinite AND request.loyaltyProgramReference != vacío
+                    alt If responseRetrieveInfoCard.cardLogoReference = libparam.logoInfinite AND request.loyaltyProgramReference != vacío
 
                         API->>API: Se usa loyaltyProgramReference recibido en el request
                         Note over API: $loyaltyProgram = request.loyaltyProgramReference
@@ -212,7 +212,7 @@ sequenceDiagram
                 alt If rewardRedemptionType == "CASH"
 
                     API ->> API: Construye Request API pointsConversion
-                    Note over API: Mapeo: <br> "cardLogoReference" = responseAPIRetrieveInfoCard.cardLogoReference, <br> "merchantReference" = request.merchantReference, <br> "merchantCategoryType" = request.merchantCategoryType, <br> "terminalReference" = request.terminalReference, <br> "conversionType" = lambda.conversionType, <br> "conversionPointsAmount" = request.rewardRedemptionAmount
+                    Note over API: Mapeo: <br> "cardLogoReference" = responseAPIRetrieveInfoCard.cardLogoReference, <br> "merchantReference" = request.merchantReference, <br> "merchantCategoryType" = request.merchantCategoryType, <br> "terminalReference" = request.terminalReference, <br> "conversionType" = libparam.conversionType, <br> "conversionPointsAmount" = request.rewardRedemptionAmount
 
                     API ->> conversion: Consume API pointsConversion
                     Note right of API: cardLogoReference, merchantReference, merchantCategoryType, terminalReference, conversionType, conversionPointsAmount
@@ -250,7 +250,7 @@ sequenceDiagram
                 alt If $loyaltyProgram == 1
 
                     API ->> API: Construye Request API Initiate Loyalty Points
-                    Note over API: Mapeo: <br> "customerLegalReference" = responseAPIRetrieveInfoCard.customerLegalReference,  <br> "rewardMatrixItemId" = lambda.matrixId,  <br> "loyaltyPointsAmount" = $totalPoints <br> loyaltyProgramReference = $loyaltyProgram
+                    Note over API: Mapeo: <br> "customerLegalReference" = responseAPIRetrieveInfoCard.customerLegalReference,  <br> "rewardMatrixItemId" = libparam.matrixId,  <br> "loyaltyPointsAmount" = $totalPoints <br> loyaltyProgramReference = $loyaltyProgram
 
                     API ->> redeemPoints1: Consume API Initiate Loyalty Points
                     Note right of API: body: <br> customerLegalReference, rewardMatrixItemId, loyaltyPointsAmount
@@ -282,7 +282,7 @@ sequenceDiagram
                 else If $loyaltyProgram == 2
 
                     API->>Secret: Consulta Secretos para conexion a la BD
-                    Note right of API: secretName: lambda.secret-name
+                    Note right of API: secretName: libparam.secret-name
 
                     Secret->>API: Retorna secretos para conexión a la BD
                     Note left of Secret: user, password
@@ -293,7 +293,7 @@ sequenceDiagram
                     Note left of Lib: package = "dbo" <br> sp = "OSBINSTransaccionRedencion"
                     
                     API ->> API: Construye SP OSBINSTransaccionRedencion
-                    Note over API: Mapeo: <br> NumeroTarjeta = request.creditId, <br> Monto = $totalPoints, <br> Comercio = request.merchantReference, <br> Descripción = lambda.description, <br> Pais = header.sourceBank
+                    Note over API: Mapeo: <br> NumeroTarjeta = request.creditId, <br> Monto = $totalPoints, <br> Comercio = request.merchantReference, <br> Descripción = libparam.description, <br> Pais = header.sourceBank
 
                     API ->> SP: Consume SP OSBINSTransaccionRedencion
                     Note right of API: NumeroTarjeta, Monto, Comercio, Descripción, Pais
@@ -315,10 +315,10 @@ sequenceDiagram
                     else If CodigoError == -1
 
                         API ->> API: Construye Request API Initiate Loyalty Points campo "rewardItemReference"
-                        Note over API: "rewardItemReference" = lambda.rewardItem-{header.Application-User}, <br> si no existe parametrización para header.Application-User entonces <br> "rewardItemReference" = lambda.rewardItem-Default 
+                        Note over API: "rewardItemReference" = libparam.rewardItem-{header.Application-User}, <br> si no existe parametrización para header.Application-User entonces <br> "rewardItemReference" = libparam.rewardItem-Default 
 
                         API ->> API: Construye Request API Initiate Loyalty Points
-                        Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference, <br> "organizationReference" = responseAPIAccountDetails.organizationType, <br> "creditCardId" = lambda.cardNumber, <br> "accountNumber" = responseAPIAccountDetails.loanManagementAccountNumber, <br> "schemeReference" = responseAPIAccountDetails.loanManagementScheme, <br> "loyaltyPointsAmount" = $totalPoints * 1000, <br> "reasonCode" = lambda.reasonCode, <br> "userContextData" = lambda.userData <br> couponAmount = lambda.couponDenom,  <br> couponReference = lambda.couponNbr <br> loyaltyProgramReference = $loyaltyProgram
+                        Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference, <br> "organizationReference" = responseAPIAccountDetails.organizationType, <br> "creditCardId" = libparam.cardNumber, <br> "accountNumber" = responseAPIAccountDetails.loanManagementAccountNumber, <br> "schemeReference" = responseAPIAccountDetails.loanManagementScheme, <br> "loyaltyPointsAmount" = $totalPoints * 1000, <br> "reasonCode" = libparam.reasonCode, <br> "userContextData" = libparam.userData <br> couponAmount = libparam.couponDenom,  <br> couponReference = libparam.couponNbr <br> loyaltyProgramReference = $loyaltyProgram
 
                         API ->> redeemPoints1: Consume API Initiate Loyalty Points
                         Note right of API: Body: <br> customerLegalReference, organizationReference, creditCardId, <br> accountNumber, schemeReference, rewardItemReference, <br> loyaltyPointsAmount, loyaltyPointsAmount, reasonCode, <br> userContextData, couponAmount, couponReference, <br> loyaltyProgramReference
@@ -340,7 +340,7 @@ sequenceDiagram
                         else If HTTP Code == 200
 
                             API ->> API: Construye Request API Available Loyalty Points
-                            Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference,  <br> "institutionName" = lambda.institutionName <br> "detailLevel" = lambda.detailLevel.
+                            Note over API: Mapeo: <br> "customerLegalReference" = responseAPIAccountDetails.customerReference,  <br> "institutionName" = libparam.institutionName <br> "detailLevel" = libparam.detailLevel.
 
                             API ->> getPoints: Consume API Available Loyalty Points
                             Note right of API: Body: <br> customerLegalReference, institutionName, detailLevel

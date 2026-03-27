@@ -4,7 +4,7 @@ sequenceDiagram
     participant API as API Pago Prestamo Corresponsal Bancario <br> Epica 2267: PagoPrestamo <br> HU 57112:  POST - /correspondent-management/v1/execute-loan-repayment
     participant cloudWatch as AWS CloudWatch <br> Registro de logs
     participant CL as Caché Local
-    participant Lambda as Lambda de <br> parámetros
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
     participant Lib as Librería Pipeline (ConfigMap)
     participant wrapper as Wrapper RegionDB <br/> HU 61083 - POST: /wrapper-region-db/v1/execute-procedure <br> SP: REGISTRA_TRANSACCION_CANAL
     participant lambdaSP as Lambda Validación Corresponsales<br/> HU 7761 - ban-xrs-ic-lam-validate-bank-correspondent-{env}
@@ -25,18 +25,18 @@ sequenceDiagram
 
     alt Consulta parametros en caché local
 
-        API->>CL: Consultar parámetros Lambda Parámetros caché local
+        API->>CL: Consultar parámetros Librería de parámetros caché local
         Note right of API: Domain: "CORRESPONDENT_MANAGEMENT" <br> name: "EXECUTE_LOAN_REPAYMENT" <br> country: XRS 
 
-        CL->>API: Obtiene parámetros Lambda Parámetros Cahé Local
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
  
-    else Consulta  parametros en Lambda Parámetros / Parameter Store
+    else Consulta  parametros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
         Note right of API: Domain: "CORRESPONDENT_MANAGEMENT" <br> name: "EXECUTE_LOAN_REPAYMENT" <br> country: XRS 
 
-        Lambda->>API: Obtiene parámetros Lambda Parámetros
+        Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
 
         API->>CL: Guarda parámetros lambda Parámetros en caché local
@@ -56,7 +56,7 @@ sequenceDiagram
     Note left of Lib: Constantes: <br> connectionType <br> operationType <br> catalogueName <br> packageName <br> procedureName
 
     API->>API: Construye request Wrapper RegionDB - SP: REGISTRA_TRANSACCION_CANAL
-    Note over API: Mapeo: <br> connection: { <br> param-name = lambda.param-name <br> secret-name = lambda.secret-name <br> }, <br> connectionType = const.connectionType <br> operationType = const.operationType <br> catalogueName = const.catalogueName <br> packageName = const.packageName <br> procedureName = const.procedureName <br> params: { <br> PV_CORRESPONSAL = header.application-id <br> PN_TIPO_TRANSACCION = lambda.transactionTypeRegister <br> PV_CODIGO_CANAL = lambda.channelCode <br> PN_ESTADO_TRANSACCION = lambda.transactionState <br> PN_MONTO = request.paymentTransactionAmount <br> PV_MONEDA = request.paymentTransactionCurrency <br> PV_CODIGO_PAIS = header.sourceBank <br> PV_CLAVE_CORRESPONSAL = request.correspondentTransactionReference <br> PV_REFERENCIA_T24 = lambda.t24Reference <br> PV_CLAVE_TRANSACCION = request.loanId <br> PV_COD_CORRESPONSAL = header.branch-id <br> PV_PUNTO_VENTA_CORR = request.correspondentLocationReference <br> PV_SUB_PUNTO_VENTA_CORR = request.correspondentSubLocationReference <br> }
+    Note over API: Mapeo: <br> connection: { <br> param-name = libparam.param-name <br> secret-name = libparam.secret-name <br> }, <br> connectionType = const.connectionType <br> operationType = const.operationType <br> catalogueName = const.catalogueName <br> packageName = const.packageName <br> procedureName = const.procedureName <br> params: { <br> PV_CORRESPONSAL = header.application-id <br> PN_TIPO_TRANSACCION = libparam.transactionTypeRegister <br> PV_CODIGO_CANAL = libparam.channelCode <br> PN_ESTADO_TRANSACCION = libparam.transactionState <br> PN_MONTO = request.paymentTransactionAmount <br> PV_MONEDA = request.paymentTransactionCurrency <br> PV_CODIGO_PAIS = header.sourceBank <br> PV_CLAVE_CORRESPONSAL = request.correspondentTransactionReference <br> PV_REFERENCIA_T24 = libparam.t24Reference <br> PV_CLAVE_TRANSACCION = request.loanId <br> PV_COD_CORRESPONSAL = header.branch-id <br> PV_PUNTO_VENTA_CORR = request.correspondentLocationReference <br> PV_SUB_PUNTO_VENTA_CORR = request.correspondentSubLocationReference <br> }
 
     API->>wrapper: Consume Wrapper RegionDB - SP: REGISTRA_TRANSACCION_CANAL
     Note right of API: Request: <br> connection: { <br> param-name, <br> secret-name }, <br> connectionType, <br> operationType, <br> catalogueName, <br> packageName, <br> procedureName, <br> params: { <br> PV_CORRESPONSAL, <br> PN_TIPO_TRANSACCION, <br> PV_CODIGO_CANAL, <br> PN_ESTADO_TRANSACCION, <br> PN_MONTO, <br> PV_MONEDA, <br> PV_CODIGO_PAIS, <br> PV_CLAVE_CORRESPONSAL, <br> PV_REFERENCIA_T24, <br> PV_CLAVE_TRANSACCION, <br> PV_COD_CORRESPONSAL, <br> PV_PUNTO_VENTA_CORR, <br> PV_SUB_PUNTO_VENTA_CORR <br> }
@@ -79,7 +79,7 @@ sequenceDiagram
     else If responseWrapper.data.outputParameters.PV_ERRORCODE == "SUCCESS"
 
         API->>API: Construye request Lambda Valida Corresponsal
-        Note over API: Mapeo: <br> branchId = header.branch-id, <br> country = request.header.soruceBank, <br> transactionType = lambda.transactionTypeValidate
+        Note over API: Mapeo: <br> branchId = header.branch-id, <br> country = request.header.soruceBank, <br> transactionType = libparam.transactionTypeValidate
 
         API->>lambdaSP: Consume Lambda Valida Corresponsal
         Note right of API: branchId, soruceBank, transactionType
@@ -125,7 +125,7 @@ sequenceDiagram
                 else If paymentMechanismType == "CASH"
 
                     API->>API: Construye Request API executePayment
-                    Note over API: Mapeo: headers <br> body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentTransactionAmount, <br> paymentType = lambda.paymentType, <br> accountNumber = lambdaValCorr.debitAccountReference, <br> chequeNumber = request.chequeInstrumentReference, <br> bankCode = request.bankPartyReference, <br> interfaceReferenceNumber = request.externalInterfaceReference, <br> transactionReferenceBC = request.correspondentTransactionReference, <br> currencyCode = request.paymentTransactionCurrency
+                    Note over API: Mapeo: headers <br> body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentTransactionAmount, <br> paymentType = libparam.paymentType, <br> accountNumber = lambdaValCorr.debitAccountReference, <br> chequeNumber = request.chequeInstrumentReference, <br> bankCode = request.bankPartyReference, <br> interfaceReferenceNumber = request.externalInterfaceReference, <br> transactionReferenceBC = request.correspondentTransactionReference, <br> currencyCode = request.paymentTransactionCurrency
 
                     API->>execute: Consume API executePayment
                     Note right of API: loanId, paymentAmount, paymentType, <br> accountNumber, chequeNumber, bankCode, <br> interfaceReferenceNumber, transactionReferenceBC, currencyCode
