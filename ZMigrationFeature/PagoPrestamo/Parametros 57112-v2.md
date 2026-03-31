@@ -11,8 +11,6 @@
       "enabled": true,
       "transactionTypeValidate": "2",
       "paymentType": "ACCOUNT_DEBIT",
-      "param-name": "ban-hnd-ic-comp-parm-connection-region-db-dev",
-      "secret-name": "ban-hnd-ic-comp-secm-connection-trx-asincrono-db-dev",
       "transactionTypeRegister": "4",
       "channelCode": 1,
       "transactionState": "REGISTRADO",
@@ -32,6 +30,7 @@
     }
   ],
   "type": "JSON",
+  "version": "0001",
   "description": "CONFIG OF CORRESPONDENT_MANAGEMENT-EXP BY METHOD",
   "country": "XRS",
   "domain": "CORRESPONDENT_MANAGEMENT-EXP",
@@ -73,7 +72,8 @@
   "operationType": "update",
   "catalogueName": "TRX_BATCH_CB",
   "packageName": "OSB_P_ATB_REGISTRAR_CB",
-  "procedureName": "REGISTRA_TRANSACCION_CANAL"
+  "procedureName": "REGISTRA_TRANSACCION_CANAL",
+  "caller-service": "CORRESPONDENT_MANAGEMENT-EXP-EXCEUTE_LOAN_REPAYMENT"
 }
 ```
 ##### Registro en Dynamo Wrapper RegionDB

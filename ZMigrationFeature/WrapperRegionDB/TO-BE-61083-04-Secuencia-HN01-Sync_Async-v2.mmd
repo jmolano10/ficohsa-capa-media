@@ -1,0 +1,186 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as wrapper Consumidora
+    participant sqsRequest as AWS SQS <br> Cola de Solicitudes <br> ban-xrs-ic-wrp-sqs-wrapper-region-db-in-<env>
+    participant sqsResponse as AWS SQS <br> Cola de Respuestas <br> ban-xrs-ic-wrp-sqs-wrapper-region-db-out-<env>
+    participant wrapper as Wrapper Region DB <br> Epica 59: Componentes transversales <br> HU 61083:  POST -  /wrapper-region-db/v1/execute-procedure
+    participant homologar as Librería de homologación
+    participant lambda as Librería de Parámetros (Método getParameters - NUEVO)
+    participant parameter as Paramter Store
+    participant secret as Secret Manager
+    participant cache as Caché Local
+    participant SP as SP a consumir
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Wrapper Base de Datos Regiondb
+
+    alt Flujo Síncrono (REST)
+
+        Consumidor->>wrapper: REST Request
+        Note right of Consumidor: body: <br> connectionType <br> operationType <br> catalogueName <br> packageName <br> procedureName <br> params { }
+
+        wrapper->>wrapper: Validar Request
+        Note over wrapper: Valida campos obligatorios según ET
+
+        wrapper->>wrapper: Validación exitosa
+
+        wrapper->>homologar: Homologar header.sourceBank
+        Note right of wrapper: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
+
+        homologar->>wrapper: Obtiene sourceBank homologado
+        Note left of homologar: HN01 = HND <br> Otros códigos de país...
+
+        wrapper->>lambda: Consultar parámetros en libería de parámetros
+        Note right of lambda: country = header.sourceBank (Homologado) <br> name = header.caller-service <br> domain = "WRAPPER_REGION_DB" <br> "version": "0001"
+
+        lambda->>wrapper: Obtiene parámetros de libería de parámetros
+        Note left of lambda: param-name, secret-name
+
+        wrapper->>cache: Almacena parámetros de librería de parametros en caché local
+        Note right of wrapper: Almacena param-name, secret-name
+
+        wrapper->>parameter: Consultar parámetros en Paramter Store
+        Note right of wrapper: paramName = libparam.param-name
+
+        parameter->>wrapper: Obtiene parámetros de Parameter Store
+        Note left of parameter: Obtiene parámetros de conexión a BD (host, port, database)
+
+        wrapper->>cache: Almacena parámetros del Paramter Store en caché local
+        Note right of wrapper: Almacena parámetros de conexión a BD (host, port, database)
+
+        wrapper->>secret: Consulta secretos para conexión a servicio OSB
+        Note right of wrapper: secretName = libparam.secret-name
+
+        secret->>wrapper: Retorna secretos
+        Note left of secret: username, password
+
+        wrapper->>cache: Almacena secretos del Secret Manager en caché local
+        Note right of wrapper: Almacena username, password
+
+        wrapper->>wrapper: Construye Request SP request.procedureName
+        Note over wrapper: Mapeo de los campos request.params{} hacia parametros entrada SP <br> schemaDB = request.catalogueName
+
+        wrapper->>SP: Consume SP request.procedureName
+        Note right of wrapper: host, port, database, schemaDB, package, procedureName, params{}
+
+        SP->>wrapper: Response SP request.procedureName
+        Note over SP: Parámetros salida Stored Procedure
+
+        wrapper->>wrapper: Construye response Wrapper
+        Note over wrapper: data.outputParameters = Parámetros Salida SP <br> metadata { <br> procedureName = request.procedureName <br> executionTime = responseTime <br> timestamp = currentDateTime (YYYY-MM-DDTHH:MM:SS)}
+
+        wrapper->>Consumidor: Response Exitoso
+        Note left of wrapper: HTTP 200: Response Body
+
+        Note over Consumidor, Errors: Flujo Alternativo Síncrono - Error
+        activate wrapper
+        alt Exception occurs
+            note over Errors: Error Library Handler
+            activate Errors
+                wrapper->>Errors: Mapear código de error
+                Errors->>wrapper: Retorna código mapeado
+            deactivate Errors
+            activate Consumidor
+                wrapper->>Consumidor: Retorna error
+            deactivate Consumidor
+            Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+        end
+        deactivate wrapper
+
+    else Flujo Asíncrono (Eventos AWS SQS)
+
+        Consumidor->>sqsRequest: Publica mensaje de solicitud
+        Note right of Consumidor: Headers: <br> caller-service <br> Correlation-Id, <br> Body: <br> connectionType <br> operationType <br> catalogueName <br> packageName <br> procedureName <br> params { } <br> responseRequired: true/false
+
+        sqsRequest->>Consumidor: Confirmación de encolado (messageId)
+        Note left of sqsRequest: Consumidor almacena <br> Correlation-Id para <br> correlacionar la respuesta
+
+        wrapper->>sqsRequest: Sondea mensajes (Long Polling)
+        sqsRequest->>wrapper: Entrega mensaje de solicitud
+        Note left of sqsRequest: Entrega mensaje con <br> Correlation-Id y body
+
+        wrapper->>wrapper: Validar Request
+        Note over wrapper: Valida campos obligatorios según ET
+
+        wrapper->>wrapper: Validación exitosa
+
+        wrapper->>homologar: Homologar header.sourceBank
+        Note right of wrapper: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
+
+        homologar->>wrapper: Obtiene sourceBank homologado
+        Note left of homologar: HN01 = HND <br> Otros códigos de país...
+
+        wrapper->>lambda: Consultar parámetros en libería de parámetros
+        Note right of lambda: country = header.sourceBank (Homologado) <br> name = header.caller-service <br> domain = "WRAPPER_REGION_DB" <br> "version": "0001"
+
+        lambda->>wrapper: Obtiene parámetros de libería de parámetros
+        Note left of lambda: param-name, secret-name
+
+        wrapper->>cache: Almacena parámetros de librería de parametros en caché local
+        Note right of wrapper: Almacena param-name, secret-name
+
+        wrapper->>parameter: Consultar parámetros en Paramter Store
+        Note right of wrapper: paramName = libparam.param-name
+
+        parameter->>wrapper: Obtiene parámetros de Parameter Store
+        Note left of parameter: Obtiene parámetros de conexión a BD (host, port, database)
+
+        wrapper->>cache: Almacena parámetros del Paramter Store en caché local
+        Note right of wrapper: Almacena parámetros de conexión a BD (host, port, database)
+
+        wrapper->>secret: Consulta secretos para conexión a servicio OSB
+        Note right of wrapper: secretName = libparam.secret-name
+
+        secret->>wrapper: Retorna secretos
+        Note left of secret: username, password
+
+        wrapper->>cache: Almacena secretos del Secret Manager en caché local
+        Note right of wrapper: Almacena username, password
+
+        wrapper->>wrapper: Construye Request SP request.procedureName
+        Note over wrapper: Mapeo de los campos request.params{} hacia parametros entrada SP <br> schemaDB = request.catalogueName
+
+        wrapper->>SP: Consume SP request.procedureName
+        Note right of wrapper: host, port, database, schemaDB, package, procedureName, params{}
+
+        SP->>wrapper: Response SP request.procedureName
+        Note over SP: Parámetros salida Stored Procedure
+
+        alt If request.responseRequired == true
+
+            wrapper->>wrapper: Construye mensaje de respuesta
+            Note over wrapper: Correlation-Id = header.Correlation-Id <br> data.outputParameters = Parámetros Salida SP <br> metadata { <br> procedureName = request.procedureName <br> executionTime = responseTime <br> timestamp = currentDateTime (YYYY-MM-DDTHH:MM:SS)}
+
+            wrapper->>sqsResponse: Publica mensaje de respuesta
+            Note right of wrapper: Publica en cola salida <br> con Correlation-Id y resultado del SP
+
+            wrapper->>sqsRequest: Elimina mensaje procesado (deleteMessage)
+
+            Consumidor->>sqsResponse: Sondea cola de respuestas (polling por Correlation-Id)
+
+            sqsResponse->>Consumidor: Entrega mensaje de respuesta
+            Note left of sqsResponse: status: 200 <br> Correlation-Id <br> data.outputParameters <br> metadata {}
+
+            Note over Consumidor, Errors: Flujo Alternativo Asíncrono -  Error
+        
+        end
+
+        activate wrapper
+        alt Exception occurs
+            note over Errors: Error Library Handler
+            activate Errors
+                wrapper->>Errors: Mapear código de error
+                Errors->>wrapper: Retorna código mapeado
+            deactivate Errors
+            wrapper->>sqsResponse: Publica mensaje de error
+            Note right of wrapper: Correlation-Id <br> status: error <br> errorCode, errorMessage
+            wrapper->>sqsRequest: Elimina mensaje procesado (deleteMessage)
+            activate Consumidor
+                sqsResponse->>Consumidor: Entrega mensaje de error
+            deactivate Consumidor
+            Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+        end
+        deactivate wrapper
+
+    end

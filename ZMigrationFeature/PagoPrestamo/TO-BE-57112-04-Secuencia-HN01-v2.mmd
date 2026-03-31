@@ -1,0 +1,174 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Pago Prestamo Corresponsal Bancario <br> Epica 2267: PagoPrestamo <br> HU 57112:  POST - /correspondent-management/v1/execute-loan-repayment
+    participant cloudWatch as AWS CloudWatch <br> Registro de logs
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant wrapper as Wrapper RegionDB <br/> HU 61083 - POST: /wrapper-region-db/v1/execute-procedure <br> SP: REGISTRA_TRANSACCION_CANAL
+    participant lambdaSP as Lambda Validación Corresponsales<br/> HU 7761 - ban-xrs-ic-lam-validate-bank-correspondent-{env}
+    participant execute as API Comp Pago Préstamo <br> Epica 2267: PagoPrestamo <br> HU 56993:  POST -  /loan-payment/v1/execution
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Pago Prestamo Corresponsal Bancario
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: header: <br> soruceBank <br> branch-id <br> body: <br> correspondentLocationReference <br> correspondentSubLocationReference <br> loanId, <br> paymentTransactionAmount, <br> paymentTransactionCurrency, <br> paymentMechanismType, <br> debitAccountReference, <br> chequeInstrumentReference, <br> bankPartyReference, <br> externalInterfaceReference, <br> correspondentTransactionReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>cloudWatch: Registra log con request recibido
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Librería de parámetros caché local
+        Note right of API: Domain: "CORRESPONDENT_MANAGEMENT" <br> name: "EXECUTE_LOAN_REPAYMENT" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "CORRESPONDENT_MANAGEMENT" <br> name: "EXECUTE_LOAN_REPAYMENT" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: value.param-name 
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> connectionType <br> operationType <br> catalogueName <br> packageName <br> procedureName <br> caller-service
+
+    API->>API: Construye request Wrapper RegionDB - SP: REGISTRA_TRANSACCION_CANAL
+    Note over API: Mapeo: <br> headers: caller-service = const.caller-service <br> connectionType = const.connectionType <br> operationType = const.operationType <br> catalogueName = const.catalogueName <br> packageName = const.packageName <br> procedureName = const.procedureName <br> params: { <br> PV_CORRESPONSAL = header.application-id <br> PN_TIPO_TRANSACCION = libparam.transactionTypeRegister <br> PV_CODIGO_CANAL = libparam.channelCode <br> PN_ESTADO_TRANSACCION = libparam.transactionState <br> PN_MONTO = request.paymentTransactionAmount <br> PV_MONEDA = request.paymentTransactionCurrency <br> PV_CODIGO_PAIS = header.sourceBank <br> PV_CLAVE_CORRESPONSAL = request.correspondentTransactionReference <br> PV_REFERENCIA_T24 = libparam.t24Reference <br> PV_CLAVE_TRANSACCION = request.loanId <br> PV_COD_CORRESPONSAL = header.branch-id <br> PV_PUNTO_VENTA_CORR = request.correspondentLocationReference <br> PV_SUB_PUNTO_VENTA_CORR = request.correspondentSubLocationReference <br> }
+
+    API->>wrapper: Consume Wrapper RegionDB - SP: REGISTRA_TRANSACCION_CANAL
+    Note right of API: Request: <br> headers: caller-service <br> connectionType, <br> operationType, <br> catalogueName, <br> packageName, <br> procedureName, <br> params: { <br> PV_CORRESPONSAL, <br> PN_TIPO_TRANSACCION, <br> PV_CODIGO_CANAL, <br> PN_ESTADO_TRANSACCION, <br> PN_MONTO, <br> PV_MONEDA, <br> PV_CODIGO_PAIS, <br> PV_CLAVE_CORRESPONSAL, <br> PV_REFERENCIA_T24, <br> PV_CLAVE_TRANSACCION, <br> PV_COD_CORRESPONSAL, <br> PV_PUNTO_VENTA_CORR, <br> PV_SUB_PUNTO_VENTA_CORR <br> }
+
+    wrapper->>API: Response Wrapper RegionDB - SP: REGISTRA_TRANSACCION_CANAL
+    Note left of wrapper: Response: <br> success, <br> data
+
+    API->>API: Evalúa response Wrapper
+
+    alt If responseWrapper.data.outputParameters.PV_ERRORCODE != "SUCCESS"
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según tabla de homologación SP REGISTRA_TRANSACCION_CANAL
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    else If responseWrapper.data.outputParameters.PV_ERRORCODE == "SUCCESS"
+
+        API->>API: Construye request Lambda Valida Corresponsal
+        Note over API: Mapeo: <br> branchId = header.branch-id, <br> country = request.header.soruceBank, <br> transactionType = libparam.transactionTypeValidate
+
+        API->>lambdaSP: Consume Lambda Valida Corresponsal
+        Note right of API: branchId, soruceBank, transactionType
+
+        lambdaSP->>API: Response Lambda Valida Corresponsal
+        Note left of lambdaSP: Response: <br> creditAccountReference, <br> debitAccountReference, <br> permittedCurrencyCode, <br> transactionType, <br> commissionAmount, <br> commissionCurrencyCode, <br> commissionTransactionType, <br> commissionAccountReference
+
+        API->>API: Evalua response Lambda Valida Corresponsal
+
+        alt If lambdaValCorr.success == false
+
+            API->> Consumidor: Retorna error generado por la lambda
+            Note left of API: HTTP 4XX / 5XX
+
+        else If lambdaValCorr.success == true
+
+            API->>API: Evalúa Moneda
+            Note over API: request.paymentTransactionAmount == lambdaValCorr.permittedCurrencyCode
+
+            alt If request.paymentTransactionAmount != lambdaValCorr.permittedCurrencyCode
+
+                API->> Errors: Mapear código de error
+
+                Errors ->> API: Retorna código mapeado
+
+                API->> Consumidor: Retorna error
+                Note left of API: HTTP 422: Moneda inválida para la transacción
+
+            else If request.paymentTransactionAmount == lambdaValCorr.permittedCurrencyCode
+
+                API->>API: Evalúa Método de Pago
+                Note over API: paymentMechanismType == "CASH"
+
+                alt If paymentMechanismType != "CASH"
+
+                    API->> Errors: Mapear código de error
+
+                    Errors ->> API: Retorna código mapeado
+
+                    API->> Consumidor: Retorna error
+                    Note left of API: HTTP 422: Tipo de pago inválido
+                
+                else If paymentMechanismType == "CASH"
+
+                    API->>API: Construye Request API executePayment
+                    Note over API: Mapeo: headers <br> body: <br> loanId = request.loanId, <br> paymentAmount = request.paymentTransactionAmount, <br> paymentType = libparam.paymentType, <br> accountNumber = lambdaValCorr.debitAccountReference, <br> chequeNumber = request.chequeInstrumentReference, <br> bankCode = request.bankPartyReference, <br> interfaceReferenceNumber = request.externalInterfaceReference, <br> transactionReferenceBC = request.correspondentTransactionReference, <br> currencyCode = request.paymentTransactionCurrency
+
+                    API->>execute: Consume API executePayment
+                    Note right of API: loanId, paymentAmount, paymentType, <br> accountNumber, chequeNumber, bankCode, <br> interfaceReferenceNumber, transactionReferenceBC, currencyCode
+
+                    execute->>API: Response API executePayment
+                    Note over execute: Response: <br> paymentExecutionDateTime, loanId, installmentReference, paymentAmount
+
+                    API->>API: Evalúa Response API executePayment
+
+                    alt If data.success == true 
+
+                        API->>API: Construye response API Experiencia
+                        Note over API: Mapeo uno a uno con response API Composición executePayment
+
+                        API->>Consumidor: Response Exitoso
+                        Note left of API: HTTP 200: Response Body 
+
+                    else If data.success == false 
+
+                        API->> Consumidor: Retorna error generado por API Composición executePayment
+                        Note left of API: HTTP 4XX / 5XX 
+
+                    end
+
+                end 
+                
+            end
+
+        end
+
+    end 
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
