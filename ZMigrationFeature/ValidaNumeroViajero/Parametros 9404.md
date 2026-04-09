@@ -84,7 +84,7 @@
     "parm": "ban-xrs-ic-wpr-parm-connection-interfazdev-db-dev",
     "secm": "ban-xrs-ic-wpr-secm-connection-interfaz-sfc-db-dev"
   },
-  "connectionType": "jca",
+  "connectionType": "jdbc",
   "operationType": "query",
   "catalogueName": "SALESFORCE",
   "procedureName": "SFC_VALIDAR_NUMERO_VIAJERO",
