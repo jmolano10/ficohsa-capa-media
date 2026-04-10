@@ -1,0 +1,160 @@
+
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Composición Consulta Consolidada de Riesgo <br> Epica 36: ConsultaConsolidadaRiesgoCliente <br> HU 52:  POST -  /retrieve-customer-risk/v1/retrieve
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
+    participant parameter as Paramter Store
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant secret as Secret Manager
+    participant OSB as Servicio Consultar Remesas OSB 
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Multiregión (HN01 | GT01 | NI01 ) - Consultar Remesas
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> partyLegalEntityReference <br> taxIdentificationNumber <br> givenName <br> familyName <br> partyDateOfBirth <br> userName <br> partyIdentificationDocumentType <br> productCode
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Librería de parámetros caché local
+        Note right of API: Domain: "RETRIEVE_CUSTOMER_RISK" <br> name: "RETRIEVE" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización, conexión y negocio
+
+        API->>CL: Consultar parámetros Paramter Sotre caché local
+        Note right of API: paramName = libparam.param-name
+
+        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
+        Note left of CL: Obtiene parámetros de conexión al serivicio OSB
+
+    else Consulta  parametros en Librería de parámetros / Paramter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "RETRIEVE_CUSTOMER_RISK" <br> name: "RETRIEVE" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización, conexión y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Guarda parámetros de regionalización, conexión y negocio
+
+        API->>parameter: Consultar parámetros Paramter Sotre
+        Note right of API: paramName = libparam.param-name
+
+        parameter->>API: Obtiene parámetros Paramter Sotre
+        Note left of parameter: Obtiene parámetros de conexión al serivicio OSB
+
+        API->>CL: Guarda parámetros Paramter Sotre en caché local
+        Note right of API: Obtiene parámetros de conexión al serivicio OSB
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional Exitosa
+    Note over API: Servicio habilitado para HN01 | GT01 | NI01
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> operationHN, operationGT, operationNI
+
+    API->>API: Aplica patrón strategy para cada país según parámetros de regionalización obtenidos
+
+    API->>secret: Consulta secretos para conexión a servicio OSB
+    Note right of API: secretName = libparam.secret-name (país)
+    
+    secret->>API: Retorna secretos
+    Note left of secret: User, Password
+
+    alt header.sourceBank == HN01 | GT01
+
+        API->>API: Construye Request Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
+        Note over API: enpoint: value.param-name + const.operationHnd |  const.operationGtm <br> header: <br> UserName = secret.User <br> Password = secret.Password <br> sourceBank = header.sourceBank <br> destinationBank = header.destinationBank <br> Body: <br> CUSTOMER_LEGAL_ID = request.partyLegalEntityReference <br> FISCAL_ID = request.taxIdentificationNumber <br> FIRST_NAME = request.givenName <br> LAST_NAME = request.familyName <br> BIRTH_DATE = request.partyDateOfBirth <br> USER_NAME = request.userName <br> PERSON_TYPE = request.partyIdentificationDocumentType <br> PRODUCT_CODE = request.productCode
+
+        API->>OSB: Consume Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
+        Note right of API: endpoint, header, body
+
+        OSB->>API: Response Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
+        Note over OSB: Response: consultaConsolidadaRiesgoClienteResponse
+
+        API->>API: Evalúa Response Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
+
+        alt If successIndicator == "SUCCESS"
+
+            API->>API: Construye response API
+            Note over API: Mapeo uno a uno campos consultaConsolidadaRiesgoClienteResponse a responseBody API
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+
+        else If successIndicator != "SUCCESS"
+
+            API->> Errors: Mapear código de error
+            Note right of API: Mapeo de errores según tabla de homologación
+            
+            Errors ->> API: Retorna código mapeado
+            
+            API->> Consumidor: Retorna error
+            Note left of API: HTTP 4XX / 5XX
+
+        end
+
+    else header.sourceBank == NI01
+
+        API->>API: Construye Request Servicio OSB Dynamo getConsolidatedCustomerRisk
+        Note over API: enpoint: value.param-name + const.operationNic <br> header: <br> UserName = secret.User <br> Password = secret.Password <br> Body: <br> SourceBank = header.sourceBank <br> DestinationBank = header.destinationBank <br> ApplicationId = header.Application-Id <br> Language = header.Accept-Language <br> legalId = request.partyLegalEntityReference <br> Nit = request.taxIdentificationNumber <br> FirstName = request.givenName <br> LastName = request.familyName <br> BirthDate = request.partyDateOfBirth <br> IdType = request.partyIdentificationDocumentType 
+
+        API->>OSB: Consume Servicio OSB Dynamo getConsolidatedCustomerRisk
+        Note right of API: endpoint, header, body
+
+        OSB->>API: Response Servicio OSB Dynamo getConsolidatedCustomerRisk
+        Note over OSB: Response: getConsolidatedCustomerRiskResponse
+
+        API->>API: Evalúa Response Servicio OSB Dynamo getConsolidatedCustomerRisk
+
+        alt If successIndicator == "SUCCESS"
+
+            API->>API: Construye response API
+            Note over API: Mapeo uno a uno campos getConsolidatedCustomerRiskResponse a responseBody API
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+
+        else If successIndicator != "SUCCESS"
+
+            API->> Errors: Mapear código de error
+            Note right of API: Mapeo de errores según tabla de homologación
+            
+            Errors ->> API: Retorna código mapeado
+            
+            API->> Consumidor: Retorna error
+            Note left of API: HTTP 4XX / 5XX
+
+        end
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

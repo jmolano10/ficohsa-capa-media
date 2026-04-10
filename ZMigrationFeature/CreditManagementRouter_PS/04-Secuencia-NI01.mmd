@@ -1,0 +1,139 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as CreditManagementRouter_PS
+    participant DVM as RegionalParameters DVM
+    participant DataWH as DataWareHouseNI
+    participant Rules as RulesManagementNI
+    participant BLAZE as BLAZE Advisor NI
+    participant ErrorSvc as GetErrorMessages_BS
+    participant LogSvc as SetLogInfoService_BS
+
+    Note over Client, LogSvc: Flujo Nicaragua (NI01) - CreditManagementRouter_PS
+
+    Client->>OSB: REST/SOAP Request
+    Note right of Client: Endpoint: v1.0/credit-management<br/>Operation: getConsolidatedCustomerRisk<br/>SourceBank: NI01<br/>DestinationBank: NI01<br/>Currency: NIO
+
+    OSB->>OSB: CommonParams Stage
+    Note right of OSB: Asignar variables:<br/>codigoServicio: '3'<br/>language: ES<br/>sourceBank: NI01<br/>destinationBank: NI01<br/>serviceName: GetConsolidatedCustomerRisk_PS
+
+    OSB->>DVM: Validar Servicio Regional
+    Note right of DVM: Lookup: ServiceName=GetConsolidatedCustomerRisk_PS<br/>Name=SourceBank.NI01.DestinationBank.NI01
+
+    alt Región No Configurada
+        DVM->>OSB: Value != 'Active' o No encontrado
+        OSB->>Client: Error MW-0003: INVALID REGION REQUEST
+        Note left of Client: Nicaragua no está configurada<br/>en RegionalParameters.dvm
+    end
+
+    Note over Client, LogSvc: Configuración Requerida para NI01
+
+    OSB->>OSB: Configurar DVM para NI01
+    Note right of OSB: Agregar entrada en RegionalParameters.dvm:<br/>SourceBank.NI01.DestinationBank.NI01<br/>ServiceName: GetConsolidatedCustomerRisk_PS<br/>Value: Active<br/>Location: DataWareHouseNI/RequestorServices/ProxyServices/v1.0/
+
+    DVM->>OSB: Value = 'Active'
+    DVM->>OSB: Location = DataWareHouseNI/RequestorServices/ProxyServices/v1.0/GetConsolidatedCustomerRisk
+
+    OSB->>OSB: Branch por Operación
+    Note right of OSB: Determinar operación:<br/>getConsolidatedCustomerRisk
+
+    OSB->>OSB: GetConsolidatedRiskPP Pipeline
+    Note right of OSB: Transformar request usando:<br/>Tx_GetConsolidatedCustomerNIRisk_To_consulta_ONBASE_V2.xqy<br/>Agregar campos específicos NI:<br/>- PV_REGION: NI01<br/>- PV_MONEDA_LOCAL: NIO<br/>- Validar formato cédula NI
+
+    OSB->>OSB: Validar Documentos NI01
+    Note right of OSB: Validar cédula: 001-150485-0001A<br/>Patrón: ^[0-9]{3}-[0-9]{6}-[0-9]{4}[A-Z]$<br/>Validar RUC: J0310000000001<br/>Patrón: ^J[0-9]{13}$
+
+    alt Documentos Inválidos NI01
+        OSB->>Client: Error NI-0001: CEDULA NICARAGUENSE INVALIDA
+        Note left of Client: o Error NI-0002: RUC NICARAGUENSE INVALIDO
+    end
+
+    OSB->>DataWH: Dynamic Route
+    Note right of DataWH: Endpoint: GetConsolidatedCustomerRiskNI_PS<br/>Operation: consulta_ONBASE_V2<br/>Parámetros:<br/>- PV_CEDULA: 001-150485-0001A<br/>- PV_RUC: J0310000000001<br/>- PV_NOMBRE: CARLOS<br/>- PV_APELLIDO: MARTINEZ<br/>- PV_FECHA_NACIMIENTO: 1985-04-15<br/>- PV_REGION: NI01
+
+    alt Error en DataWareHouse NI
+        DataWH->>OSB: Error Response
+        OSB->>ErrorSvc: GetErrorMessages Request
+        Note right of ErrorSvc: Parámetros específicos NI:<br/>- codigoErrorSistema: DB_ERROR_NI<br/>- codigoServicio: '3'<br/>- codigoSistema: '1'<br/>- codigoLenguaje: ES
+
+        ErrorSvc->>OSB: Error Mapping Response
+        OSB->>OSB: Transform Error NI
+        Note right of OSB: Tx_ErrorInfo_To_ConsolidatedCustomerRiskNIResponse.xqy<br/>Mapear a estructura NI específica
+
+        OSB->>LogSvc: Log Error Request
+        Note right of LogSvc: Incluir región NI01 en log<br/>- bancoOrigen: NI01<br/>- bancoDestino: NI01
+
+        OSB->>Client: Error Response NI
+        Note left of Client: HTTP Code: 500<br/>ErrorInfo con mensajes en español NI
+    end
+
+    DataWH->>OSB: Success Response NI
+    Note left of DataWH: PV_CODIGO_ERROR: SUCCESS<br/>PV_SCORE_EXTERNO: 620<br/>PV_CALIFICACION: FAIR<br/>PV_NIVEL_RIESGO: MEDIUM_HIGH<br/>PV_SALARIO: 15000.00<br/>PV_EDAD: 39<br/>PV_MONEDA_LOCAL: NIO<br/>PV_FACTOR_CAMBIO: 36.50
+
+    OSB->>OSB: Transform Response NI
+    Note right of OSB: Tx_consulta_ONBASE_V2_To_GetConsolidatedCustomerRiskNIResponse.xqy<br/>Mapear campos específicos NI:<br/>PV_MONEDA_LOCAL → Currency<br/>PV_FACTOR_CAMBIO → ExchangeFactor<br/>Conversiones de moneda NIO
+
+    OSB->>OSB: FlujoSalida Stage
+    Note right of OSB: Verificar ErrorInfo en response NI<br/>Mapear códigos HTTP específicos
+
+    OSB->>Client: Success Response NI
+    Note left of Client: StatusInfo:<br/>- GlobalId: UUID<br/>- SuccessIndicator: SUCCESS<br/>- Messages: Consulta exitosa Nicaragua<br/><br/>GetConsolidatedCustomerRisk:<br/>- ExternalScore: 620<br/>- Qualification: FAIR<br/>- RiskLevel: MEDIUM_HIGH<br/>- Currency: NIO<br/>- ExchangeFactor: 36.50
+
+    Note over Client, LogSvc: Flujo Alternativo - getCreditOffers NI
+
+    Client->>OSB: getCreditOffers Request NI
+    Note right of Client: Operation: getCreditOffers<br/>CustomerInfo con datos NI<br/>ProductNature: PERSONAL_LOAN<br/>Salary en NIO: 15000.00
+
+    OSB->>OSB: CommonParams Stage
+    Note right of OSB: codigoServicio: '8'<br/>serviceName: GetCreditOffers_PS
+
+    OSB->>DVM: Validar Servicio Regional
+    Note right of DVM: Verificar configuración NI01<br/>para GetCreditOffers_PS
+
+    alt Servicio No Configurado para NI01
+        DVM->>OSB: Service not found for NI01
+        OSB->>Client: Error MW-0018: REGION NOT SUPPORTED
+        Note left of Client: GetCreditOffers no configurado<br/>para Nicaragua
+    end
+
+    DVM->>OSB: Location = RulesManagement/RequestorServices/ProxyServices/v1.0/GetCreditOffers
+
+    OSB->>OSB: GetCustomerOffers Pipeline
+    Note right of OSB: Transformar request usando:<br/>Tx_GetCreditOffersNI_To_BLAZE.xqy<br/>Agregar campos NI:<br/>- currency: NIO<br/>- exchangeRate: 36.50<br/>- region: NI01
+
+    OSB->>Rules: Dynamic Route
+    Note right of Rules: Endpoint: GetCreditOffersNI_PS<br/>Datos del cliente NI para evaluación
+
+    Rules->>BLAZE: Execute Rules NI
+    Note right of BLAZE: Evaluar con reglas NI:<br/>- customerId: 001-150485-0001A<br/>- salary: 15000.00 NIO<br/>- age: 39<br/>- externalScore: 620<br/>- productNature: PERSONAL_LOAN<br/>- region: NI01<br/>- currency: NIO<br/>- exchangeRate: 36.50
+
+    BLAZE->>BLAZE: Aplicar Reglas NI
+    Note right of BLAZE: Reglas específicas Nicaragua:<br/>- Tasa base NI: 15.5%<br/>- Score 600-700: +5% = 20.5%<br/>- Límite por salario NIO<br/>- Factores de riesgo locales<br/>- Validaciones regulatorias NI
+
+    BLAZE->>Rules: Rules Result NI
+    Note left of BLAZE: Ofertas calculadas NI:<br/>- ProductCode: PERSONAL_LOAN<br/>- MaxAmount: 180000.00 NIO<br/>- Rate: 18.50%<br/>- Currency: NIO<br/>- Terms: 12,24,36 meses<br/>- AmountUSD: 4931.51
+
+    Rules->>OSB: BLAZE Response NI
+
+    OSB->>OSB: Transform Response NI
+    Note right of OSB: Tx_BLAZE_To_GetCreditOffersNIResponse.xqy<br/>Mapear ofertas NI:<br/>- Conversiones NIO ↔ USD<br/>- Tasas específicas NI<br/>- Límites regionales<br/>- Validaciones regulatorias
+
+    OSB->>Client: getCreditOffers Response NI
+    Note left of Client: GetCreditOffers NI:<br/>- InternalScore: 620<br/>- InternalRiskLevel: MEDIUM_HIGH<br/>- ResolutionOffers:<br/>  * MaxOffer: 180000.00 NIO<br/>  * Rate: 18.50%<br/>  * Currency: NIO<br/>  * For12Months: 160000.00 NIO<br/>  * For24Months: 140000.00 NIO<br/>  * For36Months: 120000.00 NIO
+
+    Note over Client, LogSvc: Transformaciones Clave NI01:
+    Note over Client, LogSvc: 1. Request → consulta_ONBASE_V2 con campos NI (región, moneda, RUC)
+    Note over Client, LogSvc: 2. consulta_ONBASE_V2 → GetConsolidatedCustomerRiskNIResponse
+    Note over Client, LogSvc: 3. Request → BLAZE NI format (moneda, tasa cambio, región)
+    Note over Client, LogSvc: 4. BLAZE NI → GetCreditOffersNIResponse
+    Note over Client, LogSvc: 5. Conversiones NIO ↔ USD automáticas
+    Note over Client, LogSvc: 6. Validaciones documentos NI (cédula, RUC)
+    Note over Client, LogSvc: 7. Reglas de negocio específicas Nicaragua
+    Note over Client, LogSvc: 8. JAR específicos: ConsolidatedCustomerRiskNI.jar, CreditOffersNI.jar
+
+    Note over Client, LogSvc: Configuraciones Requeridas para Implementar NI01:
+    Note over Client, LogSvc: 1. Actualizar RegionalParameters.dvm con entradas NI01
+    Note over Client, LogSvc: 2. Crear proxies específicos NI01
+    Note over Client, LogSvc: 3. Desarrollar transformaciones XQuery NI
+    Note over Client, LogSvc: 4. Configurar business services DataWareHouseNI
+    Note over Client, LogSvc: 5. Implementar validaciones documentos nicaragüenses
+    Note over Client, LogSvc: 6. Configurar reglas BLAZE para Nicaragua

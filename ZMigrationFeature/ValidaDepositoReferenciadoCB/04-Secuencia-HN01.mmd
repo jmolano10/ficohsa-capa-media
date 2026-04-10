@@ -1,0 +1,124 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación CB
+    participant CBProxy as ValidaDepositoReferenciadoCB
+    participant Router as DepositosReferenciados
+    participant CoreProxy as ValidaDepositoReferenciado
+    participant ConsultaCorr as consultarCorresponsalB_db
+    participant ValidaServ as ValidaServicioRegional_db
+    participant ValidaDB as ValidaDepositoReferenciado_db
+    participant MapeoErr as MapeoErrores
+    participant OracleDB as Oracle Database HN
+
+    Note over Client, OracleDB: Flujo Honduras (HN01) - ValidaDepositoReferenciadoCB
+
+    Client->>CBProxy: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>BankingCorrespondent.Id<br/>Body: ACCOUNT, DOCUMENT_INFO
+
+    CBProxy->>CBProxy: Validar Esquema XML
+    Note right of CBProxy: Validar campos obligatorios<br/>ACCOUNT, DOCUMENT_INFO.TYPE, DOCUMENT_INFO.VALUE
+
+    alt Validación Fallida
+        CBProxy->>MapeoErr: Error de Validación (BEA-382505)
+        MapeoErr->>CBProxy: Respuesta de Error Mapeado
+        CBProxy->>Client: SOAP Fault
+    end
+
+    CBProxy->>ConsultaCorr: Consultar Corresponsal Bancario
+    Note right of ConsultaCorr: SP: consultarCorresponsalB<br/>Params: transactionType=7<br/>bankingCorrespId, sourceBank=HN01
+
+    ConsultaCorr->>OracleDB: CALL consultarCorresponsalB(7, CORRESPONDENT_ID, HN01)
+    
+    alt Corresponsal No Válido
+        OracleDB->>ConsultaCorr: PV_CODIGO_MENSAJE != 'SUCCESS'
+        ConsultaCorr->>CBProxy: Error de Corresponsal
+        CBProxy->>Client: Response con Error
+    end
+
+    OracleDB->>ConsultaCorr: PV_CODIGO_MENSAJE = 'SUCCESS'
+    ConsultaCorr->>CBProxy: Validación Exitosa
+
+    CBProxy->>CBProxy: Eliminar BankingCorrespondent del Header
+    Note right of CBProxy: delete ./aut:RequestHeader/BankingCorrespondent
+
+    CBProxy->>Router: Llamar DepositosReferenciados
+    Note right of CBProxy: Operación: validaDepositoReferenciado<br/>Mapeo directo de campos CB a interno
+
+    Router->>CoreProxy: Enrutar a ValidaDepositoReferenciado
+    Note right of Router: Branch por operación SOAP<br/>Enrutamiento a servicio core
+
+    CoreProxy->>CoreProxy: Validar Esquema Interno
+    Note right of CoreProxy: Validar campos obligatorios<br/>del formato interno
+
+    CoreProxy->>ValidaServ: Validar Servicio Regional
+    Note right of ValidaServ: SP: ValidaServicioRegional<br/>ServiceId: FICBCO0311<br/>SourceBank: HN01
+
+    ValidaServ->>OracleDB: CALL ValidaServicioRegional(FICBCO0311, HN01)
+    
+    alt Servicio No Válido para Región
+        OracleDB->>ValidaServ: PV_CODIGO_ERROR != 'SUCCESS'
+        ValidaServ->>CoreProxy: Error Regional
+        CoreProxy->>Router: Response con Error
+        Router->>CBProxy: Response con Error
+        CBProxy->>Client: Response con Error
+    end
+
+    OracleDB->>ValidaServ: PV_CODIGO_ERROR = 'SUCCESS'
+    ValidaServ->>CoreProxy: Validación Exitosa
+
+    CoreProxy->>CoreProxy: Enrutamiento Regional
+    Note right of CoreProxy: Branch: SourceBank = 'HN01'<br/>Pipeline: HN01_request
+
+    CoreProxy->>CoreProxy: Transformar Request (XQuery)
+    Note right of CoreProxy: validaDepositoReferenciadoIN.xq<br/>Mapear DEBTOR_CODE → tipo 1<br/>Otros tipos → tipo 2
+
+    CoreProxy->>ValidaDB: Invocar Stored Procedure
+    Note right of ValidaDB: Package: CBR_K_DEP_REFERENCIADOS<br/>SP: CRB_P_VALIDAR_DEPOSITO_REF<br/>Connection: ConnectionProxyAbanksHN
+
+    ValidaDB->>OracleDB: CALL CRB_P_VALIDAR_DEPOSITO_REF(PV_NUMERO_CUENTA, PV_TIPO_DOCUMENTO, PV_DOCUMENTO)
+    
+    alt Depósito No Encontrado
+        OracleDB->>ValidaDB: PV_CODIGO_RETORNO = '-1'
+        ValidaDB->>CoreProxy: Response con Código -1
+        CoreProxy->>CoreProxy: Error("NO RECORDS", "NO RECORDS FOUND")
+        CoreProxy->>MapeoErr: Mapear Error NO RECORDS
+        MapeoErr->>CoreProxy: Error Mapeado
+        CoreProxy->>Router: Response con Error
+        Router->>CBProxy: Response con Error
+        CBProxy->>Client: Response con Error
+    end
+
+    OracleDB->>ValidaDB: ResultSet con Datos
+    Note left of OracleDB: PV_NUMERO_DOCUMENTO<br/>PV_CUENTA<br/>PT_CODIGO_DEUDOR (Array)<br/>PT_NOMBRE_DEUDOR (Array)<br/>PV_CODIGO_ERROR<br/>PV_CODIGO_RETORNO<br/>PV_MENSAJE_ERROR
+
+    ValidaDB->>CoreProxy: Response Exitoso
+
+    CoreProxy->>CoreProxy: Transformar Response (XQuery)
+    Note right of CoreProxy: validaDepositoReferenciadoOUT.xq<br/>Correlacionar arrays por índice:<br/>PT_CODIGO_DEUDOR[x] → DEBTOR_INFO/ID<br/>PT_NOMBRE_DEUDOR[x] → DEBTOR_INFO/NAME
+
+    CoreProxy->>CoreProxy: Construir Header de Respuesta
+    Note right of CoreProxy: successIndicator: SUCCESS<br/>Pipeline: HN01_response
+
+    CoreProxy->>Router: Response Estructurado
+    Router->>CBProxy: Response del Core
+
+    alt Response con Error del Core
+        CBProxy->>MapeoErr: Mapear Error del Core
+        Note right of MapeoErr: Código: FICBCO0312<br/>Formato: "FICBCO0312$#$mensaje"
+        MapeoErr->>CBProxy: Error Mapeado
+    end
+
+    CBProxy->>CBProxy: Validar successIndicator
+    Note right of CBProxy: if successIndicator = 'SUCCESS'<br/>then aplicar transformación CB<br/>else response vacío
+
+    CBProxy->>CBProxy: Transformar Response Final (XQuery)
+    Note right of CBProxy: validaDepositoReferenciadoCBOUT.xq<br/>Mapear formato interno a CB:<br/>DEBTOR_INFOS/DEBTOR_INFO → DEBTOR_INFO
+
+    CBProxy->>Client: SOAP Response
+    Note left of Client: Header: successIndicator=SUCCESS<br/>Body: DOCUMENT_NUMBER, ACCOUNT<br/>DEBTOR_INFO[] con ID y NAME
+
+    Note over Client, OracleDB: Transformaciones Clave:
+    Note over Client, OracleDB: 1. Eliminación de BankingCorrespondent del header
+    Note over Client, OracleDB: 2. Mapeo de tipo documento: DEBTOR_CODE → 1, otros → 2
+    Note over Client, OracleDB: 3. Correlación de arrays de deudores por índice
+    Note over Client, OracleDB: 4. Validaciones múltiples: corresponsal, servicio regional, depósito
+    Note over Client, OracleDB: 5. Manejo condicional de respuesta basado en successIndicator

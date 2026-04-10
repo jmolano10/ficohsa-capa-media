@@ -1,0 +1,111 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant MainProxy as ConsultaConsolidadaRiesgoCliente.proxy
+    participant RegionalService as consultaRutaRegional_db
+    participant HNProxy as ConsultaConsolidadaRiesgoClienteHN.proxy
+    participant DBAdapter as consultaConsolidadaRiesgoCliente_db
+    participant CreditRiskDB as CREDITOS_RIESGOS Database
+    participant ErrorMapper as MapeoErrores
+
+    Note over Client, CreditRiskDB: Flujo Honduras (HN01) - ConsultaConsolidadaRiesgoCliente
+
+    Client->>MainProxy: SOAP Request
+    Note right of Client: Header: Authentication (UserName/Password)<br/>Body: CUSTOMER_LEGAL_ID
+
+    MainProxy->>MainProxy: ValidacionXSD
+    Note right of MainProxy: Validar esquema XML<br/>CUSTOMER_LEGAL_ID no vacío<br/>Schema: consultaConsolidadaRiesgoClienteTypes.xsd
+
+    alt Validación XSD Fallida
+        MainProxy->>ErrorMapper: Error de Validación
+        ErrorMapper->>MainProxy: Error Mapeado
+        MainProxy->>Client: SOAP Fault
+    end
+
+    MainProxy->>MainProxy: Asignar serviceId
+    Note right of MainProxy: serviceId = "FICBCO0398"
+
+    MainProxy->>RegionalService: Consultar Ruta Regional
+    Note right of RegionalService: consultaRutaRegionalIn.xq<br/>Parámetros:<br/>- idServicio: FICBCO0398<br/>- requestHeader: Authentication<br/>- operacion: consultaConsolidadaRiesgoCliente<br/>- version: V2
+
+    RegionalService->>CreditRiskDB: CALL consultaRutaRegional SP
+    CreditRiskDB->>RegionalService: Resultado de Enrutamiento
+
+    alt Región No Válida
+        RegionalService->>MainProxy: PV_CODIGO_ERROR != 'SUCCESS'
+        MainProxy->>ErrorMapper: Mapear Error Regional
+        ErrorMapper->>MainProxy: Error Mapeado (FICBCO0398)
+        MainProxy->>Client: Response con Error
+    end
+
+    RegionalService->>MainProxy: PV_UBICACION = Proxy HN
+    Note left of RegionalService: PV_CODIGO_ERROR: SUCCESS<br/>PV_UBICACION: ConsultaConsolidadaRiesgoClienteHN
+
+    MainProxy->>MainProxy: Aplicar Valores por Defecto Región
+    Note right of MainProxy: aplicarValoresPorDefectoRegion.xq<br/>Configurar headers regionales
+
+    MainProxy->>HNProxy: Dynamic Route
+    Note right of MainProxy: Router Dinámico<br/>Enrutar a: ConsultaConsolidadaRiesgoClienteHN.proxy
+
+    HNProxy->>HNProxy: Transformar Request
+    Note right of HNProxy: consultaConsolidadaRiesgoClienteIn.xq<br/>Mapear: CUSTOMER_LEGAL_ID → IDENTIDAD
+
+    HNProxy->>DBAdapter: Invocar Stored Procedure
+    Note right of DBAdapter: Business Service:<br/>consultaConsolidadaRiesgoCliente_db<br/>Connection: eis/DB/ConnectionCustomerCreditRisk
+
+    DBAdapter->>CreditRiskDB: CALL p_consulta_ONBASE_V2(IDENTIDAD)
+    Note right of CreditRiskDB: Schema: CREDITOS_RIESGOS<br/>Package: dbo<br/>SP: p_consulta_ONBASE_V2<br/>Parámetro: IDENTIDAD (string20)
+
+    alt Cliente No Encontrado o Error en SP
+        CreditRiskDB->>DBAdapter: Error o RowSet vacío
+        DBAdapter->>HNProxy: Response con Error
+        HNProxy->>HNProxy: Generar Header de Error
+        Note right of HNProxy: consultaConsolidadaRiesgoClienteHeaderOut.xq<br/>successIndicator: NO RECORS<br/>messages: NO RECORDS FOUND
+        HNProxy->>MainProxy: Response con Error
+        MainProxy->>Client: Response con Error
+    end
+
+    CreditRiskDB->>DBAdapter: RowSet con XML incrustado
+    Note left of CreditRiskDB: RowSet/Row/Column[1]<br/>Contiene XML complejo con:<br/>- IDENTIDAD, SEGMENTOCLIENTE<br/>- FECHANACIMIENTO, EDAD<br/>- PASIVOS/CUENTA (cuentas)<br/>- TARJETAS/CUENTA (tarjetas)<br/>- PRESTAMOS/CUENTA (préstamos)<br/>- OFERTAPREAPROBADA/OFERTA<br/>- RECORDB/CUENTA (referencias activas)<br/>- RECORDC/CUENTA (consultas)<br/>- Y muchos más elementos
+
+    DBAdapter->>HNProxy: Response Exitoso
+
+    HNProxy->>HNProxy: Extraer XML Incrustado
+    Note right of HNProxy: fn-bea:inlinedXML()<br/>Parsear XML del primer Column
+
+    HNProxy->>HNProxy: Transformar Response
+    Note right of HNProxy: consultaConsolidadaRiesgoClienteOut.xq<br/>Transformaciones complejas:<br/>- Fechas: dd/MM/yyyy → yyyy-MM-dd<br/>- Números: string → int/float/decimal<br/>- Agregaciones: sum(DISPONIBLE_1..12)<br/>- Validaciones: "00/00/0000" → null<br/>- Limpieza: fn-bea:trim()
+
+    HNProxy->>HNProxy: Construir Header de Respuesta
+    Note right of HNProxy: consultaConsolidadaRiesgoClienteHeaderOut.xq<br/>successIndicator: Success<br/>messages: Consulta exitosa
+
+    HNProxy->>MainProxy: Response Estructurado
+
+    MainProxy->>MainProxy: Validar Response
+    Note right of MainProxy: ValidacionesGenerales_response<br/>Verificar successIndicator
+
+    alt Response con Error
+        MainProxy->>ErrorMapper: Mapear Error
+        Note right of ErrorMapper: mapeoErroresUsageIn.xq<br/>CODIGO_ERROR: successIndicator<br/>MENSAJE_ERROR: FICBCO0398$#$ + messages
+        ErrorMapper->>MainProxy: Error Homologado
+        MainProxy->>MainProxy: Aplicar Error Mapeado
+        Note right of MainProxy: mapeoErroresUsageOut.xq<br/>Actualizar ResponseHeader
+    end
+
+    MainProxy->>Client: SOAP Response
+    Note left of Client: Header: successIndicator=Success<br/>Body: Estructura compleja con:<br/>LOAN_MAINTENANCE:<br/>- CUSTOMER_INFO (demografía, scoring)<br/>- ASSETS (cuentas con transacciones)<br/>- LIABILITIES (tarjetas y préstamos)<br/>LOAN_ORIGINATIONS:<br/>- PRE_APPROVED_OFFERS<br/>- INTERNAL_EXTRAS<br/>- REFERENCES_DETAILS
+
+    Note over Client, CreditRiskDB: Transformaciones Clave Aplicadas:
+    Note over Client, CreditRiskDB: 1. IDENTIDAD → ID (directo)
+    Note over Client, CreditRiskDB: 2. FECHANACIMIENTO → DATE_OF_BIRTH (formato fecha)
+    Note over Client, CreditRiskDB: 3. EDAD → AGE (string → int)
+    Note over Client, CreditRiskDB: 4. DISPONIBLE_1..12 → AVAILABLE_CASH (suma)
+    Note over Client, CreditRiskDB: 5. Fechas "00/00/0000" → omitidas
+    Note over Client, CreditRiskDB: 6. Strings → fn-bea:trim() aplicado
+    Note over Client, CreditRiskDB: 7. RECORDB/RECORDD/RECORDT → ACTIVE_REFERENCES
+    Note over Client, CreditRiskDB: 8. RECORDPRB/RECORDPRD/RECORDPRT → HISTORICAL_REFERENCES
+
+    Note over Client, CreditRiskDB: Manejo de Errores:
+    Note over Client, CreditRiskDB: - Código de Servicio: FICBCO0398
+    Note over Client, CreditRiskDB: - Prefijo de Error: FICBCO0398$#$
+    Note over Client, CreditRiskDB: - Homologación vía MapeoErrores
+    Note over Client, CreditRiskDB: - Error Handler captura excepciones

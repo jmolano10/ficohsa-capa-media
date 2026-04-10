@@ -1,0 +1,104 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as CreditManagementRouter_PS
+    participant DVM as RegionalParameters DVM
+    participant DataWH as DataWareHouseHN
+    participant Rules as RulesManagement
+    participant BLAZE as BLAZE Advisor
+    participant ErrorSvc as GetErrorMessages_BS
+    participant LogSvc as SetLogInfoService_BS
+
+    Note over Client, LogSvc: Flujo Honduras (HN01) - CreditManagementRouter_PS
+
+    Client->>OSB: REST/SOAP Request
+    Note right of Client: Endpoint: v1.0/credit-management<br/>Operation: getConsolidatedCustomerRisk<br/>SourceBank: HN01<br/>DestinationBank: HN01
+
+    OSB->>OSB: CommonParams Stage
+    Note right of OSB: Asignar variables:<br/>codigoServicio: '3'<br/>language: ES<br/>sourceBank: HN01<br/>destinationBank: HN01<br/>serviceName: GetConsolidatedCustomerRisk_PS
+
+    OSB->>DVM: Validar Servicio Regional
+    Note right of DVM: Lookup: ServiceName=GetConsolidatedCustomerRisk_PS<br/>Name=SourceBank.HN01.DestinationBank.HN01
+
+    alt Región No Válida
+        DVM->>OSB: Value != 'Active'
+        OSB->>Client: Error MW-0003: INVALID REGION REQUEST
+    end
+
+    DVM->>OSB: Value = 'Active'
+    DVM->>OSB: Location = DataWareHouseHN/RequestorServices/ProxyServices/v1.0/
+
+    OSB->>OSB: Branch por Operación
+    Note right of OSB: Determinar operación:<br/>getConsolidatedCustomerRisk
+
+    OSB->>OSB: GetConsolidatedRiskPP Pipeline
+    Note right of OSB: Transformar request usando:<br/>Tx_GetConsolidatedCustomerRisk_To_consulta_ONBASE_V2.xqy
+
+    OSB->>DataWH: Dynamic Route
+    Note right of DataWH: Endpoint: DataWareHouseHN_BS<br/>Operation: consulta_ONBASE_V2<br/>Parámetros:<br/>- PV_CEDULA: 0801199012345<br/>- PV_NIT: 08011990123456789<br/>- PV_NOMBRE: JUAN<br/>- PV_APELLIDO: PEREZ<br/>- PV_FECHA_NACIMIENTO: 1990-01-08
+
+    alt Error en DataWareHouse
+        DataWH->>OSB: Error Response
+        OSB->>ErrorSvc: GetErrorMessages Request
+        Note right of ErrorSvc: Parámetros:<br/>- codigoErrorSistema: DB_ERROR<br/>- codigoServicio: '3'<br/>- codigoSistema: '1'<br/>- codigoLenguaje: ES
+
+        ErrorSvc->>OSB: Error Mapping Response
+        OSB->>OSB: Transform Error
+        Note right of OSB: Tx_ErrorMap_To_ErrorInfo.xqy<br/>Mapear a estructura estándar
+
+        OSB->>LogSvc: Log Error Request
+        Note right of LogSvc: Tx_Msg_To_SetLogInfo.xqy<br/>- codigoAplicacion: 1<br/>- codigoServicio: '3'<br/>- estado: 'Error'<br/>- uuid: generated
+
+        OSB->>Client: Error Response
+        Note left of Client: HTTP Code: 500<br/>ErrorInfo con código mapeado
+    end
+
+    DataWH->>OSB: Success Response
+    Note left of DataWH: PV_CODIGO_ERROR: SUCCESS<br/>PV_SCORE_EXTERNO: 750<br/>PV_CALIFICACION: EXCELLENT<br/>PV_NIVEL_RIESGO: LOW<br/>PV_SALARIO: 25000.00<br/>PV_EDAD: 34
+
+    OSB->>OSB: Transform Response
+    Note right of OSB: Tx_consulta_ONBASE_V2_To_GetConsolidatedCustomerRiskResponse.xqy<br/>Mapear campos:<br/>PV_SCORE_EXTERNO → ExternalScore<br/>PV_CALIFICACION → Qualification<br/>PV_NIVEL_RIESGO → RiskLevel
+
+    OSB->>OSB: FlujoSalida Stage
+    Note right of OSB: Verificar ErrorInfo en response<br/>Si hay error, mapear HTTP code
+
+    OSB->>Client: Success Response
+    Note left of Client: StatusInfo:<br/>- GlobalId: UUID<br/>- SuccessIndicator: SUCCESS<br/>- Messages: Consulta exitosa<br/><br/>GetConsolidatedCustomerRisk:<br/>- ExternalScore: 750<br/>- Qualification: EXCELLENT<br/>- RiskLevel: LOW
+
+    Note over Client, LogSvc: Flujo Alternativo - getCreditOffers
+
+    Client->>OSB: getCreditOffers Request
+    Note right of Client: Operation: getCreditOffers<br/>CustomerInfo con datos del cliente<br/>ProductNature: PERSONAL_LOAN
+
+    OSB->>OSB: CommonParams Stage
+    Note right of OSB: codigoServicio: '8'<br/>serviceName: GetCreditOffers_PS
+
+    OSB->>DVM: Validar Servicio Regional
+    DVM->>OSB: Location = RulesManagement/RequestorServices/ProxyServices/v1.0/
+
+    OSB->>OSB: GetCustomerOffers Pipeline
+    Note right of OSB: Transformar request usando:<br/>Tx_GetCreditOffers_To_BLAZE.xqy
+
+    OSB->>Rules: Dynamic Route
+    Note right of Rules: Endpoint: RulesManagement_BS<br/>Datos del cliente para evaluación
+
+    Rules->>BLAZE: Execute Rules
+    Note right of BLAZE: Evaluar:<br/>- customerId: 0801199012345<br/>- salary: 25000.00<br/>- age: 34<br/>- externalScore: 750<br/>- productNature: PERSONAL_LOAN<br/>- region: HN01
+
+    BLAZE->>Rules: Rules Result
+    Note left of BLAZE: Ofertas calculadas:<br/>- ProductCode: PERSONAL_LOAN<br/>- MaxAmount: 500000.00<br/>- Rate: 12.50<br/>- Terms: 12,24,36 meses
+
+    Rules->>OSB: BLAZE Response
+
+    OSB->>OSB: Transform Response
+    Note right of OSB: Tx_BLAZE_To_GetCreditOffersResponse.xqy<br/>Mapear ofertas a estructura OSB
+
+    OSB->>Client: getCreditOffers Response
+    Note left of Client: GetCreditOffers:<br/>- InternalScore: 750<br/>- InternalRiskLevel: LOW<br/>- ResolutionOffers con términos<br/>- MaxOffer: 500000.00<br/>- Rate: 12.50%
+
+    Note over Client, LogSvc: Transformaciones Clave HN01:
+    Note over Client, LogSvc: 1. Request → consulta_ONBASE_V2 (DataWareHouse)
+    Note over Client, LogSvc: 2. consulta_ONBASE_V2 → GetConsolidatedCustomerRiskResponse
+    Note over Client, LogSvc: 3. Request → BLAZE format (RulesManagement)
+    Note over Client, LogSvc: 4. BLAZE → GetCreditOffersResponse
+    Note over Client, LogSvc: 5. Error mapping con códigos HTTP
+    Note over Client, LogSvc: 6. Logging centralizado de transacciones

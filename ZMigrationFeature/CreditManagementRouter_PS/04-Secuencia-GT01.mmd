@@ -1,0 +1,108 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as CreditManagementRouter_PS
+    participant DVM as RegionalParameters DVM
+    participant DataWH as DataWareHouseGT
+    participant Rules as RulesManagementGT
+    participant BLAZE as BLAZE Advisor GT
+    participant ErrorSvc as GetErrorMessages_BS
+    participant LogSvc as SetLogInfoService_BS
+
+    Note over Client, LogSvc: Flujo Guatemala (GT01) - CreditManagementRouter_PS
+
+    Client->>OSB: REST/SOAP Request
+    Note right of Client: Endpoint: v1.0/credit-management<br/>Operation: getConsolidatedCustomerRisk<br/>SourceBank: GT01<br/>DestinationBank: GT01<br/>Currency: GTQ
+
+    OSB->>OSB: CommonParams Stage
+    Note right of OSB: Asignar variables:<br/>codigoServicio: '3'<br/>language: ES<br/>sourceBank: GT01<br/>destinationBank: GT01<br/>serviceName: GetConsolidatedCustomerRisk_PS
+
+    OSB->>DVM: Validar Servicio Regional
+    Note right of DVM: Lookup: ServiceName=GetConsolidatedCustomerRisk_PS<br/>Name=SourceBank.GT01.DestinationBank.GT01
+
+    alt Región No Válida
+        DVM->>OSB: Value != 'Active'
+        OSB->>Client: Error MW-0003: INVALID REGION REQUEST
+    end
+
+    DVM->>OSB: Value = 'Active'
+    DVM->>OSB: Location = DataWareHouse/RequestorServices/ProxyServices/v1.0/GetConsolidatedCustomerRisk
+
+    OSB->>OSB: Branch por Operación
+    Note right of OSB: Determinar operación:<br/>getConsolidatedCustomerRisk
+
+    OSB->>OSB: GetConsolidatedRiskPP Pipeline
+    Note right of OSB: Transformar request usando:<br/>Tx_GetConsolidatedCustomerGTRisk_To_consulta_ONBASE_V2.xqy<br/>Agregar campos específicos GT:<br/>- PV_REGION: GT01<br/>- PV_MONEDA_LOCAL: GTQ
+
+    OSB->>DataWH: Dynamic Route
+    Note right of DataWH: Endpoint: GetConsolidatedCustomerRiskGT_PS<br/>Operation: consulta_ONBASE_V2<br/>Parámetros:<br/>- PV_CEDULA: 1234567890123<br/>- PV_NIT: 12345678901234567<br/>- PV_NOMBRE: MARIA<br/>- PV_APELLIDO: GONZALEZ<br/>- PV_FECHA_NACIMIENTO: 1985-03-15<br/>- PV_REGION: GT01
+
+    alt Error en DataWareHouse GT
+        DataWH->>OSB: Error Response
+        OSB->>ErrorSvc: GetErrorMessages Request
+        Note right of ErrorSvc: Parámetros específicos GT:<br/>- codigoErrorSistema: DB_ERROR_GT<br/>- codigoServicio: '3'<br/>- codigoSistema: '1'<br/>- codigoLenguaje: ES
+
+        ErrorSvc->>OSB: Error Mapping Response
+        OSB->>OSB: Transform Error GT
+        Note right of OSB: Tx_ErrorInfo_To_ConsolidatedCustomerRiskGTResponse.xqy<br/>Mapear a estructura GT específica
+
+        OSB->>LogSvc: Log Error Request
+        Note right of LogSvc: Incluir región GT01 en log<br/>- bancoOrigen: GT01<br/>- bancoDestino: GT01
+
+        OSB->>Client: Error Response GT
+        Note left of Client: HTTP Code: 500<br/>ErrorInfo con mensajes en español GT
+    end
+
+    DataWH->>OSB: Success Response GT
+    Note left of DataWH: PV_CODIGO_ERROR: SUCCESS<br/>PV_SCORE_EXTERNO: 680<br/>PV_CALIFICACION: GOOD<br/>PV_NIVEL_RIESGO: MEDIUM<br/>PV_SALARIO: 8000.00<br/>PV_EDAD: 39<br/>PV_MONEDA_LOCAL: GTQ<br/>PV_FACTOR_CAMBIO: 7.75
+
+    OSB->>OSB: Transform Response GT
+    Note right of OSB: Tx_consulta_ONBASE_V2_To_GetConsolidatedCustomerRiskGTResponse.xqy<br/>Mapear campos específicos GT:<br/>PV_MONEDA_LOCAL → Currency<br/>PV_FACTOR_CAMBIO → ExchangeFactor<br/>Conversiones de moneda GTQ
+
+    OSB->>OSB: FlujoSalida Stage
+    Note right of OSB: Verificar ErrorInfo en response GT<br/>Mapear códigos HTTP específicos
+
+    OSB->>Client: Success Response GT
+    Note left of Client: StatusInfo:<br/>- GlobalId: UUID<br/>- SuccessIndicator: SUCCESS<br/>- Messages: Consulta exitosa Guatemala<br/><br/>GetConsolidatedCustomerRisk:<br/>- ExternalScore: 680<br/>- Qualification: GOOD<br/>- RiskLevel: MEDIUM<br/>- Currency: GTQ<br/>- ExchangeFactor: 7.75
+
+    Note over Client, LogSvc: Flujo Alternativo - getCreditOffers GT
+
+    Client->>OSB: getCreditOffers Request GT
+    Note right of Client: Operation: getCreditOffers<br/>CustomerInfo con datos GT<br/>ProductNature: PERSONAL_LOAN<br/>Salary en GTQ: 8000.00
+
+    OSB->>OSB: CommonParams Stage
+    Note right of OSB: codigoServicio: '8'<br/>serviceName: GetCreditOffers_PS
+
+    OSB->>DVM: Validar Servicio Regional
+    DVM->>OSB: Location = RulesManagement/RequestorServices/ProxyServices/v1.0/GetCreditOffers
+
+    OSB->>OSB: GetCustomerOffers Pipeline
+    Note right of OSB: Transformar request usando:<br/>Tx_GetCreditOffersGT_To_BLAZE.xqy<br/>Agregar campos GT:<br/>- currency: GTQ<br/>- exchangeRate: 7.75<br/>- region: GT01
+
+    OSB->>Rules: Dynamic Route
+    Note right of Rules: Endpoint: GetCreditOffersGT_PS<br/>Datos del cliente GT para evaluación
+
+    Rules->>BLAZE: Execute Rules GT
+    Note right of BLAZE: Evaluar con reglas GT:<br/>- customerId: 1234567890123<br/>- salary: 8000.00 GTQ<br/>- age: 39<br/>- externalScore: 680<br/>- productNature: PERSONAL_LOAN<br/>- region: GT01<br/>- currency: GTQ<br/>- exchangeRate: 7.75
+
+    BLAZE->>BLAZE: Aplicar Reglas GT
+    Note right of BLAZE: Reglas específicas Guatemala:<br/>- Tasa base GT: 12.5%<br/>- Score 600-700: +4% = 16.5%<br/>- Límite por salario GTQ<br/>- Factores de riesgo locales
+
+    BLAZE->>Rules: Rules Result GT
+    Note left of BLAZE: Ofertas calculadas GT:<br/>- ProductCode: PERSONAL_LOAN<br/>- MaxAmount: 120000.00 GTQ<br/>- Rate: 15.75%<br/>- Currency: GTQ<br/>- Terms: 12,24,36 meses<br/>- AmountUSD: 15483.87
+
+    Rules->>OSB: BLAZE Response GT
+
+    OSB->>OSB: Transform Response GT
+    Note right of OSB: Tx_BLAZE_To_GetCreditOffersGTResponse.xqy<br/>Mapear ofertas GT:<br/>- Conversiones GTQ ↔ USD<br/>- Tasas específicas GT<br/>- Límites regionales
+
+    OSB->>Client: getCreditOffers Response GT
+    Note left of Client: GetCreditOffers GT:<br/>- InternalScore: 680<br/>- InternalRiskLevel: MEDIUM<br/>- ResolutionOffers:<br/>  * MaxOffer: 120000.00 GTQ<br/>  * Rate: 15.75%<br/>  * Currency: GTQ<br/>  * For12Months: 110000.00 GTQ<br/>  * For24Months: 100000.00 GTQ<br/>  * For36Months: 90000.00 GTQ
+
+    Note over Client, LogSvc: Transformaciones Clave GT01:
+    Note over Client, LogSvc: 1. Request → consulta_ONBASE_V2 con campos GT (región, moneda)
+    Note over Client, LogSvc: 2. consulta_ONBASE_V2 → GetConsolidatedCustomerRiskGTResponse
+    Note over Client, LogSvc: 3. Request → BLAZE GT format (moneda, tasa cambio, región)
+    Note over Client, LogSvc: 4. BLAZE GT → GetCreditOffersGTResponse
+    Note over Client, LogSvc: 5. Conversiones GTQ ↔ USD automáticas
+    Note over Client, LogSvc: 6. Reglas de negocio específicas Guatemala
+    Note over Client, LogSvc: 7. JAR específicos: ConsolidatedCustomerRiskGT.jar, CreditOffersGT.jar

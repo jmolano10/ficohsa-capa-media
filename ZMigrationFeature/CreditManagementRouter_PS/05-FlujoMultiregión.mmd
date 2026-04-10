@@ -1,0 +1,133 @@
+flowchart TD
+    A[Cliente/Aplicación] --> B[CreditManagementRouter_PS]
+    B --> C{Validar Request}
+    
+    C -->|Invalid| D[Error: Bad Request]
+    D --> Z[Response Error]
+    
+    C -->|Valid| E[CommonParams Stage]
+    E --> F[Extraer SourceBank/DestinationBank]
+    F --> G[Asignar Variables Comunes]
+    
+    G --> H[Determinar serviceName]
+    H --> I{Operación?}
+    
+    I -->|getConsolidatedCustomerRisk| J[serviceName = GetConsolidatedCustomerRisk_PS<br/>codigoServicio = '3']
+    I -->|getCreditOffers| K[serviceName = GetCreditOffers_PS<br/>codigoServicio = '8']
+    I -->|getCustomerSecondOffer| L[serviceName = GetCustomerSecondOffer_PS<br/>codigoServicio = '43']
+    I -->|refGetCustomerOffer| M[serviceName = RefGetCreditOffers_PS<br/>codigoServicio = '8']
+    
+    J --> N[DVM Lookup Regional]
+    K --> N
+    L --> N
+    M --> N
+    
+    N --> O{DVM Lookup:<br/>RegionalParameters}
+    O -->|Key: SourceBank.XX.DestinationBank.XX<br/>ServiceName: serviceName| P{Value = 'Active'?}
+    
+    P -->|No| Q[Error MW-0003:<br/>INVALID REGION REQUEST]
+    Q --> R[GetErrorMessages_BS]
+    R --> S[Tx_ErrorMap_To_ErrorInfo]
+    S --> T[SetLogInfoService_BS]
+    T --> Z
+    
+    P -->|Yes| U[Obtener Location del DVM]
+    U --> V{Región Detectada}
+    
+    V -->|HN01| W[Honduras Branch]
+    V -->|GT01| X[Guatemala Branch]
+    V -->|PA01| Y[Panamá Branch<br/>⚠️ No Implementado]
+    V -->|NI01| AA[Nicaragua Branch<br/>⚠️ No Configurado]
+    
+    Y --> AB[Error: Región no disponible]
+    AA --> AB
+    AB --> Z
+    
+    W --> AC[DataWareHouseHN Branch]
+    X --> AD[DataWareHouseGT Branch]
+    
+    AC --> AE{Operación HN01}
+    AD --> AF{Operación GT01}
+    
+    AE -->|getConsolidatedCustomerRisk| AG[Transform Request HN<br/>Tx_GetConsolidatedCustomerRisk_To_consulta_ONBASE_V2.xqy]
+    AE -->|getCreditOffers| AH[Transform Request HN<br/>Tx_GetCreditOffers_To_BLAZE.xqy]
+    
+    AF -->|getConsolidatedCustomerRisk| AI[Transform Request GT<br/>Tx_GetConsolidatedCustomerGTRisk_To_consulta_ONBASE_V2.xqy]
+    AF -->|getCreditOffers| AJ[Transform Request GT<br/>Tx_GetCreditOffersGT_To_BLAZE.xqy]
+    
+    AG --> AK[DataWareHouseHN_BS<br/>consulta_ONBASE_V2]
+    AH --> AL[RulesManagementHN_BS<br/>BLAZE Advisor]
+    AI --> AM[DataWareHouseGT_BS<br/>consulta_ONBASE_V2]
+    AJ --> AN[RulesManagementGT_BS<br/>BLAZE Advisor GT]
+    
+    AK --> AO{Response HN<br/>DataWareHouse}
+    AL --> AP{Response HN<br/>RulesManagement}
+    AM --> AQ{Response GT<br/>DataWareHouse}
+    AN --> AR{Response GT<br/>RulesManagement}
+    
+    AO -->|Success| AS[Transform Response HN<br/>Tx_consulta_ONBASE_V2_To_GetConsolidatedCustomerRiskResponse.xqy]
+    AO -->|Error| AT[Error Handler HN]
+    
+    AP -->|Success| AU[Transform Response HN<br/>Tx_BLAZE_To_GetCreditOffersResponse.xqy]
+    AP -->|Error| AT
+    
+    AQ -->|Success| AV[Transform Response GT<br/>Tx_consulta_ONBASE_V2_To_GetConsolidatedCustomerRiskGTResponse.xqy]
+    AQ -->|Error| AW[Error Handler GT]
+    
+    AR -->|Success| AX[Transform Response GT<br/>Tx_BLAZE_To_GetCreditOffersGTResponse.xqy]
+    AR -->|Error| AW
+    
+    AT --> AY[GetErrorMessages_BS HN]
+    AW --> AZ[GetErrorMessages_BS GT]
+    
+    AY --> BA[Tx_ErrorInfo_To_ConsolidatedCustomerRiskResponse.xqy]
+    AZ --> BB[Tx_ErrorInfo_To_ConsolidatedCustomerRiskGTResponse.xqy]
+    
+    BA --> BC[SetLogInfoService_BS HN]
+    BB --> BD[SetLogInfoService_BS GT]
+    
+    AS --> BE[FlujoSalida Stage HN]
+    AU --> BE
+    AV --> BF[FlujoSalida Stage GT]
+    AX --> BF
+    BC --> BE
+    BD --> BF
+    
+    BE --> BG{ErrorInfo en Response HN?}
+    BF --> BH{ErrorInfo en Response GT?}
+    
+    BG -->|Yes| BI[Insert HTTP Error Code HN<br/>Insert Response Message HN]
+    BG -->|No| BJ[Success Response HN]
+    
+    BH -->|Yes| BK[Insert HTTP Error Code GT<br/>Insert Response Message GT]
+    BH -->|No| BL[Success Response GT]
+    
+    BI --> BM[Final Response HN]
+    BJ --> BM
+    BK --> BN[Final Response GT]
+    BL --> BN
+    
+    BM --> BO[Cliente/Aplicación]
+    BN --> BO
+    Z --> BO
+    
+    style W fill:#e1f5fe
+    style X fill:#f3e5f5
+    style Y fill:#fff3e0
+    style AA fill:#ffebee
+    style AK fill:#e8f5e8
+    style AL fill:#e8f5e8
+    style AM fill:#f0e6ff
+    style AN fill:#f0e6ff
+    style AT fill:#ffcdd2
+    style AW fill:#ffcdd2
+    
+    classDef hondurasStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef guatemalaStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef errorStyle fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    classDef successStyle fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    
+    class W,AC,AE,AG,AH,AK,AL,AO,AP,AS,AU,BE,BG hondurasStyle
+    class X,AD,AF,AI,AJ,AM,AN,AQ,AR,AV,AX,BF,BH guatemalaStyle
+    class D,Q,AB,AT,AW,BI,BK errorStyle
+    class BJ,BL,BM,BN successStyle

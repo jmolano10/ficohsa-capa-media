@@ -1,0 +1,109 @@
+flowchart TD
+    A[Cliente CB] --> B[ValidaDepositoReferenciadoCB Proxy]
+    
+    B --> C{Validar Esquema XML}
+    C -->|Error| D[MapeoErrorValidate]
+    D --> E[SOAP Fault]
+    E --> A
+    
+    C -->|OK| F[Validar Campos Obligatorios]
+    F -->|ACCOUNT vacío| G[Error: NO ACCOUNT]
+    F -->|DOCUMENT_TYPE vacío| H[Error: NO DOCUMENT TYPE]
+    F -->|DOCUMENT_VALUE vacío| I[Error: NO DOCUMENT VALUE]
+    
+    G --> J[MapeoErrores]
+    H --> J
+    I --> J
+    J --> K[Response Error CB]
+    K --> A
+    
+    F -->|OK| L[Consultar Corresponsal Bancario]
+    L --> M[consultarCorresponsalB_db]
+    M --> N[Oracle DB: consultarCorresponsalB]
+    N -->|PV_CODIGO_MENSAJE != SUCCESS| O[Error Corresponsal]
+    O --> K
+    
+    N -->|SUCCESS| P[Eliminar BankingCorrespondent Header]
+    P --> Q[Llamar DepositosReferenciados Router]
+    
+    Q --> R{Branch por Operación}
+    R -->|validaDepositoReferenciado| S[ValidaDepositoReferenciado Proxy]
+    R -->|Otras operaciones| T[Otros servicios]
+    
+    S --> U[Validar Esquema Interno]
+    U -->|Error| V[Error Handler Interno]
+    V --> W[MapeoErrores FICBCO0311]
+    W --> X[Response Error Interno]
+    X --> Q
+    
+    U -->|OK| Y[Validar Servicio Regional]
+    Y --> Z[ValidaServicioRegional_db]
+    Z --> AA[Oracle DB: ValidaServicioRegional]
+    AA -->|PV_CODIGO_ERROR != SUCCESS| BB[Error Regional]
+    BB --> X
+    
+    AA -->|SUCCESS| CC{Branch por Región}
+    CC -->|SourceBank = HN01| DD[Pipeline HN01]
+    CC -->|Otras regiones| EE[Pipeline Default]
+    
+    EE --> FF[Error: MW-0008]
+    FF --> GG[SERVICE NOT IMPLEMENTED]
+    GG --> X
+    
+    DD --> HH[Transformar Request XQuery]
+    HH --> II[validaDepositoReferenciadoIN.xq]
+    II --> JJ{Tipo Documento}
+    JJ -->|DEBTOR_CODE| KK[PV_TIPO_DOCUMENTO = 1]
+    JJ -->|Otros| LL[PV_TIPO_DOCUMENTO = 2]
+    
+    KK --> MM[ValidaDepositoReferenciado_db]
+    LL --> MM
+    MM --> NN[Oracle DB: CRB_P_VALIDAR_DEPOSITO_REF]
+    NN --> OO[Package: CBR_K_DEP_REFERENCIADOS]
+    OO --> PP[Connection: ConnectionProxyAbanksHN]
+    
+    PP -->|PV_CODIGO_RETORNO = -1| QQ[Error: NO RECORDS]
+    QQ --> RR[Error Handler HN01]
+    RR --> W
+    
+    PP -->|SUCCESS| SS[Transformar Response XQuery]
+    SS --> TT[validaDepositoReferenciadoOUT.xq]
+    TT --> UU[Correlacionar Arrays Deudores]
+    UU --> VV{For Loop Deudores}
+    VV --> WW[PT_CODIGO_DEUDOR[x] → DEBTOR_INFO/ID]
+    VV --> XX[PT_NOMBRE_DEUDOR[x] → DEBTOR_INFO/NAME]
+    
+    WW --> YY[Response HN01 Success]
+    XX --> YY
+    YY --> ZZ[Header: successIndicator=SUCCESS]
+    ZZ --> Q
+    
+    Q --> AAA{Validar Response Header}
+    AAA -->|successIndicator != SUCCESS| BBB[MapeoErrores FICBCO0312]
+    BBB --> CCC[Response Error Final]
+    CCC --> A
+    
+    AAA -->|SUCCESS| DDD[Transformar Response CB]
+    DDD --> EEE[validaDepositoReferenciadoCBOUT.xq]
+    EEE --> FFF[Mapear DEBTOR_INFOS → DEBTOR_INFO]
+    FFF --> GGG[Response CB Success]
+    GGG --> A
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style DD fill:#e8f5e8
+    style EE fill:#ffebee
+    style MM fill:#fff3e0
+    style NN fill:#f1f8e9
+    style J fill:#ffcdd2
+    style W fill:#ffcdd2
+    
+    classDef errorNode fill:#ffcdd2,stroke:#d32f2f,stroke-width:2px
+    classDef successNode fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    classDef dbNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef transformNode fill:#e1f5fe,stroke:#1976d2,stroke-width:2px
+    
+    class D,G,H,I,J,O,V,BB,FF,QQ,RR,BBB errorNode
+    class P,N,AA,YY,ZZ,GGG successNode
+    class M,Z,MM,NN,OO,PP dbNode
+    class II,TT,EEE,HH,SS,DDD transformNode

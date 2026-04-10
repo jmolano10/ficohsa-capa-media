@@ -1,0 +1,88 @@
+flowchart TD
+    A[Cliente/Aplicación] -->|SOAP Request<br/>CUSTOMER_LEGAL_ID| B[ConsultaConsolidadaRiesgoCliente.proxy]
+    
+    B --> C{ValidacionXSD}
+    C -->|Schema Válido| D[Asignar serviceId<br/>FICBCO0398]
+    C -->|Schema Inválido| E[Error Handler]
+    
+    D --> F[consultaRutaRegional_db]
+    F -->|Consulta Enrutamiento| G{¿Región Válida?}
+    
+    G -->|PV_CODIGO_ERROR != SUCCESS| H[MapeoErrores<br/>FICBCO0398]
+    G -->|SUCCESS| I[Router Dinámico]
+    
+    I -->|PV_UBICACION| J[ConsultaConsolidadaRiesgoClienteHN.proxy]
+    
+    J --> K[Transformar Request<br/>consultaConsolidadaRiesgoClienteIn.xq]
+    K -->|CUSTOMER_LEGAL_ID → IDENTIDAD| L[consultaConsolidadaRiesgoCliente_db]
+    
+    L -->|JCA Connection<br/>eis/DB/ConnectionCustomerCreditRisk| M[(CREDITOS_RIESGOS<br/>p_consulta_ONBASE_V2)]
+    
+    M --> N{¿Datos Encontrados?}
+    N -->|RowSet Vacío| O[Header: NO RECORS<br/>NO RECORDS FOUND]
+    N -->|RowSet con Datos| P[Extraer XML Incrustado<br/>fn-bea:inlinedXML]
+    
+    P --> Q[Transformar Response<br/>consultaConsolidadaRiesgoClienteOut.xq]
+    
+    Q --> R[Procesar Información Cliente]
+    R --> S[Procesar Activos<br/>PASIVOS/CUENTA]
+    S --> T[Procesar Tarjetas<br/>TARJETAS/CUENTA]
+    T --> U[Procesar Préstamos<br/>PRESTAMOS/CUENTA]
+    U --> V[Procesar Ofertas<br/>OFERTAPREAPROBADA/OFERTA]
+    V --> W[Procesar Referencias<br/>RECORDB/RECORDD/RECORDT]
+    
+    W --> X[Construir Header Response<br/>consultaConsolidadaRiesgoClienteHeaderOut.xq]
+    X --> Y[Retornar a Proxy Principal]
+    
+    Y --> Z{¿Response con Error?}
+    Z -->|successIndicator != SUCCESS| AA[MapeoErrores<br/>Homologar Error]
+    Z -->|SUCCESS| BB[Response Final]
+    
+    E --> CC[MapeoErrores<br/>Error de Validación]
+    H --> DD[Response con Error Regional]
+    O --> EE[Response sin Datos]
+    AA --> FF[Response con Error Mapeado]
+    CC --> GG[Response con Error de Validación]
+    
+    BB --> HH[Cliente/Aplicación]
+    DD --> HH
+    EE --> HH
+    FF --> HH
+    GG --> HH
+    
+    %% Estilos
+    classDef proxyClass fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef dbClass fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef transformClass fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef errorClass fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+    classDef decisionClass fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class B,J proxyClass
+    class L,M dbClass
+    class K,Q,X transformClass
+    class E,H,AA,CC errorClass
+    class C,G,N,Z decisionClass
+    
+    %% Notas de transformaciones
+    R -.->|IDENTIDAD → ID<br/>SEGMENTOCLIENTE → TARGET<br/>FECHANACIMIENTO → DATE_OF_BIRTH<br/>EDAD → AGE| R1[Transformaciones<br/>Demográficas]
+    
+    S -.->|NUMEROCUENTA → NUMBER<br/>CATEGORIA → CATEGORY<br/>SALDOACTUAL → CURRENT_BALANCE| S1[Transformaciones<br/>Activos]
+    
+    T -.->|NUMEROCUENTA → ACCOUNT<br/>BEHAVIORSCORE → BEHAVIOR_SCORE<br/>DISPONIBLE_1..12 → AVAILABLE_CASH| T1[Transformaciones<br/>Tarjetas]
+    
+    U -.->|NUMEROPRESTAMO → NUMBER<br/>MONTOINICIAL → INITIAL_AMOUNT<br/>SALDOACTUAL → CURRENT_BALANCE| U1[Transformaciones<br/>Préstamos]
+    
+    V -.->|OFERTAFICOCREDITO12..60 → FOR_12_MONTHS..FOR_60_MONTHS<br/>CUOTAFICOCREDITO → INSTALLMENT| V1[Transformaciones<br/>Ofertas]
+    
+    W -.->|Acreedor → CREDITOR<br/>noReferencia → REFERENCE_NUMBER<br/>SaldoActual → BALANCE| W1[Transformaciones<br/>Referencias]
+    
+    %% Notas de conexiones
+    M -.->|Schema: CREDITOS_RIESGOS<br/>Package: dbo<br/>SP: p_consulta_ONBASE_V2<br/>Param: IDENTIDAD| M1[Detalles<br/>Base de Datos]
+    
+    %% Notas de validaciones
+    C -.->|consultaConsolidadaRiesgoClienteTypes.xsd<br/>CUSTOMER_LEGAL_ID minLength=1| C1[Validaciones<br/>XSD]
+    
+    %% Notas de manejo de errores
+    H -.->|Código: FICBCO0398<br/>Formato: FICBCO0398$#$mensaje| H1[Formato<br/>Error Regional]
+    
+    AA -.->|mapeoErroresUsageIn.xq<br/>mapeoErroresUsageOut.xq| AA1[Transformaciones<br/>Error]
