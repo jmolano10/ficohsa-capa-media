@@ -8,7 +8,8 @@ sequenceDiagram
     participant parameter as Paramter Store
     participant Lib as Librería Pipeline (ConfigMap)
     participant secret as Secret Manager
-    participant OSB as Servicio Consultar Remesas OSB 
+    participant vortex as Servicio Consulta Consolidada Riesgo Cliente <br> OSB Vortex 
+    participant dynamo as Servicio Get Customer Risk <br> OSB Dynamo 
     participant Errors as Control de Errores <br> Librería de mapeo de errores
     
     Note over Consumidor, Errors: Flujo Multiregión (HN01 | GT01 | NI01 ) - Consultar Remesas
@@ -33,7 +34,7 @@ sequenceDiagram
         Note right of API: paramName = libparam.param-name
 
         CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
-        Note left of CL: Obtiene parámetros de conexión al serivicio OSB
+        Note left of CL: Obtiene parámetros de conexión al serivicio vortex
 
     else Consulta  parametros en Librería de parámetros / Paramter Store
 
@@ -50,10 +51,10 @@ sequenceDiagram
         Note right of API: paramName = libparam.param-name
 
         parameter->>API: Obtiene parámetros Paramter Sotre
-        Note left of parameter: Obtiene parámetros de conexión al serivicio OSB
+        Note left of parameter: Obtiene parámetros de conexión a los OSB (Vortex, Dynamo)
 
         API->>CL: Guarda parámetros Paramter Sotre en caché local
-        Note right of API: Obtiene parámetros de conexión al serivicio OSB
+        Note right of API: Obtiene parámetros de conexión a los OSB (Vortex, Dynamo)
 
     end
 
@@ -70,7 +71,7 @@ sequenceDiagram
 
     API->>API: Aplica patrón strategy para cada país según parámetros de regionalización obtenidos
 
-    API->>secret: Consulta secretos para conexión a servicio OSB
+    API->>secret: Consulta secretos para conexión a los OSB (Vortex, Dynamo)
     Note right of API: secretName = libparam.secret-name (país)
     
     secret->>API: Retorna secretos
@@ -81,11 +82,11 @@ sequenceDiagram
         API->>API: Construye Request Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
         Note over API: enpoint: value.param-name + const.operationHnd |  const.operationGtm <br> header: <br> UserName = secret.User <br> Password = secret.Password <br> sourceBank = header.sourceBank <br> destinationBank = header.destinationBank <br> Body: <br> CUSTOMER_LEGAL_ID = request.partyLegalEntityReference <br> FISCAL_ID = request.taxIdentificationNumber <br> FIRST_NAME = request.givenName <br> LAST_NAME = request.familyName <br> BIRTH_DATE = request.partyDateOfBirth <br> USER_NAME = request.userName <br> PERSON_TYPE = request.partyIdentificationDocumentType <br> PRODUCT_CODE = request.productCode
 
-        API->>OSB: Consume Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
+        API->>vortex: Consume Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
         Note right of API: endpoint, header, body
 
-        OSB->>API: Response Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
-        Note over OSB: Response: consultaConsolidadaRiesgoClienteResponse
+        vortex->>API: Response Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
+        Note over vortex: Response: consultaConsolidadaRiesgoClienteResponse
 
         API->>API: Evalúa Response Servicio OSB VORTEX Consulta Consolidada Riesgo Cliente
 
@@ -114,11 +115,11 @@ sequenceDiagram
         API->>API: Construye Request Servicio OSB Dynamo getConsolidatedCustomerRisk
         Note over API: enpoint: value.param-name + const.operationNic <br> header: <br> UserName = secret.User <br> Password = secret.Password <br> Body: <br> SourceBank = header.sourceBank <br> DestinationBank = header.destinationBank <br> ApplicationId = header.Application-Id <br> Language = header.Accept-Language <br> legalId = request.partyLegalEntityReference <br> Nit = request.taxIdentificationNumber <br> FirstName = request.givenName <br> LastName = request.familyName <br> BirthDate = request.partyDateOfBirth <br> IdType = request.partyIdentificationDocumentType 
 
-        API->>OSB: Consume Servicio OSB Dynamo getConsolidatedCustomerRisk
+        API->>dynamo: Consume Servicio OSB Dynamo getConsolidatedCustomerRisk
         Note right of API: endpoint, header, body
 
-        OSB->>API: Response Servicio OSB Dynamo getConsolidatedCustomerRisk
-        Note over OSB: Response: getConsolidatedCustomerRiskResponse
+        dynamo->>API: Response Servicio OSB Dynamo getConsolidatedCustomerRisk
+        Note over dynamo: Response: getConsolidatedCustomerRiskResponse
 
         API->>API: Evalúa Response Servicio OSB Dynamo getConsolidatedCustomerRisk
 

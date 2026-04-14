@@ -2,192 +2,155 @@
 
 ## Proxies OSB
 
-### Servicio Principal CB
+### Proxy Services Principales
 - `Middleware/v2/ProxyServices/ValidaDepositoReferenciadoCB.proxy`
-  - **Descripción**: Servicio principal CB wrapper para validación de depósitos referenciados
-  - **Tipo**: Proxy Service SOAP
-  - **Endpoint**: `/Middleware/OperationsAndExecution/CalculationServices/ValidaDepositoReferenciadoCB`
-
-### Router de Operaciones
 - `Middleware/v2/ProxyServices/DepositosReferenciados.proxy`
-  - **Descripción**: Router que maneja múltiples operaciones de depósitos referenciados
-  - **Tipo**: Proxy Service SOAP
-  - **Endpoint**: `/Middleware/OperationsAndExecution/Payments/DepositosReferenciados`
-
-### Servicio Core
 - `Middleware/v2/ProxyServices/ValidaDepositoReferenciado.proxy`
-  - **Descripción**: Servicio core con lógica de negocio regionalizada
-  - **Tipo**: Proxy Service local
-  - **Regionalización**: HN01 implementado, otras regiones con error por defecto
+
+### Proxy Services de Apoyo
+- `Middleware/v2/ProxyServices/MapeoErrores.proxy`
 
 ## Business Services
 
-### Conexión a Base de Datos Principal
+### Business Services de Base de Datos
 - `Middleware/v2/BusinessServices/ABK/validaDepositoReferenciado/biz/ValidaDepositoReferenciado_db.biz`
-  - **Descripción**: Business service para conexión a Oracle DB
-  - **Conexión**: jca://eis/DB/ConnectionProxyAbanksHN
-  - **Package**: CBR_K_DEP_REFERENCIADOS
-  - **Stored Procedure**: CRB_P_VALIDAR_DEPOSITO_REF
-
-### Validaciones de Negocio
 - `Middleware/v2/BusinessServices/MDW/consultarCorresponsalB/biz/consultarCorresponsalB_db.biz`
-  - **Descripción**: Validación de corresponsal bancario
-  - **Stored Procedure**: consultarCorresponsalB
-
 - `Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db.biz`
-  - **Descripción**: Validación de servicio por región
-  - **Stored Procedure**: ValidaServicioRegional
-
-### Mapeo de Errores
-- `Middleware/v2/ProxyServices/MapeoErrores.proxy`
-  - **Descripción**: Servicio para mapeo y transformación de errores
-  - **Operación**: mapeoErrores
 
 ## Pipelines y Flujos
 
-### ValidaDepositoReferenciadoCB.proxy
-- **Pipeline Request**: `ValidaDepositoReferenciado_request`
-  - Stage: `FlujoEntrada`
-- **Pipeline Response**: `ValidaDepositoReferenciado_response`
-  - Stage: `FlujoSalida`
-- **Pipeline Request**: `Validaciones Generales_request`
-  - Stage: `ValidateMessage`
-  - Stage: `ValidarCorresponsal`
-- **Pipeline Response**: `Validaciones Generales_response`
-  - Stage: `MapeoError`
-- **Error Handler**: `_onErrorHandler-5933896112660964401--91722ad.1696d5f7d18.-7f03`
-  - Stage: `ManejoError`
+### Pipelines en ValidaDepositoReferenciadoCB.proxy
+- Pipeline: `ValidaDepositoReferenciado_request`
+- Pipeline: `ValidaDepositoReferenciado_response`
+- Pipeline: `Validaciones Generales_request`
+- Pipeline: `Validaciones Generales_response`
+- Pipeline: `_onErrorHandler-5933896112660964401--91722ad.1696d5f7d18.-7f03` (Error Handler)
 
-### ValidaDepositoReferenciado.proxy
-- **Pipeline Request**: `HN01_request`
-  - Stage: `FlujoEntrada`
-- **Pipeline Response**: `HN01_response`
-  - Stage: `FlujoSalida`
-- **Pipeline Request**: `DefaultBranchPP_request`
-  - Stage: `FlujoEntrada`
-- **Pipeline Response**: `DefaultBranchPP_response`
-  - Stage: `FlujoSalida`
-- **Pipeline Request**: `Validaciones Generales_request`
-  - Stage: `ValidateMessage`
-  - Stage: `ValidateRegionService`
-- **Pipeline Response**: `Validaciones Generales_response`
-  - Stage: `MapeoError`
+### Pipelines en ValidaDepositoReferenciado.proxy
+- Pipeline: `HN01_request`
+- Pipeline: `HN01_response`
+- Pipeline: `DefaultBranchPP_request`
+- Pipeline: `DefaultBranchPP_response`
+- Pipeline: `Validaciones Generales_request`
+- Pipeline: `Validaciones Generales_response`
+- Pipeline: `_onErrorHandler-5933896112660964401--91722ad.1696d5f7d18.-7f0d` (Error Handler)
+
+### Pipelines en DepositosReferenciados.proxy
+- Pipeline: `_onErrorHandler-3631205292627682280-56adafd5.15c6acbe3dc.-7f8d` (Error Handler)
 
 ## XQuery/XSLT
 
-### Transformaciones de Entrada
-- `Middleware/v2/BusinessServices/ABK/validaDepositoReferenciado/xq/validaDepositoReferenciadoIN.xq`
-  - **Descripción**: Transformación de entrada para mapear datos a stored procedure
-  - **Función**: Mapeo de tipo de documento (DEBTOR_CODE → 1, otros → 2)
-
-### Transformaciones de Salida
-- `Middleware/v2/Resources/ValidaDepositoReferenciado/xq/validaDepositoReferenciadoOUT.xq`
-  - **Descripción**: Transformación de salida del servicio core
-  - **Función**: Correlación de arrays de deudores por índice
-
+### Transformaciones de ValidaDepositoReferenciadoCB
 - `Middleware/v2/Resources/ValidaDepositoReferenciadoCB/xq/validaDepositoReferenciadoCBOUT.xq`
-  - **Descripción**: Transformación de salida del servicio CB
-  - **Función**: Mapeo de formato interno a formato CB
+
+### Transformaciones de ValidaDepositoReferenciado
+- `Middleware/v2/Resources/ValidaDepositoReferenciado/xq/validaDepositoReferenciadoOUT.xq`
+
+### Transformaciones de Business Services
+- `Middleware/v2/BusinessServices/ABK/validaDepositoReferenciado/xq/validaDepositoReferenciadoIN.xq`
 
 ### Transformaciones Genéricas
 - `Middleware/v2/Resources/Genericos/consultarCorresponsalBIn.xq`
-  - **Descripción**: Transformación para consulta de corresponsal bancario
-
-- `Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn.xq`
-  - **Descripción**: Transformación para validación de servicio regional
-
-- `Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn.xq`
-  - **Descripción**: Transformación de entrada para mapeo de errores
-
-- `Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut.xq`
-  - **Descripción**: Transformación de salida para mapeo de errores
-
 - `Middleware/v2/Resources/Genericos/mapeoErrorValidate.xq`
-  - **Descripción**: Mapeo de errores de validación de esquema
+- `Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn.xq`
+- `Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn.xq`
+- `Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut.xq`
+
+## Esquemas XSD
+
+### Esquemas de ValidaDepositoReferenciadoCB
+- `Middleware/v2/Resources/ValidaDepositoReferenciadoCB/xsd/validaDepositoReferenciadoCBTypes.xsd`
+
+### Esquemas de ValidaDepositoReferenciado
+- `Middleware/v2/Resources/ValidaDepositoReferenciado/xsd/validaDepositoReferenciadoTypes.xsd`
+
+### Esquemas de DepositosReferenciados
+- `Middleware/v2/Resources/DepositosReferenciados/xsd/depositosReferenciadosTypes.xsd`
+
+### Esquemas de Business Services
+- `Middleware/v2/BusinessServices/ABK/validaDepositoReferenciado/xsd/validaDepositoReferenciado_sp.xsd`
+
+### Esquemas Genéricos
+- `Middleware/v2/Resources/esquemas_generales/HeaderElementsCB.xsd`
 
 ## WSDL
 
-### Contratos de Servicio
+### WSDL de Proxy Services
 - `Middleware/v2/Resources/ValidaDepositoReferenciadoCB/wsdl/validaDepositoReferenciadoCBPS.wsdl`
-  - **Descripción**: Contrato WSDL del servicio CB
-  - **Namespace**: `http://www.ficohsa.com.hn/middleware.services/ValidaDepositoReferenciadoCBTypes`
-
 - `Middleware/v2/Resources/ValidaDepositoReferenciado/wsdl/validaDepositoReferenciadoPS.wsdl`
-  - **Descripción**: Contrato WSDL del servicio core
-  - **Namespace**: `http://www.ficohsa.com.hn/middleware.services/depositosReferenciadosTypes`
-
 - `Middleware/v2/Resources/DepositosReferenciados/wsdl/depositosReferenciadosPS.wsdl`
-  - **Descripción**: Contrato WSDL del router de operaciones
 
-### Contratos de Base de Datos
-- `Middleware/v2/BusinessServices/ABK/validaDepositoReferenciado/wsdl/validaDepositoReferenciado_db.wsdl`
-  - **Descripción**: Contrato WSDL para stored procedure principal
-
+### WSDL de Business Services
 - `Middleware/v2/BusinessServices/ABK/validaDepositoReferenciado/wsdl/validaDepositoReferenciado.wsdl`
-  - **Descripción**: Contrato WSDL genérico del business service
+- `Middleware/v2/BusinessServices/ABK/validaDepositoReferenciado/wsdl/validaDepositoReferenciado_db.wsdl`
 
-## XSD (Esquemas)
+## Configuraciones JCA
 
-### Esquemas de Datos CB
-- `Middleware/v2/Resources/ValidaDepositoReferenciadoCB/xsd/validaDepositoReferenciadoCBTypes.xsd`
-  - **Descripción**: Esquema de tipos para el servicio CB
-  - **Elementos**: validaDepositoReferenciadoCBRequest, validaDepositoReferenciadoCBResponse
-
-### Esquemas de Datos Internos
-- `Middleware/v2/Resources/ValidaDepositoReferenciado/xsd/validaDepositoReferenciadoTypes.xsd`
-  - **Descripción**: Esquema de tipos para el servicio core
-
-- `Middleware/v2/Resources/DepositosReferenciados/xsd/depositosReferenciadosTypes.xsd`
-  - **Descripción**: Esquema de tipos para el router
-
-### Esquemas de Base de Datos
-- `Middleware/v2/BusinessServices/ABK/validaDepositoReferenciado/xsd/validaDepositoReferenciado_sp.xsd`
-  - **Descripción**: Esquema para parámetros del stored procedure
-  - **Elementos**: InputParameters, OutputParameters
-  - **Tipos**: TVARCHAR100 para arrays
-
-## JCA (Adaptadores)
-
-### Configuración de Base de Datos
+### Adaptadores de Base de Datos
 - `Middleware/v2/BusinessServices/ABK/validaDepositoReferenciado/jca/validaDepositoReferenciado_db.jca`
-  - **Descripción**: Configuración del adaptador de base de datos
-  - **Conexión**: ConnectionProxyAbanksHN
-  - **Tipo**: Database Adapter
 
-## Configuración y Propiedades
+## Políticas de Seguridad
 
-### Esquemas Generales
-- `Middleware/v2/Resources/esquemas_generales/HeaderElementsCB.xsd`
-  - **Descripción**: Esquema para elementos de header CB
-  - **Namespace**: `http://www.ficohsa.com.hn/middleware.services/autType`
+### Configuraciones de Autenticación
+- Configuración custom-token-authentication en ValidaDepositoReferenciadoCB.proxy
+- Configuración custom-token-authentication en DepositosReferenciados.proxy
+- Configuración custom-token-authentication en ValidaDepositoReferenciado.proxy
 
-## JAR Files (Deployments)
+## Archivos de Configuración
 
-### Versiones de Producción
-- `JAR/2019.8.2.0/MDA-7402/PRD/MDA-7402_ValidacionDepositoReferenciadoCB.jar`
-- `JAR/2019.8.2.0/MDA-7402/PRD/MDA-7402_ValidacionDepositoReferenciado.jar`
-- `JAR/2019.8.2.0/MDA-7402/PRD/MDA-7402_Update_Deposito_RefereciadoCB.jar`
-
-### Versiones de QA
-- `JAR/2019.8.2.0/MDA-7402/QA/MDA-7402_ValidacionDepositoReferenciadoCB.jar`
-- `JAR/2019.8.2.0/MDA-7402/QA/MDA-7402_ValidacionDepositoReferenciado.jar`
-- `JAR/2019.8.2.0/MDA-7402/QA/MDA-7402_Update_Deposito_RefereciadoCB.jar`
+### Configuraciones de Endpoint
+- URI: `/Middleware/OperationsAndExecution/CalculationServices/ValidaDepositoReferenciadoCB`
+- URI: `/Middleware/OperationsAndExecution/Payments/DepositosReferenciados`
+- Conexión JCA: `eis/DB/ConnectionProxyAbanksHN`
 
 ## Tests Relevantes
 
-**No encontrado**: No se identificaron archivos de test específicos para esta funcionalidad en la estructura analizada.
+### JAR de Despliegue (Encontrados)
+- `JAR/2019.8.2.0/MDA-7402/PRD/MDA-7402_ValidacionDepositoReferenciadoCB.jar`
+- `JAR/2019.8.2.0/MDA-7402/QA/MDA-7402_ValidacionDepositoReferenciadoCB.jar`
+- `JAR/2019.8.2.0/MDA-7402/PRD/MDA-7402_ValidacionDepositoReferenciado.jar`
+- `JAR/2019.8.2.0/MDA-7402/QA/MDA-7402_ValidacionDepositoReferenciado.jar`
 
-## Resumen de Archivos por Categoría
+## Archivos de Documentación Existentes
 
-| Categoría | Cantidad | Descripción |
-|-----------|----------|-------------|
-| **Proxy Services** | 3 | Servicios OSB principales |
-| **Business Services** | 4+ | Conexiones a base de datos y servicios |
-| **XQuery** | 8 | Transformaciones de datos |
-| **WSDL** | 4 | Contratos de servicio |
-| **XSD** | 5 | Esquemas de datos |
-| **JCA** | 1 | Configuración de adaptadores |
-| **JAR** | 6 | Archivos de deployment |
-| **Pipelines** | 12 | Flujos de procesamiento |
+### Documentación Previa (Encontrada)
+- `Middleware/v2/BusinessServices/ABK/eliminarFactorCanje/EliminarFactorCanje/03-EjemplosYMapeos-HN01.md`
+- `Middleware/v2/BusinessServices/ABK/eliminarFactorCanje/EliminarFactorCanje/04-Secuencia-HN01.mmd`
 
-**Total de archivos identificados**: Aproximadamente 43 archivos directamente relacionados con la funcionalidad ValidaDepositoReferenciadoCB.
+## Dependencias Externas
+
+### Conexiones de Base de Datos
+- **ConnectionProxyAbanksHN**: Conexión a base de datos Abanks Honduras
+- **Esquema ABK**: Esquema de base de datos para operaciones bancarias
+- **Package CBR_K_DEP_REFERENCIADOS**: Package de stored procedures
+
+### Servicios Dependientes
+- **MapeoErrores**: Servicio de mapeo de códigos de error
+- **ValidaServicioRegional**: Validación de servicios por región
+- **consultarCorresponsalB**: Validación de corresponsales bancarios
+
+## Archivos de Configuración Regional
+
+### Configuraciones por Región
+- **HN01**: Implementación completa con todos los archivos listados
+- **Otras regiones**: Solo configuración de error por defecto (MW-0008)
+
+## Resumen de Conteo de Archivos
+
+- **Proxy Services**: 4
+- **Business Services**: 3
+- **Pipelines**: 11
+- **XQuery**: 8
+- **XSD**: 5
+- **WSDL**: 5
+- **JCA**: 1
+- **JAR**: 4
+- **Total**: 41 archivos principales
+
+## Notas Importantes
+
+1. **Archivos Críticos**: Los archivos XQuery de transformación son críticos para el mapeo de datos
+2. **Configuración Regional**: Solo HN01 tiene implementación completa
+3. **Dependencias**: Fuerte dependencia de servicios genéricos (MapeoErrores, ValidaServicioRegional)
+4. **Base de Datos**: Dependencia específica de conexión a Abanks Honduras
+5. **Versionado**: Los JAR indican versión 2019.8.2.0 con ticket MDA-7402

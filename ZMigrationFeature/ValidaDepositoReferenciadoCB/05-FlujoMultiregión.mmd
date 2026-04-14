@@ -2,108 +2,103 @@ flowchart TD
     A[Cliente CB] --> B[ValidaDepositoReferenciadoCB Proxy]
     
     B --> C{Validar Esquema XML}
-    C -->|Error| D[MapeoErrorValidate]
-    D --> E[SOAP Fault]
-    E --> A
+    C -->|Error| D[Error Handler - BEA-382505]
+    D --> E[mapeoErrorValidate]
+    E --> F[SOAP Fault al Cliente]
     
-    C -->|OK| F[Validar Campos Obligatorios]
-    F -->|ACCOUNT vacío| G[Error: NO ACCOUNT]
-    F -->|DOCUMENT_TYPE vacío| H[Error: NO DOCUMENT TYPE]
-    F -->|DOCUMENT_VALUE vacío| I[Error: NO DOCUMENT VALUE]
+    C -->|OK| G{Validar Campos Obligatorios}
+    G -->|ACCOUNT vacío| H[Error: NO ACCOUNT]
+    G -->|TYPE vacío| I[Error: NO DOCUMENT TYPE]
+    G -->|VALUE vacío| J[Error: NO DOCUMENT VALUE]
+    H --> K[MapeoErrores - FICBCO0312]
+    I --> K
+    J --> K
+    K --> L[Response con Error]
     
-    G --> J[MapeoErrores]
-    H --> J
-    I --> J
-    J --> K[Response Error CB]
-    K --> A
+    G -->|OK| M[Validar Corresponsal Bancario]
+    M --> N[consultarCorresponsalB_db]
+    N --> O{PV_CODIGO_MENSAJE = SUCCESS?}
+    O -->|No| P[Construir Header Error]
+    P --> Q[Response Error Corresponsal]
     
-    F -->|OK| L[Consultar Corresponsal Bancario]
-    L --> M[consultarCorresponsalB_db]
-    M --> N[Oracle DB: consultarCorresponsalB]
-    N -->|PV_CODIGO_MENSAJE != SUCCESS| O[Error Corresponsal]
-    O --> K
+    O -->|Sí| R[Eliminar BankingCorrespondent Header]
+    R --> S[Invocar DepositosReferenciados]
     
-    N -->|SUCCESS| P[Eliminar BankingCorrespondent Header]
-    P --> Q[Llamar DepositosReferenciados Router]
+    S --> T[DepositosReferenciados Router]
+    T --> U{Enrutamiento por Operación}
+    U -->|validaDepositoReferenciado| V[Route a ValidaDepositoReferenciado]
+    U -->|Otras operaciones| W[Otras rutas]
     
-    Q --> R{Branch por Operación}
-    R -->|validaDepositoReferenciado| S[ValidaDepositoReferenciado Proxy]
-    R -->|Otras operaciones| T[Otros servicios]
+    V --> X[ValidaDepositoReferenciado Proxy]
+    X --> Y{Validar Esquema Core}
+    Y -->|Error| Z[Error Handler Core]
     
-    S --> U[Validar Esquema Interno]
-    U -->|Error| V[Error Handler Interno]
-    V --> W[MapeoErrores FICBCO0311]
-    W --> X[Response Error Interno]
-    X --> Q
+    Y -->|OK| AA{Validar Campos Core}
+    AA -->|Error| Z
     
-    U -->|OK| Y[Validar Servicio Regional]
-    Y --> Z[ValidaServicioRegional_db]
-    Z --> AA[Oracle DB: ValidaServicioRegional]
-    AA -->|PV_CODIGO_ERROR != SUCCESS| BB[Error Regional]
-    BB --> X
+    AA -->|OK| BB[Validar Servicio Regional]
+    BB --> CC[ValidaServicioRegional_db]
+    CC --> DD{PV_CODIGO_ERROR = SUCCESS?}
+    DD -->|No| EE[Header Error Regional]
+    EE --> FF[Response Error Servicio]
     
-    AA -->|SUCCESS| CC{Branch por Región}
-    CC -->|SourceBank = HN01| DD[Pipeline HN01]
-    CC -->|Otras regiones| EE[Pipeline Default]
+    DD -->|Sí| GG{Enrutamiento Regional}
+    GG -->|SourceBank = HN01| HH[Pipeline HN01]
+    GG -->|Otras regiones| II[Pipeline DefaultBranch]
     
-    EE --> FF[Error: MW-0008]
-    FF --> GG[SERVICE NOT IMPLEMENTED]
-    GG --> X
+    II --> JJ[Error MW-0008]
+    JJ --> KK[SERVICE NOT IMPLEMENTED]
     
-    DD --> HH[Transformar Request XQuery]
-    HH --> II[validaDepositoReferenciadoIN.xq]
-    II --> JJ{Tipo Documento}
-    JJ -->|DEBTOR_CODE| KK[PV_TIPO_DOCUMENTO = 1]
-    JJ -->|Otros| LL[PV_TIPO_DOCUMENTO = 2]
+    HH --> LL[Invocar ValidaDepositoReferenciado_db]
+    LL --> MM[CBR_K_DEP_REFERENCIADOS.CRB_P_VALIDAR_DEPOSITO_REF]
+    MM --> NN[Conexión: eis/DB/ConnectionProxyAbanksHN]
     
-    KK --> MM[ValidaDepositoReferenciado_db]
-    LL --> MM
-    MM --> NN[Oracle DB: CRB_P_VALIDAR_DEPOSITO_REF]
-    NN --> OO[Package: CBR_K_DEP_REFERENCIADOS]
-    OO --> PP[Connection: ConnectionProxyAbanksHN]
+    NN --> OO{PV_CODIGO_RETORNO = -1?}
+    OO -->|Sí| PP[Error: NO RECORDS]
+    PP --> QQ[MapeoErrores - FICBCO0311]
     
-    PP -->|PV_CODIGO_RETORNO = -1| QQ[Error: NO RECORDS]
-    QQ --> RR[Error Handler HN01]
-    RR --> W
+    OO -->|No| RR[Procesar ResultSet]
+    RR --> SS[Transformar con validaDepositoReferenciadoOUT.xq]
+    SS --> TT[Mapear Arrays de Deudores]
     
-    PP -->|SUCCESS| SS[Transformar Response XQuery]
-    SS --> TT[validaDepositoReferenciadoOUT.xq]
-    TT --> UU[Correlacionar Arrays Deudores]
-    UU --> VV{For Loop Deudores}
-    VV --> WW[PT_CODIGO_DEUDOR[x] → DEBTOR_INFO/ID]
-    VV --> XX[PT_NOMBRE_DEUDOR[x] → DEBTOR_INFO/NAME]
+    TT --> UU[Construir Header SUCCESS]
+    UU --> VV[Response Core Exitoso]
     
-    WW --> YY[Response HN01 Success]
-    XX --> YY
-    YY --> ZZ[Header: successIndicator=SUCCESS]
-    ZZ --> Q
+    VV --> WW[Retorno a DepositosReferenciados]
+    WW --> XX[Retorno a ValidaDepositoReferenciadoCB]
     
-    Q --> AAA{Validar Response Header}
-    AAA -->|successIndicator != SUCCESS| BBB[MapeoErrores FICBCO0312]
-    BBB --> CCC[Response Error Final]
-    CCC --> A
+    XX --> YY{successIndicator = SUCCESS?}
+    YY -->|No| ZZ[MapeoErrores - FICBCO0312]
+    ZZ --> AAA[Response CB Error]
     
-    AAA -->|SUCCESS| DDD[Transformar Response CB]
-    DDD --> EEE[validaDepositoReferenciadoCBOUT.xq]
-    EEE --> FFF[Mapear DEBTOR_INFOS → DEBTOR_INFO]
-    FFF --> GGG[Response CB Success]
-    GGG --> A
+    YY -->|Sí| BBB[Transformar con validaDepositoReferenciadoCBOUT.xq]
+    BBB --> CCC[Aplanar Estructura DEBTOR_INFOS]
+    CCC --> DDD[SOAP Response Exitoso]
+    
+    DDD --> EEE[Cliente CB]
+    L --> EEE
+    Q --> EEE
+    FF --> EEE
+    KK --> EEE
+    QQ --> EEE
+    AAA --> EEE
+    F --> EEE
     
     style A fill:#e1f5fe
     style B fill:#f3e5f5
-    style DD fill:#e8f5e8
-    style EE fill:#ffebee
+    style T fill:#f3e5f5
+    style X fill:#f3e5f5
+    style HH fill:#e8f5e8
+    style II fill:#ffebee
     style MM fill:#fff3e0
-    style NN fill:#f1f8e9
-    style J fill:#ffcdd2
-    style W fill:#ffcdd2
+    style EEE fill:#e1f5fe
     
-    classDef errorNode fill:#ffcdd2,stroke:#d32f2f,stroke-width:2px
-    classDef successNode fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
-    classDef dbNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef transformNode fill:#e1f5fe,stroke:#1976d2,stroke-width:2px
+    classDef errorNode fill:#ffcdd2
+    classDef successNode fill:#c8e6c9
+    classDef processNode fill:#e1bee7
+    classDef dbNode fill:#ffe0b2
     
-    class D,G,H,I,J,O,V,BB,FF,QQ,RR,BBB errorNode
-    class P,N,AA,YY,ZZ,GGG successNode
-    class M,Z,MM,NN,OO,PP dbNode
-    class II,TT,EEE,HH,SS,DDD transformNode
+    class D,H,I,J,P,Z,EE,JJ,PP errorNode
+    class UU,VV,BBB,DDD successNode
+    class B,T,X processNode
+    class N,CC,LL,MM,NN dbNode

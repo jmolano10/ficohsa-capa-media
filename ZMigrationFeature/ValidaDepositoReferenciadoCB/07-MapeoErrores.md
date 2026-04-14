@@ -3,177 +3,159 @@
 ## Tabla de Mapeo de Errores
 
 | Código Error (Core) | Descripción Error (Core) | Código HTTP | Descripción Error |
-|-------------------|-------------------------|-------------|-------------------|
-| **NO ACCOUNT** | La cuenta es necesaria | 400 | Bad Request - Campo obligatorio faltante |
-| **NO DOCUMENT TYPE** | El tipo de documento es necesario | 400 | Bad Request - Campo obligatorio faltante |
-| **NO DOCUMENT VALUE** | El valor del documento es necesario | 400 | Bad Request - Campo obligatorio faltante |
-| **NO RECORDS** | NO RECORDS FOUND | 404 | Not Found - No se encontraron registros |
-| **MW-0008** | SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY | 501 | Not Implemented - Servicio no implementado |
-| **BEA-382505** | Schema validation error | 400 | Bad Request - Error de validación de esquema |
-| **FICBCO0312** | Error en servicio CB ValidaDepositoReferenciadoCB | 500 | Internal Server Error - Error interno del servicio CB |
-| **FICBCO0311** | Error en servicio core ValidaDepositoReferenciado | 500 | Internal Server Error - Error interno del servicio core |
-| **ERROR** | Error genérico de validación regional | 500 | Internal Server Error - Error de validación regional |
-| **SUCCESS** | Operación exitosa | 200 | OK - Operación completada exitosamente |
+|-------------------|-------------------------|-------------|------------------|
+| **FICBCO0312** | Error en ValidaDepositoReferenciadoCB - Wrapper CB | 500 | Internal Server Error - Error en validación de depósito referenciado CB |
+| **FICBCO0311** | Error en ValidaDepositoReferenciado - Servicio Core | 500 | Internal Server Error - Error en validación de depósito referenciado |
+| **NO ACCOUNT** | La cuenta es necesaria | 400 | Bad Request - Campo ACCOUNT requerido |
+| **NO DOCUMENT TYPE** | El tipo de documento es necesario | 400 | Bad Request - Campo DOCUMENT_INFO.TYPE requerido |
+| **NO DOCUMENT VALUE** | El valor del documento es necesario | 400 | Bad Request - Campo DOCUMENT_INFO.VALUE requerido |
+| **NO RECORDS** | NO RECORDS FOUND | 404 | Not Found - No se encontraron registros para los criterios especificados |
+| **BEA-382505** | Error de validación de esquema XML | 400 | Bad Request - Estructura XML inválida |
+| **MW-0008** | SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY | 501 | Not Implemented - Servicio no implementado para esta región |
+| **ERROR** | Error en validación de corresponsal bancario | 403 | Forbidden - Corresponsal bancario no autorizado |
+| **ERROR** | Error en validación de servicio regional | 403 | Forbidden - Servicio no habilitado para la región |
+| **SUCCESS** | Operación exitosa | 200 | OK - Validación exitosa |
 
-## Detalles de Errores por Categoría
+## Códigos de Error por Componente
 
-### 1. Errores de Validación de Entrada (400 - Bad Request)
+### ValidaDepositoReferenciadoCB Proxy (Wrapper CB)
 
-#### NO ACCOUNT
-- **Origen**: ValidaDepositoReferenciadoCB.proxy - Pipeline "Validaciones Generales_request"
-- **Condición**: `fn:string($body/val:validaDepositoReferenciadoCBRequest/ACCOUNT/text()) = ""`
-- **Ubicación en código**: Stage "ValidateMessage"
-- **Acción**: Error inmediato con código "NO ACCOUNT"
-- **Mensaje**: "La cuenta es necesaria"
+#### Errores de Validación de Entrada
+- **NO ACCOUNT**: Campo ACCOUNT vacío o nulo
+- **NO DOCUMENT TYPE**: Campo DOCUMENT_INFO.TYPE vacío o nulo  
+- **NO DOCUMENT VALUE**: Campo DOCUMENT_INFO.VALUE vacío o nulo
+- **BEA-382505**: Error de validación de esquema XML
 
-#### NO DOCUMENT TYPE
-- **Origen**: ValidaDepositoReferenciadoCB.proxy - Pipeline "Validaciones Generales_request"
-- **Condición**: `fn:string($body/val:validaDepositoReferenciadoCBRequest/DOCUMENT_INFO/TYPE/text()) = ""`
-- **Ubicación en código**: Stage "ValidateMessage"
-- **Acción**: Error inmediato con código "NO DOCUMENT TYPE"
-- **Mensaje**: "El tipo de documento es necesario"
+#### Errores de Corresponsal Bancario
+- **Error de Corresponsal**: Cuando `PV_CODIGO_MENSAJE != 'SUCCESS'` en consultarCorresponsalB_db
 
-#### NO DOCUMENT VALUE
-- **Origen**: ValidaDepositoReferenciadoCB.proxy - Pipeline "Validaciones Generales_request"
-- **Condición**: `fn:string($body/val:validaDepositoReferenciadoCBRequest/DOCUMENT_INFO/VALUE/text()) = ""`
-- **Ubicación en código**: Stage "ValidateMessage"
-- **Acción**: Error inmediato con código "NO DOCUMENT VALUE"
-- **Mensaje**: "El valor del documento es necesario"
+#### Código de Servicio
+- **FICBCO0312**: Código identificador del servicio ValidaDepositoReferenciadoCB
 
-#### BEA-382505 (Schema Validation Error)
-- **Origen**: OSB Framework - Validación automática de esquema
-- **Condición**: Request no cumple con el esquema XSD definido
-- **Manejo**: Transformación con `mapeoErrorValidate.xq`
-- **Ubicación**: Error handler de ambos proxies
-- **Acción**: Mapeo automático a formato de error estándar
+### ValidaDepositoReferenciado Proxy (Servicio Core)
 
-### 2. Errores de Negocio (404 - Not Found)
+#### Errores de Validación Regional
+- **Error Regional**: Cuando `PV_CODIGO_ERROR != 'SUCCESS'` en ValidaServicioRegional_db
 
-#### NO RECORDS
-- **Origen**: ValidaDepositoReferenciado.proxy - Pipeline "HN01_request"
-- **Condición**: `$codigoValidaDeposito = "-1"`
-- **Fuente**: Stored procedure CRB_P_VALIDAR_DEPOSITO_REF retorna PV_CODIGO_RETORNO = "-1"
-- **Ubicación en código**: Stage "FlujoEntrada" después de wsCallout a ValidaDepositoReferenciado_db
-- **Acción**: Error inmediato con código "NO RECORDS"
-- **Mensaje**: "NO RECORDS FOUND"
+#### Errores de Datos
+- **NO RECORDS**: Cuando `PV_CODIGO_RETORNO = '-1'` desde la base de datos
 
-### 3. Errores de Implementación (501 - Not Implemented)
+#### Errores de Implementación
+- **MW-0008**: Servicio no implementado para regiones diferentes a HN01
 
-#### MW-0008
-- **Origen**: ValidaDepositoReferenciado.proxy - Pipeline "DefaultBranchPP_response"
-- **Condición**: Región diferente a HN01
-- **Ubicación en código**: Branch por defecto en regionalización
-- **Acción**: Error inmediato con código "MW-0008"
-- **Mensaje**: "SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY"
+#### Código de Servicio
+- **FICBCO0311**: Código identificador del servicio ValidaDepositoReferenciado
 
-### 4. Errores Internos del Sistema (500 - Internal Server Error)
+### Base de Datos (ValidaDepositoReferenciado_db)
 
-#### FICBCO0312 (Servicio CB)
-- **Origen**: ValidaDepositoReferenciadoCB.proxy - Error handlers
-- **Condición**: Errores no manejados específicamente en el servicio CB
-- **Formato de mensaje**: `fn:concat("FICBCO0312", "$#$", $errorMessage)`
-- **Procesamiento**: Llamada a servicio MapeoErrores
-- **Transformación**: mapeoErroresUsageIn.xq / mapeoErroresUsageOut.xq
+#### Parámetros de Error de Salida
+- **PV_CODIGO_ERROR**: Código de error del stored procedure
+- **PV_CODIGO_RETORNO**: Código de retorno (-1 = sin registros, 0 = exitoso)
+- **PV_MENSAJE_ERROR**: Mensaje descriptivo del error
 
-#### FICBCO0311 (Servicio Core)
-- **Origen**: ValidaDepositoReferenciado.proxy - Error handlers
-- **Condición**: Errores no manejados específicamente en el servicio core
-- **Formato de mensaje**: `fn:concat("FICBCO0311", "$#$", $errorMessage)`
-- **Procesamiento**: Llamada a servicio MapeoErrores
-- **Transformación**: mapeoErroresUsageIn.xq / mapeoErroresUsageOut.xq
-
-#### ERROR (Validación Regional)
-- **Origen**: ValidaDepositoReferenciado.proxy - Stage "ValidateRegionService"
-- **Condición**: `fn:string($RSPValidaServicioRegional/vsr:PV_CODIGO_ERROR/text()) != 'SUCCESS'`
-- **Fuente**: Stored procedure ValidaServicioRegional
-- **Acción**: Response con successIndicator="ERROR"
-- **Mensaje**: Contenido de PV_MENSAJE_ERROR del stored procedure
-
-### 5. Errores de Corresponsal Bancario (500 - Internal Server Error)
-
-#### Error de Corresponsal
-- **Origen**: ValidaDepositoReferenciadoCB.proxy - Stage "ValidarCorresponsal"
-- **Condición**: `fn:string($RSPConsultaCorresponsal/con:PV_CODIGO_MENSAJE/text()) != 'SUCCESS'`
-- **Fuente**: Stored procedure consultarCorresponsalB
-- **Acción**: Response con successIndicator="Error"
-- **Mensaje**: Contenido de PV_MENSAJE_ERROR del stored procedure
+#### Stored Procedure
+- **Package**: CBR_K_DEP_REFERENCIADOS
+- **Procedure**: CRB_P_VALIDAR_DEPOSITO_REF
 
 ## Flujo de Manejo de Errores
 
-### 1. Errores de Validación (BEA-382505)
+### 1. Errores de Validación de Esquema
 ```
-Error de Esquema → mapeoErrorValidate.xq → Response Header con Error → Cliente
-```
-
-### 2. Errores de Aplicación (Otros códigos)
-```
-Error → MapeoErrores Service → mapeoErroresUsageIn.xq → 
-Stored Procedure de Mapeo → mapeoErroresUsageOut.xq → Response Header con Error → Cliente
+Cliente → ValidaDepositoReferenciadoCB → Error BEA-382505 → mapeoErrorValidate → SOAP Fault
 ```
 
-### 3. Errores de Negocio Específicos
+### 2. Errores de Campos Obligatorios
 ```
-Validación de Negocio → Error Inmediato → Response con successIndicator != SUCCESS → Cliente
+Cliente → ValidaDepositoReferenciadoCB → Error (NO ACCOUNT/TYPE/VALUE) → MapeoErrores (FICBCO0312) → Response Error
 ```
+
+### 3. Errores de Corresponsal
+```
+Cliente → ValidaDepositoReferenciadoCB → consultarCorresponsalB_db → Error → Response Error
+```
+
+### 4. Errores de Servicio Regional
+```
+Cliente → ValidaDepositoReferenciado → ValidaServicioRegional_db → Error → MapeoErrores (FICBCO0311) → Response Error
+```
+
+### 5. Errores de Datos
+```
+Cliente → ValidaDepositoReferenciado → ValidaDepositoReferenciado_db → NO RECORDS → MapeoErrores (FICBCO0311) → Response Error
+```
+
+### 6. Errores de Región No Implementada
+```
+Cliente → ValidaDepositoReferenciado → DefaultBranch → MW-0008 → Response Error
+```
+
+## Transformaciones de Error
+
+### mapeoErrorValidate (BEA-382505)
+- **Entrada**: `$fault` (contexto de error OSB)
+- **Salida**: Header con `successIndicator` y `messages`
+- **Uso**: Errores de validación de esquema XML
+
+### MapeoErrores Service
+- **Entrada**: 
+  - `CODIGO_ERROR`: Código del error
+  - `MENSAJE_ERROR`: Mensaje con formato "FICBCO0312$#$mensaje" o "FICBCO0311$#$mensaje"
+- **Salida**: Header estructurado con error mapeado
+- **Uso**: Mapeo de errores de negocio a códigos estándar
 
 ## Estructura de Response de Error
 
-### Header de Error Estándar
+### Header de Error
 ```xml
 <aut:ResponseHeader xmlns:aut="http://www.ficohsa.com.hn/middleware.services/autType">
     <successIndicator>ERROR</successIndicator>
-    <messages>Mensaje de error específico</messages>
+    <messages>Descripción del error</messages>
 </aut:ResponseHeader>
 ```
 
-### Body de Error (Vacío)
+### Body de Error
 ```xml
 <val:validaDepositoReferenciadoCBResponse xmlns:val="http://www.ficohsa.com.hn/middleware.services/ValidaDepositoReferenciadoCBTypes"/>
 ```
 
-## Configuración de Retry y Timeout
+## Códigos de Transacción
 
-### Configuración de Retry
-- **Retry Count**: 0 (sin reintentos automáticos)
-- **Retry Interval**: 30 segundos
-- **Retry Application Errors**: true
+### Tipos de Transacción para Validaciones
+- **Tipo 7**: Validación de corresponsal bancario en consultarCorresponsalB_db
 
-### Implicaciones
-- Los errores de aplicación no se reintentan automáticamente
-- Los errores de conectividad podrían reintentar según configuración de conexión
-- Timeout por defecto del contenedor OSB (no configurado específicamente)
+### Códigos de Servicio
+- **FICBCO0312**: ValidaDepositoReferenciadoCB (Wrapper CB)
+- **FICBCO0311**: ValidaDepositoReferenciado (Servicio Core)
 
-## Códigos de Servicio para Mapeo
+## Logging y Monitoreo
 
-### Identificadores de Servicio
-- **FICBCO0312**: Identificador para errores del servicio CB ValidaDepositoReferenciadoCB
-- **FICBCO0311**: Identificador para errores del servicio core ValidaDepositoReferenciado
-- **Transacción 7**: Tipo de transacción para validación de corresponsal bancario
+### Configuración de Logging
+- **Nivel**: Debug habilitado en todos los proxy services
+- **SLA Alerting**: Habilitado en nivel normal
+- **Pipeline Alerting**: Habilitado en nivel normal
 
-### Formato de Mensaje de Error
-```
-CODIGO_SERVICIO$#$MENSAJE_ERROR
-```
-
-Ejemplo:
-```
-FICBCO0312$#$La cuenta es necesaria
-```
+### Información de Debug
+- Requests y responses completos
+- Transformaciones XQuery
+- Errores de base de datos
+- Validaciones fallidas
 
 ## Recomendaciones para Manejo de Errores
 
-### 1. Logging y Monitoreo
-- Todos los servicios tienen logging habilitado en nivel DEBUG
-- SLA alerting configurado en nivel NORMAL
-- Considerar implementar métricas específicas por tipo de error
+### Para Desarrollo
+1. **Validar Esquemas**: Asegurar que los XSD estén actualizados
+2. **Probar Validaciones**: Verificar todos los campos obligatorios
+3. **Simular Errores**: Probar todos los flujos de error
+4. **Logging Detallado**: Mantener logs para troubleshooting
 
-### 2. Mejoras Sugeridas
-- Implementar códigos de error más granulares
-- Agregar información de contexto en mensajes de error
-- Considerar implementar retry logic para errores transitorios
-- Documentar mapeo completo de errores de stored procedures
+### Para Operación
+1. **Monitoreo**: Configurar alertas para errores frecuentes
+2. **Dashboards**: Crear métricas de errores por tipo
+3. **Documentación**: Mantener catálogo de errores actualizado
+4. **Escalamiento**: Definir procedimientos para errores críticos
 
-### 3. Consistencia Regional
-- Mantener códigos de error consistentes entre regiones
-- Implementar mapeo de errores específico por región si es necesario
-- Considerar localización de mensajes de error
+### Para Migración
+1. **Mapeo Regional**: Adaptar códigos de error por región
+2. **Base de Datos**: Configurar stored procedures por región
+3. **Testing**: Validar manejo de errores en cada región
+4. **Rollback**: Preparar procedimientos de reversión

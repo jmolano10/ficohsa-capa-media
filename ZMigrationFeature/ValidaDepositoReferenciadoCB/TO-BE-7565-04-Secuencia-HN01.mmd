@@ -1,0 +1,107 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidore/Aplicación
+    participant API as API Exp Validar <br> Depósito Referenciado CB <br> Epica 2682: ValidaDepositoReferenciadoCB <br> HU 7565:  POST - /correspondent-banking/v1/initiate-deposit-validation
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
+    participant lambdaSP as Lambda Validación Corresponsales<br/> HU 7761 - ban-xrs-ic-lam-validate-bank-correspondent-{env}
+    participant valida as API Producto Validación <br>  Depósito Referenciado <br> Epica 2277: ValidaDepositoReferenciado <br> HU 10391:  POST -  /loans-and-deposits/deposit-account-retrieves/v1/debtors-list
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - Validación Depósito Referenciado CB
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> accountNumber, <br> customerReferenceType, <br> customerReference <br> pointOfSale <br> subPointOfSale
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "CORRESPONDENT_BANKING" <br> name: "INITIATE_DEPOSIT_VALIDATION" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Cahé Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "CORRESPONDENT_BANKING" <br> name: "INITIATE_DEPOSIT_VALIDATION" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>API: Construye request Lambda Valida Corresponsal
+    Note over API: Mapeo: <br> correspondentPartyReference = header.Branch-Id, <br> country = request.header.soruceBank, <br> transactionType = libparam.transactionType
+
+    API->>lambdaSP: Consume Lambda Valida Corresponsal
+    Note right of API: correspondentPartyReference, soruceBank, transactionType
+
+    lambdaSP->>API: Response Lambda Valida Corresponsal
+    Note left of lambdaSP: Response: <br> creditAccountReference, <br> debitAccountReference, <br> permittedCurrencyCode, <br> transactionType, <br> commissionAmount, <br> commissionCurrencyCode, <br> commissionTransactionType, <br> commissionAccountReference
+
+    API->>API: Evalua response Lambda Valida Corresponsal
+
+    alt If lambdaValCorr.success == false
+
+        API->> Consumidor: Retorna error generado por la lambda
+        Note left of API: HTTP 4XX / 5XX
+
+    else If lambdaValCorr.success == true
+
+        API->>API: Construye Request API Prod Deposit Account Retrieves Debtor List
+        Note over API: body: <br> accountIdentification = request.accountNumber, <br> identificationScheme = request.customerReferenceType, <br> identificationValue = request.customerReference
+
+        API->>valida: Consume API Prod Deposit Account Retrieves Debtor List
+        Note right of API: accountIdentification, <br> partyIdentificationDetails { <br> identificationScheme, identificationValue <br> }
+
+        valida->>API: Response API Prod Deposit Account Retrieves Debtor List
+        Note left of valida: Response: <br> validatedDocumentNumber, <br> validatedAccountIdentification, <br> authorizedPartyRecord [ <br> partyReference, <br> partyName ]
+
+        API->>API: Evalúa Response API Prod Deposit Account Retrieves Debtor List
+
+        alt If data.success == false 
+
+            API->> Consumidor: Retorna error generado por API Prod Deposit Account Retrieves Debtor List
+            Note left of API: HTTP 4XX / 5XX
+
+        else If data.success == true 
+
+            API->>API: Construye response API Experiencia
+            Note over API: depositDocumentReference = responseDebtorList.validatedDocumentNumber <br> accountNumber = responseDebtorList.validatedAccountIdentification <br> debtorReference = responseDebtorList.partyReference <br> debtorName = responseDebtorList.partyName
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+
+        end
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
