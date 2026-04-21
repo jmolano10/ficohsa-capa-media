@@ -1,0 +1,105 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant ConsultaRuta as consultaRutaRegional_db
+    participant ObtenerTipo as obtenerTipoTrxGen_db
+    participant ValidarEstado as validarEstadoTransaccion_db
+    participant T24Service as svcReversarTransaccionCB
+    participant ActualizarTrx as actualizarEstadoTransaccionUUID_db
+    participant ErrorHandler as MapeoErrores
+
+    Note over Client, ErrorHandler: Flujo Guatemala (GT01) - ReversarTransaccionID - DEPOSITO
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: Region=GT01, UserName=USUARIO_GT01<br/>Body: TRANSACTION_TYPE=DEPOSITO<br/>TRANSACTION_ID=550e8400-e29b-41d4-a716-446655440001
+
+    OSB->>OSB: Validar Autenticación
+    Note right of OSB: Username/Password en RequestHeader<br/>Validación de credenciales GT01
+
+    alt Autenticación Fallida
+        OSB->>ErrorHandler: Error de Autenticación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>ConsultaRuta: Consultar Ruta Regional
+    Note right of ConsultaRuta: PV_ID_SERVICIO: FICBCO0516<br/>PV_REGION: GT01<br/>PV_OPERACION: reversarTransaccionID<br/>PV_VERSION: V2
+
+    ConsultaRuta->>OSB: Respuesta Ruta Regional
+    Note left of ConsultaRuta: PV_CODIGO_ERROR: SUCCESS<br/>PV_RUTA_REGIONAL: GT01_ROUTE
+
+    alt Ruta Regional No Válida
+        OSB->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>ObtenerTipo: Obtener Tipo de Transacción
+    Note right of ObtenerTipo: PV_COD_OSB: DEPOSITO
+
+    ObtenerTipo->>OSB: Respuesta Tipo Transacción
+    Note left of ObtenerTipo: PV_ERROR_CODE: SUCCESS<br/>PV_MESSAGE: NOGEN<br/>PV_TIPO_OPE: REVERSA_DEPOSITO
+
+    OSB->>OSB: Calcular Tipo Consulta
+    Note right of OSB: tipoConsulta = if (tipoTRX = 'NOGEN') then 1 else 4<br/>Resultado: tipoConsulta = 1
+
+    OSB->>ValidarEstado: Validar Estado Transacción
+    Note right of ValidarEstado: PV_UUID: 550e8400-e29b-41d4-a716-446655440001<br/>PN_TIPO_CONSULTA: 1<br/>PN_CODIGO_ESTADO: 0
+
+    ValidarEstado->>OSB: Respuesta Estado Transacción
+    Note left of ValidarEstado: PV_ERRORCODE: SUCCESS<br/>PV_FT: FT24001GT123456<br/>PV_MESSAGE: TRUE<br/>Pv_uuido: 550e8400-e29b-41d4-a716-446655440001<br/>Pv_refcb: CBGT20241201001
+
+    alt Estado No Válido para Reversión
+        OSB->>OSB: Error Estado Transacción
+        OSB->>Client: Response con Error
+        Note right of OSB: "La transaccion no tiene el estado correcto"
+    end
+
+    OSB->>OSB: Validar Tipo de Transacción
+    Note right of OSB: Tipo DEPOSITO → Flujo Default<br/>(No es PAGO_TC ni PAGO_EEH)
+
+    OSB->>T24Service: Reversar Depósito en T24
+    Note right of T24Service: Operación: ReversionDepositoTengo<br/>User: USUARIO_GT01<br/>FT: FT24001GT123456
+
+    T24Service->>OSB: Respuesta T24
+    Note left of T24Service: successIndicator: SUCCESS<br/>messages: Reversión de depósito procesada<br/>transactionId: REV24001GT123456
+
+    alt Reversión T24 Fallida
+        OSB->>OSB: Error T24
+        OSB->>Client: Response con Error
+        Note right of OSB: Error en reversión T24
+    end
+
+    OSB->>ActualizarTrx: Actualizar Estado Transacción
+    Note right of ActualizarTrx: PV_ESTADO: R (Reversada)<br/>PV_UUID: 550e8400-e29b-41d4-a716-446655440001
+
+    ActualizarTrx->>OSB: Respuesta Actualización
+    Note left of ActualizarTrx: PV_ERRORCODE: SUCCESS
+
+    OSB->>OSB: Construir Respuesta Final
+    Note right of OSB: T24_REFERENCE: REV24001GT123456<br/>TRANSACTION_ID: 550e8400-e29b-41d4-a716-446655440001<br/>REFERENCE_CB: CBGT20241201001
+
+    OSB->>Client: SOAP Response Exitoso
+    Note left of Client: Header: successIndicator=SUCCESS<br/>Body: Datos de reversión<br/>T24_REFERENCE, TRANSACTION_ID, REFERENCE_CB
+
+    Note over Client, ErrorHandler: Transformaciones Clave GT01:
+    Note over Client, ErrorHandler: 1. Mapeo DEPOSITO → NOGEN → tipoConsulta=1
+    Note over Client, ErrorHandler: 2. Validación estado TRUE para permitir reversión
+    Note over Client, ErrorHandler: 3. Flujo directo a T24 (sin registro previo)
+    Note over Client, ErrorHandler: 4. Reversión con operación ReversionDepositoTengo
+    Note over Client, ErrorHandler: 5. Mapeo FT en lugar de TFS para depósitos
+    Note over Client, ErrorHandler: 6. Actualización estado a 'R' (Reversada)
+
+    Note over Client, ErrorHandler: Configuración Regional GT01:
+    Note over Client, ErrorHandler: - Zona horaria: GMT-6 (Guatemala)
+    Note over Client, ErrorHandler: - Monedas: GTQ (Quetzal), USD (Dólar)
+    Note over Client, ErrorHandler: - Ventana procesamiento: 06:00-22:00 local
+    Note over Client, ErrorHandler: - Timeout: 30 segundos, Retry: 0
+    Note over Client, ErrorHandler: - Endpoint T24: t24-gt01.ficohsa.com:8080
+
+    Note over Client, ErrorHandler: Manejo de Errores GT01:
+    Note over Client, ErrorHandler: - Código base: FICBCO0259
+    Note over Client, ErrorHandler: - Mensajes en español para Guatemala
+    Note over Client, ErrorHandler: - Logging nivel debug habilitado
+    Note over Client, ErrorHandler: - Alertas SLA y Pipeline nivel normal
+```

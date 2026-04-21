@@ -14,13 +14,13 @@
     },
     {
       "region": "GT01-GT01",
-      "enabled": false,
+      "enabled": true,
       "param-name": "ban-gtm-ic-comp-parm-retrieve-customer-risk-osb-wsdl-dev",
       "secret-name": "ban-gtm-ic-comp-secm-retrieve-customer-risk-osb-wsdl-dev"
     },
     {
       "region": "NI01-NI01",
-      "enabled": false,
+      "enabled": true,
       "param-name": "ban-nic-ic-comp-parm-retrieve-customer-risk-osb-wsdl-dev",
       "secret-name": "ban-nic-ic-comp-secm-retrieve-customer-risk-osb-wsdl-dev"
     },

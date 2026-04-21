@@ -1,0 +1,143 @@
+```mermaid
+flowchart TD
+    A[Cliente/Aplicación] --> B[OSB Proxy Service<br/>ReversarTransaccionID]
+    B --> C{Validar<br/>Autenticación}
+    C -->|Error| Z1[Error Handler<br/>FICBCO0259]
+    C -->|OK| D[consultaRutaRegional_db<br/>FICBCO0516]
+    
+    D --> E{Ruta Regional<br/>Válida?}
+    E -->|No| Z2[Error: Servicio no disponible<br/>para la región]
+    E -->|Sí| F[obtenerTipoTrxGen_db<br/>TRANSACTION_TYPE]
+    
+    F --> G{Tipo de<br/>Transacción}
+    G -->|NOGEN| H[tipoConsulta = 1]
+    G -->|GEN| I[tipoConsulta = 4]
+    
+    H --> J[validarEstadoTransaccion_db]
+    I --> J
+    J --> K{Estado = TRUE<br/>Reversible?}
+    K -->|No| Z3[Error: Estado incorrecto<br/>no se puede reversar]
+    K -->|Sí| L{Tipo de<br/>Transacción}
+    
+    L -->|PAGO_TC| M[Flujo Pago TC]
+    L -->|PAGO_EEH| N[Flujo Pago EEH]
+    L -->|Otros| O[Flujo Genérico]
+    
+    %% Flujo PAGO_TC
+    M --> M1[registrarReversionTCCB_db]
+    M1 --> M2{Registro<br/>Exitoso?}
+    M2 -->|No| Z4[Error: No aplicada en V+]
+    M2 -->|Sí| M3[svcReversarTransaccionCB<br/>ReversionPagoTCTengo]
+    M3 --> M4{T24<br/>Exitoso?}
+    M4 -->|No| Z5[Error T24]
+    M4 -->|Sí| M5[conReversarPagoTCRG_db<br/>Master Data]
+    M5 --> P[actualizarEstadoTransaccionUUID_db<br/>Estado = 'R']
+    
+    %% Flujo PAGO_EEH
+    N --> N1[svcGestionesTrxSEEHTENGO<br/>ReversarTransaccionTENGOEEH]
+    N1 --> N2{EEH<br/>Exitoso?}
+    N2 -->|No| Z6[Error EEH]
+    N2 -->|Sí| Q[actualizarTransaccionGenCB_db<br/>Transacciones Genéricas]
+    
+    %% Flujo Genérico
+    O --> O1[svcReversarTransaccionCB<br/>ReversionDepositoTengo]
+    O1 --> O2{Reversión<br/>Exitosa?}
+    O2 -->|No| Z7[Error Reversión]
+    O2 -->|Sí| P
+    
+    %% Actualización final
+    P --> R{Actualización<br/>Exitosa?}
+    Q --> S{Actualización Gen<br/>Exitosa?}
+    R -->|Sí| T[Construir Respuesta Exitosa]
+    S -->|Sí| T
+    R -->|No| Z8[Error Actualización]
+    S -->|No| Z8
+    
+    T --> U[SOAP Response<br/>T24_REFERENCE<br/>TRANSACTION_ID<br/>REFERENCE_CB]
+    
+    %% Errores
+    Z1 --> V[MapeoErrores<br/>Código FICBCO0259]
+    Z2 --> V
+    Z3 --> V
+    Z4 --> V
+    Z5 --> V
+    Z6 --> V
+    Z7 --> V
+    Z8 --> V
+    V --> W[SOAP Fault Response]
+    
+    %% Configuración Regional
+    subgraph "Configuración por Región"
+        R1[HN01: Honduras<br/>Endpoint T24: 10.242.104.55:7004]
+        R2[GT01: Guatemala<br/>Endpoint T24: Regional]
+        R3[PA01: Panamá<br/>Endpoint T24: Regional]
+        R4[NI01: Nicaragua<br/>Endpoint T24: Regional]
+    end
+    
+    D -.-> R1
+    D -.-> R2
+    D -.-> R3
+    D -.-> R4
+    
+    %% Tipos de Transacción Soportados
+    subgraph "Tipos de Transacción"
+        T1[RETIRO]
+        T2[PAGO_TC]
+        T3[PAGO_REMESA]
+        T4[PAGO_PRESTAMO]
+        T5[DEPOSITO]
+        T6[PAGO_RECAUDO]
+        T7[PAGO_EEH]
+        T8[CUPON]
+        T9[CAN_CUPON_HIST]
+        T10[CASHOUT/CASHIN]
+        T11[CASHIN_TC]
+        T12[TRANSFER_CRED]
+        T13[MIG_TC]
+        T14[ADJ_*]
+    end
+    
+    F -.-> T1
+    F -.-> T2
+    F -.-> T3
+    F -.-> T4
+    F -.-> T5
+    F -.-> T6
+    F -.-> T7
+    F -.-> T8
+    F -.-> T9
+    F -.-> T10
+    F -.-> T11
+    F -.-> T12
+    F -.-> T13
+    F -.-> T14
+    
+    %% Sistemas Backend
+    subgraph "Sistemas Backend"
+        BE1[T24 Core Banking<br/>Operaciones: ReversionPagoTCTengo<br/>ReversionDepositoTengo]
+        BE2[Core Banking CB<br/>Registro de Reversiones]
+        BE3[Base de Datos MDW<br/>Control de Transacciones]
+        BE4[LDAP Security<br/>Credenciales Dinámicas]
+    end
+    
+    M3 -.-> BE1
+    N1 -.-> BE1
+    O1 -.-> BE1
+    M1 -.-> BE2
+    M5 -.-> BE2
+    J -.-> BE3
+    P -.-> BE3
+    Q -.-> BE3
+    B -.-> BE4
+    
+    %% Notas de Configuración
+    classDef errorClass fill:#ffcccc,stroke:#ff0000,stroke-width:2px
+    classDef successClass fill:#ccffcc,stroke:#00ff00,stroke-width:2px
+    classDef processClass fill:#cceeff,stroke:#0066cc,stroke-width:2px
+    classDef regionClass fill:#ffffcc,stroke:#ffcc00,stroke-width:2px
+    
+    class Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,V,W errorClass
+    class T,U successClass
+    class B,D,F,J,M1,M3,M5,N1,O1,P,Q processClass
+    class R1,R2,R3,R4 regionClass
+```

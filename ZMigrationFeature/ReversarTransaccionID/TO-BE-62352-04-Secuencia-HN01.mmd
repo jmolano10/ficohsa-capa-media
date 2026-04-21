@@ -1,0 +1,97 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API Reversar Transacción Tengo EEH <br> Epica 55011: ReversarTransaccionID <br> HU 62352:  POST - /payments/payment-execution-processing/v1/execute-reverse-transaction
+    participant CL as Caché Local
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant wrapper as Wrapper T24 <br/> HU 53  - POST /t24-wrapper-hnd/v1/ReversarTransaccionTENGOEEH  <br> OP: ReversarTransaccionTENGOEEH
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Registrar Reversión Tengo EEH
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: transactionReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "PAYMENT_EXECUTION_PROCESSING" <br> name: "EXECUTE_REVERSE_TRANSACTION" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "PAYMENT_EXECUTION_PROCESSING" <br> name: "EXECUTE_REVERSE_TRANSACTION" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> caller-service <br> operation <br> type
+
+    API->>API: Construye Request Wrapper T24 - OP: ReversarTransaccionTENGOEEH
+    Note over API:  body: <br>  operation = const.operation <br> payload { <br> type = const.type <br> data { <br> const.type { <br> transactionId = request.transactionReference <br> } } }
+
+    API->>wrapper: Consume Wrapper T24 - OP: ReversarTransaccionTENGOEEH
+    Note right of API: Request: <br> operation, <br> payload
+
+    wrapper->>API: Response Wrapper T24 - OP: ReversarTransaccionTENGOEEH
+    Note left of wrapper: Response: <br> meta, data
+
+    API->>API: Evalúa Response Wrapper T24 - OP: ReversarTransaccionTENGOEEH
+
+    alt If ReversarTransaccionTENGOEEHResponse.status.successIndicator != SUCCESS 
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según <br> tabla de homologación OP: ReversarTransaccionTENGOEEH
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    else If ReversarTransaccionTENGOEEHResponse.status.successIndicator == SUCCESS 
+
+        API->>API: Construye response API Producto
+        Note over API: Mapeo uno a uno campos response <br> Wrapper T24 - OP: ReversarTransaccionTENGOEEH a response API Producto
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

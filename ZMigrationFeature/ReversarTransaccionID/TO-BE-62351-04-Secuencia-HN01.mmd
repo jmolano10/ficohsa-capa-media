@@ -1,0 +1,174 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor / Aplicación
+    participant sqsRequest as AWS SQS <br> Cola de Solicitudes <br> ban-xrs-ic-comp-sqs-regsiter-reverse-cc-in-<env>
+    participant API as API Registra Reverso TC <br> Epica 55011: ReversarTransaccionID <br> HU 62351:  POST - /register-reverse-credit-card/v1/register
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant parameter as Paramter Store
+    participant secret as Secret Manager
+    participant Homologador as Liberería de <br> Homologación
+    participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
+    participant master as BD <br> MasterData <br/> SP: OSBRegistraReversaTC
+    participant Reintentos as AWS EventBridge <br> Componente de Idempotencia / Reintentos
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Multiregión (HN01 | GT01 | NI01 | PA01) - API Registra Reverso TC
+    
+    alt Flujo síncrono
+
+        Consumidor->>API: REST Request
+        Note right of Consumidor: body: organizationReference, <br> transactionReferenceReverse, <br> operationType
+    
+    else Flujo Asíncrono
+
+        Consumidor->>sqsRequest: Publica mensaje de solicitud
+        Note right of Consumidor: Headers: <br> caller-service <br> Correlation-Id, <br> Body: <br> organizationReference <br> transactionReferenceReverse <br> operationType
+
+        API->>sqsRequest: Sondea mensajes (Long Polling)
+        
+        sqsRequest->>API: Entrega mensaje de solicitud
+        Note left of sqsRequest: Entrega mensaje con <br> Correlation-Id y body
+
+    end
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt If request.header.caller-service == const.caller-service-retry
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 202: Transacción recibida exitosamente, pero es un reintento.
+
+        API->>API: Continúa procesamiento
+
+    end 
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "REGISTER_REVERSE_CREDIT_CARD" <br> name: "REGISTER" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Consultar parámetros de Parameter Store en caché local
+        Note right of API: paranName = libparam.param-name
+
+        CL->>API: Obtiene parámetros de Parameter Store en Cahé Local
+        Note left of CL: Obtiene parámetros de conexión a BD: ip, port, database
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "REGISTER_REVERSE_CREDIT_CARD" <br> name: "REGISTER" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+        API->>parameter: Consultar parámetros del Parameter Store
+        Note right of API: paranName = libparam.param-name
+
+        parameter->>API: Obtiene parámetros del Parameter Store
+        Note left of parameter: Obtiene parámetros de conexión a BD: ip, port, database
+
+        API->>CL: Guarda parámetros del Parameter Store en caché local
+        Note right of API: ip, port, database
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> caller-service <br> operation <br> type <br> caller-service-retry
+
+    API->>secret: Consulta secretos para conexión a base de datos
+    Note right of API: secretName = libparam.secret-name
+    
+    secret->>API: Retorna secretos
+    Note left of secret: User, Password
+
+    API->>Homologador: Consulta Homologación sourceBank
+    Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
+
+    Homologador->>API: Retorna Valor Homologado 
+    Note left of Homologador: HN01 → HND <br> Otros códigos de país...
+
+    API->>API: Validación caller-service-retry
+    Note over API: Valida si caller-service-retry es igual al recibido en el header de la <br> request para determinar si es un reintento o una request nueva
+
+    alt If request.header.caller-service != const.caller-service-retry
+
+        API->>Idempotencia: Consume API Idempotencia / Reintentos
+        Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> "methodVersion": "1.0" <br> dataPayload: { organizationReference, <br> transactionReferenceReverse , <br> operationType <br>}
+    
+    end
+
+    API->>API: Construye Request SP: OSBRegistraReversaTC - MasterData
+    Note over API: Conexión: <br> Valor de sourceBank.param-name <br> Valor de sourceBank.secret-name <br> Mapeo Campos: <br> Pais = header.sourceBank (Homologado) <br> Org = request.organizationReference <br> SecuenciaMovimiento = request.transactionReferenceReverse <br> TipoOperacion = request.operationType 
+
+    API->>master: Consume SP: OSBRegistraReversaTC - MasterData
+    Note right of API: Conexión: <br> ip, port, database <br> user, password <br> Pais, SecuenciaMovimiento, TipoOperacion
+
+    master->>API: Response SP: OSBRegistraReversaTC - MasterData
+    Note over master: Response: CodigoError, MensajeError
+
+    API->>API: Evalúa Response SP: OSBRegistraReversaTC - MasterData
+
+    alt If CodigoError != Vacío 
+
+        API->>Reintentos: Envía envento al eventBridge API Idempotencia 
+        Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {organizationReference, transactionReferenceReverse, operationType} <br> Transaccion: TimeOut 
+
+        alt Flujo síncrono AND request.header.caller-service != const.caller-service-retry
+
+            API->> Errors: Mapear código de error
+            Note right of API: Mapeo de errores según <br> tabla de homologación SP: OSBRegistraReversaTC
+            
+            Errors ->> API: Retorna código mapeado
+            
+            API->> Consumidor: Retorna error
+            Note left of API: HTTP 4XX / 5XX
+        
+        end
+
+    else If CodigoError != Vacío 
+
+        API->>Reintentos: Envía envento al eventBridge API Idempotencia 
+        Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {organizationReference, transactionReferenceReverse, operationType} <br> Transaccion: Exitosa
+
+        alt Flujo síncrono AND request.header.caller-service != const.caller-service-retry
+
+            API->>Consumidor: Response Exitoso
+            Note left of API: HTTP 200: Response Body 
+
+        end
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

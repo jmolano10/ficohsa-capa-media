@@ -1,0 +1,97 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API Obtener Tipo <br> Transacción Genérica <br> Epica 55011: ReversarTransaccionID <br> HU 62347:  GET - /payments/payment-execution-processing/v1/retrieve-generic-transaction-type
+    participant CL as Caché Local
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant wrapper as Wrapper Region DB <br/> HU 61083  - POST - /wrapper-region-db/v1/execute-procedure <br> PKG: OSB_P_CTROL_TRANS_GENERICAS_CB <br> SP: OBTENER_TIPO_TRANSACCION
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Obtener Tipo Transacción
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: transactionType
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "PAYMENT_EXECUTION_PROCESSING" <br> name: "RETRIEVE_GENERIC_TRANSACTION_TYPE" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "PAYMENT_EXECUTION_PROCESSING" <br> name: "RETRIEVE_GENERIC_TRANSACTION_TYPE" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> connectionType <br> operationType <br> catalogueName <br> packageName <br> procedureName
+
+    API->>API: Construye Request Wrapper Region DB - SP: OBTENER_TIPO_TRANSACCION
+    Note over API:  headers: caller-service = const.caller-service <br> body: <br> connectionType = const.connectionType <br> operationType = const.operationType <br> catalogueName = const.catalogueName <br> packageName = const.packageName <br> procedureName = const.procedureName <br> params: { <br> PV_COD_OSB = request.transactionType <br> }
+
+    API->>valida: Consume Wrapper Region DB - SP: OBTENER_TIPO_TRANSACCION
+    Note right of API: Request: <br> headers: caller-service <br> connectionType, <br> operationType, <br> catalogueName, <br> packageName, <br> procedureName, <br> params: { <br> PV_COD_OSB <br> }
+
+    valida->>API: Response Wrapper Region DB - SP: OBTENER_TIPO_TRANSACCION
+    Note left of valida: Response: <br> success, <br> outputParameters { <br> PV_ERROR_CODE <br> Pv_ERRORMESSAGE <br> PV_MESSAGE, <br> PV_TIPO_OPE }
+
+    API->>API: Evalúa Response Wrapper Region DB - SP: OBTENER_TIPO_TRANSACCION
+
+    alt If outputParameters.PV_ERROR_CODE == ERROR 
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según tabla de homologación SP: OBTENER_TIPO_TRANSACCION
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    else If outputParameters.PV_ERROR_CODE == SUCCESS 
+
+        API->>API: Construye response API Producto
+        Note over API:  genericTransactionIndicator = outputParameters.PV_MESSAGE <br> operationType = outputParameters.PV_TIPO_OPE
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

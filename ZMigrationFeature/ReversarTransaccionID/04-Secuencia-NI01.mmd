@@ -1,0 +1,145 @@
+```mermaid
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service
+    participant ConsultaRuta as consultaRutaRegional_db
+    participant ObtenerTipo as obtenerTipoTrxGen_db
+    participant ValidarEstado as validarEstadoTransaccion_db
+    participant T24Service as svcReversarTransaccionCB
+    participant ATMService as Sistema ATM Nicaragua
+    participant ActualizarTrx as actualizarEstadoTransaccionUUID_db
+    participant ErrorHandler as MapeoErrores
+
+    Note over Client, ErrorHandler: Flujo Nicaragua (NI01) - ReversarTransaccionID - RETIRO
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: Region=NI01, UserName=USUARIO_NI01<br/>Body: TRANSACTION_TYPE=RETIRO<br/>TRANSACTION_ID=550e8400-e29b-41d4-a716-446655440003
+
+    OSB->>OSB: Validar Autenticación
+    Note right of OSB: Username/Password en RequestHeader<br/>Validación de credenciales NI01
+
+    alt Autenticación Fallida
+        OSB->>ErrorHandler: Error de Autenticación
+        ErrorHandler->>OSB: Respuesta de Error
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>ConsultaRuta: Consultar Ruta Regional
+    Note right of ConsultaRuta: PV_ID_SERVICIO: FICBCO0516<br/>PV_REGION: NI01<br/>PV_OPERACION: reversarTransaccionID<br/>PV_VERSION: V2
+
+    ConsultaRuta->>OSB: Respuesta Ruta Regional
+    Note left of ConsultaRuta: PV_CODIGO_ERROR: SUCCESS<br/>PV_RUTA_REGIONAL: NI01_ROUTE
+
+    alt Ruta Regional No Válida
+        OSB->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    OSB->>ObtenerTipo: Obtener Tipo de Transacción
+    Note right of ObtenerTipo: PV_COD_OSB: RETIRO
+
+    ObtenerTipo->>OSB: Respuesta Tipo Transacción
+    Note left of ObtenerTipo: PV_ERROR_CODE: SUCCESS<br/>PV_MESSAGE: NOGEN<br/>PV_TIPO_OPE: REVERSA_RETIRO
+
+    OSB->>OSB: Calcular Tipo Consulta
+    Note right of OSB: tipoConsulta = if (tipoTRX = 'NOGEN') then 1 else 4<br/>Resultado: tipoConsulta = 1
+
+    OSB->>ValidarEstado: Validar Estado Transacción
+    Note right of ValidarEstado: PV_UUID: 550e8400-e29b-41d4-a716-446655440003<br/>PN_TIPO_CONSULTA: 1<br/>PN_CODIGO_ESTADO: 0
+
+    ValidarEstado->>OSB: Respuesta Estado Transacción
+    Note left of ValidarEstado: PV_ERRORCODE: SUCCESS<br/>PV_FT: FT24001NI123456<br/>PV_MESSAGE: TRUE<br/>Pv_uuido: 550e8400-e29b-41d4-a716-446655440003<br/>Pv_refcb: CBNI20241201001
+
+    alt Estado No Válido para Reversión
+        OSB->>OSB: Error Estado Transacción
+        OSB->>Client: Response con Error
+        Note right of OSB: "La transaccion no tiene el estado correcto"
+    end
+
+    OSB->>OSB: Validar Tipo de Transacción
+    Note right of OSB: Tipo RETIRO → Flujo Default<br/>(No es PAGO_TC ni PAGO_EEH)
+
+    OSB->>T24Service: Reversar Retiro en T24
+    Note right of T24Service: Operación: ReversionDepositoTengo<br/>User: USUARIO_NI01<br/>FT: FT24001NI123456<br/>TransactionType: RETIRO
+
+    T24Service->>ATMService: Validar Estado ATM
+    Note right of ATMService: Verificar dispensación física<br/>Estado de ATM operativo<br/>Comunicación con red ATM nacional
+
+    ATMService->>T24Service: Respuesta Estado ATM
+    Note left of ATMService: ATM_STATUS: OPERATIVO<br/>DISPENSED: FALSE<br/>CASH_AVAILABLE: TRUE
+
+    alt Efectivo Ya Dispensado
+        T24Service->>OSB: Error Dispensación
+        OSB->>Client: Response con Error
+        Note right of OSB: "No se puede reversar<br/>Efectivo ya dispensado"
+    end
+
+    alt ATM No Operativo
+        T24Service->>OSB: Error ATM
+        OSB->>Client: Response con Error
+        Note right of OSB: "ATM no disponible<br/>para reversión"
+    end
+
+    T24Service->>T24Service: Procesar Reversión Retiro
+    Note right of T24Service: Validar límites de retiro<br/>Verificar saldo disponible<br/>Actualizar estado en T24
+
+    T24Service->>OSB: Respuesta T24
+    Note left of T24Service: successIndicator: SUCCESS<br/>messages: Reversión de retiro procesada<br/>transactionId: REV24001NI123456
+
+    alt Reversión T24 Fallida
+        OSB->>OSB: Error T24
+        OSB->>Client: Response con Error
+        Note right of OSB: Error en reversión T24
+    end
+
+    OSB->>ActualizarTrx: Actualizar Estado Transacción
+    Note right of ActualizarTrx: PV_ESTADO: R (Reversada)<br/>PV_UUID: 550e8400-e29b-41d4-a716-446655440003
+
+    ActualizarTrx->>ActualizarTrx: Notificar Sistema Compensación
+    Note right of ActualizarTrx: Notificación a BCN<br/>Actualización saldos tiempo real<br/>Reconciliación interbancaria
+
+    ActualizarTrx->>OSB: Respuesta Actualización
+    Note left of ActualizarTrx: PV_ERRORCODE: SUCCESS
+
+    OSB->>OSB: Construir Respuesta Final
+    Note right of OSB: T24_REFERENCE: REV24001NI123456<br/>TRANSACTION_ID: 550e8400-e29b-41d4-a716-446655440003<br/>REFERENCE_CB: CBNI20241201001
+
+    OSB->>Client: SOAP Response Exitoso
+    Note left of Client: Header: successIndicator=SUCCESS<br/>Body: Datos de reversión<br/>T24_REFERENCE, TRANSACTION_ID, REFERENCE_CB
+
+    Note over Client, ErrorHandler: Transformaciones Clave NI01:
+    Note over Client, ErrorHandler: 1. Mapeo RETIRO → NOGEN → tipoConsulta=1
+    Note over Client, ErrorHandler: 2. Validación estado TRUE para permitir reversión
+    Note over Client, ErrorHandler: 3. Validación específica con red ATM nacional
+    Note over Client, ErrorHandler: 4. Reversión con operación ReversionDepositoTengo
+    Note over Client, ErrorHandler: 5. Verificación de no dispensación física
+    Note over Client, ErrorHandler: 6. Actualización estado a 'R' (Reversada)
+
+    Note over Client, ErrorHandler: Configuración Regional NI01:
+    Note over Client, ErrorHandler: - Zona horaria: GMT-6 (Nicaragua)
+    Note over Client, ErrorHandler: - Monedas: NIO (Córdoba), USD (Dólar)
+    Note over Client, ErrorHandler: - Ventana ATM: 05:00-23:00 local
+    Note over Client, ErrorHandler: - Mantenimiento: 02:00-04:00 diario
+    Note over Client, ErrorHandler: - Timeout ATM: 60 segundos, Retry: 2
+
+    Note over Client, ErrorHandler: Validaciones Específicas ATM NI01:
+    Note over Client, ErrorHandler: - Red ATM nacional de Nicaragua
+    Note over Client, ErrorHandler: - Banco Central de Nicaragua (BCN)
+    Note over Client, ErrorHandler: - Códigos ATM específicos NI01
+    Note over Client, ErrorHandler: - Límites diarios por tarjeta
+    Note over Client, ErrorHandler: - Validación saldo disponible
+    Note over Client, ErrorHandler: - Estado comunicación con banco
+
+    Note over Client, ErrorHandler: Sistema de Compensación NI01:
+    Note over Client, ErrorHandler: - Notificación sistema compensación nacional
+    Note over Client, ErrorHandler: - Actualización saldos tiempo real
+    Note over Client, ErrorHandler: - Reconciliación con BCN
+    Note over Client, ErrorHandler: - Impacto compensación interbancaria
+
+    Note over Client, ErrorHandler: Manejo de Errores NI01:
+    Note over Client, ErrorHandler: - Código base: FICBCO0259
+    Note over Client, ErrorHandler: - Errores específicos red ATM
+    Note over Client, ErrorHandler: - Mensajes en español para Nicaragua
+    Note over Client, ErrorHandler: - Códigos error específicos país y ATM
+    Note over Client, ErrorHandler: - Logging nivel debug habilitado
+```

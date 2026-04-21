@@ -1,0 +1,94 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API Consultar Transacciones <br> Epica 55011: ReversarTransaccionID <br> HU 62349:  POST - /payments/payment-execution-processing/v1/{transactionReference}/reversal-card-register
+    participant CL as Caché Local
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant wrapper as Wrapper Pagos WS TC <br/> HU 57724  - POST - /pagos-wrapper/v1/execute-procedure <br> SP: OSB_P_REGISTRA_REVERSION_TC_CB
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Registrar Reversión TC CB
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: pathParam: transactionReference
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "PAYMENT_EXECUTION_PROCESSING" <br> name: "REVERSAL_CARD_REGISTER" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "PAYMENT_EXECUTION_PROCESSING" <br> name: "REVERSAL_CARD_REGISTER" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> connectionType <br> operationType <br> catalogueName <br> packageName <br> procedureName
+
+    API->>API: Construye Request Wrapper Pagos WS TC - SP: OSB_P_REGISTRA_REVERSION_TC_CB
+    Note over API:  body: <br> connection { <br> parm = libparam.param-name <br> secm = libparam.secret-name <br> } <br> operationType = const.operationType <br> schema = const.schema <br> procedureName = const.procedureName <br> params: { <br> Pv_Transaction_Id = request.transactionReference <br> }
+
+    API->>wrapper: Consume Wrapper Pagos WS TC - SP: OSB_P_REGISTRA_REVERSION_TC_CB
+    Note right of API: Request: <br> operationType, <br> catalogueName, <br> procedureName, <br> params: { <br> Pv_Transaction_Id <br> }
+
+    wrapper->>API: Response Wrapper Pagos WS TC - SP: OSB_P_REGISTRA_REVERSION_TC_CB
+    Note left of wrapper: Response: <br> success, <br> outputParameters { <br> Pv_ErrorCode, <br> Pv_ErrorMessage <br> }
+
+    API->>API: Evalúa Response Wrapper Pagos WS TC - SP: OSB_P_REGISTRA_REVERSION_TC_CB
+
+    alt If outputParameters.Pv_ErrorCode != SUCCESS 
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según tabla de homologación SP: OSB_P_REGISTRA_REVERSION_TC_CB
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    else If outputParameters.Pv_ErrorCode == SUCCESS 
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

@@ -1,0 +1,102 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor/Aplicación
+    participant API as API Exp Reversar Transacción ID <br> Epica 55011: ReversarTransaccionID <br> HU 61960:  POST - XXX
+    participant CL as Caché Local
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
+    participant obtener trx as API Obtener Tipo <br> Transacción Genérica <br> Epica 55011: ReversarTransaccionID <br> HU 62347:  GET - /payments/payment-execution-processing/v1/retrieve-transaction-type
+    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Experiencia Reversar Trasnacción ID
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: transactionType
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "SSSS" <br> name: "MMMM" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "SSSS" <br> name: "MMMM" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: 
+
+    API->>API: Construye Request API Producto Obtener Tipo Transacción
+    Note over API:  body: <br> transactionType = request.transactionType
+
+    API->>valida: Consume API Producto Obtener Tipo Transacción
+    Note right of API: Body: transactionType
+
+    valida->>API: Response API Producto Obtener Tipo Transacción
+    Note left of valida: Response: genericTransactionIndicator <br> operationType
+
+    API->>API: Evalúa Response API Producto Obtener Tipo Transacción
+
+    alt If data.success == false 
+    
+        API->> Consumidor: Retorna error API Producto Obtener Tipo Transacción
+        Note left of API: HTTP 4XX / 5XX
+
+    else If data.success == true 
+
+        API->>API: Evalúa responseAPI.genericTransactionIndicator
+        Note over API: If responseAPI.genericTransactionIndicator == "NOGEN" then $tipoTrx = 1 <br> else $tipoTrx = 4
+
+        API->>API: Construye Request API Producto Consultar Transacciones
+        Note over API:  body: <br> codigoEstado = libparam.codigoEstado <br> uuid = request.transactionId <br> tipoConsulta = $tipoTrx
+
+        API->>valida: Consume API Producto Consultar Transacciones
+        Note right of API: Body: transactionType
+
+        valida->>API: Response API Producto Consultar Transacciones
+        Note left of valida: Response: AA <br> AA <br> AA
+
+        API->>API: Evalúa Response API Producto Consultar Transacciones
+
+        
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
