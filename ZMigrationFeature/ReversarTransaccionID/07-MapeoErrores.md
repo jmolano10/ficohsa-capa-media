@@ -332,6 +332,24 @@ Homologación de los valores posibles del campo `Status/successIndicator` retorn
 
 ---
 
+---
+
+## Homologación Errores ReversionDepositoTengo
+
+Homologación de los valores posibles del campo `Status/successIndicator` retornados por la operación `ReversionDepositoTengo` del Business Service `svcReversarTransaccionCB`, hacia códigos HTTP semánticos. El proxy invoca esta operación en la rama `default` del stage `ReversarTransaccion` — es decir, cuando `$tipoTransaccion` no es `PAGO_TC` ni `PAGO_EEH` (transacciones de depósito Tengo genéricas). El resultado se captura mediante `fn:upper-case(fn:string($RSPRevDeposito/Status/successIndicator/text()))` hacia `$successIndicator`; el mensaje de error se toma de `$RSPRevDeposito/Status/messages` hacia `$errorCode`; y la referencia T24 de `$RSPRevDeposito/Status/transactionId` hacia `$statusT24`.
+
+| `Status/successIndicator` | `Status/messages` | Escenario | Código HTTP | Descripción HTTP |
+|--------------------------|-------------------|-----------|-------------|-----------------|
+| **Success** | *(vacío)* | Reversión de depósito Tengo procesada exitosamente en T24; el proxy continúa al stage `ActualizarEstadoTransaccion` para actualizar el estado en base de datos y retorna `T24_REFERENCE`, `TRANSACTION_ID` y `REFERENCE_CB` | **200** | OK |
+| **TWSError** | Mensaje de error del Web Service | Error en la comunicación con el Web Service de T24; falla en la capa de transporte antes de llegar al core bancario | **502** | Bad Gateway |
+| **T24Error** | Mensaje de error del core T24 | El core bancario T24 rechazó o no pudo procesar la reversión del depósito Tengo (p.ej. transacción inválida, ya reversada, error de procesamiento interno) | **500** | Internal Server Error |
+| **T24Override** | Mensaje descriptivo del override | T24 requiere una autorización adicional (override) para completar la reversión; la transacción queda pendiente de aprobación | **202** | Accepted |
+| **T24Offline** | Mensaje de sistema no disponible | T24 se encuentra fuera de línea o en mantenimiento; no es posible procesar la reversión del depósito en este momento | **503** | Service Unavailable |
+
+> **Nota:** El proxy uppercasea el `successIndicator` antes de la comparación (`fn:upper-case`), por lo que `Success` del XSD se evalúa como `SUCCESS`. Solo el valor `SUCCESS` habilita el flujo hacia `ActualizarEstadoTransaccion`; cualquier otro valor resulta en una respuesta SOAP con `successIndicator=ERROR` y el campo `messageId` poblado con el contenido de `Status/messages`. Esta operación comparte el mismo Business Service (`svcReversarTransaccionCB`) que `ReversionPagoTCTengo`, pero se distingue por la operación invocada y por ser el camino `default` (depósitos) frente a `PAGO_TC`. El mapeo HTTP es semántico — la capa SOAP retorna siempre HTTP 200 en el transporte; los códigos aquí representan la intención de negocio para la capa REST/API Gateway.
+
+---
+
 ## Códigos de Estado HTTP Utilizados
 
 - **200 OK**: Reversión exitosa
