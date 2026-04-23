@@ -2,7 +2,7 @@
 ```json
 //REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO
 {
-  "pk": "COUNTRY#XRS#DOMAIN#PAYMENT_EXECUTION_TRANSFER#PARAM#EXECUTE_DEPOSIT_REVERSAL",
+  "pk": "COUNTRY#XRS#DOMAIN#PAYMENT_EXECUTION_TRANSACTION#PARAM#EXECUTE_DEPOSIT_REVERSAL",
   "sk": "V#0001",
   "name": "EXECUTE_DEPOSIT_REVERSAL",
   "value": [
@@ -24,9 +24,9 @@
     }
   ],
   "type": "list",
-  "description": "CONFIG OF PAYMENT_EXECUTION_TRANSFER BY METHOD",
+  "description": "CONFIG OF PAYMENT_EXECUTION_TRANSACTION BY METHOD",
   "country": "XRS",
-  "domain": "PAYMENT_EXECUTION_TRANSFER",
+  "domain": "PAYMENT_EXECUTION_TRANSACTION",
   "tags": [],
   "precedence": 10,
   "effective_from": "",
@@ -81,7 +81,7 @@
 
 ```json
 {
-  "caller-service":  "PAYMENT_EXECUTION_TRANSFER-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
+  "caller-service":  "PAYMENT_EXECUTION_TRANSACTION-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
   "operation": "ReversionDepositoTengo",
   "type": "FUNDSTRANSFERFICOREVTXNUUIDFTType"
 }
@@ -90,15 +90,15 @@
 
 ```json
 {
-  "pk": "COUNTRY#HND#DOMAIN#WRAPPER_T24#PARAM#srv-itintb|PAYMENT_EXECUTION_TRANSFER-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
+  "pk": "COUNTRY#HND#DOMAIN#WRAPPER_T24#PARAM#srv-itintb|PAYMENT_EXECUTION_TRANSACTION-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
   "sk": "V#0001",
-  "name": "srv-itintb|PAYMENT_EXECUTION_TRANSFER-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
+  "name": "srv-itintb|PAYMENT_EXECUTION_TRANSACTION-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
   "value": {
     "secret-name": "ban-hnd-ic-comp-secm-t24-reversion-deposito-tengo-wsdl-dev",
     "param-name": "ban-hnd-ic-comp-param-t24-reversion-deposito-tengo-wsdl-dev"
   },
   "type": "json",
-  "description": "Credenciales de la operación ReversionDepositoTengo del PAYMENT_EXECUTION_TRANSFER-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
+  "description": "Credenciales de la operación ReversionDepositoTengo del PAYMENT_EXECUTION_TRANSACTION-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
   "country": "HND",
   "domain": "WRAPPER_T24",
   "tags": [
@@ -120,7 +120,7 @@ postman request POST 'http://localhost:8080/t24-wrapper-hnd/v2/Depositoenefectiv
   --header 'Correlation-Id: de957188-87a4-4808-a97e-d5da44a7798f' \
   --header 'Accept-Language: es' \
   --header 'Authorization: Bearer token.ok.ok' \
-  --header 'Caller-Service: PAYMENT_EXECUTION_TRANSFER-PRODUCT-EXECUTE_DEPOSIT_REVERSAL' \
+  --header 'Caller-Service: PAYMENT_EXECUTION_TRANSACTION-PRODUCT-EXECUTE_DEPOSIT_REVERSAL' \
   --header 'Channel: C001' \
   --header 'APP_CONTEXTUAL: 1' \
   --header 'Destination-Bank: test' \
