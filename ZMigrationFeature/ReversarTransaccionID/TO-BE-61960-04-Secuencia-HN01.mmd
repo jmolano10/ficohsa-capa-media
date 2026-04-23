@@ -1,17 +1,24 @@
 sequenceDiagram
     autonumber
     participant Consumidor as Consumidor/Aplicación
-    participant API as API Exp Reversar Transacción ID <br> Epica 55011: ReversarTransaccionID <br> HU 61960:  POST - XXX
+    participant API as API Exp Reversar Transacción ID <br> Epica 55011: ReversarTransaccionID <br> HU 61960:  POST - /execute-reversion/v1/execute
     participant CL as Caché Local
-    participant Lib as Librería Pipeline (ConfigMap)
     participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
-    participant obtener trx as API Obtener Tipo <br> Transacción Genérica <br> Epica 55011: ReversarTransaccionID <br> HU 62347:  GET - /payments/payment-execution-processing/v1/retrieve-transaction-type
+    participant generic as API Obtener Tipo <br> Transacción Genérica <br> Epica 55011: ReversarTransaccionID <br> HU 62347:  GET - /payments/payment-execution-processing/v1/retrieve-generic-transaction-type
+    participant consultar as API Consultar Transacciones <br> Epica 55011: ReversarTransaccionID <br> HU 62348:  GET - /payments/payment-execution-processing/v1/retrieve-transaction
+    participant registrar as API Registrar Reversión TC CB <br> Epica 55011: ReversarTransaccionID <br> HU 62349:  POST - /payments/payment-execution-processing/v1/{transactionReference}/reversal-card-register
+    participant ejecutar as API Reversion Pago TC Tengo <br> Epica 55011: ReversarTransaccionID <br> HU 62350:  POST - /payments/payment-execution-processing/v1/execute-card-reversal
+    participant sqsRequest as AWS SQS <br> Cola de Solicitudes <br> HU 62351: <br> ban-xrs-ic-comp-sqs-regsiter-reverse-cc-in-<env>
+    participant ejecutar2 as API Reversar Transacción Tengo EEH <br> Epica 55011: ReversarTransaccionID <br> HU 62352:  POST - /payments/payment-execution-processing/v1/execute-reverse-transaction
+    participant ejecutar3 as API Reversar Depósito Tengo <br> Epica 55011: ReversarTransaccionID <br> HU 62353:  POST - /payments/payment-execution-transfer/v1/execute-deposit-reversal
+    participant update1 as API Actualización con UUID <br> Epica 2461: ConsultaEstadoTransaccionHN <br> HU 62319:  PUT - /payments/payment-execution-mechanism/v1/update-unique-record
+    participant update2 as API Actualización Trx Genérica <br> Epica 2461: ConsultaEstadoTransaccionHN <br> HU 62320:  PUT - /payments/payment-execution-mechanism/v1/update-generic-transaction
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
     Note over Consumidor, Errors: Flujo Honduras (HN01) - API Experiencia Reversar Trasnacción ID
 
     Consumidor->>API: REST Request
-    Note right of Consumidor: body: transactionType
+    Note right of Consumidor: body: transactionType <br> transactionReference
 
     API->>API: Validar Request
     Note over API: Valida campos obligatorios según contrato OpenAPI 
@@ -21,7 +28,7 @@ sequenceDiagram
     alt Consulta parametros en caché local
 
         API->>CL: Consultar parámetros de Librería de parámetros en caché local
-        Note right of API: Domain: "SSSS" <br> name: "MMMM" <br> country: XRS 
+        Note right of API: Domain: "EXECUTE_REVERSION" <br> name: "EXECUTE" <br> country: XRS 
 
         CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
@@ -29,7 +36,7 @@ sequenceDiagram
     else Consulta  parametros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros lambda parámetros
-        Note right of API: Domain: "SSSS" <br> name: "MMMM" <br> country: XRS 
+        Note right of API: Domain: "EXECUTE_REVERSION" <br> name: "EXECUTE" <br> country: XRS 
 
         Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
@@ -45,21 +52,16 @@ sequenceDiagram
     API->>API: Validación Regional success
     Note over API: Servicio habilitado para HN01 
 
-    API->>Lib: Consulta Constantes
-    
-    Lib->>API: Retorna constantes necesarias
-    Note left of Lib: Constantes: 
-
     API->>API: Construye Request API Producto Obtener Tipo Transacción
-    Note over API:  body: <br> transactionType = request.transactionType
+    Note over API:  queryParam: <br> transactionType = request.transactionType
 
-    API->>valida: Consume API Producto Obtener Tipo Transacción
-    Note right of API: Body: transactionType
+    API->>generic: Consume API Producto Obtener Tipo Transacción
+    Note right of API: queryParam: transactionType
 
-    valida->>API: Response API Producto Obtener Tipo Transacción
-    Note left of valida: Response: genericTransactionIndicator <br> operationType
+    generic->>API: Response API Producto Obtener Tipo Transacción
+    Note left of generic: Response: genericTransactionIndicator <br> operationType
 
-    API->>API: Evalúa Response API Producto Obtener Tipo Transacción
+    API->>API: Evalúa response API Obtener Tipo Transacción Genérica
 
     alt If data.success == false 
     
@@ -67,22 +69,322 @@ sequenceDiagram
         Note left of API: HTTP 4XX / 5XX
 
     else If data.success == true 
-
-        API->>API: Evalúa responseAPI.genericTransactionIndicator
+    
+        API->>API: Determina variable $tipoTrx según response.genericTransactionIndicator
         Note over API: If responseAPI.genericTransactionIndicator == "NOGEN" then $tipoTrx = 1 <br> else $tipoTrx = 4
 
         API->>API: Construye Request API Producto Consultar Transacciones
-        Note over API:  body: <br> codigoEstado = libparam.codigoEstado <br> uuid = request.transactionId <br> tipoConsulta = $tipoTrx
+        Note over API:  queryParam: <br> transactionStatusCode = libparam.codigoEstado <br> transactionReference = request.transactionReference <br> queryRefType = $tipoTrx
 
-        API->>valida: Consume API Producto Consultar Transacciones
-        Note right of API: Body: transactionType
+        API->>consultar: Consume API Producto Consultar Transacciones
+        Note right of API: queryParam: transactionStatusCode, transactionReference, queryRefType
 
-        valida->>API: Response API Producto Consultar Transacciones
-        Note left of valida: Response: AA <br> AA <br> AA
+        consultar->>API: Response API Producto Consultar Transacciones
+        Note left of consultar: Response: executionMessage <br> paymentTransactionReference <br> transactionReference <br> transactionReferenceBC
 
         API->>API: Evalúa Response API Producto Consultar Transacciones
 
+        alt If data.success == false 
+    
+            API->> Consumidor: Retorna error API Producto Consultar Transacciones
+            Note left of API: HTTP 4XX / 5XX
+
+        else If data.success == true 
+
+            API->>API: Evalúa executionMessage del response API Producto Consultar Transacciones
+
+            alt If responseAPIConsultaTrx.executionMessage != "TRUE" 
+
+                API->> Errors: Mapear código de error
+                
+                Errors ->> API: Retorna código mapeado
+                
+                API->> Consumidor: Retorna error
+                Note left of API: HTTP 422: La transacción no tiene el estado correcto para ejecutar reversión.
+            
+            else If responseAPIConsultaTrx.executionMessage == "TRUE" 
+
+                API->>API: Evalúa transactionType del request para determinar tipo de transacción
+
+                alt If request.transactionType == "PAGO_TC" 
+                Note over Consumidor, update2: Tipo de transacción: PAGO_TC
+                    rect rgb(245, 248, 233)
+                        API->>API: Construye Request API Registrar Reversión TC CB
+                        Note over API:  pathParam: <br> transactionReference = responseAPIConsultaTrx.paymentTransactionReference
+
+                        API->>registrar: Consume API Registrar Reversión TC CB
+                        Note right of API: pathParam: transactionReference
+
+                        registrar->>API: Response API Registrar Reversión TC CB
+                        Note left of registrar: Response: HTTP Status Code
+
+                        API->>API: Evalúa Response API Registrar Reversión TC CB
+
+                        alt If HTTP Status Code != 200 
+            
+                            API->> Consumidor: Retorna error API Registrar Reversión TC CB
+                            Note left of API: HTTP 4XX / 5XX
+
+                        else If HTTP Status Code == 200 
+
+                            API->>API: Construye Request API Reversion Pago TC Tengo
+                            Note over API:  body: <br> recordId = responseAPIConsultaTrx.paymentTransactionReference
+
+                            API->>ejecutar: Consume API Reversion Pago TC Tengo
+                            Note right of API: body: recordId
+
+                            ejecutar->>API: Response API Reversion Pago TC Tengo
+                            Note left of ejecutar: Response: statusRecord.transactionReference
+
+                            API->>API: Evalúa Response API Reversion Pago TC Tengo
+
+                            alt If HTTP Status Code != 200 
+            
+                                API->> Consumidor: Retorna error API Reversion Pago TC Tengo
+                                Note left of API: HTTP 4XX / 5XX
+
+                            else If HTTP Status Code == 200 
+
+                                API->>API: Construye mensaje para SQS regsiter-reverse-cc-in
+                                Note over API:  headers: Headers recibidos en request <br> caller-service = const.caller-service <br> body: <br> organizationReference = <br> transactionReferenceReverse <br> operationType <br> errorCode = libparam.errorCode <br> errorMessage = libparam.errorMessage
+
+                                API->>sqsRequest: Envía evento a cola SQS regsiter-reverse-cc-in
+                                Note right of API: headers, body
+
+                                API->>API: Evalúa $tipoTrx
+                                
+                                alt If $tipoTrx != "GEN"
+
+                                    API->>API: Construye Request API Actualiza Transacción con UUID
+                                    Note over API:  body: <br> transactionReference = responseAPIConsultaTrx.TransactionReference <br> transactionStatus = libpram.statusType
+
+                                    API->>update1: Consume API Actualiza Transacción con UUID
+                                    Note right of API: body: <br> transactionReference <br> transactionStatus
+
+                                    update1->>API: Response API Actualiza Transacción con UUID
+                                    Note left of update1: Response: HTTP Status Code
+
+                                    API->>API: Evalúa Response API Actualiza Transacción con UUID
+
+                                    alt If HTTP Status Code != 200 
+            
+                                        API->> Consumidor: Retorna error API Actualiza Transacción con UUID
+                                        Note left of API: HTTP 4XX / 5XX
+
+                                    else If HTTP Status Code == 200 
+
+                                        API->>API: Construye Response API Exp Reversar Transacción ID
+                                        Note over API:  body: <br> externalTransactionReference = responseReversionPagoTCTengo.statusRecord.transactionReference <br> reversedTransactionReference = responseAPIConsultaTrx.TransactionReference <br> bankingTransactionReference = responseAPIConsultaTrx.transactionReferenceBC
+
+                                        API->>Consumidor: Response Exitoso
+                                        Note left of API: HTTP 200: Response Body 
+                                    
+                                    end
+
+                                else If $tipoTrx == "GEN" 
+
+                                    API->>API: Construye Request API Actualiza Transacción Genérica
+                                    Note over API:  body: <br> transactionReference = responseAPIConsultaTrx.TransactionReference <br> coreTransactionReference = libparam.coreTransactionReference <br> interceptorIndicator = libparam.interceptorIndicator
+
+                                    API->>update2: Consume API Actualiza Transacción Genérica
+                                    Note right of API: body: <br> transactionReference <br> coreTransactionReference <br> interceptorIndicator
+
+                                    update2->>API: Response API Actualiza Transacción Genérica
+                                    Note left of update2: Response:
+
+                                    API->>API: Evalúa Response API Actualiza Transacción Genérica
+
+                                    alt If HTTP Status Code != 200 
+            
+                                        API->> Consumidor: Retorna error API Actualiza Transacción Genérica
+                                        Note left of API: HTTP 4XX / 5XX
+
+                                    else If HTTP Status Code == 200 
+
+                                        API->>API: Construye Response API Exp Reversar Transacción ID
+                                        Note over API:  body: <br> externalTransactionReference = responseReversionPagoTCTengo.statusRecord.transactionReference <br> reversedTransactionReference = responseAPIConsultaTrx.TransactionReference <br> bankingTransactionReference = responseAPIConsultaTrx.transactionReferenceBC
+
+                                        API->>Consumidor: Response Exitoso
+                                        Note left of API: HTTP 200: Response Body 
+                                    
+                                    end
+
+                                end
+
+                            end
+
+                        end
+                    end
+                else If request.transactionType == "PAGO_EEH" 
+                Note over Consumidor, update2: Tipo de transacción: PAGO_EEH
+                    rect rgb(227, 232, 233)
+                        API->>API: Construye Request API Reversar Transacción Tengo EEH
+                        Note over API:  body: <br> transactionReference = responseAPIConsultaTrx.paymentTransactionReference
+
+                        API->>registrar: Consume API Reversar Transacción Tengo EEH
+                        Note right of API: body: transactionReference
+
+                        registrar->>API: Response API Reversar Transacción Tengo EEH
+                        Note left of registrar: Response: executionStatus.transactionReference
+
+                        API->>API: Evalúa Response API Reversar Transacción Tengo EEH
+
+                        alt If HTTP Status Code != 200 
+            
+                            API->> Consumidor: Retorna error API Reversar Transacción Tengo EEH
+                            Note left of API: HTTP 4XX / 5XX
+
+                        else If HTTP Status Code == 200 
+
+                            API->>API: Evalúa $tipoTrx
+                                
+                            alt If $tipoTrx != "GEN"
+
+                                API->>API: Construye Request API Actualiza Transacción con UUID
+                                Note over API:  body: <br> transactionReference = responseAPIConsultaTrx.TransactionReference <br> transactionStatus = libpram.statusType
+
+                                API->>update1: Consume API Actualiza Transacción con UUID
+                                Note right of API: body: <br> transactionReference <br> transactionStatus
+
+                                update1->>API: Response API Actualiza Transacción con UUID
+                                Note left of update1: Response: HTTP Status Code
+
+                                API->>API: Evalúa Response API Actualiza Transacción con UUID
+
+                                alt If HTTP Status Code != 200 
         
+                                    API->> Consumidor: Retorna error API Actualiza Transacción con UUID
+                                    Note left of API: HTTP 4XX / 5XX
+
+                                else If HTTP Status Code == 200 
+
+                                    API->>API: Construye Response API Exp Reversar Transacción ID
+                                    Note over API:  body: <br> externalTransactionReference = responseReversarTrxTengoEEH.executionStatus.transactionReference <br> reversedTransactionReference = responseAPIConsultaTrx.TransactionReference <br> bankingTransactionReference = responseAPIConsultaTrx.transactionReferenceBC
+
+                                    API->>Consumidor: Response Exitoso
+                                    Note left of API: HTTP 200: Response Body 
+                                
+                                end
+
+                            else If $tipoTrx == "GEN" 
+
+                                API->>API: Construye Request API Actualiza Transacción Genérica
+                                Note over API:  body: <br> transactionReference = responseAPIConsultaTrx.TransactionReference <br> coreTransactionReference = libparam.coreTransactionReference <br> interceptorIndicator = libparam.interceptorIndicator
+
+                                API->>update2: Consume API Actualiza Transacción Genérica
+                                Note right of API: body: <br> transactionReference <br> coreTransactionReference <br> interceptorIndicator
+
+                                update2->>API: Response API Actualiza Transacción Genérica
+                                Note left of update2: Response:
+
+                                API->>API: Evalúa Response API Actualiza Transacción Genérica
+
+                                alt If HTTP Status Code != 200 
+        
+                                    API->> Consumidor: Retorna error API Actualiza Transacción Genérica
+                                    Note left of API: HTTP 4XX / 5XX
+
+                                else If HTTP Status Code == 200 
+
+                                    API->>API: Construye Response API Exp Reversar Transacción ID
+                                    Note over API:  body: <br> externalTransactionReference = responseReversarTrxTengoEEH.executionStatus.transactionReference <br> reversedTransactionReference = responseAPIConsultaTrx.TransactionReference <br> bankingTransactionReference = responseAPIConsultaTrx.transactionReferenceBC
+
+                                    API->>Consumidor: Response Exitoso
+                                    Note left of API: HTTP 200: Response Body 
+                                
+                                end
+
+                            end
+                        
+                        end
+                    end                
+                else  
+                Note over Consumidor, update2: Tipo de transacción: CUALQUIER OTRO TIPO
+                    rect rgb(248, 241, 226)
+                        API->>API: Construye Request API Reversar Depósito Tengo
+                        Note over API:  pathParam: <br> transactionReference = responseAPIConsultaTrx.paymentTransactionReference
+
+                        API->>registrar: Consume API Reversar Depósito Tengo
+                        Note right of API: pathParam: transactionReference
+
+                        registrar->>API: Response API Reversar Depósito Tengo
+                        Note left of registrar: Response: responseReversionDepositoTengo.transactionReference
+
+                        API->>API: Evalúa Response API Reversar Depósito Tengo
+
+                        alt If HTTP Status Code != 200 
+            
+                            API->> Consumidor: Retorna error API Reversar Depósito Tengo
+                            Note left of API: HTTP 4XX / 5XX
+
+                        else If HTTP Status Code == 200 
+
+                            API->>API: Evalúa $tipoTrx
+                                
+                            alt If $tipoTrx != "GEN"
+
+                                API->>API: Construye Request API Actualiza Transacción con UUID
+                                Note over API:  body: <br> transactionReference = responseAPIConsultaTrx.TransactionReference <br> transactionStatus = libpram.statusType
+
+                                API->>update1: Consume API Actualiza Transacción con UUID
+                                Note right of API: body: <br> transactionReference <br> transactionStatus
+
+                                update1->>API: Response API Actualiza Transacción con UUID
+                                Note left of update1: Response: HTTP Status Code
+
+                                API->>API: Evalúa Response API Actualiza Transacción con UUID
+
+                                alt If HTTP Status Code != 200 
+        
+                                    API->> Consumidor: Retorna error API Actualiza Transacción con UUID
+                                    Note left of API: HTTP 4XX / 5XX
+
+                                else If HTTP Status Code == 200 
+
+                                    API->>API: Construye Response API Exp Reversar Transacción ID
+                                    Note over API:  body: <br> externalTransactionReference = responseReversionDepositoTengo.transactionReference <br> reversedTransactionReference = responseAPIConsultaTrx.TransactionReference <br> bankingTransactionReference = responseAPIConsultaTrx.transactionReferenceBC
+
+                                    API->>Consumidor: Response Exitoso
+                                    Note left of API: HTTP 200: Response Body 
+                                
+                                end
+
+                            else If $tipoTrx == "GEN" 
+
+                                API->>API: Construye Request API Actualiza Transacción Genérica
+                                Note over API:  body: <br> transactionReference = responseAPIConsultaTrx.TransactionReference <br> coreTransactionReference = libparam.coreTransactionReference <br> interceptorIndicator = libparam.interceptorIndicator
+
+                                API->>update2: Consume API Actualiza Transacción Genérica
+                                Note right of API: body: <br> transactionReference <br> coreTransactionReference <br> interceptorIndicator
+
+                                update2->>API: Response API Actualiza Transacción Genérica
+                                Note left of update2: Response:
+
+                                API->>API: Evalúa Response API Actualiza Transacción Genérica
+
+                                alt If HTTP Status Code != 200 
+        
+                                    API->> Consumidor: Retorna error API Actualiza Transacción Genérica
+                                    Note left of API: HTTP 4XX / 5XX
+
+                                else If HTTP Status Code == 200 
+
+                                    API->>API: Construye Response API Exp Reversar Transacción ID
+                                    Note over API:  body: <br> externalTransactionReference = responseReversionDepositoTengo.transactionReference <br> reversedTransactionReference = responseAPIConsultaTrx.TransactionReference <br> bankingTransactionReference = responseAPIConsultaTrx.transactionReferenceBC
+
+                                    API->>Consumidor: Response Exitoso
+                                    Note left of API: HTTP 200: Response Body 
+                                
+                                end
+
+                            end
+                        
+                        end
+                    end                
+                end
+            end
+
+        end
 
     end
 

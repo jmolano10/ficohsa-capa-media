@@ -19,12 +19,12 @@ sequenceDiagram
     alt Flujo síncrono
 
         Consumidor->>API: REST Request
-        Note right of Consumidor: body: organizationReference, <br> transactionReferenceReverse, <br> operationType
+        Note right of Consumidor: body: organizationReference, <br> transactionReferenceReverse, <br> operationType <br> errorCode <br> errorMessage
     
     else Flujo Asíncrono
 
         Consumidor->>sqsRequest: Publica mensaje de solicitud
-        Note right of Consumidor: Headers: <br> caller-service <br> Correlation-Id, <br> Body: <br> organizationReference <br> transactionReferenceReverse <br> operationType
+        Note right of Consumidor: Headers: <br> caller-service <br> Correlation-Id, <br> Body: <br> organizationReference <br> transactionReferenceReverse <br> operationType <br> errorCode <br> errorMessage
 
         API->>sqsRequest: Sondea mensajes (Long Polling)
         
@@ -117,10 +117,10 @@ sequenceDiagram
     end
 
     API->>API: Construye Request SP: OSBRegistraReversaTC - MasterData
-    Note over API: Conexión: <br> Valor de sourceBank.param-name <br> Valor de sourceBank.secret-name <br> Mapeo Campos: <br> Pais = header.sourceBank (Homologado) <br> Org = request.organizationReference <br> SecuenciaMovimiento = request.transactionReferenceReverse <br> TipoOperacion = request.operationType 
+    Note over API: Conexión: <br> Valor de sourceBank.param-name <br> Valor de sourceBank.secret-name <br> Mapeo Campos: <br> Pais = header.sourceBank (Homologado) <br> Org = request.organizationReference <br> SecuenciaMovimiento = request.transactionReferenceReverse <br> TipoOperacion = request.operationType <br> CodigoError = request.errorCode, <br> MensajeError = request.errorMessage
 
     API->>master: Consume SP: OSBRegistraReversaTC - MasterData
-    Note right of API: Conexión: <br> ip, port, database <br> user, password <br> Pais, SecuenciaMovimiento, TipoOperacion
+    Note right of API: Conexión: <br> ip, port, database <br> user, password <br> Pais, SecuenciaMovimiento, TipoOperacion <br> errorCode, errorMessage
 
     master->>API: Response SP: OSBRegistraReversaTC - MasterData
     Note over master: Response: CodigoError, MensajeError
@@ -130,7 +130,7 @@ sequenceDiagram
     alt If CodigoError != Vacío 
 
         API->>Reintentos: Envía envento al eventBridge API Idempotencia 
-        Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {organizationReference, transactionReferenceReverse, operationType} <br> Transaccion: TimeOut 
+        Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {organizationReference, transactionReferenceReverse, <br> operationType, errorCode, errorMessage} <br> Transaccion: TimeOut 
 
         alt Flujo síncrono AND request.header.caller-service != const.caller-service-retry
 
@@ -147,7 +147,7 @@ sequenceDiagram
     else If CodigoError != Vacío 
 
         API->>Reintentos: Envía envento al eventBridge API Idempotencia 
-        Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {organizationReference, transactionReferenceReverse, operationType} <br> Transaccion: Exitosa
+        Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {organizationReference, transactionReferenceReverse, <br> operationType, errorCode, errorMessage} <br> Transaccion: Exitosa
 
         alt Flujo síncrono AND request.header.caller-service != const.caller-service-retry
 

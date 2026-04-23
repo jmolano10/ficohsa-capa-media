@@ -187,7 +187,9 @@ Homologación de los posibles resultados del stored procedure `OSBRegistraRevers
             "fieldMapping": {
                 "transactionReference": "$.transactionReference",
                 "transactionReferenceReverse": "$.transactionReferenceReverse",
-                "operationType": "$.operationType"
+                "operationType": "$.operationType",
+                "errorCode": "$.errorCode",
+                "errorMessage": "$.errorMessage"
             }
         }
     },
@@ -226,7 +228,9 @@ curl --location 'http://internal-ban-xrs-ic-elb-alb-master-dev-548527349.us-east
     "dataPayload": {
         "organizationReference": "str",
         "transactionReferenceReverse": "string",
-        "operationType": "s"
+        "operationType": "s",
+        "errorCode": 0,
+        "errorMessage": "temp"
     }
 }'
 ```
@@ -251,10 +255,11 @@ curl --location 'http://internal-ban-xrs-ic-elb-alb-master-dev-548527349.us-east
             "body": {
                 "organizationReference": "str",
                 "transactionReferenceReverse": "string",
-                "operationType": "s"
+                "operationType": "s",
+                "errorCode": 0,
+                "errorMessage": "temp"
             }
         }
     }
 }
-
 ```
