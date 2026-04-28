@@ -38,7 +38,7 @@
 ```
 ##### AWS Systems Manager Parameter Store
 
-**Nombre:** `ban-hnd-ic-comp-param-t24-reversion-deposito-tengo-wsdl-dev` 
+**Nombre:** `ban-hnd-ic-comp-parm-t24-reversion-deposito-tengo-wsdl-dev` 
 
 ```json
 {
@@ -47,7 +47,7 @@
   "basePath": "/svcReversarTransaccionCB/services"
 }
 ```
-**Nombre:** `ban-hnd-ic-comp-param-t24-reversion-deposito-tengo-wsdl-stg` 
+**Nombre:** `ban-hnd-ic-comp-parm-t24-reversion-deposito-tengo-wsdl-stg` 
 
 ```json
 {
@@ -95,7 +95,7 @@
   "name": "srv-itintb|PAYMENT_EXECUTION_TRANSACTION-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
   "value": {
     "secret-name": "ban-hnd-ic-comp-secm-t24-reversion-deposito-tengo-wsdl-dev",
-    "param-name": "ban-hnd-ic-comp-param-t24-reversion-deposito-tengo-wsdl-dev"
+    "param-name": "ban-hnd-ic-comp-parm-t24-reversion-deposito-tengo-wsdl-dev"
   },
   "type": "json",
   "description": "Credenciales de la operación ReversionDepositoTengo del PAYMENT_EXECUTION_TRANSACTION-PRODUCT-EXECUTE_DEPOSIT_REVERSAL",
