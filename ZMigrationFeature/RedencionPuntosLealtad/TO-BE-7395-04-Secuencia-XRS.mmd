@@ -8,6 +8,7 @@ sequenceDiagram
     participant Lib as Librería Pipeline (ConfigMap)
     participant MRS as Mastercard CustomerService <br/> Operación: doItemRedemption <br> URI DEV: https://192.168.55.21:7021/mastercard-webservices/CustomerService
     participant WVPLUS as Wrapper Vision Plus <br/> Operación: PointsRedeem <br> URI: http://172.28.1.146:7802/VisionPlusService
+    participant event as AWS Event Bridge <br> lending-cards Account
     participant SQS as Cola SQS para invalidar caché Redis <br> ban-xrs-ic-sqs-manager-cache-vision-handler-dev
     participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
     
@@ -88,7 +89,10 @@ sequenceDiagram
         API->>API: Construye response API
         Note over API: Mapeo Campos : <br> householdReference = householdId <br> pointTotalRemaining = pointTotalRemaining <br> redemptionDate = redemptionDate <br> redemptionNumber = redemptionNumber <br> redemptionId = redemptionId <br> orderInformation = orderInformation <br> voucherId = voucherId <br> referenceNumber = referenceNumber <br> redemptionItemDescription = redemptionItemDesc <br> sourceItemId = sourceItemId <br> sourceItemCode = sourceItemCode
 
-        API->>SQS: Envía Evento para invalidar caché Redis
+        API->>event: Envía Evento al Event Bridge para invalidar caché Redis
+        Note right of API: Mensaje: <br> “eventId”: “”, <br> “eventType”: “CACHE_INVALIDATE”, <br> “timestamp”: “2025-11-03T14:02:33Z”, <br> “callerService”: “header.caller-service”, <br> “cacheKey”: [ <br> "request.creditCardId", <br> "request.loyaltyProgramReference"    ]
+        
+        event->>SQS: Envía mensaje a la cola SQS para invalidar caché Redis
         Note right of API: Mensaje: <br> “eventId”: “”, <br> “eventType”: “CACHE_INVALIDATE”, <br> “timestamp”: “2025-11-03T14:02:33Z”, <br> “callerService”: “header.caller-service”, <br> “cacheKey”: [ <br> "request.creditCardId", <br> "request.loyaltyProgramReference"    ]
 
         API->>Consumidor: Response Exitoso
@@ -108,7 +112,10 @@ sequenceDiagram
         API->>API: Construye response API
         Note over API: Mapeo Campos : <br> codigoRetorno = SVC-RETURN <br> descripcionRetorno = RC-NBR-OCCUR 
 
-        API->>SQS: Envía Evento para invalidar caché Redis
+        API->>event: Envía Evento al Event Bridge para invalidar caché Redis
+        Note right of API: Mensaje: <br> “eventId”: “”, <br> “eventType”: “CACHE_INVALIDATE”, <br> “timestamp”: “2025-11-03T14:02:33Z”, <br> “callerService”: “header.caller-service”, <br> “cacheKey”: [ <br> "request.creditCardId", <br> "request.loyaltyProgramReference"    ]
+        
+        event->>SQS: Envía mensaje a la cola SQS invalidar caché Redis
         Note right of API: Mensaje: <br> “eventId”: “”, <br> “eventType”: “CACHE_INVALIDATE”, <br> “timestamp”: “2025-11-03T14:02:33Z”, <br> “callerService”: “header.caller-service”, <br> “cacheKey”: [ <br> "request.creditCardId", <br> "request.loyaltyProgramReference"    ]
 
         API->>Consumidor: Response Exitoso
