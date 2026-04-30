@@ -1,0 +1,139 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor / Aplicación
+    participant event as Event Bridge <br> Bus de Eventos
+    participant sqsRequest as AWS SQS <br> Cola de Solicitudes <br> ban-xrs-ic-comp-sqs-regsiter-transaccion-cb-in-<env>
+    participant API as API Registra Transacciones Canal CB <br> Epica 2668: RetiroEfectivoCBS <br> HU 7034:  POST - /register-channel-transaction-status/v1/registe
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant parameter as Paramter Store
+    participant secret as Secret Manager
+    participant region as BD regionDB <br/> SP: REGISTRA_TRANSACCION_CANAL <br> connectionCollection
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Registrar transacción Canal
+    
+    alt Flujo síncrono
+
+        Consumidor->>API: REST Request
+        Note right of Consumidor: Headers: <br> caller-service <br> Correlation-Id, <br> sourceBank, <br> Channel, <br> Branch-Id <br> body: <br> correspondentBankingAgentName, <br> transactionTypeCode, <br> transactionStatus, <br> transactionAmount, <br> currencyCode, <br> transactionReferenceBC, <br> transactionReference, <br> transactionKeyReference, <br> pointOfSaleReference, <br> subPointOfSaleReference, <br> payerIdentificationReference, <br> customerName, <br> accountNumber, <br> securityTokenReference, <br> commissionTransactionReference, <br> commissionAmount, <br> commissionCurrencyCode, <br> reversalTransactionReference
+    
+    else Flujo Asíncrono
+
+        Consumidor->>event: Publica mensaje de solicitud
+        Note right of Consumidor: Headers: <br> caller-service <br> Correlation-Id, <br> sourceBank, <br> Channel, <br> Branch-Id <br> body: <br> correspondentBankingAgentName, <br> transactionTypeCode, <br> transactionStatus, <br> transactionAmount, <br> currencyCode, <br> transactionReferenceBC, <br> transactionReference, <br> transactionKeyReference, <br> pointOfSaleReference, <br> subPointOfSaleReference, <br> payerIdentificationReference, <br> customerName, <br> accountNumber, <br> securityTokenReference, <br> commissionTransactionReference, <br> commissionAmount, <br> commissionCurrencyCode, <br> reversalTransactionReference
+
+        event->>sqsRequest: Entrega Mensaje a SQS
+        Note right of Consumidor: Headers, body: 
+
+        API->>sqsRequest: Sondea mensajes (Long Polling)
+        
+        sqsRequest->>API: Entrega mensaje de solicitud
+        Note right of sqsRequest: Entrega mensaje con <br> Header y Body
+
+    end
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "REGISTER_CHANNEL_TRANSACTION_STATUS" <br> name: "REGISTER" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Consultar parámetros de Parameter Store en caché local
+        Note right of API: paranName = libparam.param-name
+
+        CL->>API: Obtiene parámetros de Parameter Store en Cahé Local
+        Note left of CL: Obtiene parámetros de conexión a BD: ip, port, database
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "REGISTER_CHANNEL_TRANSACTION_STATUS" <br> name: "REGISTER" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+        API->>parameter: Consultar parámetros del Parameter Store
+        Note right of API: paranName = libparam.param-name
+
+        parameter->>API: Obtiene parámetros del Parameter Store
+        Note left of parameter: Obtiene parámetros de conexión a BD: ip, port, database
+
+        API->>CL: Guarda parámetros del Parameter Store en caché local
+        Note right of API: ip, port, database
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> caller-service <br> schema <br> package <br> procedureName
+
+    API->>secret: Consulta secretos para conexión a base de datos
+    Note right of API: secretName = libparam.secret-name
+    
+    secret->>API: Retorna secretos
+    Note left of secret: User, Password
+
+    API->>API: Construye Request SP: REGISTRA_TRANSACCION_CANAL - RegionDB
+    Note over API: Conexión: <br> Valor de libparam.param-name <br> Valor de libparam.secret-name <br> Mapeo Campos: <br> PV_CORRESPONSAL = body.correspondentBankingAgentName <br> PN_TIPO_TRANSACCION = body.transactionTypeCode <br> PV_CODIGO_CANAL = header.Channel <br> PV_ESTADO_TRANSACCION = body.transactionStatus <br> PN_MONTO = body.transactionAmount <br> PV_MONEDA = body.currencyCode <br> PV_CODIGO_PAIS = header.sourceBank <br> PV_CLAVE_CORRESPONSAL = body.transactionReferenceBC <br> PV_REFERENCIA_T24 = body.transactionReference <br> PV_CLAVE_TRANSACCION = body.transactionKeyReference <br> PV_COD_CORRESPONSAL = header.Branch-Id <br> PV_PUNTO_VENTA_CORR = body.pointOfSaleReference <br>  PV_SUB_PUNTO_VENTA_CORR = body.subPointOfSaleReference <br> PV_TOKEN_ID = body.securityTokenReference <br> PV_ID_TRANSACCION_COMISION = body.commissionTransactionReference <br> PD_MONTO_COMISION = body.commissionAmount <br> PV_MONEDA_COMISION = body.commissionCurrencyCode <br> PV_REFERENCIA_T24_REV = body.reversalTransactionReference
+
+    API->>region: Consume SP: REGISTRA_TRANSACCION_CANAL - RegionDB
+    Note over API, Lambda: Conexión: <br> ip, port, database, user, password <br> Campos: <br> PV_CORRESPONSAL, PN_TIPO_TRANSACCION, PV_CODIGO_CANAL, PV_ESTADO_TRANSACCION, PN_MONTO, PV_MONEDA, PV_CODIGO_PAIS, <br> PV_CLAVE_CORRESPONSAL, PV_REFERENCIA_T24, PV_CLAVE_TRANSACCION, PV_COD_CORRESPONSAL, PV_PUNTO_VENTA_CORR, <br> PV_SUB_PUNTO_VENTA_CORR, PV_TOKEN_ID, PV_ID_TRANSACCION_COMISION, PD_MONTO_COMISION, PV_MONEDA_COMISION, PV_REFERENCIA_T24_REV
+
+    region->>API: Response SP: REGISTRA_TRANSACCION_CANAL - RegionDB
+    Note over region: Response: Pv_ErrorCode, Pv_ErrorMessage
+
+    API->>API: Registra Log Response CloudWatch
+
+    API->>API: Evalúa Response SP: REGISTRA_TRANSACCION_CANAL - RegionDB
+
+    alt If Pv_ErrorCode != SUCCESS AND Flujo síncrono 
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según <br> tabla de homologación SP: REGISTRA_TRANSACCION_CANAL
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+        
+
+    else If Pv_ErrorCode == SUCCESS AND Flujo síncrono 
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API

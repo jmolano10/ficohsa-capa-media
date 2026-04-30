@@ -1,0 +1,168 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB RetiroEfectivoCBS
+    participant ValidaRegional as ValidaServicioRegional
+    participant ConsultaCorr as consultarCorresponsalB_db
+    participant UsoServicio as registrarUsoServicio_db
+    participant RegEstado as registraEstadoTransaccion_db
+    participant ConsultaComision as consultaComisionesCB_db
+    participant ConsultaCuenta as consultaCuentasBS
+    participant T24 as svcRegistraTransaccionTengo
+    participant Transferencia as transferenciasBS
+    participant Reversa as ReversarTransaccion
+    participant ActEstado as actualizaEstadoTransaccion_db
+    participant MapeoError as MapeoErrores
+
+    Note over Client, MapeoError: Flujo Honduras (HN01) - RetiroEfectivoCBS
+
+    Client->>OSB: SOAP Request
+    Note right of Client: Header: SourceBank=HN01<br/>Authentication: UserName/Password<br/>BankingCorrespondent: Id<br/>Body: ACCOUNT_NUMBER, CURRENCY, AMOUNT, TOKEN_ID, TRANSACTION_ID_CB
+
+    OSB->>OSB: Validar Esquema XML
+    Note right of OSB: Validar contra retiroEfectivoCBTypes.xsd<br/>Campos obligatorios: ACCOUNT_NUMBER, CURRENCY, AMOUNT, TOKEN_ID, TRANSACTION_ID_CB
+
+    alt Validación Fallida
+        OSB->>Client: SOAP Fault
+    end
+
+    OSB->>RegEstado: Registrar Estado Inicial
+    Note right of RegEstado: Estado: REGISTRADO<br/>Tipo: RETIRO<br/>Canal: 1<br/>Referencia: TRANSACTION_ID_CB
+    RegEstado->>OSB: Confirmación
+
+    OSB->>ValidaRegional: Validar Servicio Regional
+    Note right of ValidaRegional: ServiceId: FICBCO0218<br/>Region: HN01
+    
+    alt Región No Válida
+        ValidaRegional->>OSB: Error Regional
+        OSB->>Client: Response con Error
+    end
+
+    ValidaRegional->>OSB: Validación Exitosa
+    Note right of OSB: Estado: VALIDACION_REGIONAL_EXITOSA
+
+    OSB->>ConsultaCorr: Consultar Parámetros Corresponsal
+    Note right of ConsultaCorr: BankingCorrespondent Id<br/>TransactionType: 4<br/>SourceBank: HN01
+    
+    alt Corresponsal No Válido
+        ConsultaCorr->>OSB: Error Corresponsal
+        OSB->>Client: Response con Error
+    end
+
+    ConsultaCorr->>OSB: Parámetros Corresponsal
+    Note left of ConsultaCorr: PV_CUENTA_DEBITO<br/>PV_CUENTA_CREDITO<br/>PV_MONEDA_PERMITIDA<br/>PV_TIPO_TRANSACCION
+
+    OSB->>OSB: Validar Moneda Transacción
+    Note right of OSB: CURRENCY == PV_MONEDA_PERMITIDA
+
+    alt Moneda Inválida
+        OSB->>Client: Error Moneda Inválida
+    end
+
+    OSB->>UsoServicio: Registrar Uso Servicio
+    Note right of UsoServicio: ServiceId: FICBCO0218<br/>Usuario: UserName<br/>Banco: HN01<br/>Operación: 1
+    
+    alt Cuota Excedida
+        UsoServicio->>OSB: SERVICE QUOTA EXCEEDED
+        OSB->>Client: Error MW-0001
+    end
+
+    UsoServicio->>OSB: Uso Registrado
+
+    OSB->>ConsultaComision: Consultar Comisión
+    Note right of ConsultaComision: SP: MW_P_CON_COMISION_CORBAN<br/>PV_MONTO: AMOUNT<br/>PV_MONEDA: CURRENCY<br/>PV_CODIGO_TRANSACCION: 4<br/>PV_USUARIO_TRANSACCION: UserName
+
+    alt Error Consultando Comisión
+        ConsultaComision->>OSB: Error Comisión
+        OSB->>Client: Response con Error
+    end
+
+    ConsultaComision->>OSB: Monto Comisión
+    Note left of ConsultaComision: PV_CODIGO_ERROR: SUCCESS<br/>PV_MONTO_COMISION: 25.00
+
+    OSB->>ConsultaCuenta: Consultar Saldo Cuenta
+    Note right of ConsultaCuenta: Operación: Consultadesaldodecuenta<br/>ACCOUNT_NUMBER: 1234567890
+
+    alt Cuenta No Existe
+        ConsultaCuenta->>OSB: Count = 0
+        OSB->>Client: R03-Número de Cuenta Inexistente
+    end
+
+    ConsultaCuenta->>OSB: Saldo Disponible
+    Note left of ConsultaCuenta: AVAILBALANCE: 5000.00<br/>ACCOUNTTITLE: Nombre Cliente
+
+    OSB->>OSB: Validar Fondos Suficientes
+    Note right of OSB: Disponible >= (Monto + Comisión)<br/>5000.00 >= (1000.00 + 25.00)
+
+    alt Fondos Insuficientes
+        OSB->>Client: R01-Fondos Insuficientes
+    end
+
+    OSB->>T24: Registrar Transferencia Principal
+    Note right of T24: Operación: RetiroEfectivoTengo<br/>DebitAccount: ACCOUNT_NUMBER<br/>DebitAmount: AMOUNT<br/>CreditAccount: PV_CUENTA_CREDITO<br/>LRREFTENGO: TRANSACTION_ID_CB
+
+    alt Error en T24
+        T24->>OSB: Error Transferencia
+        OSB->>Client: Response con Error
+    end
+
+    T24->>OSB: Transferencia Exitosa
+    Note left of T24: Status: SUCCESS<br/>TransactionId: FT231201001<br/>Messages: Transaction completed
+
+    alt Comisión > 0
+        OSB->>Transferencia: Cobrar Comisión
+        Note right of Transferencia: Operación: Transfmodelbankentrecuentas<br/>Monto: PV_MONTO_COMISION<br/>Cuenta Origen: ACCOUNT_NUMBER<br/>Cuenta Destino: Cuenta Comisión
+
+        alt Error Cobrando Comisión
+            Transferencia->>OSB: Error Comisión
+            OSB->>Reversa: Reversar Transacción Principal
+            Note right of Reversa: TransactionId: FT231201001
+            
+            alt Error Reversando
+                Reversa->>OSB: Error Reversión
+                OSB->>Client: Error Reversión
+            end
+            
+            Reversa->>OSB: Reversión Exitosa
+            OSB->>Client: Error Comisión + Reversión
+        end
+
+        Transferencia->>OSB: Comisión Cobrada
+    end
+
+    OSB->>ActEstado: Actualizar Estado Final
+    Note right of ActEstado: Estado: TRANSACCION_EXITOSA<br/>FT: TransactionId<br/>Tipo: TENGO
+    ActEstado->>OSB: Estado Actualizado
+
+    OSB->>UsoServicio: Registrar Fin Uso Servicio
+    Note right of UsoServicio: Operación: 2 (Fin de uso)
+    UsoServicio->>OSB: Uso Finalizado
+
+    OSB->>OSB: Construir Response
+    Note right of OSB: retiroEfectivoOut.xq<br/>ACCOUNT_NUMBER, AMOUNT, CURRENCY<br/>ACCOUNT_NAME, TOKEN_ID<br/>COMMISION_AMOUNT
+
+    OSB->>OSB: Construir Header Response
+    Note right of OSB: retiroEfectivoHeaderOut.xq<br/>successIndicator: SUCCESS<br/>transactionId: FT231201001<br/>messages: Transacción exitosa
+
+    alt Error en Flujo
+        OSB->>ActEstado: Actualizar Estado Error
+        OSB->>MapeoError: Mapear Error
+        Note right of MapeoError: Código: FICBCO0218<br/>Mensaje: Error específico
+        MapeoError->>OSB: Error Mapeado
+        OSB->>Client: Response con Error Mapeado
+    end
+
+    OSB->>Client: SOAP Response Exitoso
+    Note left of Client: Header: successIndicator=SUCCESS<br/>transactionId=FT231201001<br/>Body: Datos completos del retiro<br/>ACCOUNT_NUMBER, AMOUNT, CURRENCY<br/>ACCOUNT_NAME, TOKEN_ID, COMMISION_AMOUNT
+
+    Note over Client, MapeoError: Transformaciones Clave:
+    Note over Client, MapeoError: 1. consultaComisionesCBIn.xq: OSB → BD Comisiones
+    Note over Client, MapeoError: 2. retiroEfectivoTengoT24In.xq: OSB → T24
+    Note over Client, MapeoError: 3. retiroEfectivoOut.xq: Servicios → OSB Response
+    Note over Client, MapeoError: 4. retiroEfectivoHeaderOut.xq: Estado → Header Response
+
+    Note over Client, MapeoError: Validaciones Críticas:
+    Note over Client, MapeoError: 1. Esquema XML contra retiroEfectivoCBTypes.xsd
+    Note over Client, MapeoError: 2. Región HN01 válida para servicio FICBCO0218
+    Note over Client, MapeoError: 3. Corresponsal configurado y moneda permitida
+    Note over Client, MapeoError: 4. Fondos suficientes: Saldo >= (Monto + Comisión)
+    Note over Client, MapeoError: 5. Atomicidad: Reversión automática si falla comisión

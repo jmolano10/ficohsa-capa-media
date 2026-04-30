@@ -1,0 +1,101 @@
+flowchart TD
+    A[Cliente SOAP Request] --> B[OSB RetiroEfectivoCBS Proxy]
+    
+    B --> C{Validar Esquema XML}
+    C -->|Error| Z1[SOAP Fault - Esquema Inválido]
+    C -->|OK| D[Registrar Estado: REGISTRADO]
+    
+    D --> E[Validar Servicio Regional FICBCO0218]
+    E -->|Error| Z2[Error: Región No Válida]
+    E -->|OK| F[Aplicar Valores Por Defecto Región]
+    
+    F --> G[Consultar Parámetros Corresponsal]
+    G -->|Error| Z3[Error: Corresponsal Inválido]
+    G -->|OK| H{Validar Moneda Permitida}
+    
+    H -->|Moneda Inválida| Z4[Error: MONEDA INVALIDA PARA TRANSACCION]
+    H -->|OK| I[Registrar Uso Servicio]
+    
+    I -->|Cuota Excedida| Z5[Error: MW-0001 SERVICE QUOTA EXCEEDED]
+    I -->|OK| J{Evaluar Región SourceBank}
+    
+    J -->|HN01| K[Pipeline HN01_request]
+    J -->|Otra Región| L[Pipeline Default - Sin Implementación]
+    
+    L --> Z6[Sin Procesamiento Específico]
+    
+    K --> M[Consultar Comisión MW_P_CON_COMISION_CORBAN]
+    M -->|Error| Z7[Error: Consultando Comisión]
+    M -->|OK| N[Consultar Saldo Cuenta]
+    
+    N -->|Cuenta No Existe| Z8[Error: R03-Número de Cuenta Inexistente]
+    N -->|OK| O{Validar Fondos Suficientes}
+    
+    O -->|Fondos Insuficientes| Z9[Error: R01-Fondos Insuficientes]
+    O -->|OK| P[Transferencia Principal T24]
+    
+    P -->|Error T24| Z10[Error: Transferencia Fallida]
+    P -->|OK| Q{Comisión > 0?}
+    
+    Q -->|No| S[Actualizar Estado: TRANSACCION_EXITOSA]
+    Q -->|Sí| R[Cobrar Comisión]
+    
+    R -->|Error Comisión| T[Reversar Transacción Principal]
+    T -->|Error Reversión| Z11[Error: Reversión Fallida]
+    T -->|OK| Z12[Error: Comisión Fallida + Reversión OK]
+    
+    R -->|OK| S
+    
+    S --> U[Registrar Fin Uso Servicio]
+    U --> V[Construir Response Exitoso]
+    V --> W[SOAP Response SUCCESS]
+    
+    %% Manejo de Errores Global
+    Z1 --> ERROR[Error Handler]
+    Z2 --> ERROR
+    Z3 --> ERROR
+    Z4 --> ERROR
+    Z5 --> ERROR
+    Z7 --> ERROR
+    Z8 --> ERROR
+    Z9 --> ERROR
+    Z10 --> ERROR
+    Z11 --> ERROR
+    Z12 --> ERROR
+    
+    ERROR --> MAPEROR[Mapeo de Errores]
+    MAPEROR --> ACTERROR[Actualizar Estado Error]
+    ACTERROR --> ERRORRES[SOAP Response ERROR]
+    
+    %% Estilos
+    classDef errorNode fill:#ffcccc,stroke:#ff0000,stroke-width:2px
+    classDef successNode fill:#ccffcc,stroke:#00ff00,stroke-width:2px
+    classDef processNode fill:#cceeff,stroke:#0066cc,stroke-width:2px
+    classDef decisionNode fill:#ffffcc,stroke:#ffcc00,stroke-width:2px
+    
+    class Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11,Z12,ERROR,MAPEROR,ACTERROR,ERRORRES errorNode
+    class W,V successNode
+    class A,B,D,E,F,G,I,K,M,N,P,R,S,T,U processNode
+    class C,H,J,O,Q decisionNode
+    
+    %% Notas de Transformaciones
+    K -.->|consultaComisionesCBIn.xq| M
+    P -.->|retiroEfectivoTengoT24In.xq| P
+    V -.->|retiroEfectivoOut.xq<br/>retiroEfectivoHeaderOut.xq| V
+    
+    %% Notas de Conexiones
+    M -.->|SP: MW_P_CON_COMISION_CORBAN<br/>Conexión: eis/DB/ConnectionMiddleware| M
+    P -.->|Endpoint: http://10.242.104.55:7005<br/>Operación: RetiroEfectivoTengo| P
+    N -.->|BS: consultaCuentasBS<br/>Op: Consultadesaldodecuenta| N
+    R -.->|BS: transferenciasBS<br/>Op: Transfmodelbankentrecuentas| R
+    
+    %% Estados de Transacción Tengo
+    D -.->|Estado: REGISTRADO| D
+    E -.->|Estado: VALIDANDO_RUTA_REGIONAL| E
+    F -.->|Estado: VALIDACION_REGIONAL_EXITOSA| F
+    G -.->|Estado: OBTENIENDO_PARAMETRIA_CORRESPONSAL| G
+    M -.->|Estado: OBTENIENDO_COMISION| M
+    N -.->|Estado: CONSULTANDO_CUENTA| N
+    P -.->|Estado: REALIZANDO_TRANSFERENCIA| P
+    R -.->|Estado: REALIZANDO_COBRO_COMISION| R
+    S -.->|Estado: TRANSACCION_EXITOSA| S
