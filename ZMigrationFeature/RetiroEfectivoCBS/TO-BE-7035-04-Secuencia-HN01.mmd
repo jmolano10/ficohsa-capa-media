@@ -1,0 +1,116 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor / Aplicación
+    participant API as API Consulta Comisión CB <br> Epica 2668: RetiroEfectivoCBS <br> HU 7035:  POST - /retrieve-correspondent-commission/v1/retrieve
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant Lib as Librería Phosteline (ConfigMap)
+    participant parameter as Paramter Store
+    participant sp as Stored Procedure <br/> ban-xrs-ic-sp-get-corban-commission-{env}-{env}
+    participant aurora as BD Aurora <br/> ban-xrs-ic-rds-aurora-postgresql-{env}
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Consulta Comisión
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Headers: <br> Application-Id <br> body: <br> transactionAmount, <br> currencyCode, <br> correspondentTransactionTypeCode
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "RETRIEVE_CORRESPONDENT_COMISSION" <br> name: "RETRIEVE" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Consultar parámetros de Parameter Store en caché local
+        Note right of API: paranName = libparam.param-name
+
+        CL->>API: Obtiene parámetros de Parameter Store en Cahé Local
+        Note left of CL: Obtiene parámetros de conexión a BD: host, port, database
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "RETRIEVE_CORRESPONDENT_COMISSION" <br> name: "RETRIEVE" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+        API->>parameter: Consultar parámetros del Parameter Store
+        Note right of API: paranName = libparam.param-name
+
+        parameter->>API: Obtiene parámetros del Parameter Store
+        Note left of parameter: Obtiene parámetros de conexión a BD: host, port, database
+
+        API->>CL: Guarda parámetros del Parameter Store en caché local
+        Note right of API: host, port, database
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> caller-service <br> userDB <br> procedureName
+
+     API->>API: Construye Request SP Get Comission
+    Note over API: params:  <br> p_amount = request.transactionAmount <br> p_currencyCode = request.currencyCode <br> p_transaction_code = request.correspondentTransactionTypeCode <br> p_transactionUser = header.Application-Id
+
+    API->>sp: Consume SP Get Comission
+    Note right of API: host, port, database, userDB, libparam.arn-secret <br> p_amount, p_currencyCode, p_transaction_code, p_transactionUser
+
+    sp->>aurora: Consulta Tablas en BD Aurora
+    aurora->>sp: Entrega información de tablas <br> necesarias para cálculo de comisión
+
+    sp->>API: Response SP Get Comission
+    Note left of sp: Response: <br> p_commissionAmount, p_commission_currency, <br> p_response_code, p_response_message
+
+    alt If p_response_code != SUCCESS
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según <br> tabla de homologación SP: get_corban_commission
+        
+        Errors ->> API: Retorna código mapeado
+        
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+        
+
+    else If p_response_code == SUCCESS
+
+        API->>API: Construye response API Sistema Consulta Comisión CB
+        Note over API: commissionAmount = p_commissionAmount, <br> currencyCode = p_commission_currency
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
