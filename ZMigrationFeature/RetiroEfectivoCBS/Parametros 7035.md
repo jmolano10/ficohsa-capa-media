@@ -2,7 +2,7 @@
 ```json
 //REGISTRO EN DYNAMODB PARAMETER - CONFIGURACIÓN POR MÉTODO
 {
-  "pk": "COUNTRY#XRS#DOMAIN#RETRIEVE_CORRESPONDENT_COMISSION#PARAM#RETRIEVE",
+  "pk": "COUNTRY#XRS#DOMAIN#RETRIEVE_CORRESPONDENT_COMMISSION#PARAM#RETRIEVE",
   "sk": "V#0001",
   "name": "RETRIEVE",
   "value": [
@@ -26,9 +26,9 @@
     }
   ],
   "type": "list",
-  "description": "CONFIG OF RETRIEVE_CORRESPONDENT_COMISSION BY METHOD",
+  "description": "CONFIG OF RETRIEVE_CORRESPONDENT_COMMISSION BY METHOD",
   "country": "XRS",
-  "domain": "RETRIEVE_CORRESPONDENT_COMISSION",
+  "domain": "RETRIEVE_CORRESPONDENT_COMMISSION",
   "tags": [],
   "precedence": 10,
   "effective_from": "",
@@ -58,9 +58,9 @@
 
 ```json
 {
-  "caller-service":  "RETRIEVE_CORRESPONDENT_COMISSION-SYSTEM-RETRIEVE",
+  "caller-service":  "RETRIEVE_CORRESPONDENT_COMMISSION-SYSTEM-RETRIEVE",
   "userDB": "dbadmin",
-  "procedureName": "ban-xrs-ic-sp-get-comission-cb-{env}"
+  "procedureName": "ban-xrs-ic-sp-get-corban-commission-{env}"
 }
 ```
 
