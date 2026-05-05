@@ -1,0 +1,159 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor / Aplicación
+    participant API as API Realiza Retiro Efectivo <br> Epica 2668: RetiroEfectivoCBS <br> HU 62887:  POST - /execute-cash-withdrawal/v1/execute
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant Lib as Librería Phosteline (ConfigMap)
+    participant saldo as API Consulta Saldo Disponible <br> HU: 61911 <br> POST - /loans-and-deposits/deposit-account-facility-retrieve/v1/retrieve-account-balance
+    participant retiro as API Realiza Retiro Efectivo Tengo <br> HU: 57119 <br> POST - /loans-and-deposits/loan-admin/v1/initiate-transaction
+    participant comision as API Transferencia Entre Cuentas <br> HU: 55724 <br> POST - /payments/payment-execution-transfer/v1/initiate-transfers-between-accounts
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Realiza Retiro Efectivo
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> accountNumber, <br> currencyCode, <br> transactionAmount, <br> securityTokenReference, <br> commissionAmount <br> creditAccountNumber <br> transactionType <br> transactionReferenceCB <br> commissionCurrencyCode <br> commissionType <br> commissionCreditAccountNumber
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "EXECUTE_CASH_WITHDRAWAL" <br> name: "EXECUTE" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros lambda parámetros
+        Note right of API: Domain: "EXECUTE_CASH_WITHDRAWAL" <br> name: "EXECUTE" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>API: Construye Request API Consulta Saldo Disponible
+    Note over API: body:  <br> accountNumber = request.accountNumber
+
+    API->>saldo: Consume API Consulta Saldo Disponible
+    Note right of API: accountNumber
+
+    saldo->>API: Response API Consulta Saldo Disponible
+    Note left of saldo: Response: <br> availableBalance, <br> ++ 7 campos adicionales
+
+    API->>API: Validar Response API Consulta Saldo Disponible
+
+    alt If HTTP Code != 200
+    
+        API->> Consumidor: Retorna error API Consulta Saldo Disponible
+        Note left of API: HTTP 4XX / 5XX
+
+    else If HTTP Code == 200 
+
+        API->>API: Calcula monto total a debitar
+        Note over API: $totalDebit = request.transactionAmount + request.commissionAmount
+
+        API->>API: Calcula fondos disponibles
+        Note over API: $totalAvailable = responseAPIConsultaDisp.availableBalance - $totalDebit
+
+        API->>API: Valida fondos disponibles
+
+        alt If $totalAvailable < 0
+
+            API->> Errors: Mapear código de error
+            
+            Errors ->> API: Retorna código mapeado
+            
+            API->> Consumidor: Retorna error
+            Note left of API: HTTP 422: Fondos insuficientes
+
+        else If $totalAvailable >= 0
+
+            API->>API: Construye Request API Retiro Efectivo Tengo
+            Note over API: body: <br> OfsFunction.authorizationsNumber = libparam.noOfAuth <br> transactionType = request.transactionType <br> debitAccountNumber = request.accountNumber <br> debitAmount = request.transactionAmount <br> debitCurrencyCode = request.currencyCode <br> creditAccountNumber = request.creditAccountNumber <br> tengoReference = request.transactionReferenceCB
+
+            API->>retiro: Consume API Retiro Efectivo Tengo
+            Note right of API: body:<br> OfsFunction.authorizationsNumber, transactionType, debitAccountNumber, <br> debitAmount, debitCurrencyCode, creditAccountNumber, tengoReference
+
+            retiro->>API: Response API Retiro Efectivo Tengo
+            Note left of retiro: Response: <br> transactionReference, ++ Campos adicionales
+
+            API->>API: Validar Response API Retiro Efectivo Tengo
+
+            alt If HTTP Code != 200
+
+                API->> Consumidor: Retorna error API Retiro Efectivo Tengo
+                Note left of API: HTTP 4XX / 5XX
+
+            else If HTTP Code == 200 AND request.commissionAmount > 0
+
+                API->>API: Construye Request API Transferenecia entre cuentas (comisión)
+                Note over API: body: <br> paymentExecutionRequestReference = responseRetiroEfectivoTengo.transactionReference, <br> paymentTransactionType = request.commissionTransactionType, <br> debtorAccountReference = request.accountNumber, <br> currencyCode = request.commissionCurrencyCode, <br> paymentAmount = request.commissionAmount, <br> creditorAccountReference = request.commissionCreditAccountNumber, <br> paymentNarrative = concat(libparam.paymentDetails, responseRetiroEfectivoTengo.transactionReference), <br> businessUnitReference = libparam.businessUnitReference, <br> transactionDirectionCode = libparam.transactionDirectionCode, <br> initiatingUserReference = header.Application-Id
+
+                API->>comision: Consume API Transferenecia entre cuentas (comisión)
+                Note right of API: body: <br> paymentExecutionRequestReference, paymentTransactionType, <br> debtorAccountReference, currencyCode, paymentAmount, <br> creditorAccountReference, paymentNarrative, businessUnitReference, <br> transactionDirectionCode, initiatingUserReference
+
+                comision->>API: Response API Transferenecia entre cuentas (comisión)
+                Note left of comision: Response: <br> transactionReference, ++ Campos adicionales
+
+                API->>API: Validar Response API Transferenecia entre cuentas (comisión)
+
+                alt If HTTP Code != 200 
+
+                    API->>API: Construye Request API Reverso Transacciones (Retiro Efectivo Tengo)
+                    Note over API: body: <br> transactionReference = responseRetiroEfectivoTengo.transactionReference, <br> transactionType = " " 
+
+                    API->>comision: Consume API Reverso Transacciones (Retiro Efectivo Tengo)
+                    Note right of API: body: <br> transactionReference, transactionType
+
+                    comision->>API: Response API Reverso Transacciones (Retiro Efectivo Tengo)
+                    Note left of comision: Response: <br> transactionDate
+
+                    API->> Consumidor: Retorna error API Transferenecia entre cuentas (comisión)
+                    Note left of API: HTTP 4XX / 5XX
+
+                else If HTTP Code == 200 
+
+                    API->>API: Construye response API Composición Realiza Retiro Efectivo
+                    Note over API: accountNumber = request.accountNumber, transactionAmount = request.transactionAmount, currencyCode = request.currencyCode, securityTokenReference = request.securityTokenReference, commissionAmount = request.commissionAmount
+
+                    API->>Consumidor: Response Exitoso
+                    Note left of API: HTTP 200: Response Body 
+
+                end
+            
+            end
+        
+        end
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
