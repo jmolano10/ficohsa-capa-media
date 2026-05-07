@@ -8,12 +8,15 @@ sequenceDiagram
     participant saldo as API Consulta Saldo Disponible <br> HU: 61911 <br> POST - /loans-and-deposits/deposit-account-facility-retrieve/v1/retrieve-account-balance
     participant retiro as API Realiza Retiro Efectivo Tengo <br> HU: 57119 <br> POST - /loans-and-deposits/loan-admin/v1/initiate-transaction
     participant comision as API Transferencia Entre Cuentas <br> HU: 55724 <br> POST - /payments/payment-execution-transfer/v1/initiate-transfers-between-accounts
+    participant reverso as API Reversar Loan Payment <br> Epica 2490: ReversarTransaccion <br> HU 33776: <br> POST: /loan-payment-mgmt/v1/reverse-transaction
+    participant event as Event Bridge <br> integration-composition
+    participant API5 as API Actualiza Estado Transacción <br> Epica 2461: ConsultaEstadoTransaccionHN <br> HU 62321:  PUT /update-transaction-status/v1/update
     participant Errors as Control de Errores <br> Librería de mapeo de errores
     
     Note over Consumidor, Errors: Flujo Honduras (HN01) - API Realiza Retiro Efectivo
 
     Consumidor->>API: REST Request
-    Note right of Consumidor: body: <br> accountNumber, <br> currencyCode, <br> transactionAmount, <br> securityTokenReference, <br> commissionAmount <br> creditAccountNumber <br> transactionTypeCode <br> transactionReferenceCB <br> commissionCurrencyCode <br> commissionType <br> commissionCreditAccountNumber
+    Note right of Consumidor: body: <br> accountNumber, <br> currencyCode, <br> transactionAmount, <br> securityTokenReference, <br> commissionAmount <br> creditAccountNumber <br> transactionTypeCode <br> transactionReferenceBC <br> commissionCurrencyCode <br> commissionType <br> commissionCreditAccountNumber
 
     API->>API: Validar Request
     Note over API: Valida campos obligatorios según contrato OpenAPI 
@@ -59,6 +62,14 @@ sequenceDiagram
     API->>API: Validar Response API Consulta Saldo Disponible
 
     alt If HTTP Code != 200
+
+        API->>API: Construye mensaje para Event Bridge (API Actualiza Estado Transacción)
+        Note over API: Headers: <br> Application-Id = header.Application-Id <br> ++ Headers recibidos en la petición <br> Body: <br> transactionType = libparam.transactionTypeUpdate, <br> queryType = libparam.queryType, <br> transactionReference = request.transactionReferenceBC, <br> status = "ERROR CONSULTANDO CUENTA", <br> financialTransactionReference = "", <br> coreSystemTransactionReference = libparam.transactionReferenceT24, <br> paymentRecordUpdateType = libparam.updateType
+
+        API->>event: Envía evento a Event Bridge
+        Note right of API: Header, Body <br> Regla de enrutamiento para SQS <br> queueName: cola-api-actualiza-estado-transaccion-hn
+
+        event->>API5: Entrega Mensaje a API Actualiza Estado Transacción
     
         API->> Consumidor: Retorna error API Consulta Saldo Disponible
         Note left of API: HTTP 4XX / 5XX
@@ -75,6 +86,14 @@ sequenceDiagram
 
         alt If $totalAvailable < 0
 
+            API->>API: Construye mensaje para Event Bridge (API Actualiza Estado Transacción)
+            Note over API: Headers: <br> Application-Id = header.Application-Id <br> ++ Headers recibidos en la petición <br> Body: <br> transactionType = libparam.transactionTypeUpdate, <br> queryType = libparam.queryType, <br> transactionReference = request.transactionReferenceBC, <br> status = "ERROR SALDO INSUFICIENTE", <br> financialTransactionReference = "", <br> coreSystemTransactionReference = libparam.transactionReferenceT24, <br> paymentRecordUpdateType = libparam.updateType
+
+            API->>event: Envía evento a Event Bridge
+            Note right of API: Header, Body <br> Regla de enrutamiento para SQS <br> queueName: cola-api-actualiza-estado-transaccion-hn
+
+            event->>API5: Entrega Mensaje a API Actualiza Estado Transacción
+
             API->> Errors: Mapear código de error
             
             Errors ->> API: Retorna código mapeado
@@ -85,7 +104,7 @@ sequenceDiagram
         else If $totalAvailable >= 0
 
             API->>API: Construye Request API Retiro Efectivo Tengo
-            Note over API: body: <br> OfsFunction.authorizationsNumber = libparam.noOfAuth <br> transactionType = request.transactionTypeCode <br> debitAccountNumber = request.accountNumber <br> debitAmount = request.transactionAmount <br> debitCurrencyCode = request.currencyCode <br> creditAccountNumber = request.creditAccountNumber <br> tengoReference = request.transactionReferenceCB
+            Note over API: body: <br> OfsFunction.authorizationsNumber = libparam.noOfAuth <br> transactionType = request.transactionTypeCode <br> debitAccountNumber = request.accountNumber <br> debitAmount = request.transactionAmount <br> debitCurrencyCode = request.currencyCode <br> creditAccountNumber = request.creditAccountNumber <br> tengoReference = request.transactionReferenceBC
 
             API->>retiro: Consume API Retiro Efectivo Tengo
             Note right of API: body:<br> OfsFunction.authorizationsNumber, transactionType, debitAccountNumber, <br> debitAmount, debitCurrencyCode, creditAccountNumber, tengoReference
@@ -96,6 +115,14 @@ sequenceDiagram
             API->>API: Validar Response API Retiro Efectivo Tengo
 
             alt If HTTP Code != 200
+
+                API->>API: Construye mensaje para Event Bridge (API Actualiza Estado Transacción)
+                Note over API: Headers: <br> Application-Id = header.Application-Id <br> ++ Headers recibidos en la petición <br> Body: <br> transactionType = libparam.transactionTypeUpdate, <br> queryType = libparam.queryType, <br> transactionReference = request.transactionReferenceBC, <br> status = "ERROR AL REALIZAR LA TRANSAFERENCIA", <br> financialTransactionReference = "", <br> coreSystemTransactionReference = libparam.transactionReferenceT24, <br> paymentRecordUpdateType = libparam.updateType
+
+                API->>event: Envía evento a Event Bridge
+                Note right of API: Header, Body <br> Regla de enrutamiento para SQS <br> queueName: cola-api-actualiza-estado-transaccion-hn
+
+                event->>API5: Entrega Mensaje a API Actualiza Estado Transacción
 
                 API->> Consumidor: Retorna error API Retiro Efectivo Tengo
                 Note left of API: HTTP 4XX / 5XX
@@ -126,11 +153,19 @@ sequenceDiagram
                     API->>API: Construye Request API Reverso Transacciones (Retiro Efectivo Tengo)
                     Note over API: body: <br> transactionReference = responseRetiroEfectivoTengo.transactionReference, <br> transactionType = " " 
 
-                    API->>comision: Consume API Reverso Transacciones (Retiro Efectivo Tengo)
+                    API->>reverso: Consume API Reverso Transacciones (Retiro Efectivo Tengo)
                     Note right of API: body: <br> transactionReference, transactionType
 
-                    comision->>API: Response API Reverso Transacciones (Retiro Efectivo Tengo)
-                    Note left of comision: Response: <br> transactionDate
+                    reverso->>API: Response API Reverso Transacciones (Retiro Efectivo Tengo)
+                    Note left of reverso: Response: <br> transactionDate
+
+                    API->>API: Construye mensaje para Event Bridge (API Actualiza Estado Transacción)
+                    Note over API: Headers: <br> Application-Id = header.Application-Id <br> ++ Headers recibidos en la petición <br> Body: <br> transactionType = libparam.transactionTypeUpdate, <br> queryType = libparam.queryType, <br> transactionReference = request.transactionReferenceBC, <br> status = "ERROR COBRANDO COMISION, TRANSACCION REVERSADA", <br> financialTransactionReference = responseRetiroEfectivoTengo.transactionReference, <br> coreSystemTransactionReference = libparam.transactionReferenceT24, <br> paymentRecordUpdateType = libparam.updateType
+
+                    API->>event: Envía evento a Event Bridge
+                    Note right of API: Header, Body <br> Regla de enrutamiento para SQS <br> queueName: cola-api-actualiza-estado-transaccion-hn
+
+                    event->>API5: Entrega Mensaje a API Actualiza Estado Transacción
 
                     API->> Consumidor: Retorna error API Transferenecia entre cuentas (comisión)
                     Note left of API: HTTP 4XX / 5XX

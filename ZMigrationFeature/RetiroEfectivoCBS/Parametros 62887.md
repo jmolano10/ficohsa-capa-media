@@ -14,7 +14,12 @@
       // HU 55724
       "paymentDetails": "Comision Retiro TENGO ",
       "businessUnitReference": "Tengo",
-      "transactionDirectionCode": "D"
+      "transactionDirectionCode": "D",
+      // HU 62321
+      "transactionTypeUpdate": "RETIRO",
+      "queryType": "1",
+      "updateType": "RETIRO",
+      "transactionReferenceT24": ""
     },
     {
       "region": "GT01-GT01",
