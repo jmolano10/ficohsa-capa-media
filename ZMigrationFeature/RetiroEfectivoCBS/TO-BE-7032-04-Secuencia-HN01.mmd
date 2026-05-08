@@ -1,0 +1,212 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor / Aplicación
+    participant API as API Exp Retiro Efectivo CBS <br> Epica 2668: RetiroEfectivoCBS <br> HU 7032:  /correspondent-banking/v1/retrieve-cash-withdrawal-account
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant Lib as Librería Phosteline (ConfigMap)
+    participant lambdaCorr as Lambda Validación Corresponsales<br/> HU 7761 - ban-xrs-ic-lam-validate-bank-correspondent-{env}
+    participant API1 as API Registra Transacciones Canal CB <br> Epica 2668: RetiroEfectivoCBS <br> HU 7034:  POST - /register-channel-transaction-status/v1/register
+    participant API2 as API Limites Uso Servicio <br> Epica 2458: ConsultaCuentaRetiroEfectivoCBS <br> HU 6294:  POST - /controls-service-usage-limits/v1/initiate
+    participant API3 as API Consulta Comisión CB <br> Epica 2668: RetiroEfectivoCBS <br> HU 7035:  POST - /retrieve-correspondent-commission/v1/retrieve
+    participant API4 as API Realiza Retiro Efectivo <br> Epica 2668: RetiroEfectivoCBS <br> HU 62887:  POST - /execute-cash-withdrawal/v1/execute
+    participant event as Event Bridge <br> integration-composition <br> ban-xrs-ic-te-evb-support-provider-responses-<env>
+    participant API5 as API Actualiza Estado Transacción <br> Epica 2461: ConsultaEstadoTransaccionHN <br> HU 62321:  PUT /update-transaction-status/v1/update
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Consulta Comisión
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: Headers: <br> Branch-Id <br> body: <br> accountNumber, <br> currencyCode, <br> transactionAmount, <br> securityTokenReference, <br> transactionReferenceBC, <br> pointOfSale, <br> subPointOfSale
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "CORRESPONDENT_BANKING" <br> name: "INITIATE_CASH_WITHDRAWAL" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros en librería de parámetros
+        Note right of API: Domain: "CORRESPONDENT_BANKING" <br> name: "INITIATE_CASH_WITHDRAWAL" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> caller-service
+
+    API->>API: Construye request Lambda Valida Corresponsal
+    Note over API: Mapeo: <br> correspondentPartyReference = header.Branch-Id, <br> country = request.header.soruceBank, <br> transactionType = libparam.transactionTypeT24
+
+    API->>lambdaCorr: Consume Lambda Valida Corresponsal
+    Note right of API: correspondentPartyReference, soruceBank, transactionType
+
+    lambdaCorr->>API: Response Lambda Valida Corresponsal
+    Note left of lambdaCorr: Response: <br> creditAccountReference, <br> debitAccountReference, <br> permittedCurrencyCode, <br> transactionType, <br> commissionAmount, <br> commissionCurrencyCode, <br> commissionTransactionType, <br> commissionAccountReference
+
+    API->>API: Evalua response Lambda Valida Corresponsal
+
+    alt If lambdaValCorr.success == false
+
+        API->> Consumidor: Retorna error generado por lambda validación de corresponsal
+        Note left of API: HTTP 4XX / 5XX
+
+    else If lambdaValCorr.success == true
+
+        API->>API: Evalua permittedCurrencyCode
+        Note over API: permittedCurrencyCode = request.currencyCode <br> para continuar con el flujo
+
+        alt If permittedCurrencyCode != request.currencyCode
+
+            API->> Consumidor: Retorna error Moneda no permitida para este corresponsal
+            Note left of API: HTTP 400: Moneda inválida
+
+        else If permittedCurrencyCode == request.currencyCode        
+
+            API->>API: Construye request API Registra Transacciones Canal CB
+            Note over API: Headers: <br> sourcebank = header.sourceBank, <br> Branch-Id = header.Branch-Id <br> Body: <br> correspondentBankingAgentName = header.Application-Id, <br> transactionTypeCode = libparam.transactionType, <br> transactionStatus = libparam.transactionStatus, <br> transactionAmount = request.transactionAmount, <br> currencyCode = request.currencyCode, <br> transactionReferenceBC = request.transactionReferenceBC, <br> transactionReference = libparam.transactionReferenceT24, <br> transactionKeyReference = request.accountNumber, <br> pointOfSaleReference = request.pointOfSale, <br> subPointOfSaleReference = request.subPointOfSaleReference, <br> securityTokenReference = request.securityTokenReference, <br> commissionTransactionReference = libparam.commissionReferenceT24, <br> commissionAmount = libparam.commissionAmount, <br> commissionCurrencyCode = libparam.commissionCurrencyCode, <br> reversalTransactionReference = libparam.reversalTransactionReferenceT24
+
+            API->>API1: Consume API Registra Transacciones Canal CB
+            Note right of API: headers, body
+
+            API1->>API: Response API Registra Transacciones Canal CB
+            Note left of API1: Response: HTTP Code
+
+            API->>API: Evalua response API Registra Transacciones Canal CB
+
+            alt If HTTP Code != 200
+
+                API->> Consumidor: Retorna error generado por API Registra Transacciones Canal CB
+                Note left of API: HTTP 4XX / 5XX
+
+            else If HTTP Code == 200
+
+                API->>API: Construye request API Limites Uso Servicio
+                Note over API: Body: <br> serviceName = const.caller-service, <br> user = header.Application-Id, <br> operationCode = libparam.operationCode, 
+
+                API->>API2: Consume API Limites Uso Servicio
+                Note right of API: serviceName, user, operationCode
+
+                API2->>API: Response API Limites Uso Servicio
+                Note left of API2: Response: HTTP Code
+
+                API->>API: Evalua response API Limites Uso Servicio
+
+                alt If HTTP Code != 200
+
+                    API->>API: Construye mensaje para Event Bridge (API Actualiza Estado Transacción)
+                    Note over API: Headers: <br> Application-Id = header.Application-Id <br> ++ Headers recibidos en la petición <br> Body: <br> transactionType = libparam.transactionTypeUpdate, <br> queryType = libparam.queryType, <br> transactionReference = request.transactionReferenceBC, <br> status = "CUOTA SERVICIO EXCEDIDA", <br> financialTransactionReference = "", <br> coreSystemTransactionReference = libparam.transactionReferenceT24, <br> paymentRecordUpdateType = libparam.updateType
+
+                    API->>event: Envía evento a Event Bridge
+                    Note right of API: Header, Body <br> Regla de enrutamiento para SQS <br> queueName: cola-api-actualiza-estado-transaccion-hn
+
+                    event->>API5: Entrega Mensaje a API Actualiza Estado Transacción
+
+                    API->> Consumidor: Retorna error generado por API Limites Uso Servicio
+                    Note left of API: HTTP 4XX / 5XX
+
+                else If HTTP Code == 200
+
+                    API->>API: Construye request API Consulta Comisión CB
+                    Note over API: Header: <br> Application-Id = header.Application-Id <br> Body: <br> transactionAmount = request.transactionAmount, <br> currencyCode = request.currencyCode, <br> correspondentTransactionTypeCode = libparam.transactionTypeT24 
+
+                    API->>API3: Consume API Consulta Comisión CB
+                    Note right of API: Header, Body
+
+                    API3->>API: Response API Consulta Comisión CB
+                    Note left of API3: Response: commissionAmount, <br> currencyCode
+
+                    API->>API: Evalua response API Consulta Comisión CB
+
+                    alt If HTTP Code != 200
+
+                        API->>API: Construye mensaje para Event Bridge (API Actualiza Estado Transacción)
+                        Note over API: Headers: <br> Application-Id = header.Application-Id <br> ++ Headers recibidos en la petición <br> Body: <br> transactionType = libparam.transactionTypeUpdate, <br> queryType = libparam.queryType, <br> transactionReference = request.transactionReferenceBC, <br> status = "ERROR OBTENIENDO COMISION", <br> financialTransactionReference = "", <br> coreSystemTransactionReference = libparam.transactionReferenceT24, <br> paymentRecordUpdateType = libparam.updateType
+
+                        API->>event: Envía evento a Event Bridge
+                        Note right of API: Header, Body <br> Regla de enrutamiento para SQS <br> queueName: cola-api-actualiza-estado-transaccion-hn
+
+                        event->>API5: Entrega Mensaje a API Actualiza Estado Transacción
+
+                        API->> Consumidor: Retorna error generado por API Consulta Comisión CB
+                        Note left of API: HTTP 4XX / 5XX
+
+                    else If HTTP Code == 200
+
+                        API->>API: Construye request API Realiza Retiro Efectivo
+                        Note over API: Body: <br> accountNumber = request.accountNumber, <br> currencyCode = request.currencyCode, <br> transactionAmount = request.transactionAmount, <br> securityTokenReference = request.securityTokenReference, <br> commissionAmount = responseValCorr.commissionAmount, <br> creditAccountNumber = responseValCorr.creditAccountNumber, <br> transactionTypeCode = responseValCorr.transactionType, <br> transactionReferenceBC = request.transactionReferenceBC, <br> commissionCurrencyCode = responseValCorr.commissionCurrencyCode, <br> commissionType = responseValCorr.commissionType, <br> commissionCreditAccountNumber = responseValCorr.commissionCreditAccountNumber
+
+                        API->>API4: Consume API Realiza Retiro Efectivo
+                        Note right of API: Header, Body
+
+                        API4->>API: Response API Realiza Retiro Efectivo
+                        Note left of API4: Response: <br> accountNumber, transactionAmount, currencyCode, <br> securityTokenReference, commissionAmount, transactionReference
+
+                        API->>API: Evalua response API Realiza Retiro Efectivo
+
+                        alt If HTTP Code != 200
+
+                            API-->>event: No se envía evento desde API experiencia porque el evento de error lo envía la API de composición
+
+                            API->> Consumidor: Retorna error generado por API Realiza Retiro Efectivo
+                            Note left of API: HTTP 4XX / 5XX
+                        
+                        else If HTTP Code == 200
+
+                            API->>API: Construye mensaje para Event Bridge (API Actualiza Estado Transacción)
+                            Note over API: Headers: <br> Application-Id = header.Application-Id <br> ++ Headers recibidos en la petición <br> Body: <br> transactionType = libparam.transactionTypeUpdate, <br> queryType = libparam.queryType, <br> transactionReference = request.transactionReferenceBC, <br> status = "TRANSACCION EXITOSA", <br> financialTransactionReference = responseRealizaRetiroEfectivo.transactionReference, <br> coreSystemTransactionReference = libparam.transactionReferenceT24, <br> paymentRecordUpdateType = libparam.updateType
+
+                            API->>event: Envía evento a Event Bridge
+                            Note right of API: Header, Body <br> Regla de enrutamiento para SQS <br> queueName: cola-api-actualiza-estado-transaccion-hn
+
+                            event->>API5: Entrega Mensaje a API Actualiza Estado Transacción
+
+                            API->>Consumidor: Response Exitoso
+                            Note left of API: HTTP 200: Response Body 
+                        
+                        end
+                    
+                    end
+                
+                end
+            
+            end
+
+        end
+    end 
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
