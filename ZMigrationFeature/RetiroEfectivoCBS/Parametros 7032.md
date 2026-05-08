@@ -14,11 +14,9 @@
       // HU 7034, 62321
       "transactionType": "1",
       "commissionReferenceT24": "", 
-      "commissionCurrencyCode": "",
       "channelCode": "1", 
       "transactionStatus": "REGISTRADO",
       "reversalTransactionReferenceT24": "",
-      "commissionAmount": "", 
       "transactionReferenceT24": "", 
       // HU 6294
       "operationCode": "1",
