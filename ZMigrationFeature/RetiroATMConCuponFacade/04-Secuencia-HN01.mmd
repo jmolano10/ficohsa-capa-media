@@ -1,0 +1,59 @@
+sequenceDiagram
+    participant Switch as Switch (ISO8583)
+    participant Facade as RetiroATMConCuponFacade
+    participant Proxy as RetiroATMConCupon
+    participant ValRegional as ValidaServicioRegional (DB)
+    participant Param as ObtenerParametrizacion (DB)
+    participant TENGO as TENGO (umarketsc)
+    participant JavaSHA as GenerarCredencialesTengo (Java)
+    participant SecDB as obtenerSecuencia (DB)
+    participant RegDB as registraTrxCuponTengoATM (DB)
+    participant T24 as AplicaRetiroATMT24
+    participant ActDB as actualizarTrxCuponCB (DB)
+    participant MapErr as MapeoErrores
+
+    Switch->>Facade: procesaMensajeGenericoSwitchFacadeRequest (MTI=0200)
+    Facade->>Facade: Guardar OriginalBody
+    Facade->>Facade: Transformar (retiroATMConCuponIn.xq)
+    Facade-->>RegDB: Publish registrarTransaccionCupon.xq → MW_P_REGISTRAR_BILLETERA_CUPON
+    Facade->>Proxy: retiroATMConCupon (body transformado)
+
+    Proxy->>Proxy: Validar XSD
+    Proxy->>ValRegional: ValidaServicioRegional(serviceId=FICBCO0259, region)
+    ValRegional-->>Proxy: PV_CODIGO_ERROR=SUCCESS
+
+    Proxy->>Param: obtenerParametrizacion(TNGC001.USERID, FICBCO0259.151000.DEBITACCT, FICBCO0259.TRX.CODE, FICBCO0259.151000.DEBITACCT_TC)
+    Param-->>Proxy: Configuraciones
+
+    Proxy->>TENGO: createsession()
+    TENGO-->>Proxy: sessionId
+
+    Proxy->>Proxy: Obtener credenciales ServiceAccount
+    Proxy->>JavaSHA: sha1(user, password, sessionId)
+    JavaSHA-->>Proxy: pinTengo (cifrado)
+
+    Proxy->>TENGO: login(sessionId, pin, initiator)
+    TENGO-->>Proxy: result=0 (OK)
+
+    Proxy->>TENGO: coupontransfer(sessionId, couponId, amount, currency, terminal)
+    TENGO-->>Proxy: result=0, transid, trans_ext_reference
+
+    Proxy->>SecDB: obtenerSecuencia(CC_SWITCH_COUPON, "C")
+    SecDB-->>Proxy: consecutivo
+
+    Proxy->>T24: aplicaRetiroATMT24(trxCode, amount, account, osbRef, tengoRef, date)
+    T24-->>Proxy: Respuesta T24
+
+    Proxy->>ActDB: actualizarTrxCuponCB(reftengo, retrievalref, date, cuponID)
+    ActDB-->>Proxy: OK
+
+    Proxy-->>Proxy: Construir respuesta (successIndicator=Success, TRANSACTION_DATE, AUTORIZATION_NUMBER)
+    Proxy-->>Facade: retiroATMConCuponResponse
+
+    alt successIndicator != SUCCESS
+        Facade->>MapErr: mapeoErroresUsageIn(FICBCO0259, errorMessage)
+        MapErr-->>Facade: Código/mensaje mapeado
+    end
+
+    Facade->>Facade: Transformar (retiroATMConCuponOut.xq) → ISO8583 Response
+    Facade-->>Switch: procesaMensajeGenericoSwitchFacadeResponse (MTI=0210, RC=00)

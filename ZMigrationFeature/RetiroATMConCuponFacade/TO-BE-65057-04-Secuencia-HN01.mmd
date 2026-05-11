@@ -1,0 +1,139 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor / Aplicación
+    participant event as Event Bridge <br> Bus de Eventos
+    participant sqsRequest as AWS SQS <br> Cola de Solicitudes <br> ban-xrs-ic-comp-sqs-create-coupon-wallet-register-in-<env>
+    participant API as API Create Coupon Wallet Register <br> Épica 64281: RetiroATMConCuponFacade <br> HU 65057 <br> POST - /create-coupon-wallet-register/v1/register
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant secret as Secret Manager
+    participant sp as Stored Procedure <br> ban-xrs-ic-sp-register-atm-coupon-withdrawal-{env}
+    participant aurora as BD Aurora PostgreSQL <br> ban-xrs-ic-rds-aurora-postgresql-{env}
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Create Coupon Wallet Register
+
+    alt Flujo síncrono
+
+        Consumidor->>API: REST Request
+        Note right of Consumidor: Headers: <br> Authorization, <br> Correlation-Id, <br> Source-Bank, <br> Application-Id, <br> Channel, <br> Transaction-Date <br> body: <br> data.REGISTERReferenceTransaction, <br> data.terminalReference, <br> data.terminalIdentifier, <br> data.couponReference, <br> data.transactionAmount, <br> data.currencyCode
+
+    else Flujo Asíncrono
+
+        Consumidor->>event: Publica mensaje de solicitud
+        Note right of Consumidor: Headers: <br> Authorization, <br> Correlation-Id, <br> Source-Bank, <br> Application-Id, <br> Channel, <br> Transaction-Date <br> body: <br> data.REGISTERReferenceTransaction, <br> data.terminalReference, <br> data.terminalIdentifier, <br> data.couponReference, <br> data.transactionAmount, <br> data.currencyCode
+
+        event->>sqsRequest: Entrega Mensaje a SQS
+        Note right of Consumidor: Headers, body:
+
+        API->>sqsRequest: Sondea mensajes (Long Polling)
+
+        sqsRequest->>API: Entrega mensaje de solicitud
+        Note right of sqsRequest: Entrega mensaje con <br> Header y Body
+
+    end
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "CREATE_COUPON_WALLET_REGISTER" <br> name: "REGISTER" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Consultar parámetros de Parameter Store en caché local
+        Note right of API: paranName = libparam.param-name
+
+        CL->>API: Obtiene parámetros de Parameter Store en Cahé Local
+        Note left of CL: Obtiene parámetros de conexión a BD: host, port, database
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros en librería de parámetros
+        Note right of API: Domain: "CREATE_COUPON_WALLET_REGISTER" <br> name: "REGISTER" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+        API->>parameter: Consultar parámetros del Parameter Store
+        Note right of API: paranName = libparam.param-name
+
+        parameter->>API: Obtiene parámetros del Parameter Store
+        Note left of parameter: Obtiene parámetros de conexión a BD: host, port, database
+
+        API->>CL: Guarda parámetros del Parameter Store en caché local
+        Note right of API: host, port, database
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> caller-service <br> schema <br> procedureName
+
+    API->>secret: Consulta secretos para conexión a base de datos
+    Note right of API: secretName = libparam.secret-name
+
+    secret->>API: Retorna secretos
+    Note left of secret: User, Password
+
+    API->>API: Construye Request SP: sp_register_atm_coupon_withdrawal
+    Note over API: Conexión: <br> Valor de libparam.param-name <br> Valor de libparam.secret-name <br> Mapeo Campos: <br> p_retrieval_reference_number = body.data.REGISTERReferenceTransaction <br> p_transaction_reference_number = body.data.terminalReference <br> p_terminal_id = body.data.terminalIdentifier <br> p_coupon_id = body.data.couponReference <br> p_transaction_amount = body.data.transactionAmount <br> p_currency_code = body.data.currencyCode
+
+    API->>sp: Consume SP: sp_register_atm_coupon_withdrawal
+    Note right of API: host, port, database, user, password <br> p_retrieval_reference_number, p_transaction_reference_number, <br> p_terminal_id, p_coupon_id, <br> p_transaction_amount, p_currency_code
+
+    sp->>aurora: INSERT INTO atmCouponManagement.atm_coupon_withdrawal_record
+    aurora->>sp: Confirmación de inserción exitosa
+
+    sp->>API: Response SP: sp_register_atm_coupon_withdrawal
+    Note left of sp: Response: <br> p_response_code, p_response_message
+
+    API->>API: Registra Log Response CloudWatch
+
+    API->>API: Evalúa Response SP: sp_register_atm_coupon_withdrawal
+
+    alt If p_response_code != SUCCESS AND Flujo síncrono
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según <br> tabla de homologación SP: sp_register_atm_coupon_withdrawal
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Consumidor: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    else If p_response_code == SUCCESS AND Flujo síncrono
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body
+
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
