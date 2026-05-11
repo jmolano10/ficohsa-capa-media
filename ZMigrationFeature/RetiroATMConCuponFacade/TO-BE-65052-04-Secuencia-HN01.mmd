@@ -1,0 +1,112 @@
+sequenceDiagram
+    autonumber
+    participant Consumidor as Consumidor / Aplicación
+    participant API as API Exp Retiro ATM Con Cupón <br> Epica 2668: RetiroATMConCuponFacade <br> HU 65052: POST -  /cash-management-coupon/v1/execute
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant event as Event Bridge <br> integration-composition <br> ban-xrs-ic-te-evb-support-provider-responses-<env>
+    participant registra as API Registra Transacción Cupón <br> Épica 64281: RetiroATMConCuponFacade <br> HU 65057 
+    participant comp as API Inicia Retiro ATM con Cupón <br> Épica 62419: RetiroAtmConCupon <br> HU 64932: POST - /cash-management/v1/initiate-wallet-withdrawal
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+
+    participant Errors as Control de Errores <br> Librería de mapeo de errores
+    
+    Note over Consumidor, Errors: Flujo Honduras (HN01) - API Consulta Comisión
+
+    Consumidor->>API: REST Request
+    Note right of Consumidor: body: <br> mti, <br> iso8583Item [ <br> messageHeaderSpecification {key, value}, <br> messageIso8583XmlContent {key, value} <br> ]
+
+    API->>API: Validar Request
+    Note over API: Valida campos obligatorios según contrato OpenAPI 
+
+    API->>API: Validación exitosa
+
+    alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros de Librería de parámetros en caché local
+        Note right of API: Domain: "CASH_MANAGEMENT_COUPON" <br> name: "EXECUTE" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+ 
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros en librería de parámetros
+        Note right of API: Domain: "CASH_MANAGEMENT_COUPON" <br> name: "EXECUTE" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda Parámetros en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+    end
+
+    API->>API: Validar Servicio Regional
+    Note over API: Usando parámetros de regionalización obtenidos
+
+    API->>API: Validación Regional success
+    Note over API: Servicio habilitado para HN01 
+
+    API->>Lib: Consulta Constantes
+    
+    Lib->>API: Retorna constantes necesarias
+    Note left of Lib: Constantes: <br> caller-service
+
+    API->>API: Construye mensaje para Event Bridge (API Registra Transacción Cupón)
+    Note over API: Headers: <br> Application-Id = header.Application-Id <br> ++ Headers recibidos en la petición <br> Body: <br> data.retrieveReferenceTransaction = messageIso8583XmlContent.value.key{DE037}, <br> data.terminalReference = messageIso8583XmlContent.value.key{DE011}, <br> data.terminalIdentifier = messageIso8583XmlContent.value.key{DE041}, <br> data.couponReference = messageIso8583XmlContent.value.key{DE048}, <br> data.transactionAmount = messageIso8583XmlContent.value.key{DE004}, <br> data.currencyCode = messageIso8583XmlContent.value.key{DE049}
+
+    API->>event: Envía evento a Event Bridge
+    Note right of API: Header, Body <br> Regla de enrutamiento para SQS <br> queueName: ban-xrs-ic-comp-sqs-create-coupon-wallet-register-in-<env>
+
+    event->>registra: Entrega Mensaje a API Registra Transacción Cupón
+
+    API->>API: Construye request API Comp Retiro ATM Cupon ( Campo currencyCode )
+    Note over API: If <br> messageIso8583XmlContent.value.key{DE049} == "340" then currencyCode = "HNL" <br> else If <br> messageIso8583XmlContent.value.key{DE049} == "840" then currencyCode = "USD" <br> else <br> currencyCode = ""
+
+    API->>API: Construye request API Comp Retiro ATM Cupon
+    Note over API: Headers: <br> channel = libparam.channel <br> ++ demás headers request <br> Body: <br> withdrawalAmount = (messageIso8583XmlContent.value.key{DE004} / 100), <br> couponReference = messageIso8583XmlContent.value.key{DE048}, <br> atmTerminalReference = messageIso8583XmlContent.value.key{DE041}, <br> terminalReference = messageIso8583XmlContent.value.key{DE011}, <br> retrievalReference = messageIso8583XmlContent.value.key{DE037}
+
+    API->>comp: Consume API Comp Retiro ATM Cupon
+    Note over API, Lambda: Headers: <br> channel, <br> Body: <br> withdrawalAmount, couponReference, atmTerminalReference, terminalReference, retrievalReference, currencyCode
+
+    comp->>API: Response API Comp Retiro ATM Cupon
+    Note left of comp: Response: <br> transactionDateTime, authorizationReference
+
+    API->>API: Evalua response API Comp Retiro ATM Cupon
+
+    alt If HTTP Code != 200
+
+        API->>API: Construye response API Exp Retiro ATM Con Cupón
+        Note over API: Mapeo: <br> mti = "0210", <br> iso8583Item [ como se recibió en el request ], <br> ++  messageIso8583XmlContent {key = "DE07", value = CURRENT_DATETIME(format: MMddHHmmss)}, <br> ++  messageIso8583XmlContent {key = "DE039", value = "80"},
+
+        API->> Consumidor: Retorna HTTP Code generado por API Comp Retiro ATM Cupon
+        Note left of API: HTTP 4XX / 5XX
+    
+    else If HTTP Code == 200
+
+        API->>API: Construye response API Exp Retiro ATM Con Cupón
+        Note over API: Mapeo: <br> mti = "0210", <br> iso8583Item [ como se recibió en el request ], <br> ++  messageIso8583XmlContent {key = "DE07", value = CURRENT_DATETIME(format: 'MMddHHmmss')}, <br> ++  messageIso8583XmlContent {key = "DE039", value = "00"}, <br> ++  messageIso8583XmlContent {key = "DE121", <br> value = concat("Ficohsa: " , <br> messageIso8583XmlContent.value.key{DE043} , ":" , <br> responseAPIRetiroCupon.transactionDateTime(format('yyyy-MM-dd HH:mm')) , <br> messageIso8583XmlContent.value.key{DE011} , <br> responseAPIRetiroCupon.authorizationReference) , <br> "RETIRO CUPON" , <br> (messageIso8583XmlContent.value.key{DE004} / 100) , <br> ": Comprometidos a ser los mejores "GRACIAS POR USAR NUESTROS CAJEROS")}
+        
+        Note over API: NOTA: En la construcción del DE121 el símbolo ":" se debe sustutuir por dos puntos
+
+        API->>Consumidor: Response Exitoso
+        Note left of API: HTTP 200: Response Body 
+    
+    end
+
+    Note over Consumidor, Errors: Flujo Alternativo - Error
+    activate API
+    alt Exception occurs
+        note over Errors: Error Library Handler
+        activate Errors
+            API->> Errors: Mapear código de error
+            Errors ->> API: Retorna código mapeado
+        deactivate Errors
+        activate Consumidor
+            API-->> Consumidor: Retorna error
+        deactivate Consumidor
+        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+    end
+    deactivate API
