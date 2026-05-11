@@ -4,8 +4,10 @@ sequenceDiagram
     participant event as Event Bridge <br> Bus de Eventos
     participant sqsRequest as AWS SQS <br> Cola de Solicitudes <br> ban-xrs-ic-comp-sqs-create-coupon-wallet-register-in-<env>
     participant API as API Create Coupon Wallet Register <br> Épica 64281: RetiroATMConCuponFacade <br> HU 65057 <br> POST - /create-coupon-wallet-register/v1/register
-    participant Lib as Librería Pipeline (ConfigMap)
-    participant secret as Secret Manager
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
+    participant Lib as Librería Phosteline (ConfigMap)
+    participant parameter as Paramter Store
     participant sp as Stored Procedure <br> ban-xrs-ic-sp-register-atm-coupon-withdrawal-{env}
     participant aurora as BD Aurora PostgreSQL <br> ban-xrs-ic-rds-aurora-postgresql-{env}
     participant Errors as Control de Errores <br> Librería de mapeo de errores
@@ -83,12 +85,6 @@ sequenceDiagram
 
     Lib->>API: Retorna constantes necesarias
     Note left of Lib: Constantes: <br> caller-service <br> schema <br> procedureName
-
-    API->>secret: Consulta secretos para conexión a base de datos
-    Note right of API: secretName = libparam.secret-name
-
-    secret->>API: Retorna secretos
-    Note left of secret: User, Password
 
     API->>API: Construye Request SP: sp_register_atm_coupon_withdrawal
     Note over API: Conexión: <br> Valor de libparam.param-name <br> Valor de libparam.secret-name <br> Mapeo Campos: <br> p_retrieval_reference_number = body.data.REGISTERReferenceTransaction <br> p_transaction_reference_number = body.data.terminalReference <br> p_terminal_id = body.data.terminalIdentifier <br> p_coupon_id = body.data.couponReference <br> p_transaction_amount = body.data.transactionAmount <br> p_currency_code = body.data.currencyCode
