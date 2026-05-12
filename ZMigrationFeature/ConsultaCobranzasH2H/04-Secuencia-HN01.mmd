@@ -1,0 +1,126 @@
+sequenceDiagram
+    participant Client as Cliente H2H
+    participant CobranzasPS as CobranzasH2H (Proxy Padre)
+    participant ConsultaPS as ConsultaCobranzasH2H (Proxy Hijo)
+    participant ValidaRegion as validaServicioRegional_db
+    participant ValidaAcceso as validaAccesoH2H_db
+    participant ObtParam as obtenerParametrizacion
+    participant ConsPeticiones as consultaPeticionesDisponiblesH2H_db
+    participant ConsConvenios as consultaConveniosH2H_db
+    participant SplitJoin as sjConsultaCobranzasH2H
+    participant ActPeticiones as actualizaPeticionesDisponiblesH2H_db
+    participant MapeoErr as mapeoErrores
+    participant Bitacora as registrarBitacoraH2H_db
+
+    Note over Client, Bitacora: Flujo Honduras (HN01) - ConsultaCobranzasH2H
+
+    Client->>CobranzasPS: SOAP Request (operación: consulta)
+    Note right of Client: Header: UserName, Password, SourceBank=HN01<br/>Body: CUSTOMER_ID, SERVICES[SERVICE/ID, DEBTORS]
+
+    CobranzasPS->>CobranzasPS: Autenticación Custom-Token
+    Note right of CobranzasPS: XPath: aut:RequestHeader/Authentication/UserName<br/>XPath: aut:RequestHeader/Authentication/Password
+
+    CobranzasPS->>Bitacora: Registrar Bitácora REQ (publish/async)
+    Note right of Bitacora: SP: registrarBitacoraH2H<br/>Esquema: INTFC<br/>Params: uuid, servicio="CobranzasH2H",<br/>tipoRegistro="REQ", operacion="CONSULTA",<br/>host=$inbound/client-address
+
+    CobranzasPS->>ConsultaPS: Route (operación: consulta, transporte: local)
+
+    ConsultaPS->>ConsultaPS: Validar XSD
+    Note right of ConsultaPS: Schema: cobranzasH2HTypes.xsd<br/>Element: cob:consultaCobranzas
+
+    ConsultaPS->>ValidaRegion: wsCallout - ValidaServicioRegional
+    Note right of ValidaRegion: SP: ValidaServicioRegional<br/>Esquema: MDW<br/>XQ: validaServicioRegionalIn<br/>Params: requestHeader, serviceId="FICBCO0258"
+
+    alt PV_CODIGO_ERROR != 'SUCCESS'
+        ValidaRegion-->>ConsultaPS: Error Regional
+        ConsultaPS-->>CobranzasPS: ResponseHeader: ERROR + mensaje
+        CobranzasPS->>Bitacora: Registrar Bitácora RSP (error)
+        CobranzasPS-->>Client: Response con Error
+    end
+
+    ValidaRegion-->>ConsultaPS: SUCCESS + aplicarValoresPorDefectoRegion
+
+    ConsultaPS->>ValidaAcceso: wsCallout - validaAccesoH2H
+    Note right of ValidaAcceso: SP: validaAccesoH2H<br/>Esquema: INTFC<br/>XQ: validaAccesoH2HIn<br/>Params: usuario=upper-case(UserName),<br/>operacion=upper-case($operation),<br/>idProxy="FICBCO0258",<br/>codigoPais=SourceBank,<br/>codigoCliente=CUSTOMER_ID
+
+    alt PV_DESCRIPCIONMENSAJE != ''
+        ValidaAcceso-->>ConsultaPS: Error de Acceso
+        ConsultaPS->>MapeoErr: mapeoErrores (FICBCO0258)
+        MapeoErr-->>ConsultaPS: Error mapeado
+        ConsultaPS-->>CobranzasPS: Error: "El usuario y/o cliente no tiene acceso"
+        CobranzasPS->>Bitacora: Registrar Bitácora RSP (error)
+        CobranzasPS-->>Client: Response con Error
+    end
+
+    ValidaAcceso-->>ConsultaPS: Acceso válido
+
+    ConsultaPS->>ObtParam: wsCallout - obtenerParametrizacion
+    Note right of ObtParam: SP: OSB_GET_CONFIG<br/>Esquema: ORA_BANK<br/>XQ: obtenerParametrizacionIn<br/>Param: "FICBCO0244.MAXAGREEMENTS"
+
+    alt Error en obtenerParametrizacion
+        ObtParam-->>ConsultaPS: Error (resume)
+        Note right of ConsultaPS: maxRequestAllowed = 10 (default)
+    end
+
+    ObtParam-->>ConsultaPS: MAXAGREEMENTS value (ej: 50)
+    Note right of ConsultaPS: maxRequestAllowed = valor obtenido
+
+    Note over ConsultaPS: Branch: SourceBank = 'HN01'
+
+    ConsultaPS->>ConsultaPS: Validar Número de Solicitudes
+    Note right of ConsultaPS: maxRequestIn = count(DEBTORS/DEBTOR)<br/>Regla: maxRequestIn > maxRequestAllowed?
+
+    alt maxRequestIn > maxRequestAllowed
+        ConsultaPS->>MapeoErr: mapeoErrores (FICBCO0258)
+        MapeoErr-->>ConsultaPS: Error mapeado
+        ConsultaPS-->>CobranzasPS: Error: "Contratos en solicitud exceden cantidad permitida"
+        CobranzasPS->>Bitacora: Registrar Bitácora RSP (error)
+        CobranzasPS-->>Client: Response con Error
+    end
+
+    ConsultaPS->>ConsPeticiones: wsCallout - consultaPeticionesDisponiblesH2H
+    Note right of ConsPeticiones: SP: consultaPeticionesDisponiblesH2H<br/>Esquema: ABKHN<br/>XQ: consPeticionesDispH2HIn<br/>Params: codigoUsuario=upper-case(UserName),<br/>IdProxy="FICBCO0258",<br/>operacion=upper-case($operation),<br/>numeroPeticiones=count(DEBTORS)
+
+    alt PV_DESCRIPCIONMENSAJE != ''
+        ConsPeticiones-->>ConsultaPS: Cuota excedida (validationMessage)
+        Note right of ConsultaPS: Se salta consulta de convenios y cobranzas
+    end
+
+    ConsPeticiones-->>ConsultaPS: allowedAmount, successAmount, errorAmount
+
+    ConsultaPS->>ConsConvenios: wsCallout - consultaConveniosH2H
+    Note right of ConsConvenios: SP: consultaConveniosH2H<br/>Esquema: INTFC<br/>XQ: consultaConveniosH2HIn<br/>Params: PT_IDSERVICIO=distinct-values(SERVICE/ID),<br/>PV_CODIGOPAIS=SourceBank
+
+    ConsConvenios-->>ConsultaPS: PT_INFOCONVENIOS (ID_SERVICIO, ID_CONTRATO, DESCRIPCION)
+
+    ConsultaPS->>SplitJoin: wsCallout - sjConsultaCobranzasH2H
+    Note right of SplitJoin: Operación: sjConsulta<br/>XQ entrada: sjConsultaRecaudoH2HIn<br/>Mapeo: USER_NAME=upper-case(UserName),<br/>PASSWORD=Password, SOURCE_BANK=SourceBank,<br/>CUSTOMER_ID, SERVICES enriquecidos con<br/>CONTRACT_ID y NAME de convenios
+
+    SplitJoin-->>ConsultaPS: sjConsultaCobranzasResponse (SUCCESS_AMOUNT, ERROR_AMOUNT, SERVICES)
+    Note right of ConsultaPS: successAmount = RSP/SUCCESS_AMOUNT<br/>errorAmount = RSP/ERROR_AMOUNT
+
+    ConsultaPS->>ActPeticiones: wsCallout - actualizaPeticionesDisponiblesH2H
+    Note right of ActPeticiones: SP: actualizaPeticionesDisponiblesH2H<br/>Esquema: ABKHN<br/>XQ: actualizaPeticionesDisponiblesH2HIn<br/>Params: codigoUsuario, idProxy="FICBCO0258",<br/>operacion, cantidadExitosos, cantidadErroneos
+
+    alt Error en actualización
+        ActPeticiones-->>ConsultaPS: Error (resume, log warning)
+        Note right of ConsultaPS: No bloquea la respuesta
+    end
+
+    ActPeticiones-->>ConsultaPS: Actualización OK
+
+    alt validationMessage != '' (cuota excedida)
+        ConsultaPS-->>CobranzasPS: ResponseHeader: ERROR + validationMessage<br/>Body: consultaCobranzasResponse vacío
+    else Flujo exitoso
+        ConsultaPS->>ConsultaPS: Transformar Respuesta
+        Note right of ConsultaPS: XQ: sjConsultaRecaudoH2HOut<br/>Agrupa por distinct-values(SERVICE/ID)<br/>Transforma DEALSLIP si serviceId=9:<br/>replace([→<, ]→>, @→")
+        ConsultaPS-->>CobranzasPS: ResponseHeader: Success<br/>Body: consultaCobranzasResponse con SERVICES
+    end
+
+    CobranzasPS->>CobranzasPS: MapeoError (si successIndicator != SUCCESS)
+    Note right of CobranzasPS: XQ: mapeoErroresUsageIn/Out<br/>Código: FICBCO0258
+
+    CobranzasPS->>Bitacora: Registrar Bitácora RSP (publish/async)
+    Note right of Bitacora: SP: registrarBitacoraH2H<br/>Params: uuid, tipoRegistro="RSP",<br/>codigoRespuesta=successIndicator,<br/>mensajeRespuesta=messages (max 4000 chars)
+
+    CobranzasPS-->>Client: SOAP Response

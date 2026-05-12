@@ -1,0 +1,66 @@
+sequenceDiagram
+    participant Client as Cliente H2H
+    participant CobranzasPS as CobranzasH2H (Proxy Padre)
+    participant ConsultaPS as ConsultaCobranzasH2H (Proxy Hijo)
+    participant ValidaRegion as validaServicioRegional_db
+    participant ValidaAcceso as validaAccesoH2H_db
+    participant ObtParam as obtenerParametrizacion
+    participant HN01Flow as Pipeline HN01
+    participant DefaultFlow as Pipeline Default
+    participant MapeoErr as mapeoErrores
+
+    Note over Client, MapeoErr: Flujo Multiregión - ConsultaCobranzasH2H
+
+    Client->>CobranzasPS: SOAP Request (operación: consulta)
+    Note right of Client: Header: SourceBank = {HN01|GT01|PA01|NI01}
+
+    CobranzasPS->>CobranzasPS: Autenticación + Bitácora REQ
+    CobranzasPS->>ConsultaPS: Route por operación "consulta" (local)
+
+    ConsultaPS->>ConsultaPS: Validar XSD (cobranzasH2HTypes.xsd)
+
+    ConsultaPS->>ValidaRegion: ValidaServicioRegional (serviceId=FICBCO0258)
+    Note right of ValidaRegion: Valida si el servicio está habilitado<br/>para la región indicada en SourceBank
+
+    alt Servicio no habilitado para la región
+        ValidaRegion-->>ConsultaPS: PV_CODIGO_ERROR != SUCCESS
+        ConsultaPS-->>Client: Error: PV_MENSAJE_ERROR
+    end
+
+    ValidaRegion-->>ConsultaPS: SUCCESS + aplicarValoresPorDefectoRegion
+
+    ConsultaPS->>ValidaAcceso: validaAccesoH2H
+    Note right of ValidaAcceso: Valida usuario + cliente + operación + país
+
+    alt Sin acceso
+        ValidaAcceso-->>ConsultaPS: PV_DESCRIPCIONMENSAJE != ''
+        ConsultaPS-->>Client: Error: "No tiene acceso a operaciones H2H"
+    end
+
+    ValidaAcceso-->>ConsultaPS: Acceso válido
+
+    ConsultaPS->>ObtParam: obtenerParametrizacion
+    Note right of ObtParam: HN01 → "FICBCO0244.MAXAGREEMENTS"<br/>GT01 → "FICBCO0244.MAXAGREEMENTS.GT"<br/>Otros → null (error → default 10)
+
+    ObtParam-->>ConsultaPS: maxRequestAllowed
+
+    Note over ConsultaPS: Branch por SourceBank
+
+    alt SourceBank = 'HN01'
+        ConsultaPS->>HN01Flow: Pipeline HNBanco_ConsultaCobranzasH2H
+        Note right of HN01Flow: 1. Valida count(DEBTORS) <= maxRequestAllowed<br/>2. consultaPeticionesDisponiblesH2H<br/>3. consultaConveniosH2H<br/>4. sjConsultaCobranzasH2H (Split-Join)<br/>5. actualizaPeticionesDisponiblesH2H<br/>6. Mapeo salida: sjConsultaRecaudoH2HOut
+        HN01Flow-->>ConsultaPS: consultaCobranzasResponse
+    else Default (GT01, PA01, NI01, otros)
+        ConsultaPS->>DefaultFlow: Pipeline Default_ConsultaCobranzasH2H
+        DefaultFlow->>DefaultFlow: Raise Error MW-0008
+        Note right of DefaultFlow: "SERVICE NOT IMPLEMENTED YET<br/>FOR THIS COUNTRY/COMPANY"
+        DefaultFlow-->>ConsultaPS: Error MW-0008
+    end
+
+    ConsultaPS->>ConsultaPS: MapeoError (si successIndicator != SUCCESS)
+    Note right of ConsultaPS: XQ: mapeoErroresUsageIn/Out<br/>Código servicio: FICBCO0258
+
+    ConsultaPS-->>CobranzasPS: Response
+
+    CobranzasPS->>CobranzasPS: Bitácora RSP
+    CobranzasPS-->>Client: SOAP Response

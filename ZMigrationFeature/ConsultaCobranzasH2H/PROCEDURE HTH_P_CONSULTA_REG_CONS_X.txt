@@ -1,0 +1,95 @@
+    PROCEDURE HTH_P_CONSULTA_REG_CONS_X_SERV(
+        --
+        Pv_CodigoUsuario                IN VARCHAR2,
+        Pv_IdProxy                      IN VARCHAR2,
+        Pv_Operacion                    IN VARCHAR2,
+        Pn_CantidadPeticiones           IN NUMBER,
+        --
+        Pn_CantidadPermitida           OUT NUMBER,
+        Pn_CantidadExitosos            OUT NUMBER,
+        Pn_CantidadErroneos            OUT NUMBER,
+        Pd_Fecha                       OUT DATE,
+        Pv_CodigoMensaje               OUT VARCHAR2,
+        Pv_DescripcionMensaje          OUT VARCHAR2
+        --
+    ) IS
+        --
+        Ln_CantidadErroneos             NUMBER(3);
+        Ln_CantidadExitosos             NUMBER(3);
+        Ln_CantidadPermitida            NUMBER(3);
+        Ln_TotalSolicitudes             NUMBER(3);
+        Ld_Fecha                        DATE := SYSDATE;
+        --
+    BEGIN
+        --
+        SELECT p.CANT_PERMITIDA
+          INTO Ln_CantidadPermitida
+          FROM HTH_PARAM_OPER_X_CLIENTE p
+         WHERE p.CODIGO_USUARIO = Pv_CodigoUsuario
+           AND p.ID_PROXY       = Pv_IdProxy
+           AND p.OPERACION      = Pv_Operacion
+           AND p.ESTADO         = 'A';
+        --
+        BEGIN
+            --
+            IF Ln_CantidadPermitida >= Pn_CantidadPeticiones THEN
+                --
+                SELECT o.CANT_RSP_ERROR, o.CANT_RSP_SUCCESS
+                  INTO Ln_CantidadErroneos, Ln_CantidadExitosos
+                  FROM HTH_OPER_X_CLIENTE o
+                 WHERE o.CODIGO_USUARIO              = Pv_CodigoUsuario
+                   AND o.ID_PROXY                    = Pv_IdProxy
+                   AND o.OPERACION                   = Pv_Operacion
+                   AND TRUNC(o.FECHA)                = TRUNC(Ld_Fecha);
+                --
+                Ln_TotalSolicitudes := Pn_CantidadPeticiones + Ln_CantidadExitosos + Ln_CantidadErroneos;
+                --
+                IF Ln_CantidadPermitida >= Ln_TotalSolicitudes THEN
+                    --
+                    Pn_CantidadPermitida := Ln_CantidadPermitida;
+                    Pd_Fecha             := Ld_Fecha;
+                    Pn_CantidadExitosos  := Ln_CantidadExitosos;
+                    Pn_CantidadErroneos  := Ln_CantidadErroneos;
+                    Pv_CodigoMensaje     := 'SUCCESS';
+                    RETURN;
+                    --
+                ELSE
+                    --
+                    Pv_CodigoMensaje      := 'ERROR';
+                    Pv_DescripcionMensaje := 'Se excedió el máximo de solicitudes permitidas por día';
+                    RETURN;
+                    --
+                END IF;
+                --
+            ELSE
+                --
+                Pv_CodigoMensaje      := 'ERROR';
+                Pv_DescripcionMensaje := 'Se excedió el máximo de solicitudes permitidas por día';
+                RETURN;
+                --
+            END IF;
+            --
+        EXCEPTION
+            --
+            WHEN NO_DATA_FOUND THEN
+                --
+                Pn_CantidadPermitida := Ln_CantidadPermitida;
+                Pd_Fecha             := Ld_Fecha;
+                Pn_CantidadExitosos  := 0;
+                Pn_CantidadErroneos  := 0;
+                Pv_CodigoMensaje     := 'SUCCESS';
+                RETURN;
+        END;
+    EXCEPTION
+        --
+        WHEN NO_DATA_FOUND THEN
+            --
+            Pv_CodigoMensaje      := 'ERROR';
+            Pv_DescripcionMensaje := 'No se ha parametrizado la cantidad de solicitudes permitidas para este usuario o se encuentra inactivo';
+            --
+        WHEN OTHERS THEN
+            --
+            Pv_CodigoMensaje      := 'ERROR';
+            Pv_DescripcionMensaje := 'Error consultando la cantidad de solicitudes permitidas para este usuario. ' || SQLERRM;
+            --
+    END HTH_P_CONSULTA_REG_CONS_X_SERV;
