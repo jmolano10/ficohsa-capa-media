@@ -1,19 +1,19 @@
 sequenceDiagram
     autonumber
     participant Client as Consumidor / Aplicación
-    participant API as API Available Requests Admin - System <br> Epica 65964: ConsultaCobranzasH2H <br> HU 65987: POST /available-requests-admin/v1/retrieve
+    participant API as API Available Requests Admin - System <br> Epica 65964: ConsultaCobranzasH2H <br> HU 66021: PUT /available-requests-admin/v1/update
     participant CL as Caché Local
     participant Lambda as Librería de parámetros <br> com.ficohsa.lib:regionalization <br> 2.4.2-SNAPSHOT
     participant Lib as Librería Pipeline (ConfigMap)
     participant parameter as Parameter Store
     participant secret as Secret Manager
-    participant region as BD interfazdev <br/> SP: HTH_P_CONSULTA_REG_CONS_X_SERV <br> ConnectionProxyAbanksHN
+    participant region as BD interfazdev <br/> SP: HTH_P_ACT_SOL_X_CLIENTE <br> ConnectionProxyAbanksHN
     participant Errors as Lib Errores <br/> lib-java-webflux_core-xrs
 
-    Note over Client, Errors: Flujo Honduras (HN01) - Consulta Peticiones Disponibles H2H
+    Note over Client, Errors: Flujo Honduras (HN01) - Actualización Peticiones Disponibles H2H
 
-    Client->>API: POST /available-requests-admin/v1/retrieve
-    Note right of Client: Headers: <br> Source-Bank, Destination-Bank, <br> Caller-Service, Authorization, <br> Application-Id <br> Body: <br> data.userCode, <br> data.operationType, <br> data.requestCount
+    Client->>API: PUT /available-requests-admin/v1/update
+    Note right of Client: Headers: <br> Source-Bank, Destination-Bank, <br> Caller-Service, Authorization, <br> Application-Id <br> Body: <br> data.userCode, <br> data.operationType, <br> data.successfulCount, <br> data.errorCount
 
     rect rgb(250, 250, 250)
     Note over API, Client: Validación Campos Obligatorios
@@ -27,7 +27,7 @@ sequenceDiagram
     alt Consulta parámetros en caché local
 
         API->>CL: Consultar parámetros de Librería de parámetros en caché local
-        Note right of API: Domain: "AVAILABLE_REQUESTS_ADMIN" <br> name: "RETRIEVE" <br> country: XRS
+        Note right of API: Domain: "AVAILABLE_REQUESTS_ADMIN" <br> name: "UPDATE" <br> country: XRS
 
         CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
@@ -41,7 +41,7 @@ sequenceDiagram
     else Consulta parámetros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros en librería de parámetros
-        Note right of API: Domain: "AVAILABLE_REQUESTS_ADMIN" <br> name: "RETRIEVE" <br> country: XRS
+        Note right of API: Domain: "AVAILABLE_REQUESTS_ADMIN" <br> name: "UPDATE" <br> country: XRS
 
         Lambda->>API: Obtiene parámetros Librería de parámetros
         Note left of Lambda: Obtiene parámetros de regionalización y negocio
@@ -75,7 +75,6 @@ sequenceDiagram
 
     alt Source-Bank = HN01
 
-
         API->>secret: Obtener Secreto ConnectionProxyAbanksHN
         secret-->>API: Retorna JSON con credenciales
         Note over secret: { "user": "****", <br> "password": "****" }
@@ -86,35 +85,37 @@ sequenceDiagram
 
         API->>Lib: Consulta Constantes
         Lib->>API: Retorna constantes necesarias
-        Note left of Lib: Constantes: <br> caller-service: "AVAILABLE_REQUESTS_ADMIN-SYSTEM-RETRIEVE" <br> schema: "PROXYABANKSHN" <br> package: "HTH_K_GENERALES" <br> procedureName: "HTH_P_CONSULTA_REG_CONS_X_SERV"
+        Note left of Lib: Constantes: <br> caller-service: "AVAILABLE_REQUESTS_ADMIN-SYSTEM-UPDATE" <br> schema: "PROXYABANKSHN" <br> package: "HTH_K_GENERALES" <br> procedureName: "HTH_P_ACT_SOL_X_CLIENTE"
+
+        Note over API, Client: Paso 1: Actualizar contadores de peticiones exitosas y erróneas del cliente
 
         API->>API: Preparar Payload
-        Note over API: Mapeo Campos: <br> PV_CODIGOUSUARIO = data.userCode <br> PV_IDPROXY = header.Caller-Service <br> PV_OPERACION = data.operationType <br> PN_CANTIDADPETICIONES = data.requestCount
+        Note over API: Mapeo Campos IN: <br> PV_CODIGOUSUARIO = data.userCode <br> PV_IDPROXY = header.Caller-Service <br> PV_OPERACION = data.operationType <br> PN_CANTIDADEXITOSOS = data.successfulCount <br> PN_CANTIDADERRONEOS = data.errorCount
 
-        API->>region: CALL HTH_K_GENERALES.HTH_P_CONSULTA_REG_CONS_X_SERV
-        Note over API, CL: Conexión: <br> ip, port, database (Parameter Store) <br> user, password (Secret Manager) <br> Schema: PROXYABANKSHN <br> Package: HTH_K_GENERALES <br> SP: HTH_P_CONSULTA_REG_CONS_X_SERV <br> IN: Pv_CodigoUsuario, Pv_IdProxy, Pv_Operacion, Pn_CantidadPeticiones
+        API->>region: CALL HTH_K_GENERALES.HTH_P_ACT_SOL_X_CLIENTE
+        Note over API, CL: Conexión: <br> ip, port, database (Parameter Store) <br> user, password (Secret Manager) <br> Schema: PROXYABANKSHN <br> Package: HTH_K_GENERALES <br> SP: HTH_P_ACT_SOL_X_CLIENTE <br> IN: Pv_CodigoUsuario, Pv_IdProxy, Pv_Operacion, <br> Pn_CantidadExitosos, Pn_CantidadErroneos <br> Tabla: HTH_OPER_X_CLIENTE <br> Lógica: UPDATE acumulativo por usuario/proxy/operación/fecha. <br> Si no existe registro (ROWCOUNT=0) → INSERT nuevo.
 
-        region->>API: Response SP: HTH_P_CONSULTA_REG_CONS_X_SERV
-        Note over region: OUT: Pn_CantidadPermitida, Pn_CantidadExitosos, <br> Pn_CantidadErroneos, Pd_Fecha, <br> Pv_CodigoMensaje, Pv_DescripcionMensaje
+        region->>API: Response SP: HTH_P_ACT_SOL_X_CLIENTE
+        Note over region: OUT: <br> Pv_CodigoMensaje (SUCCESS | ERROR) <br> Pv_DescripcionMensaje (vacío si éxito, <br> detalle SQLERRM si error)
 
         API->>API: Registra Log Response CloudWatch
 
-        API->>API: Evalúa Response SP: HTH_P_CONSULTA_REG_CONS_X_SERV
+        API->>API: Evalúa Response SP: HTH_P_ACT_SOL_X_CLIENTE
 
-        alt If Pv_CodigoMensaje != SUCCESS
+        alt If PV_CODIGOMENSAJE != SUCCESS
 
             API->> Errors: Mapear código de error
-            Note right of API: Mapeo de errores según tabla de homologación <br> SP: HTH_P_CONSULTA_REG_CONS_X_SERV
+            Note right of API: Mapeo de errores según tabla de homologación <br> SP: HTH_P_ACT_SOL_X_CLIENTE
 
             Errors ->> API: Retorna código mapeado
 
             API->> Client: Retorna error
             Note left of API: HTTP 4XX / 5XX
 
-        else If Pv_CodigoMensaje == SUCCESS
+        else If PV_CODIGOMENSAJE == SUCCESS
 
             API->>API: Construir Response
-            Note over API: Mapeo Campos Response: <br> data.allowedRequestCount = PN_CANTIDADPERMITIDA <br> data.successfulCount = PN_CANTIDADEXITOSOS <br> data.errorCount = PN_CANTIDADERRONEOS <br> data.dateTime = PD_FECHA
+            Note over API: Mapeo Campos Response: <br> data: {}
 
             API->>Client: Response Exitoso
             Note left of API: HTTP 200: Response Exitoso
