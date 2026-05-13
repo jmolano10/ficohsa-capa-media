@@ -32,12 +32,6 @@ sequenceDiagram
         CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
         Note left of CL: Obtiene parámetros de regionalización y negocio
 
-        API->>CL: Consultar parámetros de Parameter Store en caché local
-        Note right of API: paramName = libparam.param-name
-
-        CL->>API: Obtiene parámetros de Parameter Store en Caché Local
-        Note left of CL: Obtiene parámetros de conexión a BD: ip, port, database
-
     else Consulta parámetros en Librería de parámetros / Parameter Store
 
         API->>Lambda: Consultar parámetros en librería de parámetros
@@ -48,15 +42,6 @@ sequenceDiagram
 
         API->>CL: Guarda parámetros lambda en caché local
         Note right of API: Almacena parámetros de regionalización y negocio
-
-        API->>parameter: Consultar parámetros del Parameter Store
-        Note right of API: paramName = libparam.param-name
-
-        parameter->>API: Obtiene parámetros del Parameter Store
-        Note left of parameter: Obtiene parámetros de conexión a BD: ip, port, database
-
-        API->>CL: Guarda parámetros del Parameter Store en caché local
-        Note right of API: ip, port, database
 
     end
 
@@ -84,16 +69,17 @@ sequenceDiagram
         end
 
         API->>Lib: Consulta Constantes
+
         Lib->>API: Retorna constantes necesarias
-        Note left of Lib: Constantes: <br> caller-service: "COLLECTION_RETRIEVE-PRODUCT-RETRIEVE-AGREEMENT" <br> schema: "SERVICIO" <br> package: "HTH_K_GENERALES" <br> procedureName: "HTH_P_CONSULTA_CONVENIOS"
+        Note left of Lib: Constantes: <br> caller-service <br> schema <br> package <br> procedureName <br> connectionType <br> operationType
 
         Note over API, Client: Paso 1: Consultar convenios registrados por servicio y país
 
         API->>API: Preparar Payload
-        Note over API: Mapeo Campos IN: <br> PT_IDSERVICIO = data.serviceIdList (array) <br> PV_CODIGOPAIS = data.countryCode
+        Note over API: Mapeo: Body: connection.paramName = libparam.param-name <br> secretName = libparam.secsecret-name <br> connectionType = const. connectionType <br> operationType = const.operationType <br> catalogueName = const.schema <br> packageName = const.package <br> procedureName = const.procedureName <br> params.PT_IDSERVICIO = data.serviceIdList (array) <br> params.PV_CODIGOPAIS = data.countryCode
 
         API->>wrapper: CALL HTH_K_GENERALES.HTH_P_CONSULTA_CONVENIOS
-        Note over API, CL: Conexión: <br> ip, port, database (Parameter Store) <br> user, password (Secret Manager) <br> Schema: SERVICIO <br> Package: HTH_K_GENERALES <br> SP: HTH_P_CONSULTA_CONVENIOS <br> IN: Pt_IdServicio (TVARCHAR10 array), Pv_CodigoPais <br> Lógica: Itera servicios, invoca BNKEL_P_CONSULTA_CONVENIO <br> por cada uno. Retorna lista de convenios con <br> ID_SERVICIO, ID_CONTRATO, DESCRIPCION.
+        Note over API, CL: connection {}, connectionType <br> operationType <br> catalogueName <br> packageName <br> procedureName <br> params 
 
         wrapper->>API: Response SP: HTH_P_CONSULTA_CONVENIOS
         Note over wrapper: OUT: <br> Pt_InfoConvenios (T_INFO_CONVENIOS array) <br> Pv_CodigoMensaje (SUCCESS | ERROR) <br> Pv_DescripcionMensaje (vacío si éxito, <br> detalle si error)
