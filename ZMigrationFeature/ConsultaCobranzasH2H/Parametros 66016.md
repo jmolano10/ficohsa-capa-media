@@ -9,8 +9,8 @@
     {
       "region": "HN01-HN01",
       "enabled": true,
-      "param-name": "ban-hnd-ic-comp-parm-connection-proxyabankshm-dev",
-      "secret-name": "ban-hnd-ic-comp-secm-connection-proxyabankshm-dev"
+      "param-name": "ban-hnd-ic-comp-parm-connection-PROXYABANKSHN-dev",
+      "secret-name": "ban-hnd-ic-comp-secm-connection-PROXYABANKSHN-dev"
     },
     {
       "region": "GT01-GT01",
@@ -41,7 +41,7 @@
 
 ##### 4.1.3.2. AWS Systems Manager Parameter Store
 
-**Nombre Parámetro**: `ban-hnd-ic-comp-parm-connection-proxyabankshm-dev`
+**Nombre Parámetro**: `ban-hnd-ic-comp-parm-connection-PROXYABANKSHN-dev`
 ```json
 {
   "ip": "172.23.176.20",
@@ -52,7 +52,7 @@
 
 ##### 4.1.3.3. AWS Systems Manager SecretManager
 
-**Nombre Secreto**: `ban-hnd-ic-comp-secm-connection-proxyabankshm-dev`
+**Nombre Secreto**: `ban-hnd-ic-comp-secm-connection-PROXYABANKSHN-dev`
 ```json
 {
   "user": "PROXYABANKSHN",
@@ -65,8 +65,10 @@
 ```json
 {
   "caller-service": "COLLECTION_RETRIEVE-PRODUCT-RETRIEVE-COLLECTION-FIELD",
-  "schema": "PROXYABANKSHM",
-  "package": "PROXYABANKSHM",
+  "schema": "PROXYABANKSHN",
+  "package": "PROXYABANKSHN",
   "procedureName": "HTH_P_CONS_CAMPOS_CBR_X_SERV"
 }
 ```
+
+
