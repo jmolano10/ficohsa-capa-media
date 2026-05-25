@@ -1,0 +1,52 @@
+flowchart TD
+    A[Cliente] -->|POST REST / SOAP| B{FPCWithdrawalConsultationRestPS<br/>FPCWithdrawalConsultationSoapPS}
+    
+    B --> C[FPCWithdrawalConsultationPP<br/>Template: PensionHondurasTemplateFicohsa]
+    
+    C --> D[StageAssigment]
+    D -->|service='Pension/FPCWithdrawalConsultation'<br/>version='V1'<br/>targetSystem='APIFPC'<br/>method='REST'| E[StageCloudCodeLogin<br/>GetSecurity]
+    
+    E --> F[GetParametersRestBS<br/>param: PG13516.SERVICE.ACCOUNT.APIFPC]
+    F --> G{errorCode = SUCCESS?}
+    
+    G -->|Sí| H[ExtractCredentialsAPIFPC.Xquery<br/>lookupBasicCredentials]
+    H --> I[CloudCodeLoginPS<br/>forceLogin=false]
+    I --> J[sesionToken obtenido]
+    
+    G -->|No| K[Error en obtención de parámetros]
+    
+    J --> L[TransformRegionalToTargetSystem]
+    L --> M[FPCWithdrawalConsultationToCloudCodeRestBS.Xquery<br/>RequestNumber → numeroSolicitud<br/>ClientId → numeroIdentificacion]
+    
+    M --> N[StageLogginInput<br/>LoggingRegionalRestBS - REQUEST]
+    
+    N --> O[InvokeCountry<br/>CloudCodeRestBS]
+    O -->|GET /retiros?params<br/>Authorization: Bearer token<br/>Timeout: 70s| P{Respuesta CloudCode}
+    
+    P -->|HTTP 200<br/>error='false'| Q[codeErrorService = Success]
+    P -->|HTTP 401| R[ErrorHandlerInvokeCountry]
+    P -->|Otro Error| S[codeErrorService = Error]
+    
+    R --> T[Re-extract credentials]
+    T --> U[CloudCodeLoginPS<br/>forceLogin=true]
+    U --> V[Retry invocación con nuevo token]
+    V --> P
+    
+    Q --> W[StageLoggingOutput<br/>LoggingRegionalRestBS - RESPONSE]
+    S --> W
+    
+    W --> X{codeErrorService = SUCCESS?}
+    
+    X -->|Sí| Y[CloudCodeRestToFPCWithdrawalConsultation.Xquery<br/>Mapeo campos retiro → Response regional]
+    X -->|No| Z[GetCustomErrorByStackTraceRegionalRestBS]
+    Z --> AA[ErrorMapeoRegionalToFPCWithdrawalConsultation.Xquery<br/>Mapeo error → Response regional]
+    
+    Y --> AB[Response al Cliente<br/>FPCWithdrawalConsultationResponse]
+    AA --> AB
+    
+    K --> AC[Error Handler Global]
+    AC --> AD[Report fault]
+    AD --> AE[GetCustomErrorByStackTraceRegionalRestBS]
+    AE --> AF[ErrorMapeoRegionalToFPCWithdrawalConsultation.Xquery]
+    AF --> AG[StageLoggingOutputError]
+    AG --> AH[Reply Error]

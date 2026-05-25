@@ -1,0 +1,99 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant ProxyREST as FPCWithdrawalConsultationRestPS<br/>/honduras/pension/rest/FPCWithdrawalConsultation/v1
+    participant Pipeline as FPCWithdrawalConsultationPP<br/>(Template: PensionHondurasTemplateFicohsa)
+    participant ParamsBS as GetParametersRestBS
+    participant CredXQ as ExtractCredentialsAPIFPC.Xquery
+    participant LoginPS as CloudCodeLoginPS
+    participant TransformReq as FPCWithdrawalConsultationToCloudCodeRestBS.Xquery
+    participant CloudCodeBS as CloudCodeRestBS<br/>https://apiqa.afpficohsa.com/api/v2
+    participant TransformResp as CloudCodeRestToFPCWithdrawalConsultation.Xquery
+    participant ErrorBS as GetCustomErrorByStackTraceRegionalRestBS
+    participant TransformErr as ErrorMapeoRegionalToFPCWithdrawalConsultation.Xquery
+    participant LogBS as LoggingRegionalRestBS
+
+    Note over Client, CloudCodeBS: Flujo HN01 — FPCWithdrawalConsultation (POST)
+
+    Client->>ProxyREST: POST /honduras/pension/rest/FPCWithdrawalConsultation/v1
+    Note right of Client: Content-Type: application/json<br/>Auth: HTTP Basic over SSL<br/>Body: {GeneralInfo, RequestNumber, ClientId}
+
+    ProxyREST->>Pipeline: Invoke Pipeline
+    Note right of Pipeline: Política: oracle/http_basic_auth_over_ssl_service_policy
+
+    %% Stage: StageAssigment
+    Pipeline->>Pipeline: StageAssigment
+    Note right of Pipeline: service = 'Pension/FPCWithdrawalConsultation'<br/>version = 'V1'<br/>key = 'ClientId'<br/>value = data($body/ClientId)<br/>method = 'REST'<br/>targetSystem = 'APIFPC'<br/>user = data($body//GeneralInfo/ApplicationId)
+
+    %% Stage: GetSecurity (StageCloudCodeLogin)
+    Pipeline->>ParamsBS: GetParameters
+    Note right of Pipeline: parameterName = 'PG13516.SERVICE.ACCOUNT.APIFPC'
+    ParamsBS-->>Pipeline: serviceAccountName (ej: APIFPC_SERVICE_USER)
+
+    alt errorCode = 'SUCCESS'
+        Pipeline->>CredXQ: ExtractCredentialsAPIFPC($serviceAccount)
+        Note right of CredXQ: fn-bea:lookupBasicCredentials('SB_Security/Common/{ACCOUNT_NAME}')
+        CredXQ-->>Pipeline: credentials (userName, userPassword)
+
+        Pipeline->>LoginPS: cloudCodeLogin
+        Note right of Pipeline: userName, password, timestamp<br/>forceLogin = false
+        LoginPS-->>Pipeline: sesionToken (Bearer token)
+    end
+
+    %% Stage: TransformRegionalToTargetSystem
+    alt errorCode = 'SUCCESS'
+        Pipeline->>TransformReq: FPCWithdrawalConsultationToCloudCodeRestBS
+        Note right of TransformReq: RequestNumber → numeroSolicitud<br/>ClientId → numeroIdentificacion
+        TransformReq-->>Pipeline: requestService (CloudCode format)
+    end
+
+    %% Stage: StageLogginInput
+    Pipeline->>LogBS: SaveLogInFileSystem (REQUEST)
+    Note right of LogBS: messageType = 'REQUEST'
+
+    %% Stage: InvokeCountry
+    Pipeline->>CloudCodeBS: GET /retiros?numeroSolicitud={}&numeroIdentificacion={}
+    Note right of CloudCodeBS: Header: Authorization = $sesionToken<br/>Timeout: 70s / ConnTimeout: 65s
+
+    alt HTTP 200 - error = 'false' (Éxito)
+        CloudCodeBS-->>Pipeline: {error:"false", datos:{retiros:{...}}}
+        Note right of Pipeline: codeErrorService = 'Success'<br/>statusService = 'Success'
+
+    else HTTP 401 (Token Expirado)
+        CloudCodeBS-->>Pipeline: HTTP 401
+        Note over Pipeline: Error Handler: ErrorHandlerInvokeCountry
+
+        Pipeline->>CredXQ: ExtractCredentialsAPIFPC (re-extract)
+        CredXQ-->>Pipeline: credentials
+
+        Pipeline->>LoginPS: cloudCodeLogin (forceLogin=true)
+        LoginPS-->>Pipeline: nuevo sesionToken
+
+        Pipeline->>CloudCodeBS: GET /retiros (retry con nuevo token)
+        CloudCodeBS-->>Pipeline: Response
+
+    else Otro Error
+        CloudCodeBS-->>Pipeline: Error/Fault
+        Note right of Pipeline: codeErrorService = fault errorCode<br/>statusService = 'Error'<br/>errorMessage extraído del fault
+    end
+
+    %% Stage: StageLoggingOutput
+    Pipeline->>LogBS: SaveLogInFileSystem (RESPONSE)
+    Note right of LogBS: messageType = 'RESPONSE'
+
+    %% Stage: TransformTargetSystemToRegional
+    alt codeErrorService = 'SUCCESS'
+        Pipeline->>TransformResp: CloudCodeRestToFPCWithdrawalConsultation
+        Note right of TransformResp: datos/retiros/cuenta → Account<br/>datos/retiros/nombreCliente → ClientName<br/>datos/retiros/numeroIdentificacion → IdNumber<br/>datos/retiros/formaPago → PaymentMethod<br/>datos/retiros/moneda → Currency<br/>datos/retiros/monto → Amount<br/>datos/retiros/tipoRetiro → WithdrawalType<br/>datos/retiros/cuentaBancaria → BankingAccount
+        TransformResp-->>Pipeline: FPCWithdrawalConsultationResponse (Success)
+    else Error
+        Pipeline->>ErrorBS: process (mapeo error regional)
+        Note right of ErrorBS: systemApplication = $targetSystem<br/>service = $service<br/>errorCode, errorMessage, language
+        ErrorBS-->>Pipeline: errorMappingRegionalOutput
+
+        Pipeline->>TransformErr: ErrorMapeoRegionalToFPCWithdrawalConsultation
+        Note right of TransformErr: code, error, description, shortDescription<br/>+ SystemId, SystemStatus, MessageId, Messages
+        TransformErr-->>Pipeline: FPCWithdrawalConsultationResponse (Error)
+    end
+
+    Pipeline-->>ProxyREST: Response
+    ProxyREST-->>Client: HTTP 200 (Success o Error en body)
