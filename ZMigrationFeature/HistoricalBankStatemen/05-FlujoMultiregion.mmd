@@ -1,0 +1,38 @@
+graph TD
+    A[Cliente] --> B[HistoricalBankStatemenRestPS Proxy]
+    B --> C[StageAssigment - Validar XSD]
+    C --> D[StageCloudCodeLogin]
+    D --> E{GetParametersRestBS exitoso?}
+    E -->|Sí| F[ExtractCredentialsAPIFPC.xqy]
+    E -->|No| G[Error de Parámetros → Respuesta Error]
+    F --> H[CloudCodeLoginPS - cloudCodeLogin]
+    H --> I[StageTransformationsRequest]
+    I --> J[HistoricalBankStatemenToCloudCode.xqy]
+    J --> K[StageLogginInput - LoggingRegionalRestBS]
+    K --> L[InvokeCountry]
+    L --> M[CloudCodeRestBS - POST /estados-cuentas/historicos]
+    M --> N{Respuesta Exitosa?}
+    N -->|Sí| O[StageLogginOutput - LoggingRegionalRestBS]
+    N -->|Error 401| P[CloudCodeLoginPS - forceLogin=true]
+    N -->|Otro Error| Q[Error de Invocación]
+    P --> R[CloudCodeRestBS - Retry]
+    R --> S{Retry Exitoso?}
+    S -->|Sí| O
+    S -->|No| Q
+    O --> T[StageTargetSystemToRegional]
+    T --> U{Transformación Exitosa?}
+    U -->|Sí| V[CloudCodeToHistoricalBankStatemen.xqy]
+    U -->|No| W[GetCustomErrorByStackTraceRegionalRestBS]
+    V --> X[Respuesta Exitosa al Cliente]
+    W --> Y[ErrorToHistoricalBankStatemen.xqy]
+    Y --> Z[Respuesta Error al Cliente]
+    G --> Z
+    Q --> W
+
+    style B fill:#e1f5ff
+    style D fill:#fff4e1
+    style L fill:#e8f5e9
+    style P fill:#ffcc80
+    style W fill:#ffebee
+    style G fill:#ffebee
+    style Q fill:#ffebee

@@ -1,0 +1,97 @@
+sequenceDiagram
+    autonumber
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy Service<br>HistoricalBankStatemenRestPS
+    participant Params as GetParametersRestBS
+    participant Login as CloudCodeLoginPS
+    participant Logger as LoggingRegionalRestBS
+    participant CloudCode as CloudCodeRestBS<br>apidev.afpficohsa.com/api/v2
+    participant ErrorHandler as GetCustomErrorByStackTrace
+
+    Note over Client, ErrorHandler: Flujo Honduras (HN01) - HistoricalBankStatemen
+
+    Client->>OSB: REST Request
+    Note right of Client: Body: IdentificationType, IdentificationNumber,<br>StartDate, EndDate
+
+    OSB->>OSB: StageAssigment - Validar Esquema XSD
+    Note over OSB: Campos obligatorios:<br>IdentificationType, IdentificationNumber,<br>StartDate, EndDate
+
+    alt Validación Fallida
+        OSB-->>Client: Error de Validación
+    end
+
+    Note over OSB, Login: StageCloudCodeLogin - Autenticación
+
+    OSB->>Params: POST GetParameters
+    Note right of OSB: parameterName: "PG13516.SERVICE.ACCOUNT.APIFPC"
+
+    Params-->>OSB: GetParametersResponse
+    Note left of Params: errorCode, message, parameters/parameter/value
+
+    alt errorCode != "SUCCESS"
+        OSB-->>Client: Error de Parámetros
+    end
+
+    OSB->>OSB: ExtractCredentialsAPIFPC.xqy
+    Note over OSB: Extraer y desencriptar credenciales
+
+    OSB->>Login: cloudCodeLogin
+    Note right of OSB: forceLogin: "false"<br>credentials: {encriptadas}
+
+    Login-->>OSB: cloudCodeLoginResponse
+    Note left of Login: successIndicator, message, token
+
+    Note over OSB: StageTransformationsRequest
+
+    OSB->>OSB: HistoricalBankStatemenToCloudCode.xqy
+    Note over OSB: Mapeo:<br>IdentificationType → tipoIdentificacion (Homologado)<br>1→CC, 2→CAR, 4→PAS, 5→NIT<br>IdentificationNumber → numeroIdentificacion<br>StartDate → fechaInicio<br>EndDate → fechaFinal
+
+    Note over OSB, Logger: StageLogginInput
+
+    OSB->>Logger: POST SaveLogInFileSystem (Input)
+    Logger-->>OSB: HTTP 202 Accepted
+
+    Note over OSB, CloudCode: InvokeCountry - Llamada al Backend
+
+    OSB->>CloudCode: POST /estados-cuentas/historicos
+    Note right of OSB: Header: Authorization: Bearer {token}<br>Body: tipoIdentificacion, numeroIdentificacion,<br>fechaInicio, fechaFinal
+
+    alt Error 401 - Token Expirado
+        CloudCode-->>OSB: HTTP 401 Unauthorized
+
+        OSB->>Login: cloudCodeLogin (re-autenticación)
+        Note right of OSB: forceLogin: "true"
+
+        Login-->>OSB: Nuevo token
+
+        OSB->>CloudCode: POST /estados-cuentas/historicos (Retry)
+        Note right of OSB: Header: Authorization: Bearer {nuevo_token}
+    end
+
+    CloudCode-->>OSB: Response estadoCuentasHistoricos
+    Note left of CloudCode: error, mensaje,<br>datos/estadoCuenta {<br>  fecha, nombreCliente, emailCliente, numeroCliente,<br>  movimientos[] { moneda, cuenta, rendimiento,<br>    totalPersonal, totalPatronal, granTotal,<br>    transacciones[] { fecha, tipoMovimiento,<br>      descripcionTransaccion, movimientoPersonal,<br>      movimientoPatronal, movimientoTotal }<br>  }<br>}
+
+    Note over OSB, Logger: StageLogginOutput
+
+    OSB->>Logger: POST SaveLogInFileSystem (Output)
+    Logger-->>OSB: HTTP 202 Accepted
+
+    Note over OSB: StageTargetSystemToRegional
+
+    alt error = "false" (Exitoso)
+        OSB->>OSB: CloudCodeToHistoricalBankStatemen.xqy
+        Note over OSB: Mapeo:<br>mensaje → Data/Message<br>estadoCuenta/fecha → StatusAccount/Date<br>estadoCuenta/nombreCliente → StatusAccount/NameClient<br>estadoCuenta/emailCliente → StatusAccount/EmailClient<br>estadoCuenta/numeroCliente → StatusAccount/CustomerNumber<br>movimientos[]/moneda → Movements[]/Currency<br>movimientos[]/cuenta → Movements[]/Account<br>movimientos[]/rendimiento → Movements[]/Yield<br>movimientos[]/totalPersonal → Movements[]/TotalStaff<br>movimientos[]/totalPatronal → Movements[]/TotalEmployee<br>movimientos[]/granTotal → Movements[]/GrandTotal<br>transacciones[]/fecha → Transactions[]/Date<br>transacciones[]/tipoMovimiento → Transactions[]/TypeMovement<br>transacciones[]/descripcionTransaccion → Transactions[]/DescriptionTransaction<br>transacciones[]/movimientoPersonal → Transactions[]/MovementStaff<br>transacciones[]/movimientoPatronal → Transactions[]/EmployerMovement<br>transacciones[]/movimientoTotal → Transactions[]/TotalMovement
+
+        OSB-->>Client: Response Exitoso (StatusService: Success)
+
+    else error != "false" (Error)
+        OSB->>ErrorHandler: POST GetCustomErrorByStackTrace
+        Note right of OSB: systemApplication, service,<br>errorMessage, errorCode, language
+
+        ErrorHandler-->>OSB: Error homologado
+
+        OSB->>OSB: ErrorToHistoricalBankStatemen.xqy
+        Note over OSB: Mapear error al formato regional
+
+        OSB-->>Client: Response Error (StatusService: Error)
+    end
