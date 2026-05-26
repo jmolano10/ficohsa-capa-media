@@ -1,0 +1,42 @@
+flowchart TD
+    A[Cliente REST/SOAP] -->|POST REST o SOAP| B{Proxy}
+    B -->|REST| C[GetFundPensionClientRestPS<br/>/regional/pension/rest/v1]
+    B -->|SOAP Regional| D[GetFundPensionClientSoapPS<br/>/regional/pension/soap/v1]
+    B -->|SOAP 11g| E[GetFundPensionClient11gPS<br/>/regional/pension/soap/v11g]
+
+    C --> F[GetFundPensionClientPP<br/>Template: PensionRegionalTemplateFicohsa]
+    D --> F
+
+    E --> G[GetFundPensionClient11gPP<br/>Template: PensionRegional11gTemplate]
+
+    %% Flujo 11g
+    G --> H[ConvertIdType.Xquery<br/>1→CC, 9→NIT, 4→PAS, 2→CAR]
+    H --> I[Virtual11gToRegional.Xquery<br/>Transforma request 11g → regional]
+    I --> J[GetFundPensionClient12BS<br/>SOAP mwservices.gfficohsa.hn:8020]
+    J --> K[RegionalToVirtualHeader11gHN.Xquery<br/>+ RegionalToVirtualBody11gHN.Xquery]
+    K --> L[Response 11g al cliente]
+
+    %% Flujo Regional
+    F --> M[StageDefinitions<br/>service, version, key, method, uuid, sourceBank, destinationBank]
+    M --> N[StageLoggingInput<br/>LoggingRegionalRestBS - REQUEST]
+    N --> O[StageValidate<br/>XSD: getFundPensionClient]
+    O --> P{Validación OK?}
+    P -->|No| Q[Error Handler Global]
+    P -->|Sí| R[StageRegionalitation<br/>GetCountryURLByNameRestBS]
+    R --> S{responseRegional = N/A?}
+    S -->|Sí| T[Error MW-0008<br/>SERVICE NOT IMPLEMENTED]
+    S -->|No| U[InvokeCountry<br/>GetFundPensionClientRestBS<br/>URL dinámica]
+    U --> V[StageLoggingOutput<br/>LoggingRegionalRestBS - RESPONSE]
+    V --> W{method=REST AND Status!=SUCCESS?}
+    W -->|Sí| X[Inyectar HTTP code de error]
+    W -->|No| Y[Response al cliente]
+    X --> Y
+
+    %% Error Handler
+    Q --> Z[StageIT - Report fault]
+    Z --> AA[StageMappingErrors<br/>GetCustomErrorByStackTraceRegionalRestBS]
+    AA --> AB[ErrorToGetFundPensionClient.Xquery]
+    AB --> AC{method=REST?}
+    AC -->|Sí| AD[Inyectar HTTP code]
+    AC -->|No| AE[Reply Error]
+    AD --> AE

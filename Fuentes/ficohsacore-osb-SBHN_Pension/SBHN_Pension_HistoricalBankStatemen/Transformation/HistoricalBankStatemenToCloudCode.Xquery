@@ -14,11 +14,11 @@ declare variable $historicalBankStatemen as element() (:: schema-element(ns1:his
 declare function local:obtenerXMLDocumentos()
     as element(*){
     	        <LEGAL_ID_TYPES>
-			<LEGAL_ID_TYPE name="1">CC</LEGAL_ID_TYPE>
-                        <LEGAL_ID_TYPE name="2">CAR</LEGAL_ID_TYPE>
-			<LEGAL_ID_TYPE name="4" >PAS</LEGAL_ID_TYPE>			
-                        <LEGAL_ID_TYPE name="5">NIT</LEGAL_ID_TYPE>
-		</LEGAL_ID_TYPES>
+			        <LEGAL_ID_TYPE name="1">CC</LEGAL_ID_TYPE>
+                    <LEGAL_ID_TYPE name="2">CAR</LEGAL_ID_TYPE>
+			        <LEGAL_ID_TYPE name="4" >PAS</LEGAL_ID_TYPE>			
+                    <LEGAL_ID_TYPE name="5">NIT</LEGAL_ID_TYPE>
+		        </LEGAL_ID_TYPES>
     };
 
 declare function local:func($historicalBankStatemen as element() (:: schema-element(ns1:historicalBankStatement) ::)) as element() (:: schema-element(ns2:estadoCuentasHistoricos) ::) {

@@ -1,0 +1,76 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant ProxyREST as GetFundPensionClientRestPS<br/>/regional/pension/rest/getFundPensionClient/v1
+    participant Pipeline as GetFundPensionClientPP<br/>(Template: PensionRegionalTemplateFicohsa)
+    participant LogBS as LoggingRegionalRestBS
+    participant ValidateXSD as StageValidate<br/>(XSD: GetFundPensionClientTypes)
+    participant RegionBS as GetCountryURLByNameRestBS
+    participant BackendBS as GetFundPensionClientRestBS<br/>mwservices.gfficohsa.hn:8020
+    participant ErrorBS as GetCustomErrorByStackTraceRegionalRestBS
+    participant ErrorXQ as ErrorToGetFundPensionClient.Xquery
+
+    Note over Client, BackendBS: Flujo HN01 — GetFundPensionClient (REST POST)
+
+    Client->>ProxyREST: POST /regional/pension/rest/getFundPensionClient/v1
+    Note right of Client: Auth: HTTP Basic over SSL<br/>Body: {GeneralInfo, IdentificationType,<br/>IdentificationNumber, Clientcode}
+
+    ProxyREST->>Pipeline: Invoke Pipeline
+    Note right of Pipeline: Política: oracle/http_basic_auth_over_ssl_service_policy
+
+    %% StageDefinitions
+    Pipeline->>Pipeline: StageDefinitions
+    Note right of Pipeline: service = 'Pension/GetFundPensionClient'<br/>version = 'v1'<br/>key = 'IdentificationNumber'<br/>value = data(IdentificationNumber)<br/>method = 'REST' (detectado por URI)<br/>uuid = GlobalId o fn-bea:uuid()<br/>sourceBank = GeneralInfo/SourceBank<br/>destinationBank = GeneralInfo/DestinationBank
+
+    %% StageLoggingInput
+    Pipeline->>LogBS: SaveLogInFileSystem (REQUEST)
+    Note right of LogBS: messageType = 'REQUEST'
+
+    %% StageValidate
+    Pipeline->>ValidateXSD: Validar body contra XSD getFundPensionClient
+    alt Validación fallida
+        ValidateXSD-->>Pipeline: Error de validación
+        Pipeline-->>Client: Error (via error handler)
+    end
+
+    %% StageRegionalitation
+    Pipeline->>RegionBS: GetCountryURLByName
+    Note right of Pipeline: destinationBank, service, version, sourceBank
+    RegionBS-->>Pipeline: URL del backend (responseRegional)
+
+    alt responseRegional = "N/A"
+        Pipeline-->>Client: Error MW-0008<br/>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY
+    end
+
+    %% InvokeCountry
+    Pipeline->>BackendBS: POST / (getFundPensionClient)
+    Note right of BackendBS: URL dinámica: $responseRegional<br/>Body: $body/pen:getFundPensionClient<br/>Auth: oracle/http_basic_auth_over_ssl_client_policy<br/>Timeout: 70s / ConnTimeout: 65s
+
+    BackendBS-->>Pipeline: getFundPensionClientResponse
+
+    %% StageLoggingOutput
+    Pipeline->>LogBS: SaveLogInFileSystem (RESPONSE)
+    Note right of LogBS: state = StatusInfo/Status<br/>codeError = ErrorInfo/Code<br/>messageError = ErrorInfo/Description
+
+    %% StageReplaceCodeError
+    alt method='REST' AND StatusInfo/Status != 'SUCCESS'
+        Pipeline->>Pipeline: Inyectar ErrorInfo/Code como HTTP response code
+    end
+
+    Pipeline-->>ProxyREST: Response
+    ProxyREST-->>Client: HTTP 200 (Success o Error en body)
+
+    Note over Client, BackendBS: Flujo Alternativo — Error Handler Global
+
+    alt Exception / Error en cualquier stage
+        Pipeline->>LogBS: SaveLogInFileSystem (RESPONSE ERROR)
+        Pipeline->>ErrorBS: process (mapeo error regional)
+        Note right of ErrorBS: systemApplication='OSB'<br/>service, errorMessage, errorCode, language
+        ErrorBS-->>Pipeline: errorMappingRegionalOutput
+        Pipeline->>ErrorXQ: ErrorToGetFundPensionClient
+        Note right of ErrorXQ: Construye getFundPensionClientResponse<br/>con StatusInfo/Status='Error'<br/>y ErrorInfo completo
+        ErrorXQ-->>Pipeline: getFundPensionClientResponse (Error)
+        alt method='REST'
+            Pipeline->>Pipeline: Inyectar responseError/code como HTTP response code
+        end
+        Pipeline-->>Client: Reply con error
+    end
