@@ -1,0 +1,110 @@
+sequenceDiagram
+    autonumber
+    participant Client as Client
+    participant API as ComplianceReporting-Product<br/>ms-rc-crpt-compliance_reporting_retrieve-product
+    participant Param as Lib Regionalizacion <br/> lib-java-webflux_core-xrs v. 2.4.2-SNAPSHOT
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant Wrapper as WrapperPreCredit DB<br/>ms-ic-comp-precredit-db-wrapper
+    participant wrapperAbanks as Wrapper Abanks Multiconexión <br/> HU 16254
+    participant Errors as Lib Errores <br/> lib-java-webflux_core-xrs v. 2.4.2-SNAPSHOT
+
+    Client->>API: POST /regulationscompliance/compliance-reporting/v1/retrieve-customer-check
+    Note right of Client: Headers Authorization, Source-Bank, Destination-Bank,<br/>Application-Id, Caller-Service, Channel, Transaction-Date<br/>Body data.customerLegalReference (req),<br/>data.regulatoryListType (opcional, requerido funcional para GT01)
+
+    rect rgb(250, 250, 250)
+        Note over API, Client: Validacion Campos Obligatorios
+        API->>API: ValidacionEsquema OpenAPI
+        API->>API: Validar Headers obligatorios <br/> Authorization, Source-Bank, Destination-Bank,<br/> Application-Id, Caller-Service
+        API->>API: Validar Body obligatorios <br/> data.customerLegalReference
+        alt Errores de validacion
+            API-->>Client: Error 400
+        end
+    end
+
+    rect rgb(250, 250, 250)
+        Note over Client, Param: Proceso Validacion Regional
+        API->>API: Cache Local <br/> key retrieve-customer-check
+        alt Cache Config Not Found
+            API->>Param: Solicitud Validacion
+            Note over API: Regiones Disponibles de Dynamo <br/> NI01-NI01, GT01-GT01
+            Param-->>API: Respuesta Validacion
+            API->>API: Almacenar Config (TTL 24h)
+            alt Param Service Unavailable
+                API-->>Client: Error 502 (PARAMETER_SERVICE_UNAVAILABLE)
+            end
+        end
+        alt Region no encontrada o enabled false
+            API-->>Client: Error 422 (REGION_NOT_CONFIGURED / REGION_NOT_ENABLED)
+        end
+    end
+
+    Note over API: Uso del Patron Strategy
+    Note over API: Configuracion multidestino del Wrapper PreCredit<br/>HU 61619 debe registrar 2 items en DynamoDB del wrapper<br/>NI COUNTRY#NIC#DOMAIN#WRAPPER_PRECREDIT_DB#PARAM#compliance-reporting-retrieve-customer-check-ni<br/>GT COUNTRY#GTM#DOMAIN#WRAPPER_PRECREDIT_DB#PARAM#compliance-reporting-retrieve-customer-check-gt<br/>cada uno con su pareja param-name y secret-name por region
+    API->>API: Selecciona Estrategia por Source-Bank
+
+    alt Source-Bank = NI01
+        Note over API: Estrategia Nicaragua regulatoryListType se ignora,<br/>backend retorna todas las listas<br/>Conectividad delegada al Wrapper PreCredit DB
+        API->>API: Preparar Payload <br/> operationType=query, catalogueName=CREDITOS_RIESGOS,<br/>procedureName=NI_ONBASE.CONSULTA_LISTA_CLIENTE,<br/>params.IDENTIDAD=customerLegalReference
+        API->>Wrapper: POST /wrapper-precredit-db/v1/execute-procedure
+        Note over API,Wrapper: Header sourceBank=NI01<br/>Header caller-service=compliance-reporting-retrieve-customer-check-ni
+        Note over Wrapper: HU 61642 - resuelve PS/SM via item Dynamo<br/>COUNTRY#NIC#DOMAIN#WRAPPER_PRECREDIT_DB#PARAM#compliance-reporting-retrieve-customer-check-ni
+        Wrapper-->>API: Evaluar Payload <br/> success, data.outputParameters, data.resultSets<br/>(LISTAS multiples segun SP NI_ONBASE.CONSULTA_LISTA_CLIENTE)
+        API->>API: Mapear salida NI a regulatoryMatchList (cardinalidad N)
+        API-->>Client: 200 OK
+        Note over Client, API: data.customerReference, data.customerName,<br/>data.regulatoryMatchList.regulatoryListDetail
+
+    else Source-Bank = GT01
+        Note over API: Estrategia Guatemala regulatoryListType funcionalmente requerido<br/>Conectividad delegada al Wrapper PreCredit DB
+        alt regulatoryListType no informado
+            API-->>Client: Error 422 (REGULATORY_LIST_TYPE_REQUIRED)
+        else regulatoryListType informado
+            API->>API: Resolver SP por regulatoryListType<br/>CRIME spr_validaListaNegraDelitos_v2,<br/>IVE spr_validaListaNegraIVE_v2,<br/>OFAC_ONU spr_validaListaNegraOfacOnu_v2,<br/>PEP spr_validaListaNegraPEP_v2,<br/>RCJ spr_validaListaNegraRCJ_v2,<br/>RSR spr_validaListaNegraRSR_v2
+            API->>API: Preparar Payload <br/> operationType=query, catalogueName=dbo,<br/>procedureName=resuelto, params.LEGAL_ID=customerLegalReference
+            API->>Wrapper: POST /wrapper-precredit-db/v1/execute-procedure
+            Note over API,Wrapper: Header sourceBank=GT01<br/>Header caller-service=compliance-reporting-retrieve-customer-check-gt
+            Note over Wrapper: HU 61642 - resuelve PS/SM via item Dynamo<br/>COUNTRY#GTM#DOMAIN#WRAPPER_PRECREDIT_DB#PARAM#compliance-reporting-retrieve-customer-check-gt
+            Wrapper-->>API: Evaluar Payload <br/> success, data.outputParameters, data.resultSets<br/>(1 elemento)
+            API->>API: Mapear salida GT a regulatoryMatchList (cardinalidad 1)
+            Note over API: Regla OFAC_ONU GT01 si LISTANEGRA es NULL,<br/>tratar como NO RECORDS
+            API-->>Client: 200 OK
+            Note over Client, API: data.customerReference, data.customerName,<br/>data.regulatoryMatchList.regulatoryListDetail
+        end
+
+    else Source-Bank = PA01
+        Note over API: Estrategia Panamá regulatoryListType se ignora,<br/>backend retorna todas las listas<br/>Conectividad delegada al Wrapper Abanks Multiconexión
+
+        API->>Lib: Consulta Constantes
+    
+        Lib->>API: Retorna constantes necesarias
+        Note left of Lib: Constantes: <br> caller-service <br> schemaPA <br> packagePA <br> procedureNamePA
+        
+        API->>API: Preparar Payload 
+        Note over API: paramName = libParam.param-name <br> secretName = libParam.secret-name <br> operationType = const.query, catalogueName = const.schemaPA,<br/>procedureName = const.procedureNamePA,<br/>params.IDENTIDAD = customerLegalReference
+        
+        API->>wrapperAbanks: POST /wrapper-precredit-db/v1/execute-procedure
+        Note right of API: Header sourceBank=NI01<br/>Header caller-service=const.caller-service <br> paramName, <br> secretName <br> operationType, <br> catalogueName, <br> procedureName <br> params
+
+        wrapperAbanks->>API: Evaluar Response Wrapper
+        Note left of wrapperAbanks: success, data.outputParameters, <br> data.outputParameters.Pv_Identificacion,<br> data.outputParameters.Pv_Nombre, <br>  data.outputParameters.Pv_Lista_Peps, <br>  data.outputParameters.Pv_Lista_Excepciones, <br> data.outputParameters.Pv_Otros, <br> data.outputParameters.Pv_Message, <br>  data.outputParameters.Pv_SuccessIndicator
+        
+        API->>API: Consstruir Response API
+        Note over API: customerReference = data.outputParameters.Pv_Identificacion <br/> customerName = data.outputParameters.Pv_Nombre <br> regulatoryMatchList.regulatoryListDetail {<br> regulatoryListName = "Lista Peps", customerComplianceStatus = data.outputParameters.Pv_Lista_Peps <br> regulatoryListName = "Lista Excepciones", customerComplianceStatus = data.outputParameters.Pv_Lista_Excepciones <br> regulatoryListName = "Otros", customerComplianceStatus = data.outputParameters.Pv_Otros <br> }
+        
+        API-->>Client: 200 OK
+        Note over Client, API: Respuesta Exitosa
+    
+    end
+
+    activate API
+        alt Exception occurs
+            note over Errors: Error Library Handler
+            activate Errors
+                API->>Errors: BusinessCoreException(apiMethod, applicationBackend, errorMessage, errorCode)
+                Errors-->>API: Retorna httpCode, businessErrorCode, shortDesc, longDesc
+            deactivate Errors
+            activate Client
+                API-->>Client: Retorna error
+            deactivate Client
+        end
+    deactivate API
+    Note over Client,Errors: Diagrama guia de manejo de errores <br> http://bit.ly/4rpKVIU
