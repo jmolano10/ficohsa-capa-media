@@ -1,0 +1,49 @@
+sequenceDiagram
+    participant Consumer as Consumer (SOAP)
+    participant Proxy as ConsultaConsolidadaRiesgoClienteHN<br/>.proxy
+    participant XQ_IN as consultaConsolidadaRiesgoClienteIn.xq
+    participant BIZ as consultaConsolidadaRiesgoCliente_db<br/>(Business Service)
+    participant DB as SQL Server<br/>CREDITOS_RIESGOS
+    participant BURO as Linked Server<br/>[svrpruebas].BURO_EXTERNO
+    participant XQ_OUT as consultaConsolidadaRiesgoClienteOut.xq
+
+    Consumer->>Proxy: SOAP Request<br/>{CUSTOMER_LEGAL_ID}
+    
+    Note over Proxy: Request Pipeline<br/>"ConsultaConsolidadRiesgoCliente"
+    
+    Proxy->>XQ_IN: Transform Request
+    XQ_IN-->>Proxy: InputParameters<br/>{IDENTIDAD}
+    
+    Proxy->>BIZ: WS-Callout<br/>operation: consultaConsolidadRiesgoCliente
+    BIZ->>DB: JCA DB Adapter<br/>EXEC dbo.p_consulta_ONBASE_V2 @IDENTIDAD
+    
+    Note over DB: Consulta MA_CLIENTES
+    Note over DB: Consulta MA_PASIVOS + TRX
+    Note over DB: Consulta MA_TARJETAS + TRX (12 meses)
+    Note over DB: Consulta EXTRAFIN
+    Note over DB: Consulta Ma_Prestamos + TRX
+    Note over DB: Consulta MA_OFERTA_PREAPROBADA
+    
+    DB->>BURO: Linked Server Query<br/>EQX_CONTROL + RecordScore
+    BURO-->>DB: Datos Buró Equifax
+    
+    Note over DB: Consulta RecordB, RecordD, RecordT<br/>(Referencias Activas)
+    Note over DB: Consulta RecordPRB, RecordPRD, RecordPRT<br/>(Referencias Históricas)
+    Note over DB: Consulta RecordHB, RecordHD, RecordHT<br/>(Historiales de Mora)
+    Note over DB: Consulta RecordA, RecordTel, RecordH<br/>(Direcciones, Teléfonos, Cargos Admin)
+    Note over DB: Consulta RecordS, RecordC, RecordEvaluacion<br/>(SICOM, Consultas, Evaluación)
+    
+    DB-->>BIZ: XML Consolidado<br/>(FOR XML RAW/ROOT)
+    BIZ-->>Proxy: OutputParameters<br/>{RowSet/Row/Column[XML]}
+    
+    Note over Proxy: responseData = fn-bea:inlinedXML(Column[1])
+    
+    Note over Proxy: Response Pipeline<br/>"FujoSalida"
+    
+    Proxy->>XQ_OUT: Transform Response<br/>{responseData}
+    XQ_OUT-->>Proxy: consultaConsolidadaRiesgoClienteResponse<br/>{LOAN_MAINTENANCE + LOAN_ORIGINATIONS}
+    
+    Proxy-->>Consumer: SOAP Response<br/>Header: successIndicator=Success<br/>Body: Datos consolidados
+
+    Note over Proxy: En caso de error:
+    Proxy-->>Consumer: SOAP Response<br/>Header: successIndicator=ERROR<br/>Body: consultaConsolidadaRiesgoClienteResponse vacío

@@ -9,14 +9,14 @@ declare namespace ns0 = "http://www.ficohsa.com.hn/middleware.services/autType";
 declare namespace ns2 = "http://www.ficohsa.com.hn/middleware.services/pagoPrestamoTypes";
 declare namespace ns1 = "T24WebServicesImpl";
 
-(: Función encargada de realizar el mapeo de usuario:)
+(: Funciï¿½n encargada de realizar el mapeo de usuario:)
 declare function getUsername ($LDAPUsername as xs:string)  as xs:string { 
 	let $data := fn-bea:lookupBasicCredentials(concat("Middleware/Security/", upper-case($LDAPUsername)))
   		return
 		    $data/con:username/text()
  };
 
-(: Función encargada de realizar el mapeo de contraseña:)
+(: Funciï¿½n encargada de realizar el mapeo de contraseï¿½a:)
 declare function getPassword ($LDAPUsername as xs:string)  as xs:string {      
 	let $data := fn-bea:lookupBasicCredentials(concat("Middleware/Security/", upper-case($LDAPUsername)))
   		return
