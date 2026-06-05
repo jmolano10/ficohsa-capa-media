@@ -1,0 +1,58 @@
+flowchart TD
+    A[Cliente / Aplicación] -->|SOAP Request<br/>solicitudTC| B[OSB Proxy: SolicitudTCHN]
+    
+    B --> C{ORG vacío?}
+    
+    C -->|Sí| D[convertirCodigoPais.xqy<br/>HN01 → HND]
+    D --> E[conDatoCuentaHNIn.xqy<br/>Pais=HND, NumCuenta=pad-left 19]
+    E --> F[BS: conDatoCuenta_db<br/>ConnectionTarjetasHN<br/>SP: dbo.OSBConDatoCuenta]
+    F --> G{CodigoError = -1?}
+    G -->|Sí| H[Extraer ORG donde TIPOORG=BASE]
+    G -->|No| I[validationMessage = MensajeError]
+    
+    C -->|No| J[org = ORG del request]
+    
+    H --> K{org != vacío?}
+    J --> K
+    I --> K
+    
+    K -->|Sí| L[embosserAddL8VBNIIn.xqy<br/>Transformar request]
+    
+    subgraph Reglas de Negocio - Transformación
+        L --> L1[CARD_ACTION: NEW_CARD→1, NORMAL_REPLACEMENT→3,<br/>EMERGENCY_REPLACEMENT→6, RENOVATION→7]
+        L --> L2[CARDHOLDER_FLAG: PRINCIPAL→1, ADDITIONAL→0]
+        L --> L3[PIN_SUPPRESSION: YES→0, NO→1]
+        L --> L4[SDP_PROCESS_TYPE: EMERGENCY→1, NORMAL→0]
+        L --> L5[RQTD_CARD_TYPE/TYPE_CARD_MAILER:<br/>Si vacío → PRINCIPAL=01, ADDITIONAL=00]
+    end
+    
+    L1 --> M[Validar Schema<br/>XMLSchema_769155616]
+    L2 --> M
+    L3 --> M
+    L4 --> M
+    L5 --> M
+    
+    M --> N[BS: visionPlus<br/>http://172.28.1.145:7802/VisionPlusService<br/>Operación: EmbosserAddL8VB<br/>Timeout: 5seg]
+    
+    N --> O{ServiceReturnCode = P?}
+    O -->|Sí| P[validationMessage = vacío]
+    O -->|No| Q[validationMessage = RC-1-Desc<br/>errorCode = RC-1-Code]
+    
+    K -->|No - org vacío| R[No invoca VisionPlus]
+    R --> S
+    
+    P --> S{validationMessage = vacío?}
+    Q --> S
+    
+    S -->|Sí - Éxito| T[solicitudTCOut.xqy<br/>Mapear respuesta VP → OSB]
+    T --> U[Response Header: Success<br/>Body: LCY_ORG, FCY_ORG, LOGO,<br/>ACCOUNT_NUMBER, CARD_NUMBER,<br/>CARD_SEQUENCE, CHIP_SEQUENCE]
+    
+    S -->|No - Error| V[Response Header: errorCode + messages<br/>Body: solicitudTCResponse vacío]
+    
+    U --> W[Cliente recibe SOAP Response]
+    V --> W
+    
+    subgraph Error Handler Global
+        X[Excepción no controlada] --> Y[successIndicator = fault/errorCode<br/>messages = fault/reason<br/>Body: solicitudTCResponse vacío]
+        Y --> W
+    end

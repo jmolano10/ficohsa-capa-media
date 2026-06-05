@@ -1,0 +1,85 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant OSB as OSB Proxy<br/>SolicitudTCHN
+    participant XQ1 as convertirCodigoPais.xqy
+    participant XQ2 as conDatoCuentaHNIn.xqy
+    participant DB as conDatoCuenta_db<br/>ConnectionTarjetasHN
+    participant XQ3 as embosserAddL8VBNIIn.xqy
+    participant VP as VisionPlus<br/>http://172.28.1.145:7802
+    participant XQ4 as solicitudTCOut.xqy
+    participant EH as Error Handler
+
+    Note over Client, VP: Flujo HN01 - SolicitudTC (EmbosserAddL8VB)
+
+    Client->>OSB: SOAP Request solicitudTC
+    Note right of Client: Header: SourceBank=HN01<br/>Body: ACCOUNT_NUMBER, CARD_ACTION,<br/>CUSTOMER_ID, EMBOSSED_NAME, etc.
+
+    OSB->>OSB: Evaluar ORG del request
+    Note right of OSB: fn:string($body/ges:solicitudTC/ORG/text()) = ""
+
+    alt ORG vacío → Resolver vía SP
+        OSB->>XQ1: convertirCodigoPais(HN01, 'OSB-ISO3')
+        XQ1-->>OSB: "HND"
+        Note right of XQ1: Conversión: HN01 → HND
+
+        OSB->>XQ2: conDatoCuentaHNIn(countryCode=HND, org="", accountNumber)
+        Note right of XQ2: pad-left(ACCOUNT_NUMBER, 19, '0')
+        XQ2-->>OSB: InputParameters(Pais=HND, NumCuenta=padded)
+
+        OSB->>DB: wsCallout operación: conDatoCuenta
+        Note right of DB: SP: dbo.OSBConDatoCuenta<br/>Params: Pais=HND, NumCuenta=padded
+
+        DB-->>OSB: OutputParameters(RowSet, CodigoError, MensajeError)
+
+        OSB->>OSB: Evaluar respuesta SP
+        Note right of OSB: Si CodigoError != '-1' →<br/>$validationMessage = MensajeError<br/><br/>Extraer ORG donde TIPOORG='BASE'
+
+    else ORG informado → Usar directo
+        OSB->>OSB: $org = ORG del request
+    end
+
+    alt $org != "" → Invocar VisionPlus
+        OSB->>XQ3: embosserAddL8VBNIIn($org, $solicitudTCRequest)
+        Note right of XQ3: Transformaciones clave:<br/>CARD_ACTION: NEW_CARD→1, NORMAL_REPLACEMENT→3,<br/>EMERGENCY_REPLACEMENT→6, RENOVATION→7<br/><br/>CARDHOLDER_FLAG: PRINCIPAL→1, ADDITIONAL→0<br/>PIN_SUPPRESSION: YES→0, NO→1<br/>SDP_PROCESS_TYPE: EMERGENCY→1, NORMAL→0<br/><br/>RQTD_CARD_TYPE: Si TYPE_CARD vacío →<br/>PRINCIPAL='01', ADDITIONAL='00'<br/>TYPE_CARD_MAILER: ídem lógica
+        XQ3-->>OSB: EmbosserAddL8VBRequest
+
+        OSB->>OSB: Validar schema XMLSchema_769155616
+        Note right of OSB: Valida fdcs:EmbosserAddL8VBRequest
+
+        OSB->>VP: wsCallout EmbosserAddL8VB
+        Note right of VP: Endpoint: http://172.28.1.145:7802/VisionPlusService<br/>Operación: EmbosserAddL8VB<br/>Timeout: 5 seg
+
+        VP-->>OSB: EmbosserAddL8VBResponse
+
+        OSB->>OSB: Evaluar respuesta VisionPlus
+        Note right of OSB: $errorCode = trim(RC[1]/Code)<br/><br/>Si ServiceReturnCode != 'P' →<br/>$validationMessage = trim(RC[1]/Desc)<br/>Si ServiceReturnCode = 'P' →<br/>$validationMessage = ""
+
+    else $org vacío → No invocar VisionPlus
+        Note right of OSB: Flujo continúa sin llamar a VP<br/>$validationMessage tiene el error del SP
+    end
+
+    alt $validationMessage = "" → Respuesta Exitosa
+        OSB->>OSB: Construir ResponseHeader Success
+        Note right of OSB: successIndicator = "Success"
+
+        OSB->>XQ4: solicitudTCOut($RSPEmbosserAddL8VB)
+        Note right of XQ4: Mapeo:<br/>AZXAPO-ORG → LCY_ORG<br/>AZXAPO-FOREIGN-ORG → FCY_ORG<br/>AZXAPO-LOGO → LOGO<br/>AZXAPO-ACCT → ACCOUNT_NUMBER<br/>AZXAPO-CARD-NBR → CARD_NUMBER<br/>AZXAPO-CARD-SEQ → CARD_SEQUENCE<br/>AZXAPO-CURR-CHIP-SEQ → CHIP_SEQUENCE
+        XQ4-->>OSB: solicitudTCResponse con datos
+
+        OSB-->>Client: SOAP Response (Success + datos tarjeta)
+
+    else $validationMessage != "" → Respuesta Error
+        OSB->>OSB: Construir ResponseHeader Error
+        Note right of OSB: successIndicator = $errorCode<br/>messages = $validationMessage<br/>Body: &lt;ges:solicitudTCResponse/&gt; vacío
+
+        OSB-->>Client: SOAP Response (Error + mensaje)
+    end
+
+    Note over OSB, EH: Manejo de Excepciones (ErrorHandler global)
+
+    rect rgb(255, 230, 230)
+        OSB->>EH: Cualquier excepción no controlada
+        EH->>EH: Construir respuesta de error
+        Note right of EH: successIndicator = fault/errorCode<br/>messages = fault/reason<br/>Body: &lt;ges:solicitudTCResponse/&gt; vacío
+        EH-->>Client: SOAP Response (Fault)
+    end

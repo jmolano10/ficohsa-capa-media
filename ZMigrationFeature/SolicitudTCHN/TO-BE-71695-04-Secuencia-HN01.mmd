@@ -1,0 +1,166 @@
+sequenceDiagram
+    autonumber
+    participant Client as Consumidor
+    participant API as CreditCardFullfil-Product <br/> HU: 71695 <br> POST - /cards/credit-card-fullfil/v1/initiate-service-request
+    participant CL as Caché Local
+    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant parameter as Parameter Store
+    participant secret as Secret Manager
+    participant Homologador as Liberíra Homologación de campos
+    participant accountDetails as CreditCardDetailRetrieves <br/> HU 14137 <br/> Get /cards/credit-card-detail-retrieves/v1/product/{accountNumber}/account-details
+    participant wrapper as VisionPlus <br> HU 13726 <br/> EmbosserAddL8VB / EmbosserAddL8VG
+    participant Errors as Microservicio Manejador de Errores<br/> ms-ic-error_mapping-wrapper
+
+    Note over Client, Errors:  CreditCardFullfil - /initiate-service-request
+
+    Client->>API: Rest Request
+    Note right of Client: Header: todos los estándar <br/> Body: {...}
+    
+    rect rgb(250, 250, 250)
+    Note over API, Client: Validación Campos Obligatorios
+    API->>API: Validación Esquema OpenAPI
+    API->>API: Validar Headers obligatorios <br> Source-Bank, Authorization, Application-Id
+    alt Errores de validación
+        API-->>Client: Error 400 Bad Request
+    end
+    end
+
+   alt Consulta parametros en caché local
+
+        API->>CL: Consultar parámetros Librería de parámetros caché local
+        Note right of API: Domain: "CREDIT_CARD_FULLFIL" <br> name: "INITIATE_SERVICE_REQUEST" <br> country: XRS 
+
+        CL->>API: Obtiene parámetros de Librería de parámetros en Caché Local
+        Note left of CL: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Consultar parámetros de Parameter Store en caché local
+        Note right of API: paramName = libparam.param-name
+
+        CL->>API: Obtiene parámetros de Parameter Store en Caché Local
+        Note left of CL: Obtiene parámetros de conexión a BD: ip, port, basePath
+
+    else Consulta  parametros en Librería de parámetros / Parameter Store
+
+        API->>Lambda: Consultar parámetros en librería de parámetros
+        Note right of API: Domain: "CREDIT_CARD_FULLFIL" <br> name: "INITIATE_SERVICE_REQUEST" <br> country: XRS 
+
+        Lambda->>API: Obtiene parámetros Librería de parámetros
+        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+        API->>CL: Guarda parámetros lambda en caché local
+        Note right of API: Almacena parámetros de regionalización y negocio
+
+        API->>parameter: Consultar parámetros del Parameter Store
+        Note right of API: paramName = libparam.param-name
+
+        parameter->>API: Obtiene parámetros del Parameter Store
+        Note left of parameter: Obtiene parámetros de conexión a BD: ip, port, basePath
+
+        API->>CL: Guarda parámetros del Parameter Store en caché local
+        Note right of API: ip, port, basePath
+
+    end
+
+    API->>API: Aplica patron Strategy
+
+    API->>Homologador: Consulta Homologación sourceBank
+    Note right of API: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
+
+    Homologador->>API: Retorna Valor Homologado 
+    Note left of Homologador: HN01 → HND <br> GT01 → GTM <br> NI01 → NIC <br> PA01 → PAN 
+
+    alt ORG is null or empty
+
+        API->>API: Prepara Payload API account-details
+        Note over API: pathParam: <br> accountNumber = request.accountNumber <br> countryCode = valor homologado de header.sourceBank
+        
+        API->>accountDetails: Consume API account-details
+        Note right of API: pathParam: <br> accountNumber, countryCode
+
+        accountDetails->>API: Response API account-details
+        Note left of accountDetails: organizationType, organizationReference <br> ++ 23 campos
+
+        API->>API: Determina ORG
+        Note over API: If organizationType == "BASE" then $org = organizationReference
+
+    else ORG is not null or empty
+
+        API->>API: Determina ORG
+        Note over API: $org = requestBody.organizationReference
+
+    end
+
+    alt If sourceBank == "HN01"
+
+        alt If $org == 342 
+
+            API->>API: Prepara Payload para Wrapper VisionPlus EmbosserAddL8VB
+            Note over API: operation = const.operationDefault <br> paramName = libParam.paramName <br> payload.data = según tabla de mapeo OP: EmbosserAddL8VB
+
+            API->>wrapper: Consume Wrapper VisionPlus operación EmbosserAddL8VB
+            Note right of API: operation, payload.data, paramName
+
+            wrapper->>API: Response
+
+        else If $org != 342
+
+            API->>API: Prepara Payload para Wrapper VisionPlus EmbosserAddL8VG
+            Note over API: operation = const.operationOther <br> paramName = libParam.paramName <br> payload.data = según tabla de mapeo OP: EmbosserAddL8VG 
+
+            API->>wrapper: Consume Wrapper VisionPlus operación EmbosserAddL8VG
+            Note right of API: operation, payload.data, paramName
+
+            wrapper->>API: Response
+
+        end
+
+    else If sourceBank == "GT01" | sourceBank == "NI01" | sourceBank == "PA01" (Código Existente)
+
+        API->>API: Prepara Payload para Wrapper VisionPlus EmbosserAddL8VB
+        Note over API: operation = const.operationDefault <br> paramName = libParam.paramName <br> payload.data = según tabla de mapeo OP: EmbosserAddL8VB
+
+        API->>wrapper: Consume Wrapper VisionPlus operación EmbosserAddL8VB
+        Note right of API: operation, payload.data, paramName
+
+        wrapper->>API: Response
+
+    end
+
+    API->>API: Evaluar response de Wrapper VisionPlus y determinar resultado
+
+    alt Response exitosa
+
+        API->>API: Construir response API
+        Note over API: Mapeo de campos de response de Wrapper VisionPlus a response API
+        
+        API->>Client: Response Exitoso
+        Note right of Client: Construye response según tabla de mapeo campos <br> response operación EmbosserAddL8VB / EmbosserAddL8VG
+
+
+    else Response con error
+
+        API->> Errors: Mapear código de error
+        Note right of API: Mapeo de errores según tabla de homologación <br> Operación: EmbosserAddL8VB / EmbosserAddL8VG
+
+        Errors ->> API: Retorna código mapeado
+
+        API->> Client: Retorna error
+        Note left of API: HTTP 4XX / 5XX
+
+    end
+    
+    activate API
+        alt Exception occurs  
+            note over Errors: Error Library Handler
+            activate Errors
+                API ->> Errors: Mapear código de error
+                Errors -->> API: Retorna código mapeado
+            deactivate Errors
+            activate Client
+                API -->> Client: Retorna error
+            deactivate Client
+        end
+    deactivate API
+
+    Note over Client,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU

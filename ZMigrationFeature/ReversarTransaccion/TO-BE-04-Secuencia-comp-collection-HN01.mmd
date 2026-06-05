@@ -8,7 +8,7 @@ sequenceDiagram
     participant Consulta as HU 5388 <br> API Consulta Detalle Transacción <br> POST: /payments/payment-execution-retrieves/v1/retrieve-transaction-details
     participant BD as DynamoDB <br> Registro Transacciones
     participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
-    participant SP1 as SP: REVERSION_COBRANZA <br/> ConnectionWebServices <br> PackageName: OSB_K_COBRANZA_ABANKS
+    participant wrapper as Wrapper Multidestino <br> SP: REVERSION_COBRANZA <br/> ConnectionWebServices <br> PackageName: OSB_K_COBRANZA_ABANKS
     participant Eliminar as HU 6653 <br/> API Eliminar Pago Recaudo <br> POST: /payments/payment-execution-admin/v1/reverse-transaction-payment
     participant Reintentos as EventBridge <br> Componente de Reintentos
     participant Errors as Control de Errores <br/> <<Librería de mapeo de errores>>
@@ -224,13 +224,13 @@ sequenceDiagram
                         rect rgba(238, 238, 238, 1)
 
                             API->>API: Construye request SP REVERSION_COBRANZA
-                            Note over API: PV_USUARIO = JWT.User <br> PV_AGENCIA = header.channel <br> PV_TRANSACCION = body.transactionReference <br> PV_FECHA = currentDate (YYYYMMDD)
+                            Note over API: connection { <br> paramName = libParam.paramName, <br> secretName = libParam.secretName <br> } <br> connectionType = const.connectionType <br> catalogueName = const.catalogueName <br> packageName = const.packageName <br> procedureName = const.procedureName <br> params { <br> PV_USUARIO = JWT.User <br> PV_AGENCIA = header.channel <br> PV_TRANSACCION = body.transactionReference <br> PV_FECHA = currentDate (YYYYMMDD) <br> }
                             
-                            API->>SP1: Consume SP REVERSION_COBRANZA
-                            Note right of API: PV_USUARIO, PV_AGENCIA, PV_TRANSACCION, PV_FECHA
+                            API->>wrapper: Consume Wrapper Multidestino - SP REVERSION_COBRANZA
+                            Note right of API: connection { <br> paramName, <br> secretName <br> } <br> connectionType <br> catalogueName <br> packageName <br> procedureName <br> params { <br> PV_USUARIO, PV_AGENCIA, PV_TRANSACCION, PV_FECHA <br> }
 
-                            SP1->>API: Respose SP REVERSION_COBRANZA
-                            Note left of SP1: SuccessIndicatorAbanks
+                            wrapper->>API: Respose SP REVERSION_COBRANZA
+                            Note left of wrapper: SuccessIndicatorAbanks
 
                             API->>API: Evalúa response SP REVERSION_COBRANZA
 
@@ -354,13 +354,13 @@ sequenceDiagram
                             Idempotencia->>API: Response API Idempotencia 
 
                             API->>API: Construye request SP REVERSION_COBRANZA
-                            Note over API: PV_USUARIO = JWT.User <br> PV_AGENCIA = header.channel <br> PV_TRANSACCION = body.transactionReference <br> PV_FECHA = currentDate (YYYYMMDD)
+                            Note over API: connection { <br> paramName = libParam.paramName, <br> secretName = libParam.secretName <br> } <br> connectionType = const.connectionType <br> operationType = const.operationType <br> catalogueName = const.catalogueName <br> packageName = const.packageName <br> procedureName = const.procedureName <br> params { <br> PV_USUARIO = JWT.User <br> PV_AGENCIA = header.channel <br> PV_TRANSACCION = body.transactionReference <br> PV_FECHA = currentDate (YYYYMMDD) <br> }
                             
-                            API->>SP1: Consume SP REVERSION_COBRANZA
-                            Note right of API: PV_USUARIO, PV_AGENCIA, PV_TRANSACCION, PV_FECHA
+                            API->>wrapper: Consume Wrapper Multidestino - SP REVERSION_COBRANZA
+                            Note right of API: connection { <br> paramName, <br> secretName <br> } <br> connectionType <br> operationType <br> catalogueName <br> packageName <br> procedureName <br> params { <br> PV_USUARIO, PV_AGENCIA, PV_TRANSACCION, PV_FECHA <br> }
 
-                            SP1->>API: Respose SP REVERSION_COBRANZA
-                            Note left of SP1: SuccessIndicatorAbanks
+                            wrapper->>API: Respose SP REVERSION_COBRANZA
+                            Note left of wrapper: SuccessIndicatorAbanks
 
                             API->>API: Evalúa response SP REVERSION_COBRANZA
 
@@ -412,7 +412,7 @@ sequenceDiagram
                                     Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: payment_execution_admin-Product_authorize_reverse_transaction <br> detail-type: "provider.response" <br> request: {transactionReference, transactionType} <br> Transaccion: Exitosa
 
                                     API->>Consumidor: API Response
-                                    Note over Consumidor: "HTTP 200: Transacción Reversada Exitosamente" <br> responseBody.transactionDate = currentDateTime (YYYYMMDDHHMMSS)
+                                    Note over Consumidor: "HTTP 200: Transacción Reversada Exitosamente" <br> responseBody.transactionDate = currentDateTime (YYYYMMDDHHMMSS)" 
 
                                 end
                             end
