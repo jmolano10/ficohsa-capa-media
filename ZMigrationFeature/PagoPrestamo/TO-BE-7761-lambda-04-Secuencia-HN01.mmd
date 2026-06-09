@@ -1,7 +1,9 @@
 sequenceDiagram
     autonumber
     participant API as API Consumidora
-    participant Lambda as Lambda Validación Corresponsales <br/> HU 7761: ban-xrs-ic-lam-validate-bank-correspondent-{env}
+    participant Lambda as Lambda Validación Corresponsales<br/>ban-xrs-ic-lam-validate-bank-correspondent-{env}
+    participant Lib as Librería Pipeline (ConfigMap)
+    participant parameter as Parameter Store
     participant SP as SP sp_validate_correspondent_bank<br/>ban-xrs-ic-sp-validate-bank-correspondent-{env}
     participant Aurora as AWS Aurora Serverless<br/>ban-xrs-ic-rds-aurora-postgresql-{env}
 
@@ -11,6 +13,17 @@ sequenceDiagram
     Note right of API: { branchId,<br/> country, transactionType }
 
     Lambda->>Lambda: Validar campos de entrada
+
+    Lambda->>Lib: Consulta variables entorno
+
+    Lib->>Lambda: Retorna variables de entorno
+    Note left of Lib: param-name: 
+
+    Lambda->>parameter: Consultar parámetros en Parameter Store
+    Note right of Lambda: param-name
+
+    parameter->>Lambda: Retorna parámetros de regionalización y negocio
+    Note left of parameter: secret, host, port, name, user 
 
     Lambda->>Lambda: Construir parámetros SP
     Note over Lambda:Mapeo: p_branchId = request.branchId, <br> p_countryCode = request.country, <br> p_transactionTypeCode = request.transactionType
@@ -29,7 +42,7 @@ sequenceDiagram
     SP->>Lambda: p_response_code = 'SUCCESS' + datos
     Note left of SP: creditAccountReference,<br/> debitAccountReference,<br/> permittedCurrencyCode,<br/> transactionType, commissionAmount,<br/> commissionCurrencyCode,<br/> commissionTransactionType,<br/> commissionAccountReference
 
-    Lambda->>Lambda: Construir respuesta Lambda 
-    Note over lambda:  If p_response_code = 'SUCCESS' then success = true <br> else success = false
+    Lambda->>Lambda: Construir respuesta Lambda
+    Note over Lambda:  If p_response_code = 'SUCCESS' then success = true <br> else success = false
 
     Lambda->>API: HTTP 200 + { success, correlationId, data }
