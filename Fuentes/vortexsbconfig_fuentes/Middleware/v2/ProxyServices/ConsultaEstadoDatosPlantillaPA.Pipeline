@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaEstadoDatosPlantilla/wsdl/consultaEstadoDatosPlantillaPS"/>
+            <con:binding>
+                <con:name>consultaEstadoDatosPlantillaPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaEstadoDatosPlantillaPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-3784933988618968909--1379d0fe.16bc2c7733b.-7c3c" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="ConsultaEstadoDatosPlanillaPA_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/eCConRequestControl" prefix="ecc"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesEstadoCuentaTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="codPais">
+                        <con1:id>_ActionId-3784933988618968909--1379d0fe.16bc2c7733b.-7d26</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                </con1:param>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>'OSB-ISO3'</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-7526426968563285632--2692d1d5.16bd237b593.-54e8</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ProcesosPA/eCConRequestControl/biz/eCConRequestControl_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>eCConRequestControl</con2:operation>
+                        <con2:request>
+                            <con2:body>REQeCConRequestControl</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPeCConRequestControl</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQeCConRequestControl">
+                                <con1:id>_ActionId-7526426968563285632--2692d1d5.16bd237b593.-54d2</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ProcesosPA/eCConRequestControlPAIn"/>
+                                        <con1:param name="codigoPais">
+                                            <con1:path>$codPais</con1:path>
+                                        </con1:param>
+                                        <con1:param name="batch_id">
+                                            <con1:path>string($body/ges:consultaEstadoDatosPlantilla/BATCH_ID/text())</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:validate>
+                                <con1:id>_ActionId-7526426968563285632--2692d1d5.16bd237b593.-54b7</con1:id>
+                                <con2:schema ref="Middleware/v2/BusinessServices/ProcesosPA/eCConRequestControl/xsd/eCConRequestControl_sp"/>
+                                <con2:schemaElement xmlns:ecin="http://xmlns.oracle.com/pcbpel/adapter/db/sp/eCInsRequestControl" xmlns:ecc="http://xmlns.oracle.com/pcbpel/adapter/db/sp/eCConRequestControl">ecc:InputParameters</con2:schemaElement>
+                                <con2:varName>REQeCConRequestControl</con2:varName>
+                                <con2:location>
+                                    <con1:xpathText>.</con1:xpathText>
+                                </con2:location>
+                            </con2:validate>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-7526426968563285632--2692d1d5.16bd237b593.-5498</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if(string($RSPeCConRequestControl/ecc:CodigoError/text()) != '-1')then(
+	string($RSPeCConRequestControl/ecc:CodigoError/text())
+)else(
+	'Success'
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-7526426968563285632--2692d1d5.16bd237b593.-547e</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if($errorCode != 'Success')then(
+	string($RSPeCConRequestControl/ecc:MensajeError/text())
+)else(
+	''
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaEstadoDatosPlanillaPA_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesEstadoCuentaTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-3784933988618968909--1379d0fe.16bc2c7733b.-7c8b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+{
+	if($validationMessage = '')then(
+		<successIndicator>Success</successIndicator>
+	)else(
+		<successIndicator>{ $errorCode }</successIndicator>,
+		<messages>{ $validationMessage }</messages>
+	)	
+}	
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3784933988618968909--1379d0fe.16bc2c7733b.-7c74</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-3784933988618968909--1379d0fe.16bc2c7733b.-7bee</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaEstadoDatosPlantilla/xq/consultaEstadoDatosPlantillaPAOut"/>
+                                            <con1:param name="batch_id">
+                                                <con1:path>string($body/ges:consultaEstadoDatosPlantilla/BATCH_ID/text())</con1:path>
+                                            </con1:param>
+                                            <con1:param name="eCConRequestControl">
+                                                <con1:path>$RSPeCConRequestControl</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-3784933988618968909--1379d0fe.16bc2c7733b.-7bd2</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;ges:consultaEstadoDatosPlantillaResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-3784933988618968909--1379d0fe.16bc2c7733b.-7c3c">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesEstadoCuentaTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-3784933988618968909--1379d0fe.16bc2c7733b.-7c34</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) } </messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-3784933988618968909--1379d0fe.16bc2c7733b.-7c23</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ges:consultaEstadoDatosPlantillaResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-3784933988618968909--1379d0fe.16bc2c7733b.-7c18</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ConsultaEstadoDatosPlanillaPA">
+                <con:request>ConsultaEstadoDatosPlanillaPA_request</con:request>
+                <con:response>ConsultaEstadoDatosPlanillaPA_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

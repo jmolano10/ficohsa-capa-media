@@ -1,0 +1,688 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/wsdl/procesaMensajeGenericoSwitchPS"/>
+            <con:binding>
+                <con:name>procesaMensajeGenericoSwitchPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>true</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8521050363166205840--207f7fc5.1633ae32498.-5fed" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con5="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="error" name="_onErrorHandler-8521050363166205840--207f7fc5.1633ae32498.-5fed">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchTypes" prefix="proc"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/schema/iso8583ConverterMultipleTypes" prefix="iso8"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="errorMessage">
+                        <con1:id>_ActionId-8521050363166205840--207f7fc5.1633ae32498.-5ef6</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-77c1</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ $errorMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7d91</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>string($errorTrama) != ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="xmlRequest">
+                                    <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7b93</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/procesaMensajeGenericoSwitchFacadeIn"/>
+                                            <con1:param name="convertISO8583ToXMLResponse">
+                                                <con1:path>$RSPconvertISO8583ToXML</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="xmlError">
+                                    <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7c58</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/procesaMensajeGenericoSwitchOut"/>
+                                            <con1:param name="procesaMensajeGenericoSwitchFacadeRequest">
+                                                <con1:path>$xmlRequest</con1:path>
+                                            </con1:param>
+                                            <con1:param name="successIndicator">
+                                                <con1:path>'80'</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:assign varName="xmlToTrama">
+                                    <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7b3d</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;ISO8583Request>
+{
+	$xmlError/*
+}
+&lt;/ISO8583Request></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:assign varName="xmlToTrama">
+                                <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7cec</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<ISO8583Request>
+	<ISO8583_HEADER>{ $headerIso8583 }</ISO8583_HEADER>
+	<ISO8583_XML_CONTENT>
+		<MTI>0210</MTI>
+		<TransmissionDateTime_007>{ fn-bea:dateTime-to-string-with-format('MMddHmmss', adjust-dateTime-to-timezone(current-dateTime(), ())) }</TransmissionDateTime_007>
+		<ResponseCode_039>12</ResponseCode_039>
+	</ISO8583_XML_CONTENT>		
+</ISO8583Request>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-2372081019098971648--681aa2ff.17cc153f997.-79e5</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/Switch/iso8583ConverterMultiple/biz/iso8583ConverterMultiple" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>convertXMLToISO8583</con2:operation>
+                        <con2:request>
+                            <con2:body>REQconvertXMLToISO8583</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPconvertXMLToISO8583</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQconvertXMLToISO8583">
+                                <con1:id>_ActionId-2372081019098971648--681aa2ff.17cc153f997.-79c2</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/convertXMLToISO8583In"/>
+                                        <con1:param name="anyType">
+                                            <con1:path>$xmlToTrama</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                    </con2:wsCallout>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-3607434977240621076-5a9a381c.163f5ce89bd.-7d13</con1:id>
+                        <con2:location>
+                            <con1:xpathText>.</con1:xpathText>
+                        </con2:location>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;proc:procesaMensajeGenericoSwitchResponse>
+	&lt;MESSAGE>{ string($RSPconvertXMLToISO8583/messageList/messageItem/message/text()) }&lt;/MESSAGE>
+&lt;/proc:procesaMensajeGenericoSwitchResponse></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8746353389612448463--1bcae0a.1634aa7d249.-7b90</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($uuidBitacoraRequest) != ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="uuidBitacoraResponse">
+                                    <con1:id>_ActionId-8746353389612448463--1bcae0a.1634aa7d249.-7b22</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con4:route>
+                                    <con1:id>_ActionId-8746353389612448463--1bcae0a.1634aa7d249.-7b04</con1:id>
+                                    <con4:service ref="Middleware/v2/BusinessServices/MDW/registrarBitacoraMensajeISO8583/biz/registrarBitacoraMensajeISO8583_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con4:operation>registrarBitacoraMensajeISO8583</con4:operation>
+                                    <con4:outboundTransform>
+                                        <con2:replace contents-only="true" varName="body">
+                                            <con1:id>_ActionId-8746353389612448463--1bcae0a.1634aa7d249.-7acc</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/registrarBitacoraMensajeISO8583In"/>
+                                                    <con1:param name="ID_PETICION">
+                                                        <con1:path>$uuidBitacoraRequest</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MENSAJE">
+                                                        <con1:path>data($body/proc:procesaMensajeGenericoSwitchRequest/MESSAGE)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="IDTERMINAL">
+                                                        <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/TERMINAL_ID)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="ID">
+                                                        <con1:path>$uuidBitacoraResponse</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="CODIGOPR">
+                                                        <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/PROCESSING_CODE)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MTI">
+                                                        <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/MTI)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="CODIGOINSTEMISOR">
+                                                        <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/FWD_INST_ID_CODE)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="TIPO_REGISTRO">
+                                                        <con1:path>"RSP"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="CODIGOINSTADQUIR">
+                                                        <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/AQ_INST_ID_CODE)</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con4:outboundTransform>
+                                </con4:route>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                    <con1:reply>
+                        <con1:id>_ActionId-8521050363166205840--207f7fc5.1633ae32498.-5d6e</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="ValidacionesGeneralesYProcesarMensajeGenerico_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchTypes" prefix="proc"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-6158827405992715868-22953bcd.163b11204e1.-713c</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xsd/procesaMensajeGenericoSwitchTypes"/>
+                        <con2:schemaElement xmlns:proc="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchTypes">proc:procesaMensajeGenericoSwitchRequest</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./proc:procesaMensajeGenericoSwitchRequest</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConvertirTramaAXML">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchTypes" prefix="proc"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/schema/iso8583ConverterMultipleTypes" prefix="iso8"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="headerIso8583">
+                        <con1:id>_ActionId-3607434977240621076-5a9a381c.163f5ce89bd.-7c50</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>''</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-8347454393881042884-76c415a5.17c0b1f9f08.-73af</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/Switch/iso8583ConverterMultiple/biz/iso8583ConverterMultiple" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>convertISO8583ToXML</con2:operation>
+                        <con2:request>
+                            <con2:body>REQconvertISO8583ToXML</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPconvertISO8583ToXML</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQconvertISO8583ToXML">
+                                <con1:id>_ActionId-2372081019098971648--681aa2ff.17cc153f997.-7ab0</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/convertISO8583ToXMLIn"/>
+                                        <con1:param name="procesaMensajeGenericoSwitchRequest">
+                                            <con1:path>$body/proc:procesaMensajeGenericoSwitchRequest</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-2372081019098971648--681aa2ff.17cc153f997.-7a4e</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSPconvertISO8583ToXML/message/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-78f7</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="errorTrama">
+                                    <con1:id>_ActionId-3769124517348157791--38343a6b.163daa55b8b.-5f7c</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>'SUCCESS'</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:Error>
+                                <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-78bf</con1:id>
+                                <con2:errCode>ERROR</con2:errCode>
+                                <con2:message>Error parseando la trama de entrada al servicio.</con2:message>
+                            </con2:Error>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BitacoraRequest">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchTypes" prefix="proc"/>
+                </con:context>
+                <con:actions>
+                    <con3:assign varName="originalRequestBody" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-3924788547418347203-787d17db.16400602035.-7ea2</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>$body</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="uuidBitacoraRequest" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-3924788547418347203-787d17db.16400602035.-7ea1</con2:id>
+                        <con3:expr>
+                            <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                <con3:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                            </con3:xqueryTransform>
+                        </con3:expr>
+                    </con3:assign>
+                    <con4:route>
+                        <con1:id>_ActionId-3924788547418347203-787d17db.16400602035.-7ea0</con1:id>
+                        <con4:service ref="Middleware/v2/BusinessServices/MDW/registrarBitacoraMensajeISO8583/biz/registrarBitacoraMensajeISO8583_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con4:operation>registrarBitacoraMensajeISO8583</con4:operation>
+                        <con4:outboundTransform>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-3924788547418347203-787d17db.16400602035.-7e9f</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/registrarBitacoraMensajeISO8583In"/>
+                                        <con1:param name="ID_PETICION">
+                                            <con1:path>""</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MENSAJE">
+                                            <con1:path>fn:string($body/proc:procesaMensajeGenericoSwitchRequest/MESSAGE/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="IDTERMINAL">
+                                            <con1:path>fn:string($body/proc:procesaMensajeGenericoSwitchRequest/TERMINAL_ID/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="ID">
+                                            <con1:path>$uuidBitacoraRequest</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MTI">
+                                            <con1:path>fn:string($body/proc:procesaMensajeGenericoSwitchRequest/MTI/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="CODIGOPR">
+                                            <con1:path>fn:string($body/proc:procesaMensajeGenericoSwitchRequest/PROCESSING_CODE/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="CODIGOINSTEMISOR">
+                                            <con1:path>fn:string($body/proc:procesaMensajeGenericoSwitchRequest/FWD_INST_ID_CODE/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="TIPO_REGISTRO">
+                                            <con1:path>"REQ"</con1:path>
+                                        </con1:param>
+                                        <con1:param name="CODIGOINSTADQUIR">
+                                            <con1:path>fn:string($body/proc:procesaMensajeGenericoSwitchRequest/AQ_INST_ID_CODE/text())</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con4:outboundTransform>
+                    </con4:route>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaRutaServicio">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchTypes" prefix="proc"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaTiposTransaccionSwitch" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaPRCode" prefix="con1"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-6158827405992715868-22953bcd.163b11204e1.-7181</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7cf0</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/consultaPRCode/biz/consultaPRCode_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaPRCode</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsultaPRCode</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsultaPRCode</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConsultaPRCode">
+                                            <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7cf3</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/consultaPRCodeIn"/>
+                                                    <con1:param name="procesaMensajeGenericoSwitchRequest">
+                                                        <con1:path>$body/proc:procesaMensajeGenericoSwitchRequest</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="requestHeader">
+                                                        <con1:path>$header/aut:RequestHeader</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7cf1</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>data($RSPConsultaPRCode/con1:PV_MENSAJEERROR)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGeneralesYProcesarMensajeGenerico_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchTypes" prefix="proc"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/schema/iso8583ConverterMultipleTypes" prefix="iso8"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-6158827405992715868-22953bcd.163b11204e1.-717a</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7a85</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;proc:procesaMensajeGenericoSwitchResponse>
+	&lt;MESSAGE>{$tramaIso8583}&lt;/MESSAGE>
+&lt;/proc:procesaMensajeGenericoSwitchResponse></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7a66</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:assign varName="xmlRequest">
+                                <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7a8f</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/procesaMensajeGenericoSwitchFacadeIn"/>
+                                        <con1:param name="convertISO8583ToXMLResponse">
+                                            <con1:path>$RSPconvertISO8583ToXML</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="xmlError">
+                                <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7a8d</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/procesaMensajeGenericoSwitchOut"/>
+                                        <con1:param name="procesaMensajeGenericoSwitchFacadeRequest">
+                                            <con1:path>$xmlRequest</con1:path>
+                                        </con1:param>
+                                        <con1:param name="successIndicator">
+                                            <con1:path>'ERROR'</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="xmlToTrama">
+                                <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7a8b</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;ISO8583Request>
+{
+	$xmlError/*
+}
+&lt;/ISO8583Request></con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:wsCallout>
+                                <con1:id>_ActionId-2372081019098971648--681aa2ff.17cc153f997.-7a34</con1:id>
+                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/Switch/iso8583ConverterMultiple/biz/iso8583ConverterMultiple" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                <con2:operation>convertXMLToISO8583</con2:operation>
+                                <con2:request>
+                                    <con2:body>REQconvertXMLToISO8583</con2:body>
+                                </con2:request>
+                                <con2:response>
+                                    <con2:body>RSPconvertXMLToISO8583</con2:body>
+                                </con2:response>
+                                <con2:requestTransform>
+                                    <con2:assign varName="REQconvertXMLToISO8583">
+                                        <con1:id>_ActionId-2372081019098971648--681aa2ff.17cc153f997.-7a1d</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/convertXMLToISO8583In"/>
+                                                <con1:param name="anyType">
+                                                    <con1:path>$xmlToTrama</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:requestTransform>
+                                <con2:responseTransform/>
+                            </con2:wsCallout>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7a89</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;proc:procesaMensajeGenericoSwitchResponse>
+{
+	let $message := string($RSPconvertXMLToISO8583/messageList/messageItem[1]/message/text())
+	return
+	&lt;MESSAGE>{ fn:substring-before($message, '|') }&lt;/MESSAGE>
+}
+&lt;/proc:procesaMensajeGenericoSwitchResponse></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BitacoraResponse">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchTypes" prefix="proc"/>
+                </con:context>
+                <con:actions>
+                    <con3:assign varName="uuidBitacoraResponse" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-3924788547418347203-787d17db.16400602035.-7e9b</con2:id>
+                        <con3:expr>
+                            <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                <con3:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                            </con3:xqueryTransform>
+                        </con3:expr>
+                    </con3:assign>
+                    <con4:route>
+                        <con1:id>_ActionId-3924788547418347203-787d17db.16400602035.-7e9a</con1:id>
+                        <con4:service ref="Middleware/v2/BusinessServices/MDW/registrarBitacoraMensajeISO8583/biz/registrarBitacoraMensajeISO8583_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con4:operation>registrarBitacoraMensajeISO8583</con4:operation>
+                        <con4:outboundTransform>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-3924788547418347203-787d17db.16400602035.-7e99</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/registrarBitacoraMensajeISO8583In"/>
+                                        <con1:param name="ID_PETICION">
+                                            <con1:path>$uuidBitacoraRequest</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MENSAJE">
+                                            <con1:path>data($body/proc:procesaMensajeGenericoSwitchResponse/MESSAGE)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="IDTERMINAL">
+                                            <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/TERMINAL_ID)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="ID">
+                                            <con1:path>$uuidBitacoraResponse</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MTI">
+                                            <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/MTI)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="CODIGOPR">
+                                            <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/PROCESSING_CODE)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="CODIGOINSTEMISOR">
+                                            <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/FWD_INST_ID_CODE)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="TIPO_REGISTRO">
+                                            <con1:path>"RSP"</con1:path>
+                                        </con1:param>
+                                        <con1:param name="CODIGOINSTADQUIR">
+                                            <con1:path>data($originalRequestBody/proc:procesaMensajeGenericoSwitchRequest/AQ_INST_ID_CODE)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con4:outboundTransform>
+                    </con4:route>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGeneralesYProcesarMensajeGenerico">
+                <con:request>ValidacionesGeneralesYProcesarMensajeGenerico_request</con:request>
+                <con:response>ValidacionesGeneralesYProcesarMensajeGenerico_response</con:response>
+            </con:pipeline-node>
+            <con:route-node name="RouterDinamico">
+                <con:context>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaTiposTransaccionSwitch" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchTypes" prefix="proc"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaPRCode" prefix="con1"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/schema/iso8583ConverterMultipleTypes" prefix="iso8"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4026287882940953204--290221c2.163414a8d9f.-5bfc</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con3:dynamic-route>
+                                    <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7cf8</con1:id>
+                                    <con3:service>
+                                        <con1:xqueryText>&lt;ctx:route>
+    &lt;ctx:service isProxy='true'>{$RSPConsultaPRCode/con1:PV_RUTASERVICIO/text()}&lt;/ctx:service>
+&lt;/ctx:route></con1:xqueryText>
+                                    </con3:service>
+                                    <con3:outboundTransform>
+                                        <con2:replace varName="body" contents-only="true">
+                                            <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7cfc</con1:id>
+                                            <con2:location>
+                                                <con1:xpathText>.</con1:xpathText>
+                                            </con2:location>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/procesaMensajeGenericoSwitchFacadeIn"/>
+                                                    <con1:param name="convertISO8583ToXMLResponse">
+                                                        <con1:path>$RSPconvertISO8583ToXML</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con3:outboundTransform>
+                                    <con3:responseTransform>
+                                        <con2:assign varName="xmlToTrama">
+                                            <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7cfb</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>&lt;ISO8583Request>
+{
+	$body/ISO8583/*
+}
+&lt;/ISO8583Request></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:wsCallout>
+                                            <con1:id>_ActionId-2372081019098971648--681aa2ff.17cc153f997.-7a95</con1:id>
+                                            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/Switch/iso8583ConverterMultiple/biz/iso8583ConverterMultiple" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                            <con2:operation>convertXMLToISO8583</con2:operation>
+                                            <con2:request>
+                                                <con2:body>REQconvertXMLToISO8583</con2:body>
+                                            </con2:request>
+                                            <con2:response>
+                                                <con2:body>RSPconvertXMLToISO8583</con2:body>
+                                            </con2:response>
+                                            <con2:requestTransform>
+                                                <con2:assign varName="REQconvertXMLToISO8583">
+                                                    <con1:id>_ActionId-2372081019098971648--681aa2ff.17cc153f997.-7a6e</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryTransform>
+                                                            <con1:resource ref="Middleware/v2/Resources/ProcesaMensajeGenericoSwitch/xq/convertXMLToISO8583In"/>
+                                                            <con1:param name="anyType">
+                                                                <con1:path>$xmlToTrama</con1:path>
+                                                            </con1:param>
+                                                        </con1:xqueryTransform>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:requestTransform>
+                                            <con2:responseTransform>
+                                                <con2:assign varName="validationMessage">
+                                                    <con1:id>_ActionId-2372081019098971648--681aa2ff.17cc153f997.-7a50</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>string($RSPconvertXMLToISO8583/messageList/messageItem/errorMessage/text())</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:responseTransform>
+                                        </con2:wsCallout>
+                                        <con2:assign varName="tramaIso8583">
+                                            <con1:id>_ActionId-8925562243467734055-6c9f6c26.163d11514b0.-7cf9</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>let $message := string($RSPconvertXMLToISO8583/messageList/messageItem[1]/message/text())
+let $size := fn:string-length($message) -1
+return
+fn:substring($message, 1, $size)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con3:responseTransform>
+                                </con3:dynamic-route>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:route-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaFinanciamientosCliente/wsdl/consultaFinanciamientosClientePS"/>
+            <con:binding>
+                <con:name>consultaFinanciamientosClientePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaFinanciamientosClientePS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con1:router errorHandler="_onErrorHandler-5161280637169041149-50e96b06.1796262a790.-792e" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="ConsultaFianciamientosCliente_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaFinanciamientosClienteTypes" prefix="con" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conListadoPrestamos" prefix="con1" xmlns:con1="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="countryCode" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-7b46</con2:id>
+                        <con1:expr>
+                            <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con2:param name="codigoPais">
+                                    <con2:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con2:path>
+                                </con2:param>
+                                <con2:param name="sentidoConversion">
+                                    <con2:path>"OSB-ISO3"</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-7b0e</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterData/conListadoPrestamos/biz/conListadoPrestamos_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>conListadoPrestamos</con1:operation>
+                        <con1:request>
+                            <con1:body>REQconListadoPrestamos</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPconListadoPrestamos</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQconListadoPrestamos">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-7aa0</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaFinanciamientosCliente/xq/conListadoPrestamosIn"/>
+                                        <con2:param name="consultaFinanciamientosCliente">
+                                            <con2:path>$body/con:consultaFinanciamientosCliente</con2:path>
+                                        </con2:param>
+                                        <con2:param name="pais">
+                                            <con2:path>$countryCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:validate>
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-7a11</con2:id>
+                                <con1:schema ref="Middleware/v2/BusinessServices/MasterData/conListadoPrestamos/xsd/conListadoPrestamos_sp"/>
+                                <con1:schemaElement xmlns:con="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conListadoPrestamos">con:InputParameters</con1:schemaElement>
+                                <con1:varName>REQconListadoPrestamos</con1:varName>
+                            </con1:validate>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-7a4b</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">fn:string($RSPconListadoPrestamos/con1:CodigoError/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-7a2e</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">if($errorCode != '-1')then(
+	fn:string($RSPconListadoPrestamos/con1:MensajeError/text())
+)else(
+	""
+)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaFianciamientosCliente_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaFinanciamientosClienteTypes" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-79d9</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">$validationMessage = ""</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="header">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-79a1</con2:id>
+                                    <con1:expr>
+                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con3:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-7984</con2:id>
+                                    <con1:expr>
+                                        <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                            <con3:resource ref="Middleware/v2/Resources/ConsultaFinanciamientosCliente/xq/consultaFinanciamientosClienteOut"/>
+                                            <con3:param name="outputParameters">
+                                                <con3:path>$RSPconListadoPrestamos</con3:path>
+                                            </con3:param>
+                                        </con3:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="header">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-794c</con2:id>
+                                <con1:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                            <con1:replace contents-only="true" varName="body">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5161280637169041149-50e96b06.1796262a790.-792f</con2:id>
+                                <con1:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;con:consultaFinanciamientosClienteResponse/></con3:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con1:pipeline type="error" name="_onErrorHandler-5161280637169041149-50e96b06.1796262a790.-792e">
+            <con1:stage name="ManejoError">
+                <con1:context>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaFinanciamientosClienteTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con:id>_ActionId-5161280637169041149-50e96b06.1796262a790.-78f6</con:id>
+                        <con2:expr>
+                            <con:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con:id>_ActionId-5161280637169041149-50e96b06.1796262a790.-78d9</con:id>
+                        <con2:expr>
+                            <con:xqueryText>&lt;con:consultaFinanciamientosClienteResponse/></con:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con:reply>
+                        <con:id>_ActionId-5161280637169041149-50e96b06.1796262a790.-78bc</con:id>
+                    </con:reply>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:pipeline-node name="ConsultaFianciamientosCliente">
+                <con:request>ConsultaFianciamientosCliente_request</con:request>
+                <con:response>ConsultaFianciamientosCliente_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con1:router>
+</con:pipelineEntry>

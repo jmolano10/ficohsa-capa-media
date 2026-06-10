@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:xqueryEntry xmlns:con="http://www.bea.com/wli/sb/resources/config">
+    <con:xquery>xquery version "2004-draft";
+(:: pragma bea:global-element-parameter parameter="$renviarCorreo" element="ns0:renviarCorreo" location="../../OperacionesCorreoElectronico/xsd/operacionesCorreoElectronicoTypes.xsd" ::)
+(:: pragma bea:global-element-return element="ns1:InputParameters" location="../../../BusinessServices/EnvioCorreoLauKey/renviarCorreo/xsd/renviarCorreo_sp.xsd" ::)
+
+declare namespace ns0 = "http://www.ficohsa.com.hn/middleware.services/operacionesCorreoElectronicoTypes";
+declare namespace ns1 = "http://xmlns.oracle.com/pcbpel/adapter/db/sp/renviarCorreo";
+declare namespace xf = "http://tempuri.org/Middleware/v2/Resources/RenviarCorreo/xq/reenviarCorreo/";
+
+declare function xf:reenviarCorreo($renviarCorreo as element(ns0:renviarCorreo))
+    as element(ns1:InputParameters) {
+        &lt;ns1:InputParameters>
+            &lt;ns1:ID_SENT_EMAIL>{ data($renviarCorreo/ID_SENT_EMAIL) }&lt;/ns1:ID_SENT_EMAIL>
+        &lt;/ns1:InputParameters>
+};
+
+declare variable $renviarCorreo as element(ns0:renviarCorreo) external;
+
+xf:reenviarCorreo($renviarCorreo)</con:xquery>
+    <con:dependency location="../../OperacionesCorreoElectronico/xsd/operacionesCorreoElectronicoTypes.xsd">
+        <con:schema ref="Middleware/v2/Resources/OperacionesCorreoElectronico/xsd/operacionesCorreoElectronicoTypes"/>
+    </con:dependency>
+    <con:dependency location="../../../BusinessServices/EnvioCorreoLauKey/renviarCorreo/xsd/renviarCorreo_sp.xsd">
+        <con:schema ref="Middleware/v2/BusinessServices/EnvioCorreoLauKey/renviarCorreo/xsd/renviarCorreo_sp"/>
+    </con:dependency>
+</con:xqueryEntry>

@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaConsolidadaRiesgoCliente/wsdl/consultaConsolidadaRiesgoClientePS"/>
+            <con:binding>
+                <con:name>consultaConsolidadaRiesgoClientePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaConsolidadaRiesgoClientePS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" level="service" aggregationInterval="360"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-6038456681144114129--70aa9758.170779496c4.-7d06" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="HN_ConsultaConsolidadaRiesgoCliente_request">
+            <con:stage id="_StageId-N3f57fef5.7a07b1f2.0.19b7f7554a1.N8000" name="ConsultaInformacionBuroInterno">
+                <con:context>
+                    <con1:userNsDecl prefix="con" namespace="http://www.ficohsa.com.hn/middleware.services/consultaConsolidadaRiesgoClienteTypes"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-N53e80373.65b1720d.0.19b8ee9d933.N7fca</con1:id>
+                        <con2:service ref="Middleware/v2/BusinessServices/DWConsultaConsolidada/SJS/sjConsultaConsolidadaRiesgoClienteHN" xsi:type="con3:FlowRef" xmlns:con3="http://www.bea.com/alsb/flow/resources/config"/>
+                        <con2:operation>consultaConsolidadaRiesgoCliente</con2:operation>
+                        <con2:request>
+                            <con2:body wrapped="false">REQsjConsultaConsolidadaRiesgoCliente</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body wrapped="false">RSPsjConsultaConsolidadaRiesgoCliente</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQsjConsultaConsolidadaRiesgoCliente">
+                                <con1:id>_ActionId-N53e80373.65b1720d.0.19b8ee9d933.N7fc7</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>$body/con:consultaConsolidadaRiesgoCliente</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="ErrorCode">
+                                <con1:id>_ActionId-N53e80366.N1576f35c.0.19ba45b9bbb.N7fc7</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;Info>
+{
+for $info in $RSPsjConsultaConsolidadaRiesgoCliente/statusInfo/tagInfo
+return
+&lt;tagInfoCiclo>
+  {
+   if($info/CODE = '0' or $info/CODE = '-1') then ('Success', + $info/NAME/text())
+   else('Error', + $info/NAME/text())
+   }
+&lt;/tagInfoCiclo>
+}
+&lt;/Info></con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="ErrorValidate">
+                                <con1:id>_ActionId-N53e80366.N1576f35c.0.19ba45b9bbb.N7fbd</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>exists($ErrorCode/tagInfoCiclo[contains(upper-case(.), 'ERROR')])</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage id="_StageId-N53e802b3.N47cc80ec.0.19b9ea10eaf.N8000" name="ConsultaInformacionBuroExterno">
+                <con:context>
+                    <con1:userNsDecl prefix="con" namespace="http://www.ficohsa.com.hn/middleware.services/consultaConsolidadaRiesgoClienteTypes"/>
+                    <con1:userNsDecl prefix="conh" namespace="http://www.ficohsa.com.hn/middleware.services/consultaTucaHNTypes"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="identidad">
+                        <con1:id>_ActionId-N53e802b3.N47cc80ec.0.19b9ea10eaf.N7f94</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/con:consultaConsolidadaRiesgoCliente/CUSTOMER_LEGAL_ID/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-N53e802b3.N47cc80ec.0.19b9ea10eaf.N7ffd</con1:id>
+                        <con2:service ref="Middleware/v2/ProxyServices/ConsultaBuroTucaHN" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>consultaTucaHN</con2:operation>
+                        <con2:request>
+                            <con2:body wrapped="false">REQconsultaBuroHN</con2:body>
+                            <con2:header>header</con2:header>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body wrapped="false">RSPconsultaBuroHN</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:replace varName="REQconsultaBuroHN" contents-only="false">
+                                <con1:id>_ActionId-N53e802b3.N47cc80ec.0.19b9ea10eaf.N7f91</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;conh:consultaTucaHNRequest>
+    &lt;CEDULA_IDENTIFICACION_PERSONAL>{$identidad}&lt;/CEDULA_IDENTIFICACION_PERSONAL>
+&lt;/conh:consultaTucaHNRequest></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="StatusCode">
+                                <con1:id>_ActionId-N53e800f1.N6382535a.0.19bc2bbc232.N7f98</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>normalize-space(string(($RSPconsultaBuroHN/BUREAU_TUCA/STATUS)[1]))</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="HN_ConsultaConsolidadaRiesgoCliente_response">
+            <con:stage name="FujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/activaFinanciamientoTypes" prefix="act"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaConsolidadaRiesgoClienteTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaConsolidadRiesgoCliente" prefix="con1"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-N53e80366.N1576f35c.0.19ba45b9bbb.N7fb0</con1:id>
+                        <con2:case id="_BranchId-N53e80366.N1576f35c.0.19ba45b9bbb.N7faf">
+                            <con2:condition>
+                                <con1:xqueryText>$ErrorValidate = 'false' and $StatusCode != 'VIGENTE' or $StatusCode != 'NO_DATA'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-N53e80366.N1576f35c.0.19ba45b9bbb.N7fa9</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;aut:ResponseHeader>
+  &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-N53e80366.N1576f35c.0.19ba45b9bbb.N7fcd</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaConsolidadaRiesgoCliente/xq/consultaConsolidadaRiesgoClienteHNOut"/>
+                                            <con1:param name="InputConsultaInformacionBuroTucaHN">
+                                                <con1:path>$RSPconsultaBuroHN</con1:path>
+                                            </con1:param>
+                                            <con1:param name="InputJSConsultaConsolidadaRiegoCliente">
+                                                <con1:path>$RSPsjConsultaConsolidadaRiesgoCliente</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header">
+                                <con1:id>_ActionId-N53e80366.N1576f35c.0.19ba45b9bbb.N7fa5</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+<successIndicator>Error</successIndicator>
+ <messagesIndicator>{$ErrorCode}</messagesIndicator>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="body">
+                                <con1:id>_ActionId-N53e80366.N1576f35c.0.19ba45b9bbb.N7fa2</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;consultaConsolidadaRiesgoClienteResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-6038456681144114129--70aa9758.170779496c4.-7d06">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/activaFinanciamientoTypes" prefix="act"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaConsolidadaRiesgoClienteTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-6038456681144114129--70aa9758.170779496c4.-7c93</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader> 
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-6038456681144114129--70aa9758.170779496c4.-7c92</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;con:consultaConsolidadaRiesgoClienteResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-6038456681144114129--70aa9758.170779496c4.-7c91</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="HN_ConsultaConsolidadaRiesgoCliente">
+                <con:request>HN_ConsultaConsolidadaRiesgoCliente_request</con:request>
+                <con:response>HN_ConsultaConsolidadaRiesgoCliente_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v3/Resources/ConsultaSaldosTCID/wsdl/consultaSaldosTCIDPS"/>
+            <con:binding>
+                <con:name>consultaSaldosTCIDPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaSaldosTCIDPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-4779522141335340725--ddf59a5.17c2d470fc6.-3c41" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMaestraSaldosTarjetaCreditoTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-3c42</con1:id>
+                        <con2:schema ref="Middleware/v3/Resources/ConsultaMaestraSaldosTarjetaCredito/xsd/consultaMaestraSaldosTarjetaCreditoTypes"/>
+                        <con2:schemaElement xmlns:con="http://www.ficohsa.com.hn/middleware.services/consultaMaestraSaldosTarjetaCreditoTypes">con:consultaSaldosTarjetaCredito</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./con:consultaSaldosTarjetaCredito</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="conValidarDatosTC">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conValidarDatosTC" prefix="val"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMaestraSaldosTarjetaCreditoTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-39fa</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conValidarDatosTC/biz/conValidarDatosTC_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>conValidarDatosTC</con2:operation>
+                        <con2:request>
+                            <con2:body>REQconValidarDatosTC</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPconValidarDatosTC</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="codigoPais">
+                                <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-3989</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                        <con1:param name="sentidoConversion">
+                                            <con1:path>'OSB-ISO3'</con1:path>
+                                        </con1:param>
+                                        <con1:param name="codigoPais">
+                                            <con1:path>$header/aut:RequestHeader/Region/SourceBank/text()</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="REQconValidarDatosTC">
+                                <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-39c2</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v3/Resources/ConsultaSaldosTCID/xq/conValidarDatosTCIn"/>
+                                        <con1:param name="consultaSaldosTarjetaCredito">
+                                            <con1:path>$body/con:consultaSaldosTarjetaCredito</con1:path>
+                                        </con1:param>
+                                        <con1:param name="codigoPais">
+                                            <con1:path>$codigoPais</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-3951</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>$RSPconValidarDatosTC/val:CodigoError/text()</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-3934</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if($errorCode = "-1") then (
+	''
+) else (
+	$RSPconValidarDatosTC/val:MensajeError/text()
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-38c4</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$validationMessage = ""</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="cardNumber">
+                                            <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-388c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RSPconValidarDatosTC/val:RowSet/val:Row[1]/val:Column[upper-case(@name) = "NUMTARJETA"]/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con1:skip>
+                                        <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-3854</con1:id>
+                                    </con1:skip>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoTypes" prefix="con2"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMaestraSaldosTarjetaCreditoTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-3243889987517136275-751ccfe8.17c31b64a60.-7971</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if($validationMessage = "") then (
+			<successIndicator>Success</successIndicator>
+		) else (
+			<successIndicator>{ $errorCode }</successIndicator>,
+			<messages>{ $validationMessage }</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-36ee</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>upper-case($errorCode) = 'SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace contents-only="true" varName="body">
+                                    <con1:id>_ActionId-3243889987517136275-751ccfe8.17c31b64a60.-78cb</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v3/Resources/ConsultaSaldosTCID/xq/consultaSaldosTCIDHNOut"/>
+                                            <con1:param name="consultaSaldosTarjetaCreditoResponse">
+                                                <con1:path>$body/con2:consultaSaldosTarjetaCreditoResponse</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-3243889987517136275-751ccfe8.17c31b64a60.-7903</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con:consultaSaldosTarjetaCreditoResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-4779522141335340725--ddf59a5.17c2d470fc6.-3c41">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaMaestraSaldosTarjetaCreditoTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-375c</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $fault/ctx:errorCode/text() }</successIndicator>
+	<messages>{ $fault/ctx:reason/text() }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-3a85</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;con:consultaSaldosTarjetaCreditoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-3a68</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:route-node name="ConsultaSaldosTC">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con3:route>
+                        <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-381d</con1:id>
+                        <con3:service ref="Middleware/v2/ProxyServices/ConsultaSaldosTarjetaCreditoHN" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>consultaSaldosTarjetaCredito</con3:operation>
+                        <con3:outboundTransform>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-4779522141335340725--ddf59a5.17c2d470fc6.-37af</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con1:consultaSaldosTarjetaCredito xmlns:con1="http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoTypes">
+	&lt;CARD_NUMBER>{ $cardNumber }&lt;/CARD_NUMBER>
+&lt;/con1:consultaSaldosTarjetaCredito></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con3:outboundTransform>
+                        <con3:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-3243889987517136275-751ccfe8.17c31b64a60.-79fc</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>$header/aut:ResponseHeader/successIndicator/text()</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-3243889987517136275-751ccfe8.17c31b64a60.-79df</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($header/aut:ResponseHeader/messages/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con3:responseTransform>
+                    </con3:route>
+                </con:actions>
+            </con:route-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

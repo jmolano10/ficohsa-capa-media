@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v3/Resources/ActivaFinanciamiento/wsdl/activaFinanciamientoPS"/>
+            <con:binding>
+                <con:name>activaFinanciamientoPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/activaFinanciamientoPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-1075516793364293724--b2e187e.16bd6ff20dc.-7e43" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="GT01_activaFinanciamiento_request">
+            <con:stage name="ConsultaParametrosMiddleware">
+                <con:context>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/activaFinanciamientoTypes" prefix="act"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="asm-user">
+                        <con1:id>_ActionId-7447368843361819048-629d8f53.16c00173d58.-78cc</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn-bea:trim(string($body/act:activaFinanciamiento/ASM_REP/text()))</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-1952916612477161950--8dc1346.16c05a27a0c.-7fda</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$asm-user = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-1952916612477161950--8dc1346.16c05a27a0c.-7fd2</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>obtenerParametrizacion</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQobtenerParametrizacion</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPobtenerParametrizacion</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="parametroRepresentante">
+                                            <con1:id>_ActionId-1952916612477161950--8dc1346.16c05a27a0c.-7fd5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>concat('FICBCO0291.',$header/aut:RequestHeader/Region/SourceBank/text(),'.ASM-USER')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="REQobtenerParametrizacion">
+                                            <con1:id>_ActionId-1952916612477161950--8dc1346.16c05a27a0c.-7fd4</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                                    <con1:param name="nombreParametros">
+                                                        <con1:path>$parametroRepresentante</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="asm-user">
+                                            <con1:id>_ActionId-1952916612477161950--8dc1346.16c05a27a0c.-7fd3</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $parametroRepresentante]/osb:VALUE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaVisioPlus">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/activaFinanciamientoTypes" prefix="act"/>
+                    <con1:varNsDecl namespace="http://www.procesa.com/fdcs" prefix="fdcs"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-7447368843361819048-629d8f53.16c00173d58.-78b4</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>MonetaryActionCodeL8V2</con2:operation>
+                        <con2:request>
+                            <con2:body>REQMonetaryActionCodeL8V2</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPMonetaryActionCodeL8V2</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQMonetaryActionCodeL8V2">
+                                <con1:id>_ActionId-7447368843361819048-629d8f53.16c00173d58.-7899</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v3/Resources/ActivaFinanciamiento/xq/monetaryActionCodeL8V2GTIn"/>
+                                        <con1:param name="activaFinanciamiento1">
+                                            <con1:path>$body/act:activaFinanciamiento</con1:path>
+                                        </con1:param>
+                                        <con1:param name="asm-user">
+                                            <con1:path>$asm-user</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:validate>
+                                <con1:id>_ActionId-7447368843361819048-629d8f53.16c00173d58.-784a</con1:id>
+                                <con2:schema ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/xsd/XMLSchema_769155616"/>
+                                <con2:schemaElement xmlns:fdcs="http://www.procesa.com/fdcs">fdcs:MonetaryActionCodeL8V2Request</con2:schemaElement>
+                                <con2:varName>REQMonetaryActionCodeL8V2</con2:varName>
+                            </con2:validate>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-7447368843361819048-629d8f53.16c00173d58.-7887</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSPMonetaryActionCodeL8V2/fdcs:ReturnCodes/RC/Code/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-7447368843361819048-629d8f53.16c00173d58.-786e</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>let $code := string($RSPMonetaryActionCodeL8V2/ServiceReturnCode/text())
+return
+   if($code != 'P')then(
+      string($RSPMonetaryActionCodeL8V2/fdcs:ReturnCodes/RC/Desc/text())
+      )else('')</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GT01_activaFinanciamiento_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/activaFinanciamientoTypes" prefix="act"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-1075516793364293724--b2e187e.16bd6ff20dc.-7e64</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+{   if($validationMessage = '')then(    
+    <successIndicator>Success</successIndicator>
+    )else(
+    <successIndicator>{ $errorCode }</successIndicator>,
+    <messages>{ $validationMessage }</messages>
+    )
+}    
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-1075516793364293724--b2e187e.16bd6ff20dc.-7e44</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;act:activaFinanciamientoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-1075516793364293724--b2e187e.16bd6ff20dc.-7e43">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/activaFinanciamientoTypes" prefix="act"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-1075516793364293724--b2e187e.16bd6ff20dc.-7e2e</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-1075516793364293724--b2e187e.16bd6ff20dc.-7e0d</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;act:activaFinanciamientoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-1075516793364293724--b2e187e.16bd6ff20dc.-7df1</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="GT01_activaFinanciamiento">
+                <con:request>GT01_activaFinanciamiento_request</con:request>
+                <con:response>GT01_activaFinanciamiento_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

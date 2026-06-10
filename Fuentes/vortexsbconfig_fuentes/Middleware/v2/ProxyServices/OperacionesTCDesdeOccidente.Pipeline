@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/OperacionesTCDesdeOccidente/wsdl/operacionesTCDesdeOccidentePS"/>
+            <con:binding>
+                <con:name>operacionesTCDesdeOccidentePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/operacionesTCDesdeOccidentePS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-57869030939146772--1779788c.17c74b602a3.-6e59" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="request" name="Operaciones_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTCDesdeOccidenteTypes" prefix="oper"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7529</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/OperacionesTCDesdeOccidente/xsd/OperacionesTCDesdeOccidenteTypes"/>
+                        <con2:schemaElement xmlns:oper="http://www.ficohsa.com.hn/middleware.services/operacionesTCDesdeOccidenteTypes">oper:operacionesTCDesdeOccidente</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./oper:operacionesTCDesdeOccidente</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="Variables">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTCDesdeOccidenteTypes" prefix="oper"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="debitaCCTPName">
+                        <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7f56</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>if(string($body/oper:operacionesTCDesdeOccidente/BALANCE_CURRENCY/text()) = 'HNL')then(
+	'T24T011.OCCIDENTE.DEBITACCTHNL'
+)else(
+	'T24T011.OCCIDENTE.DEBITACCTUSD'
+)</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7f39</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerParametrizacion</con2:operation>
+                        <con2:request>
+                            <con2:body>REQobtenerParametrizacion</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPobtenerParametrizacion</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQobtenerParametrizacion">
+                                <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7f01</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con1:param name="nombreParametros">
+                                            <con1:path>$debitaCCTPName</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7ec9</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:ERROR_MESSAGE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="debitaCCT">
+                                <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7e74</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $debitaCCTPName]/osb:VALUE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaDatosTarjetaCredito">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTCDesdeOccidenteTypes" prefix="oper"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="codigoPais">
+                        <con1:id>_ActionId-57869030939146772--1779788c.17c74b602a3.-7fa9</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                </con1:param>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>'OSB-ISO3'</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-57869030939146772--1779788c.17c74b602a3.-7f56</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoTarjeta/biz/conDatoTarjeta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>conDatoTarjeta</con2:operation>
+                        <con2:request>
+                            <con2:body>REQconDatoTarjeta</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPconDatoTarjeta</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con1:assign varName="REQconDatoTarjeta" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-57869030939146772--1779788c.17c74b602a3.-7f1d</con4:id>
+                                <con1:expr>
+                                    <con4:xqueryTransform xmlns:con4="http://www.bea.com/wli/sb/stages/config">
+                                        <con4:resource ref="Middleware/v2/Resources/MasterDataHN/xq/conDatoTarjetaIn"/>
+                                        <con4:param name="codigoPais">
+                                            <con4:path>$codigoPais</con4:path>
+                                        </con4:param>
+                                        <con4:param name="cardNumber">
+                                            <con4:path>string($body/oper:operacionesTCDesdeOccidente/CREDIT_CARD_NUMBER/text())</con4:path>
+                                        </con4:param>
+                                        <con4:param name="org">
+                                            <con4:path>''</con4:path>
+                                        </con4:param>
+                                    </con4:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="cardHolder">
+                                <con1:id>_ActionId-57869030939146772--1779788c.17c74b602a3.-7ee5</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if(fn:string($RSPconDatoTarjeta/con:RowSet/con:Row[1]/con:Column[@name = 'cardholder_name']/text()) = '') then(
+	''
+)else(
+	fn:upper-case(fn:string($RSPconDatoTarjeta/con:RowSet/con:Row[1]/con:Column[@name = 'cardholder_name']/text()))
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-57869030939146772--1779788c.17c74b602a3.-7e0e</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if(fn:upper-case(fn:string($RSPconDatoTarjeta/con:CodigoError/text())) = '-1') then(
+	'SUCCESS'
+)else(
+	'ERROR'
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-57869030939146772--1779788c.17c74b602a3.-7e90</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if(fn:string($RSPconDatoTarjeta/con:MensajeError/text()) = '') then(
+	''
+)else(
+	fn:string($RSPconDatoTarjeta/con:MensajeError/text())
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="PagoTarjetaCredito">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTCDesdeOccidenteTypes" prefix="oper"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="requestType">
+                        <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7d37</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>string($body/oper:operacionesTCDesdeOccidente/REQUEST_TYPE/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7e37</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$requestType = "QRY"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions/>
+                        </con2:case>
+                        <con2:default>
+                            <con2:wsCallout>
+                                <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7d6f</con1:id>
+                                <con2:service ref="Middleware/v3/ProxyServices/PagoTarjetaCredito/local/PagoTarjetaCreditoHN" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                <con2:operation>pagoTarjetaCredito</con2:operation>
+                                <con2:request>
+                                    <con2:body>REQpagoTarjetaCredito</con2:body>
+                                    <con2:header>REQHeaderpagoTarjetaCredito</con2:header>
+                                </con2:request>
+                                <con2:response>
+                                    <con2:body>RSPpagoTarjetaCredito</con2:body>
+                                    <con2:header>RSPHeaderpagoTarjetaCredito</con2:header>
+                                </con2:response>
+                                <con2:requestTransform>
+                                    <con2:assign varName="REQHeaderpagoTarjetaCredito">
+                                        <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7d73</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>$header</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="REQpagoTarjetaCredito">
+                                        <con1:id>_ActionId-6955616232832273411-7561f08d.17cc78e9248.-789e</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/OperacionesTCDesdeOccidente/xq/pagoTarjetaCreditoHNIn"/>
+                                                <con1:param name="transactionCurrency">
+                                                    <con1:path>string($body/oper:operacionesTCDesdeOccidente/TRANSACTION_CURRENCY/text())</con1:path>
+                                                </con1:param>
+                                                <con1:param name="balanceCurrency">
+                                                    <con1:path>string($body/oper:operacionesTCDesdeOccidente/BALANCE_CURRENCY/text())</con1:path>
+                                                </con1:param>
+                                                <con1:param name="creditCardNumber">
+                                                    <con1:path>string($body/oper:operacionesTCDesdeOccidente/CREDIT_CARD_NUMBER/text())</con1:path>
+                                                </con1:param>
+                                                <con1:param name="paymentAmount">
+                                                    <con1:path>string($body/oper:operacionesTCDesdeOccidente/PAYMENT_AMOUNT/text())</con1:path>
+                                                </con1:param>
+                                                <con1:param name="debitAccount">
+                                                    <con1:path>$debitaCCT</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:requestTransform>
+                                <con2:responseTransform>
+                                    <con2:assign varName="errorCode">
+                                        <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7d71</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>fn:string($RSPHeaderpagoTarjetaCredito/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="validationMessage">
+                                        <con1:id>_ActionId-9006272783645709120-75fc32ec.17cb2a776b6.-7d70</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>if(fn:upper-case($errorCode) = "SUCCESS")then(
+	""
+)else(
+	fn:string($RSPHeaderpagoTarjetaCredito/aut:ResponseHeader/messages/text())
+)</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="transactionId">
+                                        <con1:id>_ActionId-15199284145867433--233a2c89.17cc8c9a09d.-7b75</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RSPHeaderpagoTarjetaCredito/aut:ResponseHeader/transactionId/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:responseTransform>
+                            </con2:wsCallout>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="Operaciones_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTCDesdeOccidenteTypes" prefix="oper"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-57869030939146772--1779788c.17c74b602a3.-6ddf</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+	  if($requestType='QRY' or $requestType='PMT')then(
+	  	<successIndicator>{ $errorCode }</successIndicator>,
+	  	<transactionId>{ $transactionId }</transactionId>,
+      	if($validationMessage = '')then()
+      		else(
+      			<messages>{ $validationMessage }</messages>
+      		) 
+      	
+	  )else(
+	  	<successIndicator>ERROR</successIndicator>,
+	  	<messages>El criterio no es valido</messages>
+	  )
+	 } 
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8278516430081350894--5da8e40c.17c0a00fef5.-39e6</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case($errorCode) = "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-4095981617230554551--bce19e8.17ca3de0c97.-7f90</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/OperacionesTCDesdeOccidente/xq/operacionesTCDesdeOccidenteOut"/>
+                                            <con1:param name="cardHolderName">
+                                                <con1:path>$cardHolder</con1:path>
+                                            </con1:param>
+                                            <con1:param name="pagoTarjetaCreditoResponse">
+                                                <con1:path>$RSPpagoTarjetaCredito</con1:path>
+                                            </con1:param>
+                                            <con1:param name="requestType">
+                                                <con1:path>string($body/oper:operacionesTCDesdeOccidente/REQUEST_TYPE/text())</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-4095981617230554551--bce19e8.17ca3de0c97.-7f58</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;oper:operacionesTCDesdeOccidente/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-57869030939146772--1779788c.17c74b602a3.-6e59">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/programaLealtadTypes" prefix="prog"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesTCDesdeOccidenteTypes" prefix="oper"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-57869030939146772--1779788c.17c74b602a3.-6de3</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-57869030939146772--1779788c.17c74b602a3.-6de2</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;oper:operacionesTCDesdeOccidenteResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-57869030939146772--1779788c.17c74b602a3.-6de1</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="Operaciones">
+                <con:request>Operaciones_request</con:request>
+                <con:response>Operaciones_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

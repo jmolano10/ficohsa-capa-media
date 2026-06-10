@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaListasCliente/wsdl/consultaListasClientePS"/>
+            <con:binding>
+                <con:name>consultaListasClientePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaListasClientePS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con1:router errorHandler="_onErrorHandler-228354587694718861-3d0a16ee.14b4b38382d.-7fee" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+        <con1:pipeline type="request" name="ValidacionesGenerales_request">
+            <con1:stage name="ValidacionXSD">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaListasClienteTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:validate>
+                        <con2:id>_ActionId-3852687587868201811-6941aa9e.16f1e8c11a6.-7fff</con2:id>
+                        <con3:schema ref="Middleware/v2/Resources/ConsultaListasCliente/xsd/consultaListasClienteTypes"/>
+                        <con3:schemaElement xmlns:sjc="http://www.ficohsa.com.hn/middleware.services/sjConsultaListasCliente" xmlns:con4="http://www.ficohsa.com.hn/middleware.services/consultaListasClienteTypes">con4:consultaListasCliente</con3:schemaElement>
+                        <con3:varName>body</con3:varName>
+                        <con3:location>
+                            <con2:xpathText>./con:consultaListasCliente</con2:xpathText>
+                        </con3:location>
+                    </con3:validate>
+                </con1:actions>
+            </con1:stage>
+            <con1:stage name="ValidacionServicioRegional">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaListasClienteTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-251059900790243540-25645090.16f195cd747.-2535</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>ValidaServicioRegional</con3:operation>
+                        <con3:request>
+                            <con3:body>REQValidaSvrReg</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPValidaSvrReg</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQValidaSvrReg">
+                                <con2:id>_ActionId-251059900790243540-25645090.16f195cd747.-2539</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con2:param name="serviceId">
+                                            <con2:path>"FICBCO0177"</con2:path>
+                                        </con2:param>
+                                        <con2:param name="requestHeader1">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:ifThenElse>
+                                <con2:comment>Condicion para determinar si solicitud regional es válida.</con2:comment>
+                                <con2:id>_ActionId-251059900790243540-25645090.16f195cd747.-2538</con2:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con2:xqueryText>data($RSPValidaSvrReg/val:PV_CODIGO_ERROR) != 'SUCCESS'</con2:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con3:Error>
+                                            <con2:id>_ActionId-251059900790243540-25645090.16f195cd747.-2537</con2:id>
+                                            <con3:errCode>MW-0003</con3:errCode>
+                                            <con3:message>INVALID REGION REQUEST</con3:message>
+                                        </con3:Error>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default>
+                                    <con3:assign varName="customerId">
+                                        <con2:id>_ActionId-251059900790243540-25645090.16f195cd747.-2536</con2:id>
+                                        <con3:expr>
+                                            <con2:xqueryText>fn:string($body/con:consultaListasCliente/CUSTOMER_LEGAL_ID/text())</con2:xqueryText>
+                                        </con3:expr>
+                                    </con3:assign>
+                                    <con3:assign varName="customerName">
+                                        <con2:id>_ActionId-1270621935082525186--59f19f6a.16f579398cc.-7fac</con2:id>
+                                        <con3:expr>
+                                            <con2:xqueryText>''</con2:xqueryText>
+                                        </con3:expr>
+                                    </con3:assign>
+                                </con3:default>
+                            </con3:ifThenElse>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="ValidacionesGenerales_response">
+            <con1:stage name="MapeoError">
+                <con1:context xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+                    <con4:ifThenElse xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-251059900790243540-25645090.16f195cd747.-26b7</con2:id>
+                        <con4:case>
+                            <con4:condition>
+                                <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con2:xqueryText>
+                            </con4:condition>
+                            <con4:actions>
+                                <con4:wsCallout>
+                                    <con2:id>_ActionId-251059900790243540-25645090.16f195cd747.-26b4</con2:id>
+                                    <con4:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con4:operation>mapeoErrores</con4:operation>
+                                    <con4:request>
+                                        <con4:body>REQMapeoErrores</con4:body>
+                                    </con4:request>
+                                    <con4:response>
+                                        <con4:body>RSPMapeoErrores</con4:body>
+                                    </con4:response>
+                                    <con4:requestTransform>
+                                        <con4:assign varName="REQMapeoErrores">
+                                            <con2:id>_ActionId-251059900790243540-25645090.16f195cd747.-26b6</con2:id>
+                                            <con4:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con2:param name="MENSAJE_ERROR">
+                                                        <con2:path>fn:concat("FICBCO0177","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="CODIGO_ERROR">
+                                                        <con2:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con4:expr>
+                                        </con4:assign>
+                                    </con4:requestTransform>
+                                    <con4:responseTransform>
+                                        <con4:replace varName="header" contents-only="true">
+                                            <con2:id>_ActionId-251059900790243540-25645090.16f195cd747.-26b5</con2:id>
+                                            <con4:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con2:param name="mapeoErroresResponse1">
+                                                        <con2:path>$RSPMapeoErrores</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="successIndicator">
+                                                        <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con4:expr>
+                                        </con4:replace>
+                                    </con4:responseTransform>
+                                </con4:wsCallout>
+                            </con4:actions>
+                        </con4:case>
+                        <con4:default/>
+                    </con4:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="error" name="_onErrorHandler-228354587694718861-3d0a16ee.14b4b38382d.-7fee">
+            <con1:stage name="ManejoError">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaListasClienteTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:assign varName="errorList">
+                        <con2:id>_ActionId-228354587694718861-3d0a16ee.14b4b38382d.-7d0d</con2:id>
+                        <con3:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/Generales/mensajesError"/>
+                            </con2:xqueryTransform>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="osbError">
+                        <con2:id>_ActionId-228354587694718861-3d0a16ee.14b4b38382d.-7cfd</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>fn:string($errorList/ERROR_RECORD[CODE=fn:string($fault/ctx:errorCode/text())]/DESCRIPTION/text())</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-228354587694718861-3d0a16ee.14b4b38382d.-7dc5</con2:id>
+                        <con3:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/Business_Resources/general/ServiceErrorId/obtenerServiceErrorId"/>
+                                <con2:param name="string1">
+                                    <con2:path>"0177"</con2:path>
+                                </con2:param>
+                                <con2:param name="string2">
+                                    <con2:path>concat(fn:string($fault/ctx:errorCode/text()), ":", fn:string($fault/ctx:reason/text()), ":", $osbError)</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con3:expr>
+                    </con3:replace>
+                    <con3:replace contents-only="true" varName="body">
+                        <con2:id>_ActionId-228354587694718861-3d0a16ee.14b4b38382d.-7d9a</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>&lt;con:consultaListasClienteResponse/></con2:xqueryText>
+                        </con3:expr>
+                    </con3:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-228354587694718861-3d0a16ee.14b4b38382d.-7d84</con2:id>
+                    </con2:reply>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="HN01_ConsultaListasCliente_request">
+            <con1:stage name="consultaListasCliente">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaListasClienteTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaListasCliente" prefix="sjc"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-228354587694718861-3d0a16ee.14b4b38382d.-7ea0</con2:id>
+                        <con3:service ref="Middleware/v2/Resources/ConsultaListasCliente/sj/sjConsultaListasCliente" xsi:type="con4:FlowRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con4="http://www.bea.com/alsb/flow/resources/config"/>
+                        <con3:operation>consultaListasCliente</con3:operation>
+                        <con3:request>
+                            <con3:body>REQConsListasCliente</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPConsListasCliente</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQConsListasCliente">
+                                <con2:id>_ActionId-228354587694718861-3d0a16ee.14b4b38382d.-7e6f</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaListasCliente/xq/ConsultaListasClienteSjIn"/>
+                                        <con2:param name="consultaListasCliente1">
+                                            <con2:path>$body/con:consultaListasCliente</con2:path>
+                                        </con2:param>
+                                        <con2:param name="requestHeader1">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:assign varName="customerName">
+                                <con2:id>_ActionId-1270621935082525186--59f19f6a.16f579398cc.-7f3c</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>fn:string($RSPConsListasCliente/sjc:consultaListaClienteResponse[sjc:ASSOCIATION_NAME="OFAC"]/sjc:CUSTOMER_NAME/text())</con2:xqueryText>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="HN01_ConsultaListasCliente_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaListasClienteTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-1403999180332320354--16452504.16f23e912f5.-7fff</con2:id>
+                        <con3:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/ConsultaListasCliente/xq/ConsultaListasClienteSjHeaderOut"/>
+                                <con2:param name="sjConsultaListasClienteResponse1">
+                                    <con2:path>$RSPConsListasCliente</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con3:expr>
+                    </con3:replace>
+                    <con3:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-514562586636426102-16a4ed41.16f1f718413.-4fd1</con2:id>
+                        <con3:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/ConsultaListasCliente/xq/ConsultaListasClienteSjOut"/>
+                                <con2:param name="sjConsultaListasClienteResponse1">
+                                    <con2:path>$RSPConsListasCliente</con2:path>
+                                </con2:param>
+                                <con2:param name="customerName">
+                                    <con2:path>$customerName</con2:path>
+                                </con2:param>
+                                <con2:param name="customerId">
+                                    <con2:path>$customerId</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con3:expr>
+                    </con3:replace>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="Default_ConsultaListasCliente_request">
+            <con1:stage name="FlujoEntrada">
+                <con1:context/>
+                <con1:actions/>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="Default_ConsultaListasCliente_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaListasClienteTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-228354587694718861-3d0a16ee.14b4b38382d.-7e19</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>SERVICE NOT YET IMPLEMENTED FOR THIS REGION</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con3:expr>
+                    </con3:replace>
+                    <con3:replace contents-only="true" varName="body">
+                        <con2:id>_ActionId-228354587694718861-3d0a16ee.14b4b38382d.-7e34</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>&lt;con:consultaListasClienteResponse/></con2:xqueryText>
+                        </con3:expr>
+                    </con3:replace>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="request" name="NI01_ConsultaListasCliente_request">
+            <con1:stage name="consultaListasCliente">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaListasClienteTypes" prefix="con1"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-6892928553326111080--2c7d0ce7.193cfbca568.-7f8f</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/DataWarehouse/ConsultaListasCliente/biz/ConsultaListasClienteNI_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>ConsultaListasClienteNI</con3:operation>
+                        <con3:request>
+                            <con3:body wrapped="false">REQConsListasCliente</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPConsListasCliente</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQConsListasCliente">
+                                <con2:id>_ActionId-3367874248298756620-60de6d1e.1942ceaf8b6.-7e23</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaListasCliente/xq/consultaListasClienteNIIn"/>
+                                        <con2:param name="customerId">
+                                            <con2:path>$customerId</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:assign varName="responseServiceToString">
+                                <con2:id>_ActionId-3367874248298756620-60de6d1e.1942ceaf8b6.-7f3c</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>fn-bea:serialize(fn:data($RSPConsListasCliente))</con2:xqueryText>
+                                </con3:expr>
+                            </con3:assign>
+                            <con3:assign varName="ResponseInXML">
+                                <con2:id>_ActionId-3367874248298756620-60de6d1e.1942ceaf8b6.-7f3e</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryText>fn-bea:inlinedXML($responseServiceToString)</con2:xqueryText>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="NI01_ConsultaListasCliente_response">
+            <con1:stage name="FlujoSalida">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaClientesTypes" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-6892928553326111080--2c7d0ce7.193cfbca568.-7f1a</con2:id>
+                        <con3:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/ConsultaListasCliente/xq/consultaListasClienteNIHeaderOUT"/>
+                                <con2:param name="outputParameters">
+                                    <con2:path>$ResponseInXML</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con3:expr>
+                    </con3:replace>
+                    <con3:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-3367874248298756620-60de6d1e.1942ceaf8b6.-7e76</con2:id>
+                        <con3:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/v2/Resources/ConsultaListasCliente/xq/consultaListasClienteNIOut"/>
+                                <con2:param name="customerId">
+                                    <con2:path>$customerId</con2:path>
+                                </con2:param>
+                                <con2:param name="outputParameters">
+                                    <con2:path>$ResponseInXML</con2:path>
+                                </con2:param>
+                            </con2:xqueryTransform>
+                        </con3:expr>
+                    </con3:replace>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:flow>
+            <con1:pipeline-node name="ValidacionesGenerales">
+                <con1:request>ValidacionesGenerales_request</con1:request>
+                <con1:response>ValidacionesGenerales_response</con1:response>
+            </con1:pipeline-node>
+            <con1:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:branch-table variable="header">
+                    <con1:xpath>
+                        <con2:xpathText>./aut:RequestHeader/Region/SourceBank/text()</con2:xpathText>
+                    </con1:xpath>
+                    <con1:branch name="HN01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>"HN01"</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="HN01_ConsultaListasCliente">
+                                <con1:request>HN01_ConsultaListasCliente_request</con1:request>
+                                <con1:response>HN01_ConsultaListasCliente_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="NI01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>"NI01"</con1:value>
+                        <con1:flow>
+                            <con1:pipeline-node name="NI01_ConsultaListasCliente">
+                                <con1:request>NI01_ConsultaListasCliente_request</con1:request>
+                                <con1:response>NI01_ConsultaListasCliente_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="GT01">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value>'GT01'</con1:value>
+                        <con1:flow>
+                            <con1:route-node name="GT01_ConsultaListasCliente">
+                                <con1:context/>
+                                <con1:actions>
+                                    <con4:route xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+                                        <con2:id>_ActionId-a51ea03.N5c393ca0.0.1997423ce18.N7fcd</con2:id>
+                                        <con4:service ref="Middleware/v2/ProxyServices/ConsultaListasClienteGT" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con4:operation passThrough="true"/>
+                                        <con4:outboundTransform/>
+                                        <con4:responseTransform/>
+                                    </con4:route>
+                                </con1:actions>
+                            </con1:route-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:default-branch>
+                        <con1:flow>
+                            <con1:pipeline-node name="Default_ConsultaListasCliente">
+                                <con1:request>Default_ConsultaListasCliente_request</con1:request>
+                                <con1:response>Default_ConsultaListasCliente_response</con1:response>
+                            </con1:pipeline-node>
+                        </con1:flow>
+                    </con1:default-branch>
+                </con1:branch-table>
+            </con1:branch-node>
+        </con1:flow>
+    </con1:router>
+</con:pipelineEntry>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:xqueryEntry xmlns:con="http://www.bea.com/wli/sb/resources/config">
+    <con:xquery><![CDATA[xquery version "2004-draft";
+(:: pragma bea:global-element-parameter parameter="$validaProductoCliente" element="ns0:validaProductoCliente" location="../../ValidaProductoCliente/xsd/validaProductoClienteTypes.xsd" ::)
+(:: pragma bea:global-element-return element="ns0:validaProductoCliente" location="../../../BusinessServices/FPC/getValidProductCustomer12c/xsd/GetValidProductCustomer.xsd" ::)
+
+declare namespace ns0 = "http://www.ficohsa.com.hn/middleware.services/validaProductoClienteTypes";
+declare namespace xf = "http://tempuri.org/Middleware/v2/Resources/ValidaProductoClienteHN/xq/getValidProductCustomerIn/";
+
+declare function xf:getValidProductCustomerIn($validaProductoCliente as element(ns0:validaProductoCliente))
+    as element(ns0:validaProductoCliente) {
+        <ns0:validaProductoCliente>
+            <CUSTOMER_ID>{ data($validaProductoCliente/CUSTOMER_ID) }</CUSTOMER_ID>
+            <PRODUCT_NUMBER>{ data($validaProductoCliente/PRODUCT_NUMBER) }</PRODUCT_NUMBER>
+            <PRODUCT_TYPE>{ data($validaProductoCliente/PRODUCT_TYPE) }</PRODUCT_TYPE>
+        </ns0:validaProductoCliente>
+};
+
+declare variable $validaProductoCliente as element(ns0:validaProductoCliente) external;
+
+xf:getValidProductCustomerIn($validaProductoCliente)]]></con:xquery>
+    <con:dependency location="../../ValidaProductoCliente/xsd/validaProductoClienteTypes.xsd">
+        <con:schema ref="Middleware/v2/Resources/ValidaProductoCliente/xsd/validaProductoClienteTypes"/>
+    </con:dependency>
+    <con:dependency location="../../../BusinessServices/FPC/getValidProductCustomer12c/xsd/GetValidProductCustomer.xsd">
+        <con:schema ref="Middleware/v2/BusinessServices/FPC/getValidProductCustomer12c/xsd/GetValidProductCustomer"/>
+    </con:dependency>
+</con:xqueryEntry>

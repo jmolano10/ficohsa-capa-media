@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:xqueryEntry xmlns:con="http://www.bea.com/wli/sb/resources/config">
+    <con:xquery><![CDATA[xquery version "2004-draft";
+(:: pragma bea:global-element-parameter parameter="$outputParameters" element="ns1:OutputParameters" location="../../../../Business_Resources/consultaGeneralPrestamo/Resources/ConsultaGeneralPrestamo/xsd/ORA_BANK_OSB_CON_GENERAL_PRESTAMO.xsd" ::)
+(:: pragma bea:global-element-return element="ns0:validaProductoClienteResponse" location="../../ValidaProductoCliente/xsd/validaProductoClienteTypes.xsd" ::)
+
+declare namespace ns0 = "http://www.ficohsa.com.hn/middleware.services/validaProductoClienteTypes";
+declare namespace ns1 = "http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_CON_GENERAL_PRESTAMO/";
+declare namespace xf = "http://tempuri.org/Middleware/v2/Resources/ValidaProductoClienteHN/xq/validaProductoClientePTMHNOut/";
+
+declare function xf:validaProductoClientePTMHNOut($outputParameters as element(ns1:OutputParameters))
+    as element(ns0:validaProductoClienteResponse) {
+        <ns0:validaProductoClienteResponse>
+            {
+                for $LOAN_CUSTOMER_NAME in $outputParameters/ns1:LOAN_CUSTOMER_NAME
+                return
+                    <PRODUCT_NAME>{ data($LOAN_CUSTOMER_NAME) }</PRODUCT_NAME>
+            }
+            {
+                for $CURRENCY in $outputParameters/ns1:CURRENCY
+                return
+                    <CURRENCY>{ data($CURRENCY) }</CURRENCY>
+            }
+            {
+                for $EFFECTIVE_DATE in $outputParameters/ns1:EFFECTIVE_DATE
+                return
+                    <OPENING_DATE>{ data($EFFECTIVE_DATE) }</OPENING_DATE>
+            }
+        </ns0:validaProductoClienteResponse>
+};
+
+declare variable $outputParameters as element(ns1:OutputParameters) external;
+
+xf:validaProductoClientePTMHNOut($outputParameters)]]></con:xquery>
+    <con:dependency location="../../../../Business_Resources/consultaGeneralPrestamo/Resources/ConsultaGeneralPrestamo/xsd/ORA_BANK_OSB_CON_GENERAL_PRESTAMO.xsd">
+        <con:schema ref="Middleware/Business_Resources/consultaGeneralPrestamo/Resources/ConsultaGeneralPrestamo/xsd/ORA_BANK_OSB_CON_GENERAL_PRESTAMO"/>
+    </con:dependency>
+    <con:dependency location="../../ValidaProductoCliente/xsd/validaProductoClienteTypes.xsd">
+        <con:schema ref="Middleware/v2/Resources/ValidaProductoCliente/xsd/validaProductoClienteTypes"/>
+    </con:dependency>
+</con:xqueryEntry>

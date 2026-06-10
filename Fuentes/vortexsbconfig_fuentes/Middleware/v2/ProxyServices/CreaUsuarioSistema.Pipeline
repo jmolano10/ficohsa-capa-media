@@ -1,0 +1,908 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/AperturaProductos/wsdl/aperturaProductosPS"/>
+            <con:binding>
+                <con:name>aperturaProductosPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/aperturaProductosPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-5319654937433143370-ef821ac.1723efb706f.-6aac" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6ab8</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/AperturaProductos/xsd/aperturaProductosTypes"/>
+                        <con2:schemaElement xmlns:trib="http://www.ficohsa.com.hn/middleware.services/tributosTypes" xmlns:aper="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes">aper:creaUsuarioSistema</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./aper:creaUsuarioSistema</con1:xpathText>
+                        </con2:location>
+                        <con2:resultVarName/>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegional">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6ab1</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>ValidaServicioRegional</con2:operation>
+                        <con2:request>
+                            <con2:body>reqValidaServicioRegional</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respValidaServicioRegional</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqValidaServicioRegional">
+                                <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6ab7</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con1:param name="requestHeader1">
+                                            <con1:path>$header/aut:RequestHeader</con1:path>
+                                        </con1:param>
+                                        <con1:param name="serviceId">
+                                            <con1:path>"FICBCO0403"</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6ab6</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6ab5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:replace contents-only="true" varName="body">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6ab4</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>&lt;aper:creaUsuarioSistemaResponse/></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con1:reply>
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6ab3</con1:id>
+                                        </con1:reply>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:replace contents-only="true" varName="header">
+                                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6ab2</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con1:param name="requestHeader">
+                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:replace>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="MapeoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6ab0</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6aad</con1:id>
+                                    <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>mapeoErrores</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQMapeoErrores</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPMapeoErrores</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQMapeoErrores">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6aaf</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con1:param name="MENSAJE_ERROR">
+                                                        <con1:path>fn:concat("FICBCO0403","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="CODIGO_ERROR">
+                                                        <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6aae</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con1:param name="mapeoErroresResponse1">
+                                                        <con1:path>$RSPMapeoErrores</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="successIndicator">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-5319654937433143370-ef821ac.1723efb706f.-6aac">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="errorCode">
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6a31</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessage">
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6a30</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6a2d</con1:id>
+                        <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>mapeoErrores</con2:operation>
+                        <con2:request>
+                            <con2:body>reqMapeoErrores</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respMapeoErrores</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqMapeoErrores">
+                                <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6a2f</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con1:param name="CODIGO_ERROR">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MENSAJE_ERROR">
+                                            <con1:path>fn:concat("FICBCO0403", "$#$", $errorMessage)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:replace contents-only="true" varName="header">
+                                <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6a2e</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con1:param name="mapeoErroresResponse1">
+                                            <con1:path>$respMapeoErrores</con1:path>
+                                        </con1:param>
+                                        <con1:param name="successIndicator">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6a2c</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;aper:creaUsuarioSistemaResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6a2b</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="Default_CreaUsuarioSistema_request">
+            <con:stage name="FlujoEntrada">
+                <con:context/>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="Default_CreaUsuarioSistema_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:Error>
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6916</con1:id>
+                        <con2:errCode>MW-0008</con2:errCode>
+                        <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                    </con2:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="CreaUsuarioSistema_request">
+            <con:stage name="ObtenerParametrizacion">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="userName">
+                        <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e55</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/aper:creaUsuarioSistema/USER_NAME/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6901</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerParametrizacion</con2:operation>
+                        <con2:request>
+                            <con2:body>REQObtenerParametrizacion</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPObtenerParametrizacion</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="subsidiaryID">
+                                <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-689b</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>concat("FICBCO0403",".SUBSIDIARY.ICB.",$header/aut:RequestHeader/Region/SourceBank/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="ProductType">
+                                <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-68b1</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>concat("FICBCO0403",".PRODUCT.TYPE.ICB.",$body/aper:creaUsuarioSistema/PRODUCT_TYPE_ID/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="DocumentType">
+                                <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-68f1</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>concat("FICBCO0403",".DOCUMENT.TYPE.ICB.",$body/aper:creaUsuarioSistema/DOCUMENT_TYPE_ID/text(),".",$header/aut:RequestHeader/Region/SourceBank/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="REQObtenerParametrizacion">
+                                <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6880</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con1:param name="nombreParametros">
+                                            <con1:path>fn:concat($subsidiaryID,"||",$ProductType ,"||",$DocumentType,"||","FICBCO0403.URI.ICB")</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6829</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$RSPObtenerParametrizacion/osb:ERROR_CODE/text()='SUCCESS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="ErrorCode">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-6812</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>"Success"</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-67d7</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>""</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="subsidiaryIDValue">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-67c7</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$subsidiaryID]/osb:VALUE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="ProductTypeValue">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-67c5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$ProductType]/osb:VALUE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="DocumentTypeValue">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-67c3</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$DocumentType]/osb:VALUE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="UriICB">
+                                            <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-673a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="FICBCO0403.URI.ICB"]/osb:VALUE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:assign varName="ErrorCode">
+                                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-67fe</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>"ERROR"</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="validationMessage">
+                                        <con1:id>_ActionId-5319654937433143370-ef821ac.1723efb706f.-67c9</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RSPObtenerParametrizacion/osb:ERROR_MESSAGE/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="CreaUsuarioSistema">
+                <con:context>
+                    <con1:userNsDecl namespace="urn:infocorp.framework.businessentities.common" prefix="d4p1"/>
+                    <con1:userNsDecl namespace="urn:tailored.icbanking.services.administration.general" prefix="ns0"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e31</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$ErrorCode!='ERROR'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e1f</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ICB/CreaUsuarioSistema/biz/CreaUsuarioSistemaICB" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>UsersOnboardingProcess</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQCrearUsurioSistema</con2:body>
+                                        <con2:header>REQHeaderCrearUsurioSistema</con2:header>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPCrearUsurioSistema</con2:body>
+                                        <con2:header>RSPHeaderCrearUsurioSistema</con2:header>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQHeaderCrearUsurioSistema">
+                                            <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e27</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/BusinessServices/ICB/CreaUsuarioSistema/xq/creaUsuarioSistemaHeaderIN"/>
+                                                    <con1:param name="operation">
+                                                        <con1:path>"UsersOnboardingProcess"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="uriICB">
+                                                        <con1:path>$UriICB</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="serviceAccount">
+                                                        <con1:path>"SARASRVACCOUNT"</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="REQCrearUsurioSistema">
+                                            <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e26</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/CreaUsuarioSistema/xq/creaUsuarioSistemaIN"/>
+                                                    <con1:param name="SubsidiaryID">
+                                                        <con1:path>$subsidiaryIDValue</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="DocumentTypeID">
+                                                        <con1:path>$DocumentTypeValue</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="ProductTypeID">
+                                                        <con1:path>$ProductTypeValue</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="creaUsuarioSistemaIN">
+                                                        <con1:path>$body/aper:creaUsuarioSistema</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="ErrorCodeP">
+                                            <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e25</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RSPCrearUsurioSistema/ns0:MessageId/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:ifThenElse>
+                                            <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e24</con1:id>
+                                            <con2:case>
+                                                <con2:condition>
+                                                    <con1:xqueryText>$RSPCrearUsurioSistema/ns0:MessageId/text()!=0</con1:xqueryText>
+                                                </con2:condition>
+                                                <con2:actions>
+                                                    <con2:assign varName="ErrorCode">
+                                                        <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e23</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>"ERROR"</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="validationMessage">
+                                                        <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e22</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>$RSPCrearUsurioSistema/ns0:Message/text()</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:actions>
+                                            </con2:case>
+                                            <con2:default>
+                                                <con2:assign varName="ErrorCode">
+                                                    <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e21</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>"Success"</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:assign varName="validationMessage">
+                                                    <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e20</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>""</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:default>
+                                        </con2:ifThenElse>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con1:skip>
+                                <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e12</con1:id>
+                            </con1:skip>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="CreaUsuarioSistema_response">
+            <con:stage name="FlujodeSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7eb7</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/CreaUsuarioSistema/xq/CreaUsuarioSistemaHeaderOUT"/>
+                                <con1:param name="MessageError">
+                                    <con1:path>$validationMessage</con1:path>
+                                </con1:param>
+                                <con1:param name="ErrorCode">
+                                    <con1:path>$ErrorCode</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7ea7</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$ErrorCode='Success'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace contents-only="true" varName="body">
+                                    <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e7e</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/CreaUsuarioSistema/xq/creaUsuarioSistemaOUT"/>
+                                            <con1:param name="username">
+                                                <con1:path>$userName</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-4946358444113939104--2ec17f93.1727b4770e5.-7e96</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;aper:creaUsuarioSistemaResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="CreausuarioSistema_request">
+            <con:stage name="ObtenerParametrizacion">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="userName">
+                        <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7afd</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/aper:creaUsuarioSistema/USER_NAME/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7aef</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerParametrizacion</con2:operation>
+                        <con2:request>
+                            <con2:body>REQObtenerParametrizacion</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPObtenerParametrizacion</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="subsidiaryID">
+                                <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7afc</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>concat("FICBCO0403",".SUBSIDIARY.ICB.",$header/aut:RequestHeader/Region/SourceBank/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="ProductType">
+                                <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7afb</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>concat("FICBCO0403",".PRODUCT.TYPE.ICB.",$body/aper:creaUsuarioSistema/PRODUCT_TYPE_ID/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="DocumentType">
+                                <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7afa</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>concat("FICBCO0403",".DOCUMENT.TYPE.ICB.",$body/aper:creaUsuarioSistema/DOCUMENT_TYPE_ID/text(),".",$header/aut:RequestHeader/Region/SourceBank/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="REQObtenerParametrizacion">
+                                <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af9</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con1:param name="nombreParametros">
+                                            <con1:path>fn:concat($subsidiaryID,"||",$ProductType ,"||",$DocumentType,"||","FICBCO0403.URI.ICB")</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af8</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$RSPObtenerParametrizacion/osb:ERROR_CODE/text()='SUCCESS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="ErrorCode">
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af7</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>"Success"</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af6</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>""</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="subsidiaryIDValue">
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$subsidiaryID]/osb:VALUE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="ProductTypeValue">
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af4</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$ProductType]/osb:VALUE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="DocumentTypeValue">
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af3</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$DocumentType]/osb:VALUE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="UriICB">
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af2</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME="FICBCO0403.URI.ICB"]/osb:VALUE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:assign varName="ErrorCode">
+                                        <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af1</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>"ERROR"</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="validationMessage">
+                                        <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7af0</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryText>string($RSPObtenerParametrizacion/osb:ERROR_MESSAGE/text())</con1:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="CreaUsuarioSistema">
+                <con:context>
+                    <con1:userNsDecl namespace="urn:infocorp.framework.businessentities.common" prefix="d4p1"/>
+                    <con1:userNsDecl namespace="urn:tailored.icbanking.services.administration.general" prefix="ns0"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b5c</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$ErrorCode!='ERROR'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b53</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ICB/CreaUsuarioSistema/biz/CreaUsuarioSistemaICB" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>UsersOnboardingProcess</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQCrearUsurioSistema</con2:body>
+                                        <con2:header>REQHeaderCrearUsurioSistema</con2:header>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPCrearUsurioSistema</con2:body>
+                                        <con2:header>RSPHeaderCrearUsurioSistema</con2:header>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQHeaderCrearUsurioSistema">
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b5b</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/BusinessServices/ICB/CreaUsuarioSistema/xq/creaUsuarioSistemaHeaderIN"/>
+                                                    <con1:param name="operation">
+                                                        <con1:path>"UsersOnboardingProcess"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="uriICB">
+                                                        <con1:path>$UriICB</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="serviceAccount">
+                                                        <con1:path>"SARASRVACCOUNT"</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="REQCrearUsurioSistema">
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b5a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/CreaUsuarioSistema/xq/creaUsuarioSistemaIN"/>
+                                                    <con1:param name="SubsidiaryID">
+                                                        <con1:path>$subsidiaryIDValue</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="DocumentTypeID">
+                                                        <con1:path>$DocumentTypeValue</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="ProductTypeID">
+                                                        <con1:path>$ProductTypeValue</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="creaUsuarioSistemaIN">
+                                                        <con1:path>$body/aper:creaUsuarioSistema</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="ErrorCodeP">
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b59</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RSPCrearUsurioSistema/ns0:MessageId/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:ifThenElse>
+                                            <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b58</con1:id>
+                                            <con2:case>
+                                                <con2:condition>
+                                                    <con1:xqueryText>$RSPCrearUsurioSistema/ns0:MessageId/text()!=0</con1:xqueryText>
+                                                </con2:condition>
+                                                <con2:actions>
+                                                    <con2:assign varName="ErrorCode">
+                                                        <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b57</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>"ERROR"</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="validationMessage">
+                                                        <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b56</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>$RSPCrearUsurioSistema/ns0:Message/text()</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:actions>
+                                            </con2:case>
+                                            <con2:default>
+                                                <con2:assign varName="ErrorCode">
+                                                    <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b55</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>"Success"</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:assign varName="validationMessage">
+                                                    <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b54</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>""</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:default>
+                                        </con2:ifThenElse>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con1:skip>
+                                <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7b52</con1:id>
+                            </con1:skip>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="CreausuarioSistema_response">
+            <con:stage name="FlujodeSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7ab0</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/CreaUsuarioSistema/xq/CreaUsuarioSistemaHeaderOUT"/>
+                                <con1:param name="MessageError">
+                                    <con1:path>$validationMessage</con1:path>
+                                </con1:param>
+                                <con1:param name="ErrorCode">
+                                    <con1:path>$ErrorCode</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7aaf</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$ErrorCode='Success'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace contents-only="true" varName="body">
+                                    <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7aae</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/CreaUsuarioSistema/xq/creaUsuarioSistemaOUT"/>
+                                            <con1:param name="username">
+                                                <con1:path>$userName</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-893663032337489729--46c458b0.177d99d07fa.-7aad</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;aper:creaUsuarioSistemaResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                    <con:xpath>
+                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                    </con:xpath>
+                    <con:branch name="HN01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'HN01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="CreaUsuarioSistema">
+                                <con:request>CreaUsuarioSistema_request</con:request>
+                                <con:response>CreaUsuarioSistema_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="GT01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'GT01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="CreausuarioSistema">
+                                <con:request>CreausuarioSistema_request</con:request>
+                                <con:response>CreausuarioSistema_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_CreaUsuarioSistema">
+                                <con:request>Default_CreaUsuarioSistema_request</con:request>
+                                <con:response>Default_CreaUsuarioSistema_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

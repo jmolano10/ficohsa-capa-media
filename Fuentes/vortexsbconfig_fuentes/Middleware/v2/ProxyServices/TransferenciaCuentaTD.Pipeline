@@ -1,0 +1,727 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/TransferenciaCuentaTD/wsdl/transferenciaCuentaTDPS"/>
+            <con:binding>
+                <con:name>transferenciaCuentaTDPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/transferenciaCuentaTDPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-7985044929122335972--c256bf7.1653dd147c0.-7d54" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config">
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaCuentaTDTypes" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7f5e</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/TransferenciaCuentaTD/xsd/transferenciaCuentaTDTypes"/>
+                        <con2:schemaElement xmlns:tran1="http://www.ficohsa.com.hn/middleware.services/transferenciaCuentaTDTypes">tran1:transferenciaCuentaTD</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./tran:transferenciaCuentaTD</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegional">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaCuentaTDTypes" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7f4a</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>ValidaServicioRegional</con2:operation>
+                        <con2:request>
+                            <con2:body>reqValidaServicioRegional</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respValidaServicioRegional</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqValidaServicioRegional">
+                                <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7f27</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con1:param name="serviceId">
+                                            <con1:path>'FICBCO0259'</con1:path>
+                                        </con1:param>
+                                        <con1:param name="requestHeader1">
+                                            <con1:path>$header/aut:RequestHeader</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7f11</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7ee4</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:replace contents-only="true" varName="body">
+                                            <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7e96</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>&lt;tran:transferenciaCuentaTDResponse/></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con1:reply>
+                                            <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7e6e</con1:id>
+                                        </con1:reply>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:replace contents-only="true" varName="header">
+                                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7ec2</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con1:param name="requestHeader">
+                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:replace>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BitacoraRequest">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="uuidBitacoraRequest">
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7e53</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="originalBody">
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7e31</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="originalHeader">
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7e19</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$header</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con3:route>
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7dff</con1:id>
+                        <con3:service ref="Middleware/v2/BusinessServices/OSB/RegistrarBitacoraOSB_v2/biz/RegistrarBitacoraOSB_v2" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>registrarBitacoraOSB</con3:operation>
+                        <con3:outboundTransform>
+                            <con2:replace contents-only="true" varName="body">
+                                <con1:id>_ActionId-8231541531174917913--4d8a758e.166123a5eb3.-7cc3</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>.</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/registrarBitacoraOSBIn"/>
+                                        <con1:param name="UuidReq">
+                                            <con1:path>""</con1:path>
+                                        </con1:param>
+                                        <con1:param name="IdOsb">
+                                            <con1:path>fn:string($inbound/ctx:transport/ctx:request/tp:headers/tp:user-header[@name='Host']/@value)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="Uuid">
+                                            <con1:path>$uuidBitacoraRequest</con1:path>
+                                        </con1:param>
+                                        <con1:param name="Contenido">
+                                            <con1:path>$body</con1:path>
+                                        </con1:param>
+                                        <con1:param name="Usuario">
+                                            <con1:path>string($header/aut:RequestHeader/Authentication/UserName/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="FechaTxn">
+                                            <con1:path>current-date()</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MensajeError">
+                                            <con1:path>""</con1:path>
+                                        </con1:param>
+                                        <con1:param name="BancoDestino">
+                                            <con1:path>fn:string($header/aut:RequestHeader/Region/DestinationBank/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="BancoOrigen">
+                                            <con1:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="IdServicio">
+                                            <con1:path>'FICBCO0259'</con1:path>
+                                        </con1:param>
+                                        <con1:param name="Resultado">
+                                            <con1:path>""</con1:path>
+                                        </con1:param>
+                                        <con1:param name="IdOperacion">
+                                            <con1:path>fn:string($operation)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="IdTxn">
+                                            <con1:path>""</con1:path>
+                                        </con1:param>
+                                        <con1:param name="TipoMensaje">
+                                            <con1:path>"REQ"</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con3:outboundTransform>
+                    </con3:route>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="BitacoraResponse">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7db2</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($uuidBitacoraRequest) !=''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="uuidBitacoraResponse">
+                                    <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7d8e</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con3:route>
+                                    <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7d74</con1:id>
+                                    <con3:service ref="Middleware/v2/BusinessServices/OSB/RegistrarBitacoraOSB_v2/biz/RegistrarBitacoraOSB_v2" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>registrarBitacoraOSB</con3:operation>
+                                    <con3:outboundTransform>
+                                        <con2:replace varName="body" contents-only="true">
+                                            <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7d55</con1:id>
+                                            <con2:location>
+                                                <con1:xpathText>.</con1:xpathText>
+                                            </con2:location>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/registrarBitacoraOSBIn"/>
+                                                    <con1:param name="UuidReq">
+                                                        <con1:path>$uuidBitacoraRequest</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="IdOsb">
+                                                        <con1:path>fn:string($inbound/ctx:transport/ctx:request/tp:headers/tp:user-header[@name='Host']/@value)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Uuid">
+                                                        <con1:path>$uuidBitacoraResponse</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Contenido">
+                                                        <con1:path>$body</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Usuario">
+                                                        <con1:path>string($originalHeader/aut:RequestHeader/Authentication/UserName/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="FechaTxn">
+                                                        <con1:path>current-date()</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MensajeError">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/messages/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="BancoDestino">
+                                                        <con1:path>string($originalHeader/aut:RequestHeader/Region/DestinationBank/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="BancoOrigen">
+                                                        <con1:path>fn:string($originalHeader/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="IdServicio">
+                                                        <con1:path>"FICBCO0259"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Resultado">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="IdOperacion">
+                                                        <con1:path>fn:string($operation)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="IdTxn">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/transactionId/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="TipoMensaje">
+                                                        <con1:path>"RSP"</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con3:outboundTransform>
+                                </con3:route>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-7985044929122335972--c256bf7.1653dd147c0.-7d54">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaCuentaTDTypes" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="errorCode">
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7d42</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessage">
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7d2b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7d18</con1:id>
+                        <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>mapeoErrores</con2:operation>
+                        <con2:request>
+                            <con2:body>reqMapeoErrores</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respMapeoErrores</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqMapeoErrores">
+                                <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7cf9</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con1:param name="MENSAJE_ERROR">
+                                            <con1:path>fn:concat("FICBCO0259", "$#$", $errorMessage)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="CODIGO_ERROR">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7ce3</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con1:param name="mapeoErroresResponse1">
+                                            <con1:path>$respMapeoErrores</con1:path>
+                                        </con1:param>
+                                        <con1:param name="successIndicator">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7cc5</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;tran:transferenciaCuentaTDResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+            <con:stage name="BitacoraResponseError">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7cad</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($uuidBitacoraRequest) !=''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="uuidBitacoraError">
+                                    <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7c94</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con3:route>
+                                    <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7c73</con1:id>
+                                    <con3:service ref="Middleware/v2/BusinessServices/OSB/RegistrarBitacoraOSB_v2/biz/RegistrarBitacoraOSB_v2" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>registrarBitacoraOSB</con3:operation>
+                                    <con3:outboundTransform>
+                                        <con2:replace varName="body" contents-only="true">
+                                            <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7c53</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/registrarBitacoraOSBIn"/>
+                                                    <con1:param name="UuidReq">
+                                                        <con1:path>$uuidBitacoraRequest</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="IdOsb">
+                                                        <con1:path>fn:string($inbound/ctx:transport/ctx:request/tp:headers/tp:user-header[@name='Host']/@value)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Uuid">
+                                                        <con1:path>$uuidBitacoraError</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Contenido">
+                                                        <con1:path>$body</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Usuario">
+                                                        <con1:path>string($originalHeader/aut:RequestHeader/Authentication/UserName/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="FechaTxn">
+                                                        <con1:path>current-date()</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MensajeError">
+                                                        <con1:path>string($header/aut:ResponseHeader/messages/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="BancoDestino">
+                                                        <con1:path>string($originalHeader/aut:RequestHeader/Region/DestinationBank/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="BancoOrigen">
+                                                        <con1:path>string($originalHeader/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="IdServicio">
+                                                        <con1:path>"FICBCO0259"</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Resultado">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="IdOperacion">
+                                                        <con1:path>fn:string($operation)</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="IdTxn">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/transactionId/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="TipoMensaje">
+                                                        <con1:path>"RSP"</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con3:outboundTransform>
+                                </con3:route>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                    <con1:reply>
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7c11</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="Default_TransferenciaCuentaTD_request">
+            <con:stage name="FlujoEntrada">
+                <con:context/>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="Default_TransferenciaCuentaTD_response">
+            <con:stage name="FlujoSalida">
+                <con:context/>
+                <con:actions>
+                    <con2:Error>
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7bfe</con1:id>
+                        <con2:errCode>MW-0008</con2:errCode>
+                        <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                    </con2:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="TransferenciaCuentaTD_request">
+            <con:stage name="ParametrizacionMiddleware">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaCuentaTDTypes" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="processingCode">
+                        <con1:id>_ActionId-3666287382831820607--26e03526.176485ce6c0.-7ecd</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($body/tran:transferenciaCuentaTD/PROCESSING_CODE/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="cuentaDebitoInternoHNLParam">
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7be3</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:concat('FICBCO0259.',$processingCode,'.DEBITACCTHNL')</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="cuentaDebitoInternoUSDParam">
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7bc6</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:concat('FICBCO0259.',$processingCode,'.DEBITACCTUSD')</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="serviceAccountNameParam">
+                        <con1:id>_ActionId-2229280746444494739--487e6850.1658117641f.-7fb3</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:concat('FICBCO0259.',$processingCode,'.SERVACCOUNT.HN')</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="txnTypeCreditoParam">
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7bb2</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:concat('T24T250.',$processingCode,'.DEBITTXN')</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7b87</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerParametrizacion</con2:operation>
+                        <con2:request>
+                            <con2:body>REQobtenerParametrizacion</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPobtenerParametrizacion</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQobtenerParametrizacion">
+                                <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7b66</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con1:param name="nombreParametros">
+                                            <con1:path>fn:concat($cuentaDebitoInternoHNLParam, '||', $cuentaDebitoInternoUSDParam, '||',$serviceAccountNameParam , '||', $txnTypeCreditoParam)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-7985044929122335972--c256bf7.1653dd147c0.-7b46</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:ERROR_MESSAGE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="TransferenciaCuentaTD">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaCuentaTDTypes" prefix="tran"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="T24WebServicesImpl" prefix="t24"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3688442438684171255-7084db6b.165484217f8.-7d69</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-3688442438684171255-7084db6b.165484217f8.-7d65</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/T24/svcTransferenciasTD/biz/svcTransferenciasTDBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>TransferenciaCuentaTarjetaDebito</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQTransferenciaCuentaTarjetaDebito</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPTransferenciaCuentaTarjetaDebito</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQTransferenciaCuentaTarjetaDebito">
+                                            <con1:id>_ActionId-3688442438684171255-7084db6b.165484217f8.-7d66</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/TransferenciaCuentaTD/xq/transferenciaCuentaTarjetaDebitoIn"/>
+                                                    <con1:param name="cuentaDebitoInternoUSD">
+                                                        <con1:path>string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$cuentaDebitoInternoUSDParam]/osb:VALUE/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="serviceAccountName">
+                                                        <con1:path>string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$serviceAccountNameParam]/osb:VALUE/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="txnTypeCredito">
+                                                        <con1:path>string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$txnTypeCreditoParam]/osb:VALUE/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="cuentaDebitoInternoHNL">
+                                                        <con1:path>string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$cuentaDebitoInternoHNLParam]/osb:VALUE/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="transferenciaCuentaTD">
+                                                        <con1:path>$body/tran:transferenciaCuentaTD</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-3688442438684171255-7084db6b.165484217f8.-7d19</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>let $errorcode :=fn:string($RSPTransferenciaCuentaTarjetaDebito/Status/successIndicator/text())
+let $message := $RSPTransferenciaCuentaTarjetaDebito/Status/messages
+
+return
+	if($errorcode= 'Success') then(
+		''
+	) else(
+		fn:string-join($message,'. ')
+	)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="TransferenciaCuentaTD_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://www.functx.com" prefix="functx"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/transferenciaCuentaTDTypes" prefix="tran"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3688442438684171255-7084db6b.165484217f8.-7ea3</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-3688442438684171255-7084db6b.165484217f8.-7e86</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>.</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	  <transactionId>{ fn:string($RSPTransferenciaCuentaTarjetaDebito/Status/transactionId/text()) }</transactionId>
+	  <successIndicator>Success</successIndicator>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-168001213233194623--7f28e3c1.1655cfde453.-7fbf</con1:id>
+                                    <con2:location>
+                                        <con1:xpathText>.</con1:xpathText>
+                                    </con2:location>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/TransferenciaCuentaTD/xq/transferenciaCuentaTarjetaDebitoOut"/>
+                                            <con1:param name="transferenciaCuentaTarjetaDebitoResponse">
+                                                <con1:path>$RSPTransferenciaCuentaTarjetaDebito</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-2229280746444494739--487e6850.1658117641f.-7fec</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/TransferenciaCuentaTD/xq/extraerCodigoError"/>
+                                        <con1:param name="validationMessage">
+                                            <con1:path>$validationMessage</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-3688442438684171255-7084db6b.165484217f8.-7e5e</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>.</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{$errorCode}</successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-3688442438684171255-7084db6b.165484217f8.-7e4b</con1:id>
+                                <con2:location>
+                                    <con1:xpathText>.</con1:xpathText>
+                                </con2:location>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;tran:transferenciaCuentaTDResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                    <con:xpath>
+                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                    </con:xpath>
+                    <con:branch name="HN01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'HN01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="TransferenciaCuentaTD">
+                                <con:request>TransferenciaCuentaTD_request</con:request>
+                                <con:response>TransferenciaCuentaTD_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_TransferenciaCuentaTD">
+                                <con:request>Default_TransferenciaCuentaTD_request</con:request>
+                                <con:response>Default_TransferenciaCuentaTD_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

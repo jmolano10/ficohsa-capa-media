@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/NotificaCuponPendiente/wsdl/notificaCuponPendientePS"/>
+            <con:binding>
+                <con:name>notificaCuponPendientePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/notificaCuponPendientePS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-1294984096743893297--7583fd20.19b712167e4.-8000" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="NotificaCuponPendiente_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-1994938003745290124--34fe1244.19b0e322ded.-6332</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/RetiroSinTarjetaDebito/xsd/retiroSinTarjetaDebitoTypes"/>
+                        <con2:schemaElement xmlns:ret="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes">ret:notificaCuponPendiente</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./ret:notificaCuponPendiente</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="FlujoEntrada">
+                <con:context xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/cambiaEstadoCupon" prefix="db" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:userNsDecl namespace="urn:tailored.icbanking.services.transactionscustom" prefix="icb" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con1:assign varName="backendErrorCode">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-6168</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if(data($body/ret:notificaCuponPendiente/TYPE) = 'CANCEL') then
+	'402101'
+else if(data($body/ret:notificaCuponPendiente/TYPE) = 'EXPIRED') then
+	'402100'
+else
+	''</con3:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="status">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-61bc</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if(data($body/ret:notificaCuponPendiente/TYPE) = 'APPLY') then
+	'1'
+else
+	'5'</con3:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="uriICB">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-613b</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">data($body/ret:notificaCuponPendiente/ICB_URI)</con3:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-63c2</con3:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ICB/TransactionsCustomService/biz/TransactionsCustomService" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>UpdateTransaction</con1:operation>
+                        <con1:request>
+                            <con1:body>REQUpdateTransaction</con1:body>
+                            <con1:header>REQHeaderUpdateTransaction</con1:header>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPUpdateTransaction</con1:body>
+                            <con1:header>RSPHeaderUpdateTransaction</con1:header>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQHeaderUpdateTransaction">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-63c8</con3:id>
+                                <con1:expr>
+                                    <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                        <con3:resource ref="Middleware/v2/Resources/GestionCupon/xq/updateTransactionHeaderIn"/>
+                                        <con3:param name="uriICB">
+                                            <con3:path>$uriICB</con3:path>
+                                        </con3:param>
+                                        <con3:param name="serviceAccount">
+                                            <con3:path>'SARASRVACCOUNT'</con3:path>
+                                        </con3:param>
+                                    </con3:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="REQUpdateTransaction">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-63c7</con3:id>
+                                <con1:expr>
+                                    <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                        <con3:resource ref="Middleware/v2/Resources/GestionCupon/xq/updateTransactionIn"/>
+                                        <con3:param name="status">
+                                            <con3:path>$status</con3:path>
+                                        </con3:param>
+                                        <con3:param name="backendErrorCode">
+                                            <con3:path>$backendErrorCode</con3:path>
+                                        </con3:param>
+                                        <con3:param name="backendReference">
+                                            <con3:path>data($body/ret:notificaCuponPendiente/TRANSACTION_ID)</con3:path>
+                                        </con3:param>
+                                        <con3:param name="transactionId">
+                                            <con3:path>data($body/ret:notificaCuponPendiente/TRANSACTION_CORE_ID)</con3:path>
+                                        </con3:param>
+                                    </con3:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:routing-options>
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-63c6</con3:id>
+                                <con1:uriExpr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$uriICB</con3:xqueryText>
+                                </con1:uriExpr>
+                                <con1:mode>request-response</con1:mode>
+                                <con1:retryInterval>30</con1:retryInterval>
+                            </con1:routing-options>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="successIndicator">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-62a8</con3:id>
+                                <con1:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">data($RSPUpdateTransaction/icb:SuccessIndicator)</con3:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-63c5</con3:id>
+                                <con1:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">data($RSPUpdateTransaction/icb:Message)</con3:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="NotificaCuponPendiente_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1994938003745290124--34fe1244.19b0e322ded.-6201</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{$successIndicator}</successIndicator>
+	<messages>{$validationMessage}</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-1994938003745290124--34fe1244.19b0e322ded.-6270</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ret:notificaCuponPendiente/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-1294984096743893297--7583fd20.19b712167e4.-8000">
+            <con:stage name="ManejadorErrores">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1294984096743893297--7583fd20.19b712167e4.-7f8f</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>Notificación fallida</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-1294984096743893297--7583fd20.19b712167e4.-7f8e</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ret:notificaCuponPendiente/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-1294984096743893297--7583fd20.19b712167e4.-7f6d</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="NotificaCuponPendiente">
+                <con:request>NotificaCuponPendiente_request</con:request>
+                <con:response>NotificaCuponPendiente_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

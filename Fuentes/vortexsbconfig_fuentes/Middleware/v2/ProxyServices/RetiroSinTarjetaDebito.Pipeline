@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/RetiroSinTarjetaDebito/wsdl/retiroSinTarjetaDebitoPS"/>
+            <con:binding>
+                <con:name>retiroSinTarjetaDebitoPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con1:router errorHandler="_onErrorHandler-5656691700730765979-1f7bbe00.19683831b1c.-7b74" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con5="http://www.bea.com/wli/sb/stages/publish/config">
+        <con1:pipeline type="request" name="RetiroSinTarjetaDebito_request">
+            <con1:stage name="ConsultaRutaRegional">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaRutaRegional" prefix="con"/>
+                    <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="rtd"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:assign varName="serviceId">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7f31</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>'FICBCO0536'</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7f20</con2:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/consultaRutaRegional/biz/consultaRutaRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>consultaRutaRegional</con3:operation>
+                        <con3:request>
+                            <con3:body>REQconsultaRutaRegional</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPconsultaRutaRegional</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQconsultaRutaRegional">
+                                <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7f10</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/consultaRutaRegionalIn"/>
+                                        <con2:param name="version">
+                                            <con2:path>'V2'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="requestHeader">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                        <con2:param name="idServicio">
+                                            <con2:path>$serviceId</con2:path>
+                                        </con2:param>
+                                        <con2:param name="operacion">
+                                            <con2:path>$operation</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:ifThenElse>
+                                <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7ef5</con2:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con2:xqueryText>fn:string($RSPconsultaRutaRegional/con:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con2:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con3:replace contents-only="true" varName="header">
+                                            <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7ee5</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+<successIndicator>ERROR</successIndicator>
+<messages>{ fn:string($RSPconsultaRutaRegional/con:PV_MENSAJE_ERROR/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                            </con3:expr>
+                                        </con3:replace>
+                                        <con3:assign varName="responseEmpty">
+                                            <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7ebe</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryText>fn:string(concat('&lt;rtd:', $operation, 'Response xmlns:rtd="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes"/>'))</con2:xqueryText>
+                                            </con3:expr>
+                                        </con3:assign>
+                                        <con3:replace varName="body" contents-only="true">
+                                            <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7ea4</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryText>fn-bea:inlinedXML($responseEmpty)</con2:xqueryText>
+                                            </con3:expr>
+                                        </con3:replace>
+                                        <con2:reply>
+                                            <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7e8d</con2:id>
+                                        </con2:reply>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default>
+                                    <con3:replace varName="header" contents-only="true">
+                                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7ecf</con2:id>
+                                        <con3:expr>
+                                            <con2:xqueryTransform>
+                                                <con2:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con2:param name="requestHeader">
+                                                    <con2:path>$header/aut:RequestHeader</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con3:expr>
+                                    </con3:replace>
+                                </con3:default>
+                            </con3:ifThenElse>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con1:actions>
+            </con1:stage>
+            <con1:stage name="BitacoraRequest">
+                <con1:context xmlns:con5="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                </con1:context>
+                <con1:actions xmlns:con5="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+                    <con3:assign varName="ticket">
+                        <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-7a03</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>let $ticketRetiro := data(($body/ret:retiroCuponTD/TICKET_NUMBER | $body/ret:gestionCupon/TICKET_NUMBER | $body/ret:notificaCuponPendiente/TICKET_NUMBER))
+return
+if (string-length(normalize-space($ticketRetiro)) > 0) then
+	$ticketRetiro
+else
+	'0000'</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="uuid">
+                        <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-79e9</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>let $uuidTicket := data($body/ret:gestionCupon/TRANSACTION_ID | $body/ret:notificaCuponPendiente/TRANSACTION_ID)
+return
+	if (string-length(normalize-space($uuidTicket)) > 0 )then
+		$uuidTicket
+	else
+		'0'</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="operacion">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7d8f</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>let $typeOperation := data(($body/ret:retiroCuponTD/OPERATION | $body/ret:gestionCupon/TYPE))
+return
+	if ($operation = 'generarCuponRetiro') then
+		'GENERACION CUPON'
+	else if ($operation = 'retiroCuponTD' and $typeOperation = 'EXCHANGE') then
+		'COBRO DE CUPON'
+	else if ($operation = 'retiroCuponTD'and $typeOperation = 'REVERSE') then
+		'REVERSA COBRO'
+	else if ($operation = 'gestionCupon' and $typeOperation = 'APPLY') then
+		'APLICACION CUPON'
+	else if ($operation = 'gestionCupon' and $typeOperation = 'CANCEL') then
+		'CANCELACION CUPON'
+	else if ($operation = 'gestionCupon' and $typeOperation = 'EXPIRED') then
+		'EXPIRACION CUPON'
+	else if ($operation = 'notificaCuponPendiente') then
+		'NOTIFICACION PENDIENTE'
+	else
+		'NO DEFINIDA'</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="originalBody">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7d8e</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>$body</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="originalHeader">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7d8d</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>$header</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con4:route>
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7d8c</con2:id>
+                        <con4:service ref="Middleware/v2/BusinessServices/OperacionesTarjetaDebito/RegistraBitacora_db/biz/registraBitacora_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con4:operation>registraBitacora</con4:operation>
+                        <con4:outboundTransform>
+                            <con3:replace contents-only="true" varName="body">
+                                <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7d8b</con2:id>
+                                <con3:location>
+                                    <con2:xpathText>.</con2:xpathText>
+                                </con3:location>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/RetiroSinTarjetaDebito/xq/registraBitacoraIn"/>
+                                        <con2:param name="codRespuesta">
+                                            <con2:path>''</con2:path>
+                                        </con2:param>
+                                        <con2:param name="mensaje">
+                                            <con2:path>''</con2:path>
+                                        </con2:param>
+                                        <con2:param name="usuario">
+                                            <con2:path>string(data($header/aut:RequestHeader/Authentication/UserName))</con2:path>
+                                        </con2:param>
+                                        <con2:param name="uuid">
+                                            <con2:path>$uuid</con2:path>
+                                        </con2:param>
+                                        <con2:param name="contenido">
+                                            <con2:path>string(fn-bea:serialize($originalBody))</con2:path>
+                                        </con2:param>
+                                        <con2:param name="operacion">
+                                            <con2:path>$operacion</con2:path>
+                                        </con2:param>
+                                        <con2:param name="tipoRegistro">
+                                            <con2:path>'REQUEST'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="ticket">
+                                            <con2:path>$ticket</con2:path>
+                                        </con2:param>
+                                        <con2:param name="host">
+                                            <con2:path>string(data($inbound/ctx:transport/ctx:request/tp:headers/http:Host))</con2:path>
+                                        </con2:param>
+                                        <con2:param name="pais">
+                                            <con2:path>string(data($header/aut:RequestHeader/Region/SourceBank))</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:replace>
+                        </con4:outboundTransform>
+                    </con4:route>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="response" name="RetiroSinTarjetaDebito_response">
+            <con1:stage name="BitacoraResponse">
+                <con1:context xmlns:con5="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                </con1:context>
+                <con1:actions xmlns:con5="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con3:assign varName="ticket" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+                        <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-1f2d</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>let $ticketRetiro := data(($body/ret:generarCuponRetiroResponse/TICKET_NUMBER | $body/ret:retiroCuponTDResponse/TICKET_NUMBER | $body/ret:gestionCuponResponse/TICKET_NUMBER))
+return
+if (string-length(normalize-space($ticketRetiro)) > 0) then
+	$ticketRetiro
+else if (string-length(normalize-space($ticket)) > 0) then
+	$ticket
+else
+	'0000'</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="uuid" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+                        <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-1f2c</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>let $uuidTicket := data(($body/ret:generarCuponRetiroResponse/TRANSACTION_ID | $body/ret:retiroCuponTDResponse/TRANSACTION_ID | $body/ret:gestionCuponResponse/TRANSACTION_ID))
+return
+if (string-length(normalize-space($uuidTicket)) > 0) then
+	$uuidTicket
+else if (string-length(normalize-space($uuid)) > 0) then
+	$uuid
+else
+	'0'</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con6:route xmlns:con6="http://www.bea.com/wli/sb/stages/publish/config">
+                        <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-1f2b</con2:id>
+                        <con6:service ref="Middleware/v2/BusinessServices/OperacionesTarjetaDebito/RegistraBitacora_db/biz/registraBitacora_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con6:operation>registraBitacora</con6:operation>
+                        <con6:outboundTransform>
+                            <con3:replace contents-only="true" varName="body" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config">
+                                <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-1f2a</con2:id>
+                                <con3:location>
+                                    <con2:xpathText>.</con2:xpathText>
+                                </con3:location>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/RetiroSinTarjetaDebito/xq/registraBitacoraIn"/>
+                                        <con2:param name="codRespuesta">
+                                            <con2:path>string(data($header/aut:ResponseHeader/successIndicator))</con2:path>
+                                        </con2:param>
+                                        <con2:param name="mensaje">
+                                            <con2:path>string(data($header/aut:ResponseHeader/messages))</con2:path>
+                                        </con2:param>
+                                        <con2:param name="usuario">
+                                            <con2:path>string(data($originalHeader/aut:RequestHeader/Authentication/UserName))</con2:path>
+                                        </con2:param>
+                                        <con2:param name="uuid">
+                                            <con2:path>$uuid</con2:path>
+                                        </con2:param>
+                                        <con2:param name="contenido">
+                                            <con2:path>string(fn-bea:serialize($body))</con2:path>
+                                        </con2:param>
+                                        <con2:param name="operacion">
+                                            <con2:path>$operacion</con2:path>
+                                        </con2:param>
+                                        <con2:param name="tipoRegistro">
+                                            <con2:path>'RESPONSE'</con2:path>
+                                        </con2:param>
+                                        <con2:param name="ticket">
+                                            <con2:path>$ticket</con2:path>
+                                        </con2:param>
+                                        <con2:param name="host">
+                                            <con2:path>string(data($inbound/ctx:transport/ctx:request/tp:headers/http:Host))</con2:path>
+                                        </con2:param>
+                                        <con2:param name="pais">
+                                            <con2:path>string(data($originalHeader/aut:RequestHeader/Region/SourceBank))</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:replace>
+                        </con6:outboundTransform>
+                    </con6:route>
+                </con1:actions>
+            </con1:stage>
+            <con1:stage name="MapeoError">
+                <con1:context xmlns:con5="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con1:context>
+                <con1:actions xmlns:con5="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con3:ifThenElse>
+                        <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-1f35</con2:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != 'SUCCESS'</con2:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:wsCallout>
+                                    <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-1f32</con2:id>
+                                    <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>mapeoErrores</con3:operation>
+                                    <con3:request>
+                                        <con3:body>REQmapeoErrores</con3:body>
+                                    </con3:request>
+                                    <con3:response>
+                                        <con3:body>RSPmapeoErrores</con3:body>
+                                    </con3:response>
+                                    <con3:requestTransform>
+                                        <con3:assign varName="REQmapeoErrores">
+                                            <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-1f34</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con2:param name="MENSAJE_ERROR">
+                                                        <con2:path>fn:concat($serviceId,"$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="CODIGO_ERROR">
+                                                        <con2:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:assign>
+                                    </con3:requestTransform>
+                                    <con3:responseTransform>
+                                        <con3:replace varName="header" contents-only="true">
+                                            <con2:id>_ActionId-6589269004590814636--a68dcf9.19a30a4c04e.-1f33</con2:id>
+                                            <con3:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con2:param name="mapeoErroresResponse1">
+                                                        <con2:path>$RSPmapeoErrores</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="successIndicator">
+                                                        <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:replace>
+                                    </con3:responseTransform>
+                                </con3:wsCallout>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default/>
+                    </con3:ifThenElse>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:pipeline type="error" name="_onErrorHandler-5656691700730765979-1f7bbe00.19683831b1c.-7b74">
+            <con1:stage name="ManejoError">
+                <con1:context xmlns:con5="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/mobilDigitizationCardsTypes" prefix="mob"/>
+                </con1:context>
+                <con1:actions xmlns:con5="http://www.bea.com/wli/sb/stages/routing/config">
+                    <con3:assign varName="errorCode">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7af9</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="errorMessage">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7af8</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7af5</con2:id>
+                        <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>mapeoErrores</con3:operation>
+                        <con3:request>
+                            <con3:body>REQmapeoErrores</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPmapeoErrores</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQmapeoErrores">
+                                <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7af7</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con2:param name="MENSAJE_ERROR">
+                                            <con2:path>fn:concat('FICBCO0536', "$#$", $errorMessage)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="CODIGO_ERROR">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7af6</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con2:param name="mapeoErroresResponse1">
+                                            <con2:path>$RSPmapeoErrores</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                    <con3:assign varName="responseEmpty">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7af4</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>fn:string(concat('&lt;rtd:', $operation, 'Response xmlns:rtd="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes"/>'))</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:replace contents-only="true" varName="body">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7af3</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>fn-bea:inlinedXML($responseEmpty)</con2:xqueryText>
+                        </con3:expr>
+                    </con3:replace>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:flow>
+            <con1:pipeline-node name="RetiroSinTarjetaDebito">
+                <con1:request>RetiroSinTarjetaDebito_request</con1:request>
+                <con1:response>RetiroSinTarjetaDebito_response</con1:response>
+            </con1:pipeline-node>
+            <con1:route-node name="RouteDinamico">
+                <con1:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaRutaRegional" prefix="con"/>
+                </con1:context>
+                <con1:actions>
+                    <con4:dynamic-route>
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7c80</con2:id>
+                        <con4:service>
+                            <con2:xqueryText>&lt;ctx:route>
+&lt;ctx:service isProxy='true'>{ fn:string($RSPconsultaRutaRegional/con:PV_UBICACION/text()) }&lt;/ctx:service>
+&lt;/ctx:route></con2:xqueryText>
+                        </con4:service>
+                        <con4:outboundTransform/>
+                        <con4:responseTransform/>
+                    </con4:dynamic-route>
+                </con1:actions>
+            </con1:route-node>
+        </con1:flow>
+    </con1:router>
+</con:pipelineEntry>

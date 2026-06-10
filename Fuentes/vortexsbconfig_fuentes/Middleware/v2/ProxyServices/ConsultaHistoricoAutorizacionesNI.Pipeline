@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaHistoricoAutorizaciones/wsdl/consultaHistoricoAutorizacionesPS"/>
+            <con:binding>
+                <con:name>consultaHistoricoAutorizacionesPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaHistoricoAutorizacionesPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con2:router errorHandler="_onErrorHandler-8049491879487865322-3509ff6d.16ae042014e.-5484" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+        <con2:pipeline type="request" name="ConsultaHistoricoAutorizaciones_request">
+            <con2:stage name="FlujoEntrada">
+                <con2:context>
+                    <con:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoCuenta" prefix="cdc"/>
+                    <con:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoAutorizacionesHistorica" prefix="cons"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaHistoricoAutorizacionesTypes" prefix="con"/>
+                </con2:context>
+                <con2:actions>
+                    <con1:assign varName="codigoPais">
+                        <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f33</con:id>
+                        <con1:expr>
+                            <con:xqueryTransform>
+                                <con:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con:param name="sentidoConversion">
+                                    <con:path>"OSB-ISO3"</con:path>
+                                </con:param>
+                                <con:param name="codigoPais">
+                                    <con:path>fn:string($header/aut:RequestHeader/Region/SourceBank/text())</con:path>
+                                </con:param>
+                            </con:xqueryTransform>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f2e</con:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterData/conDatoAutorizacionesHistorica/biz/conDatoAutorizacionesHistorica_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>conDatoAutorizacionesHistorica</con1:operation>
+                        <con1:request>
+                            <con1:body>REQconDatoAutorizacionesHistorica</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPconDatoAutorizacionesHistorica</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQconDatoAutorizacionesHistorica">
+                                <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f32</con:id>
+                                <con1:expr>
+                                    <con:xqueryTransform>
+                                        <con:resource ref="Middleware/v2/Resources/MasterData/xq/conDatoAutorizacionesHistoricaIn"/>
+                                        <con:param name="consultaHistoricoAutorizacionesRequest">
+                                            <con:path>$body/con:consultaHistoricoAutorizacionesRequest</con:path>
+                                        </con:param>
+                                        <con:param name="countryCode">
+                                            <con:path>$codigoPais</con:path>
+                                        </con:param>
+                                    </con:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:validate>
+                                <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7c7f</con:id>
+                                <con1:schema ref="Middleware/v2/BusinessServices/MasterData/conDatoAutorizacionesHistorica/xsd/conDatoAutorizacionesHistorica_sp"/>
+                                <con1:schemaElement xmlns:con3="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoAutorizacionesHistorica">con3:InputParameters</con1:schemaElement>
+                                <con1:varName>REQconDatoAutorizacionesHistorica</con1:varName>
+                                <con1:location>
+                                    <con:xpathText>.</con:xpathText>
+                                </con1:location>
+                            </con1:validate>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f30</con:id>
+                                <con1:expr>
+                                    <con:xqueryText>fn:string($RSPconDatoAutorizacionesHistorica/cons:CodigoError/text())</con:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f2f</con:id>
+                                <con1:expr>
+                                    <con:xqueryText>if( not($errorCode = ('-1'))) then(
+	string($RSPconDatoAutorizacionesHistorica/cons:MensajeError/text())
+) else ('')</con:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con2:actions>
+            </con2:stage>
+        </con2:pipeline>
+        <con2:pipeline type="response" name="ConsultaHistoricoAutorizaciones_response">
+            <con2:stage name="FlujoSalida">
+                <con2:context>
+                    <con:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaHistoricoAutorizacionesTypes" prefix="con"/>
+                </con2:context>
+                <con2:actions>
+                    <con1:ifThenElse>
+                        <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f28</con:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con:xqueryText>$validationMessage = ''</con:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace varName="header" contents-only="true">
+                                    <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f27</con:id>
+                                    <con1:expr>
+                                        <con:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                                <con1:replace varName="body" contents-only="true">
+                                    <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f26</con:id>
+                                    <con1:expr>
+                                        <con:xqueryTransform>
+                                            <con:resource ref="Middleware/v2/Resources/ConsultaHistoricoAutorizaciones/xq/consultaHistoricoAutorizacionesOut"/>
+                                            <con:param name="outputParameters">
+                                                <con:path>$RSPconDatoAutorizacionesHistorica</con:path>
+                                            </con:param>
+                                        </con:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="header">
+                                <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f25</con:id>
+                                <con1:expr>
+                                    <con:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                            <con1:replace varName="body" contents-only="true">
+                                <con:id>_ActionId-7216787907343704515-17c780f6.16ac65f042d.-7f24</con:id>
+                                <con1:expr>
+                                    <con:xqueryText>&lt;con:consultaHistoricoAutorizacionesResponse/></con:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con2:actions>
+            </con2:stage>
+        </con2:pipeline>
+        <con2:pipeline type="error" name="_onErrorHandler-8049491879487865322-3509ff6d.16ae042014e.-5484">
+            <con2:stage name="ManejoError">
+                <con2:context>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaHistoricoAutorizacionesTypes" prefix="con"/>
+                </con2:context>
+                <con2:actions>
+                    <con1:replace varName="header" contents-only="true">
+                        <con:id>_ActionId-8049491879487865322-3509ff6d.16ae042014e.-5456</con:id>
+                        <con1:expr>
+                            <con:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con:id>_ActionId-8049491879487865322-3509ff6d.16ae042014e.-5440</con:id>
+                        <con1:expr>
+                            <con:xqueryText>&lt;con:consultaHistoricoAutorizacionesResponse/></con:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con:reply>
+                        <con:id>_ActionId-8049491879487865322-3509ff6d.16ae042014e.-5419</con:id>
+                    </con:reply>
+                </con2:actions>
+            </con2:stage>
+        </con2:pipeline>
+        <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:pipeline-node name="ConsultaHistoricoAutorizaciones">
+                <con:request>ConsultaHistoricoAutorizaciones_request</con:request>
+                <con:response>ConsultaHistoricoAutorizaciones_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con2:router>
+</con:pipelineEntry>

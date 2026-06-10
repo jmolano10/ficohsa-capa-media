@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ServiciosEmpresariales/wsdl/serviciosEmpresarialesPS"/>
+            <con:binding>
+                <con:name>serviciosEmpresarialesPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/serviciosEmpresarialesPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con1:router errorHandler="_onErrorHandler-458952820243128065-5c687950.16d68e258b8.-7ec7" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config">
+        <con1:pipeline type="error" name="_onErrorHandler-458952820243128065-5c687950.16d68e258b8.-7ec7">
+            <con1:stage name="ManejoError">
+                <con1:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/serviciosEmpresarialesTypes" prefix="ser"/>
+                </con1:context>
+                <con1:actions>
+                    <con3:assign varName="errorCode">
+                        <con2:id>_ActionId-458952820243128065-5c687950.16d68e258b8.-7e23</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="errorMessage">
+                        <con2:id>_ActionId-458952820243128065-5c687950.16d68e258b8.-7e06</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:wsCallout>
+                        <con2:id>_ActionId-458952820243128065-5c687950.16d68e258b8.-7de9</con2:id>
+                        <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>mapeoErrores</con3:operation>
+                        <con3:request>
+                            <con3:body>REQMapeoErrores</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPMapeoErrores</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQMapeoErrores">
+                                <con2:id>_ActionId-458952820243128065-5c687950.16d68e258b8.-7d5c</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con2:param name="CODIGO_ERROR">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                        <con2:param name="MENSAJE_ERROR">
+                                            <con2:path>fn:concat("FICBCO0364", "$#$", $errorMessage)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-458952820243128065-5c687950.16d68e258b8.-7d24</con2:id>
+                                <con3:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con2:param name="mapeoErroresResponse1">
+                                            <con2:path>$RSPMapeoErrores</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                    <con3:replace contents-only="true" varName="body">
+                        <con2:id>_ActionId-458952820243128065-5c687950.16d68e258b8.-7db1</con2:id>
+                        <con3:expr>
+                            <con2:xqueryText><![CDATA[if ($operation = "registraClienteDesembolsoLineaCredito") then (
+	<ser:registraClienteDesembolsoLineaCreditoResponse/>
+) else if ($operation = "consultaClienteDesembolsoLineaCredito") then (
+	<ser:consultaClienteDesembolsoLineaCreditoResponse/>
+) else if ($operation = "modificarClienteDesembolsoLineaCredito") then (
+	<ser:modificaClienteDesembolsoLineaCreditoResponse/>
+) else if ($operation = "registraTargetTipoPrestamo") then (
+	<ser:registraTargetTipoPrestamoResponse/>
+) else if ($operation = "consultaTargetTipoPrestamo") then (
+	<ser:consultaTargetTipoPrestamoResponse/>
+) else if ($operation = "modificaTargetTipoPrestamo") then (
+	<ser:modificaTargetTipoPrestamoResponse/>
+) else ()]]></con2:xqueryText>
+                        </con3:expr>
+                    </con3:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-458952820243128065-5c687950.16d68e258b8.-7d94</con2:id>
+                    </con2:reply>
+                </con1:actions>
+            </con1:stage>
+        </con1:pipeline>
+        <con1:flow>
+            <con1:branch-node type="operation" name="Operaciones">
+                <con1:context/>
+                <con1:branch-table>
+                    <con1:branch name="registraClienteDesembolsoLineaCredito">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value/>
+                        <con1:flow>
+                            <con1:route-node name="RegistraClienteDesembolsoLineaCredito">
+                                <con1:context/>
+                                <con1:actions>
+                                    <con4:route>
+                                        <con2:id>_ActionId-1514576921039790618--46dc5c0.16d69ff054c.-7e36</con2:id>
+                                        <con4:service ref="Middleware/v2/ProxyServices/RegistraClienteDesembolsoLineaCredito" xsi:type="con1:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con4:operation>registraClienteDesembolsoLineaCredito</con4:operation>
+                                        <con4:outboundTransform/>
+                                        <con4:responseTransform/>
+                                    </con4:route>
+                                </con1:actions>
+                            </con1:route-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="consultaClienteDesembolsoLineaCredito">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value/>
+                        <con1:flow>
+                            <con1:route-node name="ConsultaClienteDesembolsoLineaCredito">
+                                <con1:context/>
+                                <con1:actions>
+                                    <con4:route>
+                                        <con2:id>_ActionId-5772825591785964235--48208c48.16d87fcb5cb.-7f92</con2:id>
+                                        <con4:service ref="Middleware/v2/ProxyServices/ConsultaClienteDesembolsoLineaCredito" xsi:type="con1:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con4:operation>consultaClienteDesembolsoLineaCredito</con4:operation>
+                                        <con4:outboundTransform/>
+                                        <con4:responseTransform/>
+                                    </con4:route>
+                                </con1:actions>
+                            </con1:route-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="modificaClienteDesembolsoLineaCredito">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value/>
+                        <con1:flow>
+                            <con1:route-node name="ModificaClienteDesembolsoLineaCredito">
+                                <con1:context/>
+                                <con1:actions>
+                                    <con4:route>
+                                        <con2:id>_ActionId-1514576921039790618--46dc5c0.16d69ff054c.-7dff</con2:id>
+                                        <con4:service ref="Middleware/v2/ProxyServices/ModificaClienteDesembolsoLineaCredito" xsi:type="con1:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con4:operation>modificaClienteDesembolsoLineaCredito</con4:operation>
+                                        <con4:outboundTransform/>
+                                        <con4:responseTransform/>
+                                    </con4:route>
+                                </con1:actions>
+                            </con1:route-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="registraTargetTipoPrestamo">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value/>
+                        <con1:flow>
+                            <con1:route-node name="RegistraTargetTipoPrestamo">
+                                <con1:context/>
+                                <con1:actions>
+                                    <con4:route>
+                                        <con2:id>_ActionId-1514576921039790618--46dc5c0.16d69ff054c.-7c08</con2:id>
+                                        <con4:service ref="Middleware/v2/ProxyServices/RegistraTargetTipoPrestamo" xsi:type="con1:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con4:operation>registraTargetTipoPrestamo</con4:operation>
+                                        <con4:outboundTransform/>
+                                        <con4:responseTransform/>
+                                    </con4:route>
+                                </con1:actions>
+                            </con1:route-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="consultaTargetTipoPrestamo">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value/>
+                        <con1:flow>
+                            <con1:route-node name="ConsultaTargetTipoPrestamo">
+                                <con1:context/>
+                                <con1:actions>
+                                    <con4:route>
+                                        <con2:id>_ActionId-8384594811145132010--381b2121.16da7ff6418.-7f68</con2:id>
+                                        <con4:service ref="Middleware/v2/ProxyServices/ConsultaTargetTipoPrestamo" xsi:type="con1:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con4:operation>consultaTargetTipoPrestamo</con4:operation>
+                                        <con4:outboundTransform/>
+                                        <con4:responseTransform/>
+                                    </con4:route>
+                                </con1:actions>
+                            </con1:route-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:branch name="modificaTargetTipoPrestamo">
+                        <con1:operator>equals</con1:operator>
+                        <con1:value/>
+                        <con1:flow>
+                            <con1:route-node name="ModificaTargetTipoPrestamo">
+                                <con1:context/>
+                                <con1:actions>
+                                    <con4:route>
+                                        <con2:id>_ActionId-3158526111444762108-21ca5035.16dcfdb324b.-7f54</con2:id>
+                                        <con4:service ref="Middleware/v2/ProxyServices/ModificaTargetTipoPrestamo" xsi:type="con1:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con4:operation>modificaTargetTipoPrestamo</con4:operation>
+                                        <con4:outboundTransform/>
+                                        <con4:responseTransform/>
+                                    </con4:route>
+                                </con1:actions>
+                            </con1:route-node>
+                        </con1:flow>
+                    </con1:branch>
+                    <con1:default-branch>
+                        <con1:flow/>
+                    </con1:default-branch>
+                </con1:branch-table>
+            </con1:branch-node>
+        </con1:flow>
+    </con1:router>
+</con:pipelineEntry>

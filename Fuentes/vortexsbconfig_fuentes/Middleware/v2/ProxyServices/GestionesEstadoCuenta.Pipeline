@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/GestionesEstadoCuenta/wsdl/gestionesEstadoCuentaPS"/>
+            <con:binding>
+                <con:name>gestionEstadoCuentaPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/gestionEstadoCuentaPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-917853087656907375-7d8f9883.16200e6bae6.-7d72" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="error" name="_onErrorHandler-917853087656907375-7d8f9883.16200e6bae6.-7d72">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionEstadoCuentaTypes" prefix="ges"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesEstadoCuentaTypes" prefix="ges1"/>
+                </con:context>
+                <con:actions>
+                    <con4:assign varName="errorCode">
+                        <con2:id>_ActionId-917853087656907375-7d8f9883.16200e6bae6.-7d2c</con2:id>
+                        <con4:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+                        </con4:expr>
+                    </con4:assign>
+                    <con4:assign varName="errorMessage">
+                        <con2:id>_ActionId-917853087656907375-7d8f9883.16200e6bae6.-7d0e</con2:id>
+                        <con4:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+                        </con4:expr>
+                    </con4:assign>
+                    <con4:wsCallout>
+                        <con2:id>_ActionId-917853087656907375-7d8f9883.16200e6bae6.-7cee</con2:id>
+                        <con4:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con4:operation>mapeoErrores</con4:operation>
+                        <con4:request>
+                            <con4:body>reqMapeoErrores</con4:body>
+                        </con4:request>
+                        <con4:response>
+                            <con4:body>respMapeoErrores</con4:body>
+                        </con4:response>
+                        <con4:requestTransform>
+                            <con4:assign varName="reqMapeoErrores">
+                                <con2:id>_ActionId-917853087656907375-7d8f9883.16200e6bae6.-7cc4</con2:id>
+                                <con4:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con2:param name="CODIGO_ERROR">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                        <con2:param name="MENSAJE_ERROR">
+                                            <con2:path>fn:concat("FICBCO0263", "$#$", $errorMessage)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con4:expr>
+                            </con4:assign>
+                        </con4:requestTransform>
+                        <con4:responseTransform>
+                            <con4:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-917853087656907375-7d8f9883.16200e6bae6.-7cb0</con2:id>
+                                <con4:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con2:param name="mapeoErroresResponse1">
+                                            <con2:path>$respMapeoErrores</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con4:expr>
+                            </con4:replace>
+                        </con4:responseTransform>
+                    </con4:wsCallout>
+                    <con4:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-917853087656907375-7d8f9883.16200e6bae6.-7c9d</con2:id>
+                        <con4:expr>
+                            <con2:xqueryText>if($operation = 'actualizarDatosPlantilla')then(
+	&lt;ges1:actualizarDatosPlantillaResponse/>	
+)else if($operation = 'consultaEstadoDatosPlantilla')then(
+	&lt;ges1:consultaEstadoDatosPlantillaResponse/>
+)else()</con2:xqueryText>
+                        </con4:expr>
+                    </con4:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-917853087656907375-7d8f9883.16200e6bae6.-7c6b</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:branch-node type="operation" name="Operaciones">
+                <con:context/>
+                <con:branch-table>
+                    <con:branch name="consultaEstadoDatosPlantilla">
+                        <con:operator>equals</con:operator>
+                        <con:value/>
+                        <con:flow>
+                            <con:route-node name="consultaEstadoDatosPlantilla">
+                                <con:context/>
+                                <con:actions>
+                                    <con1:route>
+                                        <con2:id>_ActionId-7214835969554600346-26db48f8.161fbfa6f37.-74e0</con2:id>
+                                        <con1:service ref="Middleware/v2/ProxyServices/ConsultaEstadoDatosPlantilla" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con1:operation>consultaEstadoDatosPlantilla</con1:operation>
+                                        <con1:outboundTransform/>
+                                        <con1:responseTransform/>
+                                    </con1:route>
+                                </con:actions>
+                            </con:route-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="actualizarDatosPlantilla">
+                        <con:operator>equals</con:operator>
+                        <con:value/>
+                        <con:flow>
+                            <con:route-node name="actualizarDatosPlantilla">
+                                <con:context/>
+                                <con:actions>
+                                    <con1:route>
+                                        <con2:id>_ActionId-7214835969554600346-26db48f8.161fbfa6f37.-7473</con2:id>
+                                        <con1:service ref="Middleware/v2/ProxyServices/ActualizarDatosPlantilla" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                        <con1:operation>actualizarDatosPlantilla</con1:operation>
+                                        <con1:outboundTransform/>
+                                        <con1:responseTransform/>
+                                    </con1:route>
+                                </con:actions>
+                            </con:route-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow/>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

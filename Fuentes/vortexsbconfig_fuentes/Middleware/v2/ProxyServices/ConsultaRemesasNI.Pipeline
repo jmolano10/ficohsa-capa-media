@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con3:wsdl ref="Middleware/v2/Resources/ConsultaRemesas/wsdl/consultaRemesasPS" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:env="http://www.bea.com/wli/config/env" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config"/>
+            <con:binding>
+                <con:name>consultaRemesasPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaRemesasPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8038243182680323275-2650d0f7.199c0f6eb9a.-7e83" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="ConsultaRemesasNI_request">
+            <con:stage name="ParametrizacionMiddleware">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="REMITALLOW">
+                        <con1:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7f83</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:concat("NI01.",fn:upper-case($header/aut:RequestHeader/Authentication/UserName),".REMITALLOW")</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7f7f</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerParametrizacion</con2:operation>
+                        <con2:request>
+                            <con2:body>REQobtenerParametrizacion</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPobtenerParametrizacion</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQobtenerParametrizacion">
+                                <con1:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7f81</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con1:param name="nombreParametros">
+                                            <con1:path>fn:concat(
+$RIAAGENTID, " || ",
+$OCPAPIMSUBSCRIPTIONKEY, " || ",
+$REMITALLOW)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7f80</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:ERROR_MESSAGE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="remittanceAllowed">
+                                <con1:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7f2a</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$REMITALLOW]/osb:VALUE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ObtenerTipoRemesadora">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ObtenerTipoRemesadora" prefix="obt"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7f07</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage=''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7ee4</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MDW/obtenerTipoRemesadoraNI/biz/ObtenerTipoRemesadora_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>ObtenerTipoRemesadora</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQObtenerTipoRemesadora</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPObtenerTipoRemesadora</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQObtenerTipoRemesadora">
+                                            <con1:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7eba</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaRemesas/xq/obtenerTipoRemesadoraNIIn"/>
+                                                    <con1:param name="claveRemesadora">
+                                                        <con1:path>fn:string($body/con:consultaRemesas/REMITTANCE_ID/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="usuarioServicio">
+                                                        <con1:path>fn:string($header/aut:RequestHeader/Authentication/UserName/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con4:assign varName="errorCode" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7e66</con5:id>
+                                            <con4:expr>
+                                                <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($RSPObtenerTipoRemesadora/obt:PV_SUCCESS_INDICATOR/text())</con5:xqueryText>
+                                            </con4:expr>
+                                        </con4:assign>
+                                        <con4:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7e06</con5:id>
+                                            <con4:case>
+                                                <con4:condition>
+                                                    <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">$errorCode="SUCCESS"</con5:xqueryText>
+                                                </con4:condition>
+                                                <con4:actions>
+                                                    <con4:assign varName="numberOfRemitters">
+                                                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7e05</con5:id>
+                                                        <con4:expr>
+                                                            <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">count($RSPObtenerTipoRemesadora/obt:PT_TIPOS_REMESADORAS/obt:PT_TIPOS_REMESADORAS_ITEM)</con5:xqueryText>
+                                                        </con4:expr>
+                                                    </con4:assign>
+                                                    <con4:assign varName="remittanceType">
+                                                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7e04</con5:id>
+                                                        <con4:expr>
+                                                            <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($RSPObtenerTipoRemesadora/obt:PT_TIPOS_REMESADORAS/obt:PT_TIPOS_REMESADORAS_ITEM[1]/obt:PV_TIPO_REMESADORA/text())</con5:xqueryText>
+                                                        </con4:expr>
+                                                    </con4:assign>
+                                                </con4:actions>
+                                            </con4:case>
+                                            <con4:default>
+                                                <con4:assign varName="validationMessage">
+                                                    <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7de6</con5:id>
+                                                    <con4:expr>
+                                                        <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($RSPObtenerTipoRemesadora/obt:PV_MESSAGES/text())</con5:xqueryText>
+                                                    </con4:expr>
+                                                </con4:assign>
+                                                <con4:replace varName="header" contents-only="true">
+                                                    <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7e02</con5:id>
+                                                    <con4:expr>
+                                                        <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{$successIndTipoRem}</successIndicator>
+      <messages>{$mensajeError}</messages>
+</aut:ResponseHeader>]]></con5:xqueryText>
+                                                    </con4:expr>
+                                                </con4:replace>
+                                                <con4:replace varName="body" contents-only="true">
+                                                    <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7e01</con5:id>
+                                                    <con4:expr>
+                                                        <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">&lt;con:consultaRemesasResponse/></con5:xqueryText>
+                                                    </con4:expr>
+                                                </con4:replace>
+                                                <con5:reply xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                                                    <con5:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7e00</con5:id>
+                                                </con5:reply>
+                                            </con4:default>
+                                        </con4:ifThenElse>
+                                        <con4:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con4="http://www.bea.com/wli/sb/stages/transform/config">
+                                            <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d2a</con5:id>
+                                            <con4:case>
+                                                <con4:condition>
+                                                    <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">xs:integer($numberOfRemitters) = 1</con5:xqueryText>
+                                                </con4:condition>
+                                                <con4:actions>
+                                                    <con4:assign varName="remittSource">
+                                                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d28</con5:id>
+                                                        <con4:expr>
+                                                            <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($RSPObtenerTipoRemesadora/obt:PT_TIPOS_REMESADORAS/obt:PT_TIPOS_REMESADORAS_ITEM[1]/obt:PV_ABREVIATURA_REMESADORA/text())</con5:xqueryText>
+                                                        </con4:expr>
+                                                    </con4:assign>
+                                                    <con4:assign varName="agreementId">
+                                                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d27</con5:id>
+                                                        <con4:expr>
+                                                            <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">fn:string($RSPObtenerTipoRemesadora/obt:PT_TIPOS_REMESADORAS/obt:PT_TIPOS_REMESADORAS_ITEM[1]/obt:PN_ID_CONVENIO/text())</con5:xqueryText>
+                                                        </con4:expr>
+                                                    </con4:assign>
+                                                    <con4:assign varName="grant">
+                                                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d26</con5:id>
+                                                        <con4:expr>
+                                                            <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">let $allowsUserList := fn:tokenize(fn:string($remittanceAllowed),"\|\|")
+return empty(fn:index-of($allowsUserList,$remittSource))</con5:xqueryText>
+                                                        </con4:expr>
+                                                    </con4:assign>
+                                                    <con4:ifThenElse>
+                                                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d25</con5:id>
+                                                        <con4:case>
+                                                            <con4:condition>
+                                                                <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">$remittSource='NA'</con5:xqueryText>
+                                                            </con4:condition>
+                                                            <con4:actions>
+                                                                <con4:replace varName="header" contents-only="true">
+                                                                    <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d24</con5:id>
+                                                                    <con4:expr>
+                                                                        <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>Codigo de remesa no valido</messages>
+</aut:ResponseHeader>]]></con5:xqueryText>
+                                                                    </con4:expr>
+                                                                </con4:replace>
+                                                                <con4:replace contents-only="true" varName="body">
+                                                                    <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d23</con5:id>
+                                                                    <con4:expr>
+                                                                        <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">&lt;con:consultaRemesasResponse/></con5:xqueryText>
+                                                                    </con4:expr>
+                                                                </con4:replace>
+                                                                <con5:reply xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                                                                    <con5:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7d22</con5:id>
+                                                                </con5:reply>
+                                                            </con4:actions>
+                                                        </con4:case>
+                                                        <con4:default/>
+                                                    </con4:ifThenElse>
+                                                    <con4:ifThenElse>
+                                                        <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d21</con5:id>
+                                                        <con4:case>
+                                                            <con4:condition>
+                                                                <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">$grant = 'false'</con5:xqueryText>
+                                                            </con4:condition>
+                                                            <con4:actions/>
+                                                        </con4:case>
+                                                        <con4:default>
+                                                            <con4:replace contents-only="true" varName="body">
+                                                                <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d20</con5:id>
+                                                                <con4:expr>
+                                                                    <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config">&lt;con:consultaRemesasResponse/></con5:xqueryText>
+                                                                </con4:expr>
+                                                            </con4:replace>
+                                                            <con4:replace varName="header" contents-only="true">
+                                                                <con5:id xmlns:con5="http://www.bea.com/wli/sb/stages/config">_ActionId-5809193594957230554--176ba704.199a0a90503.-7d1f</con5:id>
+                                                                <con4:expr>
+                                                                    <con5:xqueryText xmlns:con5="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>El usuario no tiene permisos para consultar este tipos de claves de remesa</messages>
+</aut:ResponseHeader>]]></con5:xqueryText>
+                                                                </con4:expr>
+                                                            </con4:replace>
+                                                            <con5:reply xmlns:con5="http://www.bea.com/wli/sb/stages/config">
+                                                                <con5:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7d1e</con5:id>
+                                                            </con5:reply>
+                                                        </con4:default>
+                                                    </con4:ifThenElse>
+                                                </con4:actions>
+                                            </con4:case>
+                                            <con4:default/>
+                                        </con4:ifThenElse>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaRemesa">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaMultipleRemesadorasNI" prefix="sj"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-5809193594957230554--176ba704.199a0a90503.-7d01</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage=''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-3447062001791042986-105e9f2a.199b2a7b46b.-7fec</con1:id>
+                                    <con2:service ref="Middleware/v2/BusinessServices/SJS/consultaMultipleRemesadorasNI/flow/sjConsultaMultipleRemesadorasNI" xsi:type="con3:FlowRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con3="http://www.bea.com/alsb/flow/resources/config"/>
+                                    <con2:operation>consultaRemesadoras</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsultaRemesadoras</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsultaRemesadoras</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConsultaRemesadoras">
+                                            <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7fed</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaRemesas/xq/sjConsultaMultipleRemesadorasNIIn"/>
+                                                    <con1:param name="consultaRemesas">
+                                                        <con1:path>$body/con:consultaRemesas</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="outputParameters">
+                                                        <con1:path>$RSPObtenerTipoRemesadora</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7fbd</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPConsultaRemesadoras/sj:SUCCESS_INDICATOR/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7f9f</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPConsultaRemesadoras/sj:ERROR_MESSAGE/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaRemesasNI_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ingresoRelConsPagoRem" prefix="reg"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7ee1</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+    <successIndicator>
+    {
+		if (fn:string($validationMessage) != "") then (
+			$errorCode
+		) else (
+			"SUCCESS"
+		)
+	}
+    </successIndicator>
+    <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7f85</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7f51</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/registraRelConsPagoRemNI/biz/ingresoRelConsPagoRem_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>ingresoRelConsPagoRem</con2:operation>
+                                    <con2:request>
+                                        <con2:body wrapped="false">REQIngresoRelConsPagoRem</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body wrapped="false">RSPIngresoRelConsPagoRem</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQIngresoRelConsPagoRem">
+                                            <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7f40</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ConsultaRemesas/xq/ingresoRelConsPagoRemNIIn"/>
+                                                    <con1:param name="sjConsultaMultipleRemesadorasNIResponse">
+                                                        <con1:path>$RSPConsultaRemesadoras</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7f2b</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:data($RSPIngresoRelConsPagoRem/reg:PV_CODIGOERROR)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7f18</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:data($RSPIngresoRelConsPagoRem/reg:PV_MENSAJEERROR)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                                <con2:replace contents-only="true" varName="body">
+                                    <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7ea2</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaRemesas/xq/consultaRemesasNIOut"/>
+                                            <con1:param name="sjConsultaRemesadorasNIResponse">
+                                                <con1:path>$RSPConsultaRemesadoras</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7e84</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con:consultaRemesasResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con3:wsCallout xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                                <con2:id>_ActionId-a51ea03.33c5044b.0.19a16f7cad7.N7f34</con2:id>
+                                <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                <con3:operation>mapeoErrores</con3:operation>
+                                <con3:request>
+                                    <con3:body>REQMapeoErrores</con3:body>
+                                </con3:request>
+                                <con3:response>
+                                    <con3:body>RSPMapeoErrores</con3:body>
+                                </con3:response>
+                                <con3:requestTransform>
+                                    <con3:assign varName="REQMapeoErrores">
+                                        <con2:id>_ActionId-a51ea03.33c5044b.0.19a16f7cad7.N7f33</con2:id>
+                                        <con3:expr>
+                                            <con2:xqueryTransform>
+                                                <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                <con2:param name="MENSAJE_ERROR">
+                                                    <con2:path>fn:string($header/aut:ResponseHeader/messages[1]/text())</con2:path>
+                                                </con2:param>
+                                                <con2:param name="CODIGO_ERROR">
+                                                    <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con3:expr>
+                                    </con3:assign>
+                                </con3:requestTransform>
+                                <con3:responseTransform>
+                                    <con3:replace varName="header" contents-only="true">
+                                        <con2:id>_ActionId-a51ea03.33c5044b.0.19a16f7cad7.N7f32</con2:id>
+                                        <con3:expr>
+                                            <con2:xqueryTransform>
+                                                <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                <con2:param name="mapeoErroresResponse1">
+                                                    <con2:path>$RSPMapeoErrores</con2:path>
+                                                </con2:param>
+                                                <con2:param name="successIndicator">
+                                                    <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                                </con2:param>
+                                            </con2:xqueryTransform>
+                                        </con3:expr>
+                                    </con3:replace>
+                                </con3:responseTransform>
+                            </con3:wsCallout>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-8038243182680323275-2650d0f7.199c0f6eb9a.-7e83">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaRemesasTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7e0c</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7e0a</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;con:consultaRemesasResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-8038243182680323275-2650d0f7.199c0f6eb9a.-7e08</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ConsultaRemesasNI">
+                <con:request>ConsultaRemesasNI_request</con:request>
+                <con:response>ConsultaRemesasNI_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaExtrafinanciamientoDisponible/wsdl/consultaExtrafinanciamientoDisponiblePS"/>
+            <con:binding>
+                <con:name>consultaExtrafinanciamientoDisponiblePSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaExtrafinanciamientoDisponiblePS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-2595569162090790857--11225eea.16bd1f9ee85.-7e92" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="ConsultaExtrafinanciamientoDisponibleGT_request">
+            <con:stage name="FlujoEntrada">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaExtrafinanciamientoDisponibleTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="codigoPais">
+                        <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7f32</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                </con1:param>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>'OSB-ISO3'</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7f68</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ProcesosGT/obtenerBlazeData/biz/obtenerBlazeData_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerBlazeData</con2:operation>
+                        <con2:request>
+                            <con2:body>REQobtenerBlazeData</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPobtenerBlazeData</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQobtenerBlazeData">
+                                <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7e51</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MasterDataGT/xq/obtenerBlazeDataGTIn"/>
+                                        <con1:param name="codigoPais">
+                                            <con1:path>$codigoPais</con1:path>
+                                        </con1:param>
+                                        <con1:param name="tipo">
+                                            <con1:path>string($body/con:consultaExtrafinanciamientoDisponible/SEARCH_CRITERIA/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="numCuenta">
+                                            <con1:path>string($body/con:consultaExtrafinanciamientoDisponible/SEARCH_VALUE/text())</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:validate>
+                                <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7e2f</con1:id>
+                                <con2:schema ref="Middleware/v2/BusinessServices/ProcesosGT/obtenerBlazeData/xsd/obtenerBlazeData_sp"/>
+                                <con2:schemaElement xmlns:obt="http://xmlns.oracle.com/pcbpel/adapter/db/sp/obtenerBlazeData">obt:InputParameters</con2:schemaElement>
+                                <con2:varName>REQobtenerBlazeData</con2:varName>
+                            </con2:validate>
+                        </con2:requestTransform>
+                        <con2:responseTransform/>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ConsultaExtrafinanciamientoDisponibleGT_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/obtenerBlazeData" prefix="obt"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaExtrafinanciamientoDisponibleTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7f01</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:string($RSPobtenerBlazeData/obt:CodigoError/text()) = "-1"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7ed5</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7ebd</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/ConsultaExtrafinanciamientoDisponible/xq/consultaExtrafinanciamientoDisponibleGTOut"/>
+                                            <con1:param name="outputParameters">
+                                                <con1:path>$RSPobtenerBlazeData</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7eb1</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator> ERROR </successIndicator>
+	<messages> {fn:string($RSPobtenerBlazeData/obt:MensajeError/text())} </messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7e93</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;con:consultaExtrafinanciamientoDisponibleResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-2595569162090790857--11225eea.16bd1f9ee85.-7e92">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaExtrafinanciamientoDisponibleTypes" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7cef</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<message>{ string($fault/ctx:reason/text()) }</message>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7cc1</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;con:consultaExtrafinanciamientoDisponibleResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-2595569162090790857--11225eea.16bd1f9ee85.-7c74</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ConsultaExtrafinanciamientoDisponibleGT">
+                <con:request>ConsultaExtrafinanciamientoDisponibleGT_request</con:request>
+                <con:response>ConsultaExtrafinanciamientoDisponibleGT_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

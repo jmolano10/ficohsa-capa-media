@@ -1,0 +1,547 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v3/Resources/PagoTarjetaCredito/wsdl/pagoTarjetaCreditoPS"/>
+            <con:binding>
+                <con:name>pagoTarjetaCreditoPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/pagoTarjetaCreditoPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con3:router errorHandler="_onErrorHandler-5094800037764973504-7f5d924c.162ac5f6e36.-7a1f" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/pipeline/config">
+        <con:pipeline type="request" name="ValidacionesGenerales_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoTarjetaCreditoType" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-756c</con1:id>
+                        <con2:schema ref="Middleware/v3/Resources/PagoTarjetaCredito/xsd/pagoTarjetaCreditoType"/>
+                        <con2:schemaElement xmlns:pag="http://www.ficohsa.com.hn/middleware.services/pagoTarjetaCreditoType">pag:pagoTarjetaCredito</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./pag:pagoTarjetaCredito</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegion">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoTarjetaCreditoType" prefix="pag"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7f6b</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>ValidaServicioRegional</con1:operation>
+                        <con1:request>
+                            <con1:body>reqValidaServicioRegional</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>respValidaServicioRegional</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="reqValidaServicioRegional">
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7f33</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                        <con2:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con2:param name="requestHeader1">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                        <con2:param name="serviceId">
+                                            <con2:path>"FICBCO0063"</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:ifThenElse>
+                                <con2:id xmlns:con2="http://www.bea.com/wli/sb/stages/config">_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7efb</con2:id>
+                                <con1:case>
+                                    <con1:condition>
+                                        <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text())!= 'SUCCESS'</con4:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:replace varName="header" contents-only="true">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7e89</con4:id>
+                                            <con1:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:RequestHeader>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:RequestHeader>]]></con4:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con1:replace varName="body" contents-only="true">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7e8b</con4:id>
+                                            <con1:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">&lt;pag:pagoTarjetaCreditoResponse/></con4:xqueryText>
+                                            </con1:expr>
+                                        </con1:replace>
+                                        <con4:reply xmlns:con4="http://www.bea.com/wli/sb/stages/config">
+                                            <con4:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7e4d</con4:id>
+                                        </con4:reply>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:replace varName="header" contents-only="true">
+                                        <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7d6d</con4:id>
+                                        <con1:expr>
+                                            <con4:xqueryTransform xmlns:con4="http://www.bea.com/wli/sb/stages/config">
+                                                <con4:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con4:param name="requestHeader">
+                                                    <con4:path>$header/aut:RequestHeader</con4:path>
+                                                </con4:param>
+                                            </con4:xqueryTransform>
+                                        </con1:expr>
+                                    </con1:replace>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con2:assign varName="sourceBank">
+                        <con1:id>_ActionId-8666207391438852784-70e13569.16422eeb6b1.-7f5b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="MapeoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-6fcf</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != 'SUCCESS'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-6f97</con1:id>
+                                    <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>mapeoErrores</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQMapeoErrores</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPMapeoErrores</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQMapeoErrores">
+                                            <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-6f5f</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con1:param name="CODIGO_ERROR">
+                                                        <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MENSAJE_ERROR">
+                                                        <con1:path>fn:concat("FICBCO0063","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-6f27</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con1:param name="mapeoErroresResponse1">
+                                                        <con1:path>$RSPMapeoErrores</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="successIndicator">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con3:pipeline type="request" name="NI01_PagoTarjetaCredito_request">
+            <con3:stage name="ConsultaParametros">
+                <con3:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con3:context>
+                <con3:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7f27</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerParametrizacion</con2:operation>
+                        <con2:request>
+                            <con2:body>REQobtenerParametrizacion</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPobtenerParametrizacion</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="canalParameter">
+                                <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7eb7</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:upper-case(fn:concat('FICBCO0063.',$header/aut:RequestHeader/Authentication/UserName/text(),'-',$header/aut:RequestHeader/Region/SourceBank/text(),'.CANAL'))</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="usuarioPOSParameter">
+                                <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7e0d</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:upper-case(fn:concat('FICBCO0063.',$header/aut:RequestHeader/Authentication/UserName/text(),'-',$header/aut:RequestHeader/Region/SourceBank/text(),'.USUARIOPOS'))</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="comercioParameter">
+                                <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7dd3</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:upper-case(fn:concat('FICBCO0063.',$header/aut:RequestHeader/Authentication/UserName/text(),'-',$header/aut:RequestHeader/Region/SourceBank/text(),'.COMERCIO'))</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="REQobtenerParametrizacion">
+                                <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7eef</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con1:param name="nombreParametros">
+                                            <con1:path>fn:concat($canalParameter,'||',$usuarioPOSParameter, '||', $comercioParameter)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="canalOriginador">
+                                <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7e45</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$canalParameter]/osb:VALUE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="usuarioPOS">
+                                <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7df0</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$usuarioPOSParameter]/osb:VALUE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="numComercio">
+                                <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7db6</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$comercioParameter]/osb:VALUE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7cd1</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSPobtenerParametrizacion/osb:ERROR_CODE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7cd3</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($RSPobtenerParametrizacion/osb:ERROR_MESSAGE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con3:actions>
+            </con3:stage>
+            <con3:stage name="PagoTarjeta">
+                <con3:context>
+                    <con1:userNsDecl namespace="http://dto.srvaplcobiscanalesentidades.ecobis.cobiscorp" prefix="ns0"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaBitacoraEC" prefix="con1"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoTarjetaCreditoType" prefix="pag"/>
+                </con3:context>
+                <con3:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7d13</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7d0b</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v3/BusinessServices/CTS/tarjetaCredito/biz/tarjetaCredito" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>OpPagoTarjetaCredito</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQOpPagoTarjetaCredito</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPOpPagoTarjetaCredito</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQOpPagoTarjetaCredito">
+                                            <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7d0e</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v3/Resources/PagoTarjetaCredito/xq/opPagoTarjetaCreditoIn"/>
+                                                    <con1:param name="usuarioPOS">
+                                                        <con1:path>$usuarioPOS</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="sourceBank">
+                                                        <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="pagoTarjetaCredito1">
+                                                        <con1:path>$body/pag:pagoTarjetaCredito</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="codCanalOriginador">
+                                                        <con1:path>$canalOriginador</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="numComercio">
+                                                        <con1:path>$numComercio</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:validate>
+                                            <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7c63</con1:id>
+                                            <con2:schema ref="Middleware/v3/BusinessServices/CTS/tarjetaCredito/xsd/services"/>
+                                            <con2:schemaElement xmlns:ser1="http://service.srvaplcobistarjetacreditov3.ecobis.cobiscorp">ser1:opPagoTarjetaCreditoSolicitud</con2:schemaElement>
+                                            <con2:varName>REQOpPagoTarjetaCredito</con2:varName>
+                                            <con2:location>
+                                                <con1:xpathText>.</con1:xpathText>
+                                            </con2:location>
+                                        </con2:validate>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7d0d</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPOpPagoTarjetaCredito/ns0:contextoRespuesta/ns0:codTipoRespuesta/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-7886655507214244998--3d6ac289.1641d922377.-7d0c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>let $errorMessage := string($RSPOpPagoTarjetaCredito/ns0:contextoRespuesta/ns0:valDescripcionRespuesta/text())
+return
+if(xs:decimal($errorCode) = 0) then(
+	''
+)else(
+	if(contains($errorMessage, 'MsjId'))then(
+		fn-bea:trim(fn:substring-after($errorMessage, ')'))
+	)else(
+		$errorMessage
+	)
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con3:actions>
+            </con3:stage>
+        </con3:pipeline>
+        <con3:pipeline type="response" name="NI01_PagoTarjetaCredito_response">
+            <con3:stage name="FlujoSalida">
+                <con3:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoTarjetaCreditoType" prefix="pag"/>
+                </con3:context>
+                <con3:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7a75</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	{
+		if($validationMessage = '') then (
+			<successIndicator>Success</successIndicator>
+		)else(
+			<successIndicator>{ $errorCode }</successIndicator>,
+			<messages>{ $validationMessage }</messages>
+		)
+	}
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7a77</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-76a2</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v3/Resources/PagoTarjetaCredito/xq/pagoTarjetaCreditoOut"/>
+                                            <con1:param name="balanceCurrency">
+                                                <con1:path>string($body/pag:pagoTarjetaCredito/BALANCE_CURRENCY/text())</con1:path>
+                                            </con1:param>
+                                            <con1:param name="opPagoTarjetaCreditoRespuesta1">
+                                                <con1:path>$RSPOpPagoTarjetaCredito</con1:path>
+                                            </con1:param>
+                                            <con1:param name="transactionCurrency">
+                                                <con1:path>string($body/pag:pagoTarjetaCredito/TRANSACTION_CURRENCY/text())</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-76a0</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;pag:pagoTarjetaCreditoResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con3:actions>
+            </con3:stage>
+        </con3:pipeline>
+        <con3:pipeline type="error" name="_onErrorHandler-5094800037764973504-7f5d924c.162ac5f6e36.-7a1f">
+            <con3:stage name="ManejoError">
+                <con3:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/pagoTarjetaCreditoType" prefix="pag"/>
+                </con3:context>
+                <con3:actions>
+                    <con2:assign varName="errorCode">
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7122</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessage">
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7124</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7901</con1:id>
+                        <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>mapeoErrores</con2:operation>
+                        <con2:request>
+                            <con2:body>REQMapeoErrores</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPMapeoErrores</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQMapeoErrores">
+                                <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-78c5</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con1:param name="CODIGO_ERROR">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MENSAJE_ERROR">
+                                            <con1:path>fn:concat("FICBCO0063","$#$",$errorMessage)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7855</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con1:param name="mapeoErroresResponse1">
+                                            <con1:path>$RSPMapeoErrores</con1:path>
+                                        </con1:param>
+                                        <con1:param name="successIndicator">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-70ac</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;pag:pagoTarjetaCreditoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7819</con1:id>
+                    </con1:reply>
+                </con3:actions>
+            </con3:stage>
+        </con3:pipeline>
+        <con3:pipeline type="request" name="Default_PagoTarjetaCredito_request">
+            <con3:stage name="FlujoEntrada">
+                <con3:context/>
+            </con3:stage>
+        </con3:pipeline>
+        <con3:pipeline type="response" name="Default_PagoTarjetaCredito_response">
+            <con3:stage name="FlujoSalida">
+                <con3:context/>
+                <con3:actions>
+                    <con2:Error>
+                        <con1:id>_ActionId-5094800037764973504-7f5d924c.162ac5f6e36.-7492</con1:id>
+                        <con2:errCode>MW-0008</con2:errCode>
+                        <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                    </con2:Error>
+                </con3:actions>
+            </con3:stage>
+        </con3:pipeline>
+        <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizaciónPaísEmpresa">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                    <con:xpath>
+                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                    </con:xpath>
+                    <con:branch name="NI01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'NI01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="NI01_PagoTarjetaCredito">
+                                <con:request>NI01_PagoTarjetaCredito_request</con:request>
+                                <con:response>NI01_PagoTarjetaCredito_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_PagoTarjetaCredito">
+                                <con:request>Default_PagoTarjetaCredito_request</con:request>
+                                <con:response>Default_PagoTarjetaCredito_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con3:router>
+</con:pipelineEntry>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:xqueryEntry xmlns:con="http://www.bea.com/wli/sb/resources/config">
+    <con:xquery><![CDATA[xquery version "2004-draft";
+(:: pragma bea:global-element-parameter parameter="$generaDetalleEmboce" element="ns0:generaDetalleEmboce" location="../../OperacionesTarjetaDebito/xsd/operacionesTarjetaDebitoTypes.xsd" ::)
+(:: pragma bea:global-element-return element="ns0:consultaDetalleTarjetas" location="../../OperacionesTarjetaDebito/xsd/operacionesTarjetaDebitoTypes.xsd" ::)
+
+declare namespace ns0 = "http://www.ficohsa.com.hn/middleware.services/operacionesTarjetaDebitoTypes";
+declare namespace xf = "http://tempuri.org/Middleware/v2/Resources/GeneraDetalleEmboce/xq/consultaDetalleTarjetasIn/";
+
+declare function xf:consultaDetalleTarjetasIn($generaDetalleEmboce as element(ns0:generaDetalleEmboce))
+    as element(ns0:consultaDetalleTarjetas) {
+        <ns0:consultaDetalleTarjetas>
+            <CARD_NUMBERS>
+                {
+                    for $CARD_ITEM in $generaDetalleEmboce/CARD_DETAILS/CARD_ITEM
+                    return
+                        <CARD_NUMBER_ITEM>
+                            <CARD_NUMBER>{ data($CARD_ITEM/CARD_NUMBER) }</CARD_NUMBER>
+                        </CARD_NUMBER_ITEM>
+                }
+            </CARD_NUMBERS>
+        </ns0:consultaDetalleTarjetas>
+};
+
+declare variable $generaDetalleEmboce as element(ns0:generaDetalleEmboce) external;
+
+xf:consultaDetalleTarjetasIn($generaDetalleEmboce)]]></con:xquery>
+    <con:dependency location="../../OperacionesTarjetaDebito/xsd/operacionesTarjetaDebitoTypes.xsd">
+        <con:schema ref="Middleware/v2/Resources/OperacionesTarjetaDebito/xsd/operacionesTarjetaDebitoTypes"/>
+    </con:dependency>
+</con:xqueryEntry>

@@ -1,0 +1,445 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/RemplazoPlasticoTC/wsdl/remplazoPlasticoTCPS"/>
+            <con:binding>
+                <con:name>remplazoPlasticoTCPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/remplazoPlasticoTCPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-2788503017482025155-3ad849e7.17a7c423f47.-7abd" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="RemplazoPlasticoTCHN_request">
+            <con:stage name="ConsultaDatosTarjeta">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="codigoPais">
+                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7f33</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                </con1:param>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>"OSB-ISO3"</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7f2b</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoTarjeta/biz/conDatoTarjeta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>conDatoTarjeta</con2:operation>
+                        <con2:request>
+                            <con2:body>REQConDatoTarjeta</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPConDatoTarjeta</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQConDatoTarjeta">
+                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7f0d</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MasterDataHN/xq/conDatoTarjetaIn"/>
+                                        <con1:param name="codigoPais">
+                                            <con1:path>$codigoPais</con1:path>
+                                        </con1:param>
+                                        <con1:param name="cardNumber">
+                                            <con1:path>string($body/ges:remplazoPlasticoTC/CARD_NUMBER/text())</con1:path>
+                                        </con1:param>
+                                        <con1:param name="org">
+                                            <con1:path>''</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:validate>
+                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7e9c</con1:id>
+                                <con2:schema ref="Middleware/v2/BusinessServices/MasterDataHN/conDatoTarjeta/xsd/conDatoTarjeta_sp"/>
+                                <con2:schemaElement xmlns:con="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta">con:InputParameters</con2:schemaElement>
+                                <con2:varName>REQConDatoTarjeta</con2:varName>
+                            </con2:validate>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="sequence">
+                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7eef</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPConDatoTarjeta/con:RowSet/con:Row[1]/con:Column[@name = 'seqcard']/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7ed6</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPConDatoTarjeta/con:CodigoError/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7eb7</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if( not($errorCode = '-1')) then(
+	string($RSPConDatoTarjeta/con:MensajeError/text())
+) else ('')</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaVisionPlus">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.procesa.com/fdcs" prefix="fdcs"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7e60</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7e43</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>string($body/ges:remplazoPlasticoTC/CHANGE_NAME/text()) = 'YES'</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:foreach>
+                                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7e1e</con1:id>
+                                                <con2:variable>RSPConDatoTarjeta</con2:variable>
+                                                <con2:expression>
+                                                    <con1:xpathText>./con:RowSet/con:Row</con1:xpathText>
+                                                </con2:expression>
+                                                <con2:value-variable>row</con2:value-variable>
+                                                <con2:index-variable>index</con2:index-variable>
+                                                <con2:total-variable>count</con2:total-variable>
+                                                <con2:actions>
+                                                    <con2:assign varName="org">
+                                                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7e01</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>string($row/con:Column[upper-case(@name) = 'ORG']/text())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="foreignUse">
+                                                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7de6</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>if(data($row/con:Column[upper-case(@name) = 'TIPOORG']) = 'BASE') then(
+	'0'
+)else(
+	'1'
+)</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:wsCallout>
+                                                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7dc8</con1:id>
+                                                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                        <con2:operation>EmbosserUpdateR8V7</con2:operation>
+                                                        <con2:request>
+                                                            <con2:body>REQEmbosserUpdateR8V7</con2:body>
+                                                        </con2:request>
+                                                        <con2:response>
+                                                            <con2:body>RSPEmbosserUpdateR8V7</con2:body>
+                                                        </con2:response>
+                                                        <con2:requestTransform>
+                                                            <con2:assign varName="REQEmbosserUpdateR8V7">
+                                                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7d9e</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryTransform>
+                                                                        <con1:resource ref="Middleware/v2/Resources/VisionPlus/xq/embosserUpdateR8V7In"/>
+                                                                        <con1:param name="cardNumber">
+                                                                            <con1:path>string($body/ges:remplazoPlasticoTC/CARD_NUMBER/text())</con1:path>
+                                                                        </con1:param>
+                                                                        <con1:param name="secondCardName">
+                                                                            <con1:path>string($body/ges:remplazoPlasticoTC/CARD_NAME_2/text())</con1:path>
+                                                                        </con1:param>
+                                                                        <con1:param name="org">
+                                                                            <con1:path>$org</con1:path>
+                                                                        </con1:param>
+                                                                        <con1:param name="firstCardName">
+                                                                            <con1:path>string($body/ges:remplazoPlasticoTC/CARD_NAME/text())</con1:path>
+                                                                        </con1:param>
+                                                                        <con1:param name="foreignUse">
+                                                                            <con1:path>$foreignUse</con1:path>
+                                                                        </con1:param>
+                                                                    </con1:xqueryTransform>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:validate>
+                                                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7d45</con1:id>
+                                                                <con2:schema ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/xsd/XMLSchema_769155616"/>
+                                                                <con2:schemaElement xmlns:fdcs="http://www.procesa.com/fdcs">fdcs:EmbosserUpdateR8V7Request</con2:schemaElement>
+                                                                <con2:varName>REQEmbosserUpdateR8V7</con2:varName>
+                                                            </con2:validate>
+                                                        </con2:requestTransform>
+                                                        <con2:responseTransform>
+                                                            <con2:assign varName="errorCode">
+                                                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7d78</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>string($RSPEmbosserUpdateR8V7/ServiceReturnCode/text())</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:assign varName="validationMessage">
+                                                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7d64</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>if($errorCode != 'P')then(
+	string($RSPEmbosserUpdateR8V7/fdcs:ReturnCodes/RC[1]/Desc/text())
+)else('')</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                        </con2:responseTransform>
+                                                    </con2:wsCallout>
+                                                </con2:actions>
+                                            </con2:foreach>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default/>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7c69</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="org">
+                                    <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7c42</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>for $row in $RSPConDatoTarjeta/con:RowSet/con:Row
+where $row/con:Column[upper-case(@name) = 'TIPOORG' and  text() = 'BASE']
+return
+      data($row/con:Column[upper-case(@name) = 'ORG'])</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7c2c</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>PINSuppressionUpdate</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQPINSuppressionUpdate</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPPINSuppressionUpdate</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQPINSuppressionUpdate">
+                                            <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7c04</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/VisionPlus/xq/PINSuppressionUpdateIn"/>
+                                                    <con1:param name="seqCard">
+                                                        <con1:path>$sequence</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="org">
+                                                        <con1:path>$org</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="pinSuppression">
+                                                        <con1:path>string($body/ges:remplazoPlasticoTC/PIN_SUPPRESSION/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="numTarjeta">
+                                                        <con1:path>string($body/ges:remplazoPlasticoTC/CARD_NUMBER/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:validate>
+                                            <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7ba0</con1:id>
+                                            <con2:schema ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/xsd/XMLSchema_769155616"/>
+                                            <con2:schemaElement xmlns:fdcs="http://www.procesa.com/fdcs">fdcs:PINSuppressionUpdateRequest</con2:schemaElement>
+                                            <con2:varName>REQPINSuppressionUpdate</con2:varName>
+                                        </con2:validate>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7bdb</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPPINSuppressionUpdate/ServiceReturnCode/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7bb9</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != 'P')then(
+	string($RSPPINSuppressionUpdate/fdcs:ReturnCodes/RC/Desc/text())
+)else('')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7b69</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7b4d</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/biz/visionPlus" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>CardActionUpdate</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQCardActionUpdate</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPCardActionUpdate</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQCardActionUpdate">
+                                            <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7b2b</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/RemplazoPlasticoTC/xq/cardActionUpdateHNIn"/>
+                                                    <con1:param name="cardNumber">
+                                                        <con1:path>string($body/ges:remplazoPlasticoTC/CARD_NUMBER/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="pinSupression">
+                                                        <con1:path>string($body/ges:remplazoPlasticoTC/PIN_SUPPRESSION/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="sequenceCard">
+                                                        <con1:path>$sequence</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="org">
+                                                        <con1:path>$org</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="action">
+                                                        <con1:path>"3"</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:validate>
+                                            <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7ac2</con1:id>
+                                            <con2:schema ref="Middleware/v2/BusinessServices/VisionPlus/visionPlus/xsd/XMLSchema_769155616"/>
+                                            <con2:schemaElement xmlns:fdcs="http://www.procesa.com/fdcs">fdcs:CardActionUpdateRequest</con2:schemaElement>
+                                            <con2:varName>REQCardActionUpdate</con2:varName>
+                                        </con2:validate>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7b0d</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPCardActionUpdate/ServiceReturnCode/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7af2</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != 'P')then(
+	string($RSPCardActionUpdate/fdcs:ReturnCodes/RC/Desc/text())
+)else('')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="RemplazoPlasticoTCHN_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7a56</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="header" contents-only="true">
+                                    <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7a38</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-79e3</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-7957</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ges:remplazoPlasticoTCResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-2788503017482025155-3ad849e7.17a7c423f47.-7abd">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/gestionesTarjetasTypes" prefix="ges"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-78e4</con3:id>
+                        <con1:expr>
+                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>{ string($fault/ctx:errorCode) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-78e3</con3:id>
+                        <con1:expr>
+                            <con2:xqueryText xmlns:con2="http://www.bea.com/wli/sb/stages/config">&lt;ges:remplazoPlasticoTCResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-2788503017482025155-3ad849e7.17a7c423f47.-78e2</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="RemplazoPlasticoTCHN">
+                <con:request>RemplazoPlasticoTCHN_request</con:request>
+                <con:response>RemplazoPlasticoTCHN_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

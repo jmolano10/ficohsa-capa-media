@@ -1,0 +1,686 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ConsultaSaldosTarjetaCredito/wsdl/consultaSaldosTarjetaCreditoPS"/>
+            <con:binding>
+                <con:name>consultaSaldosTarjetaCreditoPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con2:router errorHandler="_onErrorHandler-8870993661483024583-41efabfd.16b9457f9f2.-7261" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con="http://www.bea.com/wli/sb/stages/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/pipeline/config">
+        <con:pipeline type="request" name="GT01_ConsultaSaldosTarjetaCredito_request" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="ConsultaSaldosTarjetaCredito">
+                <con:context>
+                    <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaSaldosTC" prefix="con1" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conConsultaSaldosCuentaTC" prefix="ns0" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoTypes" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                        <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7e96</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/consultaSaldosTC/biz/consultaSaldosTC_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>consultaSaldosTC</con1:operation>
+                        <con1:request>
+                            <con1:body>REQConsultaSaldosTC</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPConsultaSaldosTC</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQConsultaSaldosTC">
+                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7e9b</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaSaldosTarjetaCredito/xq/consultaSaldosTCIn"/>
+                                        <con2:param name="requestHeader">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                        <con2:param name="cardNumber">
+                                            <con2:path>string($body/con:consultaSaldosTarjetaCredito/CARD_NUMBER/text())</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7e9a</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConsultaSaldosTC/con1:PV_CODIGO_ERROR/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7e99</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>string($RSPConsultaSaldosTC/con1:PV_MENSAJE_ERROR/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="pagoCacheDia">
+                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7e98</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if(string($RSPConsultaSaldosTC/con1:PT_SALDOS_TARJETA/con1:PT_SALDOS_TARJETA_ITEM[con1:ORG_TYPE = 'BASE']/con1:PAYMENTS_TODAY/text()) != '') then(
+	string($RSPConsultaSaldosTC/con1:PT_SALDOS_TARJETA/con1:PT_SALDOS_TARJETA_ITEM[con1:ORG_TYPE = 'BASE']/con1:PAYMENTS_TODAY/text())
+)else(
+	'0.00'
+)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="pagoCacheDiaUSD">
+                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7e97</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if(string($RSPConsultaSaldosTC/con1:PT_SALDOS_TARJETA/con1:PT_SALDOS_TARJETA_ITEM[con1:ORG_TYPE = 'ALT']/con1:PAYMENTS_TODAY/text()) != '')then(
+	string($RSPConsultaSaldosTC/con1:PT_SALDOS_TARJETA/con1:PT_SALDOS_TARJETA_ITEM[con1:ORG_TYPE = 'ALT']/con1:PAYMENTS_TODAY/text())
+)else(
+	'0.00'
+)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con1:wsCallout xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                        <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7ddb</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v3/BusinessServices/MasterData/conConsultaSaldoTCRG/biz/conConsultaSaldosCuentaTC_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>conConsultaSaldosCuentaTC</con1:operation>
+                        <con1:request>
+                            <con1:body>REQConConsultaSaldosCuentaTC</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPConConsultaSaldosCuentaTC</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQConConsultaSaldosCuentaTC">
+                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7ddf</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ConsultaSaldosTarjetaCredito/xq/consultaSaldosCuentaTCHNIn"/>
+                                        <con2:param name="cuenta">
+                                            <con2:path>string($body/con:consultaSaldosTarjetaCredito/CARD_NUMBER/text())</con2:path>
+                                        </con2:param>
+                                        <con2:param name="org">
+                                            <con2:path>''</con2:path>
+                                        </con2:param>
+                                        <con2:param name="pais">
+                                            <con2:path>'GTM'</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="pagoDelDia">
+                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7dde</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if(string($RSPConConsultaSaldosCuentaTC/ns0:RowSet/ns0:Row[ns0:Column[@name = 'Org']/text() = 340]/ns0:Column[@name = 'PagosDia']/text()) != '')then(
+	string($RSPConConsultaSaldosCuentaTC/ns0:RowSet/ns0:Row[ns0:Column[@name = 'Org']/text() = 340]/ns0:Column[@name = 'PagosDia']/text())
+)else(
+	'0.00'
+)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="pagoDelDiaUSD">
+                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7ddd</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if(string($RSPConConsultaSaldosCuentaTC/ns0:RowSet/ns0:Row[ns0:Column[@name = 'Org']/text() = 341]/ns0:Column[@name = 'PagosDia']/text()) != '')then(
+	string($RSPConConsultaSaldosCuentaTC/ns0:RowSet/ns0:Row[ns0:Column[@name = 'Org']/text() = 341]/ns0:Column[@name = 'PagosDia']/text())
+)else(
+	'0.00'
+)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7ddc</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>(:If cache exist:)
+if(string($RSPConsultaSaldosTC/con1:PV_MENSAJE_ERROR/text()) = '')then(
+	if((xs:decimal($pagoDelDia) != xs:decimal($pagoCacheDia)) or (xs:decimal($pagoDelDiaUSD) != xs:decimal($pagoCacheDiaUSD)))then(
+		'CACHE IGNORED'
+	)else('')
+)else(
+	string($RSPConsultaSaldosTC/con1:PV_MENSAJE_ERROR/text())
+)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con1:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                        <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7cbc</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage != ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace varName="RSPConsultaSaldosTC" contents-only="true">
+                                    <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7cbb</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText>&lt;con:OutputParameters/></con2:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ParametrizacionMiddleware">
+                <con:context>
+                    <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6559680922350387621-61a5fe2d.182db17221d.-7dfd</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage != ''</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="onlineParam" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                    <con2:id>_ActionId-6559680922350387621-61a5fe2d.182db17221d.-7dfc</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText>concat('FICBCO0044.',
+string($header/aut:RequestHeader/Region/SourceBank/text()),
+'.VISIONPLUS.ONLINE')</con2:xqueryText>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:wsCallout>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6559680922350387621-61a5fe2d.182db17221d.-7df9</con3:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>obtenerParametrizacion</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQobtenerParametrizacion</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPobtenerParametrizacion</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQobtenerParametrizacion">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-6559680922350387621-61a5fe2d.182db17221d.-7dfb</con3:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                    <con2:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                                    <con2:param name="nombreParametros">
+                                                        <con2:path>$onlineParam</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="onlineValue" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                            <con2:id>_ActionId-6559680922350387621-61a5fe2d.182db17221d.-7dfa</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>string($RSPobtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME = $onlineParam]/osb:VALUE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaSaldosOffLine">
+                <con:context>
+                    <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conConsultaDatosTarjetaCredito_v3" prefix="ns1" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoTypes" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/osbConSaldosTCOffLine" prefix="osb1" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2881142156120264664-ae365ef.18337dc9fad.-794e</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage != '' and not(empty($RSPobtenerParametrizacion))</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con3:assign varName="codigoPais" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                                    <con1:id>_ActionId-2881142156120264664-ae365ef.18337dc9fad.-794d</con1:id>
+                                    <con3:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                            <con1:param name="sentidoConversion">
+                                                <con1:path>'OSB-ISO3'</con1:path>
+                                            </con1:param>
+                                            <con1:param name="codigoPais">
+                                                <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con3:expr>
+                                </con3:assign>
+                                <con1:wsCallout>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2881142156120264664-ae365ef.18337dc9fad.-7949</con3:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterDataGT/osbConSaldosTCOffLine/biz/osbConSaldosTCOffLine_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>osbConSaldosTCOffLine</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQOsbConSaldosTCOffLine</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPOsbConSaldosTCOffLine</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQOsbConSaldosTCOffLine">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2881142156120264664-ae365ef.18337dc9fad.-794c</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/MasterDataGT/xq/osbConSaldosTCOffLineIn"/>
+                                                    <con3:param name="country">
+                                                        <con3:path>$codigoPais</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="cardNumber">
+                                                        <con3:path>string($body/con:consultaSaldosTarjetaCredito/CARD_NUMBER/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="org">
+                                                        <con3:path>''</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2881142156120264664-ae365ef.18337dc9fad.-794b</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPOsbConSaldosTCOffLine/osb1:CodigoError/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-2881142156120264664-ae365ef.18337dc9fad.-794a</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if( not($errorCode = '-1')) then(
+	string($RSPOsbConSaldosTCOffLine/osb1:MensajeError/text())
+) else ('')</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                                <con1:ifThenElse>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7d9e</con3:id>
+                                    <con1:case>
+                                        <con1:condition>
+                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = '' and not(empty($RSPOsbConSaldosTCOffLine)) and $onlineValue = 'S'</con3:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con1:wsCallout>
+                                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7d99</con3:id>
+                                                <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v3/BusinessServices/MasterData/conConsultaDatosTCRG/biz/conConsultaDatosTarjetaCredito_v3_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con1:operation>conConsultaDatosTarjetaCredito_v3</con1:operation>
+                                                <con1:request>
+                                                    <con1:body>REQConsultaDatosTCv3</con1:body>
+                                                </con1:request>
+                                                <con1:response>
+                                                    <con1:body>RSPConsultaDatosTCv3</con1:body>
+                                                </con1:response>
+                                                <con1:requestTransform>
+                                                    <con1:assign varName="REQConsultaDatosTCv3">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7d9d</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                                <con3:resource ref="Middleware/v2/Resources/MasterDataHN/xq/osbConDatosTCIn"/>
+                                                                <con3:param name="country">
+                                                                    <con3:path>'GTM'</con3:path>
+                                                                </con3:param>
+                                                                <con3:param name="cardNumber">
+                                                                    <con3:path>string($body/con:consultaSaldosTarjetaCredito/CARD_NUMBER/text())</con3:path>
+                                                                </con3:param>
+                                                                <con3:param name="org">
+                                                                    <con3:path>''</con3:path>
+                                                                </con3:param>
+                                                            </con3:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                </con1:requestTransform>
+                                                <con1:responseTransform>
+                                                    <con1:assign varName="errorCode">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7d9c</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPConsultaDatosTCv3/ns1:CodigoError/text())</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="validationMessage">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7d9b</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">if( not($errorCode = '-1')) then(
+	string($RSPConsultaDatosTCv3/ns1:MensajeError/text())
+) else ('')</con3:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="accountNumber" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                                        <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7d9a</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>string($RSPConsultaDatosTCv3/ns1:RowSet/ns1:Row[1]/ns1:Column[@name = 'numcuenta']/text())</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:replace varName="RSPConsultaDatosTCv3" contents-only="false">
+                                                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-5103941549646276613-6703e572.18ebc8e6c63.-2c4d</con3:id>
+                                                        <con1:expr>
+                                                            <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                                <con3:resource ref="Middleware/v2/Resources/ConsultaSaldosTarjetaCredito/xq/cache/conDatosCompletoOut"/>
+                                                                <con3:param name="outputParameters1">
+                                                                    <con3:path>$RSPConsultaDatosTCv3</con3:path>
+                                                                </con3:param>
+                                                            </con3:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:replace>
+                                                </con1:responseTransform>
+                                            </con1:wsCallout>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:default/>
+                                </con1:ifThenElse>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaVisionPlus">
+                <con:context>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoTypes" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7dc6</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = '' and $onlineValue = 'S'</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7dc2</con3:id>
+                                    <con1:service ref="Middleware/v2/BusinessServices/SJS/consultaSaldosTarjetaCreditoGT/flow/sjConsultaSaldosTarjetaCreditoGT" xsi:type="con3:FlowRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con3="http://www.bea.com/alsb/flow/resources/config"/>
+                                    <con1:operation>sjConsultaSaldosTarjetaCredito</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQsjConsultaSaldosTarjetaCredito</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPsjConsultaSaldosTarjetaCredito</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQsjConsultaSaldosTarjetaCredito">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7dc5</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/ConsultaSaldosTarjetaCredito/xq/sjConsultaSaldosTarjetaCreditoIn"/>
+                                                    <con3:param name="countryCode">
+                                                        <con3:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="cardNumber">
+                                                        <con3:path>string($body/con:consultaSaldosTarjetaCredito/CARD_NUMBER/text())</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="outputParameters">
+                                                        <con3:path>$RSPOsbConSaldosTCOffLine</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7dc4</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPsjConsultaSaldosTarjetaCredito/ERROR_CODE/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7dc3</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">string($RSPsjConsultaSaldosTarjetaCredito/ERROR_MESSAGE/text())</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaPuntosLealtad">
+                <con:context>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoTypes" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7e82</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = '' and not(empty($RSPOsbConSaldosTCOffLine)) and $onlineValue = 'S'</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:assign varName="cardNumber">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7e81</con3:id>
+                                    <con1:expr>
+                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">fn:string($body/con:consultaSaldosTarjetaCredito/CARD_NUMBER/text())</con3:xqueryText>
+                                    </con1:expr>
+                                </con1:assign>
+                                <con1:wsCallout>
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7e7d</con3:id>
+                                    <con1:service ref="Middleware/v2/ProxyServices/ConsultaPuntosLealtadGT" xsi:type="con:PipelineRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>consultaPuntosLealtad</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQconsultaPuntosLealtad</con1:body>
+                                        <con1:header>REQheaderconsultaPuntosLealtad</con1:header>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPconsultaPuntosLealtad</con1:body>
+                                        <con1:header>RSPheaderconsultaPuntosLealtad</con1:header>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQheaderconsultaPuntosLealtad">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7e80</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$header</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="REQconsultaPuntosLealtad">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7e7f</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                                    <con3:resource ref="Middleware/v2/Resources/ConsultaSaldosTarjetaCredito/xq/consultaPuntosLealtadIn"/>
+                                                    <con3:param name="customerIdType">
+                                                        <con3:path>"CARD_NUMBER"</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="cardNumber">
+                                                        <con3:path>$cardNumber</con3:path>
+                                                    </con3:param>
+                                                    <con3:param name="returnCashEquivalent">
+                                                        <con3:path>"NO"</con3:path>
+                                                    </con3:param>
+                                                </con3:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="valSaldoActual">
+                                            <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-7208014073759710792--67651351.18191864572.-7e7e</con3:id>
+                                            <con1:expr>
+                                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">let $SaldoActual := string($RSPconsultaPuntosLealtad/BALANCE/text())
+return
+if($SaldoActual != '')then(
+	$SaldoActual
+)else(
+	'0'
+)</con3:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:assign varName="valSaldoActual">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-412319260414894028--2feaf47b.1874d611ded.-7fea</con3:id>
+                                <con1:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">'0'</con3:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GT01_ConsultaSaldosTarjetaCredito_response" xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con3:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaSaldosTC" prefix="con1" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                    <con3:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoTypes" prefix="con" xmlns:con3="http://www.bea.com/wli/sb/stages/config"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8870993661483024583-41efabfd.16b9457f9f2.-72e8</con3:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">$validationMessage = ''</con3:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace contents-only="true" varName="header">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8870993661483024583-41efabfd.16b9457f9f2.-72d1</con3:id>
+                                    <con1:expr>
+                                        <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;aut:ResponseHeader>
+      &lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con3:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8870993661483024583-41efabfd.16b9457f9f2.-7262</con3:id>
+                                    <con1:expr>
+                                        <con3:xqueryTransform xmlns:con3="http://www.bea.com/wli/sb/stages/config">
+                                            <con3:resource ref="Middleware/v2/Resources/ConsultaSaldosTarjetaCredito/xq/consultaSaldosTarjetaCreditoGTOut"/>
+                                            <con3:param name="valSaldoActual">
+                                                <con3:path>$valSaldoActual</con3:path>
+                                            </con3:param>
+                                            <con3:param name="sjConsultaSaldosTarjetaCreditoResponse">
+                                                <con3:path>$RSPsjConsultaSaldosTarjetaCredito</con3:path>
+                                            </con3:param>
+                                            <con3:param name="outputParameters">
+                                                <con3:path>$RSPConsultaSaldosTC</con3:path>
+                                            </con3:param>
+                                            <con3:param name="consultaSaldoSPMD">
+                                                <con3:path>$RSPConConsultaSaldosCuentaTC</con3:path>
+                                            </con3:param>
+                                            <con3:param name="saldosOffLine">
+                                                <con3:path>$RSPOsbConSaldosTCOffLine</con3:path>
+                                            </con3:param>
+                                            <con3:param name="consultaDatosTCSPMD">
+                                                <con3:path>$RSPConsultaDatosTCv3</con3:path>
+                                            </con3:param>
+                                        </con3:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                                <con1:ifThenElse xmlns:con3="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+                                    <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7f84</con2:id>
+                                    <con1:case>
+                                        <con1:condition>
+                                            <con2:xqueryText>empty($RSPConsultaSaldosTC/con1:PT_SALDOS_TARJETA/con1:PT_SALDOS_TARJETA_ITEM)</con2:xqueryText>
+                                        </con1:condition>
+                                        <con1:actions>
+                                            <con3:route>
+                                                <con2:comment>Save cache</con2:comment>
+                                                <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7f83</con2:id>
+                                                <con3:service ref="Middleware/v2/BusinessServices/registraSaldosTC/biz/registraSaldosTC_db" xsi:type="ref:BusinessServiceRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con3:operation>registraSaldosTC</con3:operation>
+                                                <con3:outboundTransform>
+                                                    <con1:assign varName="BodyCache">
+                                                        <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7f82</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryTransform>
+                                                                <con2:resource ref="Middleware/v2/Resources/ConsultaSaldosTarjetaCredito/xq/cache/registraCacheSaldosTCIn"/>
+                                                                <con2:param name="countryCode">
+                                                                    <con2:path>'GT01'</con2:path>
+                                                                </con2:param>
+                                                                <con2:param name="consultaSaldosTarjetaCreditoResponse1">
+                                                                    <con2:path>$body/con:consultaSaldosTarjetaCreditoResponse</con2:path>
+                                                                </con2:param>
+                                                            </con2:xqueryTransform>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:replace varName="body" contents-only="true">
+                                                        <con2:id>_ActionId-1848043423538012707-2d32795a.18eab34b9a6.-7f81</con2:id>
+                                                        <con1:location>
+                                                            <con2:xpathText>.</con2:xpathText>
+                                                        </con1:location>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>$BodyCache</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:replace>
+                                                </con3:outboundTransform>
+                                            </con3:route>
+                                        </con1:actions>
+                                    </con1:case>
+                                    <con1:default/>
+                                </con1:ifThenElse>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="header">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8870993661483024583-41efabfd.16b9457f9f2.-72bc</con3:id>
+                                <con1:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config"><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{ $errorCode }</successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con3:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                            <con1:replace varName="body" contents-only="true">
+                                <con3:id xmlns:con3="http://www.bea.com/wli/sb/stages/config">_ActionId-8870993661483024583-41efabfd.16b9457f9f2.-7294</con3:id>
+                                <con1:expr>
+                                    <con3:xqueryText xmlns:con3="http://www.bea.com/wli/sb/stages/config">&lt;con:consultaSaldosTarjetaCreditoResponse/></con3:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con2:pipeline type="error" name="_onErrorHandler-8870993661483024583-41efabfd.16b9457f9f2.-7261">
+            <con2:stage name="ManejoError">
+                <con2:context>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaSaldosTarjetaCreditoTypes" prefix="con"/>
+                </con2:context>
+                <con2:actions>
+                    <con1:replace varName="header " contents-only="true">
+                        <con:id>_ActionId-8870993661483024583-41efabfd.16b9457f9f2.-723c</con:id>
+                        <con1:expr>
+                            <con:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>ERROR</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con:id>_ActionId-8870993661483024583-41efabfd.16b9457f9f2.-721d</con:id>
+                        <con1:expr>
+                            <con:xqueryText>&lt;con:consultaSaldosTarjetaCreditoResponse/></con:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con:reply>
+                        <con:id>_ActionId-8870993661483024583-41efabfd.16b9457f9f2.-720c</con:id>
+                    </con:reply>
+                </con2:actions>
+            </con2:stage>
+        </con2:pipeline>
+        <con:flow xmlns:con="http://www.bea.com/wli/sb/pipeline/config">
+            <con:pipeline-node name="GT01_ConsultaSaldosTarjetaCredito">
+                <con:request>GT01_ConsultaSaldosTarjetaCredito_request</con:request>
+                <con:response>GT01_ConsultaSaldosTarjetaCredito_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con2:router>
+</con:pipelineEntry>

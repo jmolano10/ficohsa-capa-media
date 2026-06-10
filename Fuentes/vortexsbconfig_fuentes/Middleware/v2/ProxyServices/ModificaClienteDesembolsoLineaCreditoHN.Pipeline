@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ModificaClienteDesembolsoLineaCredito/wsdl/modificaClienteDesembolsoLineaCreditoPS"/>
+            <con:binding>
+                <con:name>modificaClienteDesembolsoLineaCreditoPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/modificaClienteDesembolsoLineaCreditoPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-1514576921039790618--46dc5c0.16d69ff054c.-7dfe" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="ModificaClienteDLCHN_request">
+            <con:stage name="ConsultaCliente">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/serviciosEmpresarialesTypes" prefix="ser"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-7812790554572039018-5ac7ca2e.16dad4ec14c.-7f5d</con1:id>
+                        <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v3/ProxyServices/ConsultaCliente" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>consultaCliente</con2:operation>
+                        <con2:request>
+                            <con2:body>REQConsultaCliente</con2:body>
+                            <con2:header>REQHeaderConsultaCliente</con2:header>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPConsultaCliente</con2:body>
+                            <con2:header>RSPHeaderConsultaCliente</con2:header>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="REQHeaderConsultaCliente">
+                                <con1:id>_ActionId-7812790554572039018-5ac7ca2e.16dad4ec14c.-7ddd</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>$header</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="REQConsultaCliente">
+                                <con1:id>_ActionId-7812790554572039018-5ac7ca2e.16dad4ec14c.-7f23</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/ModificaClienteDesembolsoLineaCredito/xq/consultaClienteHNIn"/>
+                                        <con1:param name="modificaClienteDesembolsoLineaCredito">
+                                            <con1:path>$body/ser:modificaClienteDesembolsoLineaCredito</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:assign varName="errorCode">
+                                <con1:id>_ActionId-7118262232827229076--3f36bfa6.16db24ceb0b.-7e6a</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>fn:string($RSPHeaderConsultaCliente/aut:ResponseHeader/successIndicator/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-7118262232827229076--3f36bfa6.16db24ceb0b.-7e4d</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>if(upper-case($errorCode) = 'SUCCESS') then(
+	''
+)
+else(
+	string($RSPHeaderConsultaCliente/aut:ResponseHeader/messages/text())
+)</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ModificaClienteDLC">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/modificaClienteSolEmprendedor" prefix="mod"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/serviciosEmpresarialesTypes" prefix="ser"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7118262232827229076--3f36bfa6.16db24ceb0b.-7e15</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage=''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4481248515547140740-526d16f.16db67fb30e.-7fa0</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ServiciosEmpresariales/modificaClienteSolEmprendedor/biz/modificaClienteSolEmprendedor_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>modificaClienteSolEmprendedor</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQModificaClienteSolEmprendedor</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPModificaClienteSolEmprendedor</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQModificaClienteSolEmprendedor">
+                                            <con1:id>_ActionId-9101678414433215608--5bc1ca04.16dbbb525b5.-7fc9</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ModificaClienteDesembolsoLineaCredito/xq/modificaClienteSolEmprendedorHNIn"/>
+                                                    <con1:param name="consultaClienteResponse">
+                                                        <con1:path>$RSPConsultaCliente</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="modificaClienteDesembolsoLineaCredito">
+                                                        <con1:path>$body/ser:modificaClienteDesembolsoLineaCredito</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-7533583306373759357--5984c7b4.16dda9ce84c.-7f93</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn:string($RSPModificaClienteSolEmprendedor/mod:P_SUCCESSINDICATOR/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-7533583306373759357--5984c7b4.16dda9ce84c.-7f76</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if(upper-case($errorCode) = 'SUCCESS') then(
+	''
+)
+else(
+	string($RSPModificaClienteSolEmprendedor/mod:P_MESSAGES/text())
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ModificaClienteDLCHN_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/serviciosEmpresarialesTypes" prefix="ser"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-7533583306373759357--5984c7b4.16dda9ce84c.-7f06</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[if ($validationMessage = '') then (
+	<aut:ResponseHeader>
+		<successIndicator>Success</successIndicator>
+	</aut:ResponseHeader>
+)else(
+	<aut:ResponseHeader>
+		<successIndicator>{ $errorCode }</successIndicator>
+		<messages>{$validationMessage}</messages>
+	</aut:ResponseHeader>
+)]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-7533583306373759357--5984c7b4.16dda9ce84c.-7ee9</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ser:modificaClienteDesembolsoLineaCreditoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-1514576921039790618--46dc5c0.16d69ff054c.-7dfe">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaBarrioColoniaTypes" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/SubscribeEstadoCuentaTCTypes" prefix="sub"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/actualizaDatosClienteTypes" prefix="act"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/serviciosEmpresarialesTypes" prefix="ser"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-1514576921039790618--46dc5c0.16d69ff054c.-7d8b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-1514576921039790618--46dc5c0.16d69ff054c.-7d8a</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;ser:modificaClienteDesembolsoLineaCreditoResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-1514576921039790618--46dc5c0.16d69ff054c.-7d89</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ModificaClienteDLCHN">
+                <con:request>ModificaClienteDLCHN_request</con:request>
+                <con:response>ModificaClienteDLCHN_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

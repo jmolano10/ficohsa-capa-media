@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:xqueryEntry xmlns:con="http://www.bea.com/wli/sb/resources/config">
+    <con:xquery><![CDATA[xquery version "2004-draft";
+(:: pragma bea:global-element-parameter parameter="$consultaDatosTarjetaCreditoResponse1" element="ns2:consultaDatosTarjetaCreditoResponse" location="../../../../../Business_Resources/tarjetaCredito/ConsultaDatosTarjetaCredito/consultaDatosTarjetaCreditoTypes.xsd" ::)
+(:: pragma bea:global-element-parameter parameter="$sjMarcaViajeroTC" element="ns0:sjMarcaViajeroTC" location="../xsd/sjMarcaViajeroTCHNTypes.xsd" ::)
+(:: pragma bea:global-element-return element="ns1:salesforceMarcaViajeroTC" location="../../../../Resources/SalesforceMarcaViajeroTC/xsd/salesforceMarcaViajeroTCTypes.xsd" ::)
+
+declare namespace ns0 = "http://www.ficohsa.com.hn/middleware.services/sjMarcaViajeroTCHNTypes";
+declare namespace ns2 = "http://www.ficohsa.com.hn/middleware.services/consultaDatosTarjetaCreditoTypes";
+declare namespace ns1 = "http://www.ficohsa.com.hn/middleware.services/salesforceMarcaViajeroTCTypes";
+declare namespace xf = "http://tempuri.org/Middleware/v2/BusinessServices/SJS/marcaViajeroTCHN/xq/salesforceMarcaViajeroTCIn/";
+
+declare function xf:salesforceMarcaViajeroTCIn($consultaDatosTarjetaCreditoResponse1 as element(ns2:consultaDatosTarjetaCreditoResponse),
+    $sjMarcaViajeroTC as element(ns0:sjMarcaViajeroTC))
+    as element(ns1:salesforceMarcaViajeroTC) {
+        <ns1:salesforceMarcaViajeroTC>
+            {
+                let $SALESFORCE_INFO := $sjMarcaViajeroTC/SALESFORCE_INFO
+                return
+                    <SALESFORCE_INFO>
+                        <USERNAME>{ data($SALESFORCE_INFO/USERNAME) }</USERNAME>
+                        <PASSWORD>{ data($SALESFORCE_INFO/PASSWORD) }</PASSWORD>
+                        <SESION_ID>{ data($SALESFORCE_INFO/SESION_ID) }</SESION_ID>
+                    </SALESFORCE_INFO>
+            }
+            <CREDIT_CARD_NUMBER>{ data($consultaDatosTarjetaCreditoResponse1/ns2:consultaDatosTarjetaCreditoResponseType/ns2:consultaDatosTarjetaCreditoResponseRecordType[1]/CARD_NUMBER) }</CREDIT_CARD_NUMBER>
+            <ACCOUNT_NUMBER>{ data($consultaDatosTarjetaCreditoResponse1/ns2:consultaDatosTarjetaCreditoResponseType/ns2:consultaDatosTarjetaCreditoResponseRecordType[1]/ACCOUNT_NUMBER) }</ACCOUNT_NUMBER>
+            <BEGIN_DATE>{ data($sjMarcaViajeroTC/BEGIN_DATE) }</BEGIN_DATE>
+            <END_DATE>{ data($sjMarcaViajeroTC/END_DATE) }</END_DATE>
+            <EMAILS>{ data($sjMarcaViajeroTC/EMAILS) }</EMAILS>
+            <COUNTRIES>
+                {
+                    for $COUNTRY_INFO in $sjMarcaViajeroTC/COUNTRIES/COUNTRY_INFO
+                    return
+                        <COUNTRY_INFO>
+                            <COUNTRY_CODE>{ data($COUNTRY_INFO/COUNTRY_CODE) }</COUNTRY_CODE>
+                            {
+                                for $COUNTRY_NAME in $COUNTRY_INFO/COUNTRY_NAME
+                                return
+                                    <COUNTRY_NAME>{ data($COUNTRY_NAME) }</COUNTRY_NAME>
+                            }
+                        </COUNTRY_INFO>
+                }
+            </COUNTRIES>
+            <DESTINATION>{ data($sjMarcaViajeroTC/DESTINATION) }</DESTINATION>
+
+        </ns1:salesforceMarcaViajeroTC>
+};
+
+declare variable $consultaDatosTarjetaCreditoResponse1 as element(ns2:consultaDatosTarjetaCreditoResponse) external;
+declare variable $sjMarcaViajeroTC as element(ns0:sjMarcaViajeroTC) external;
+
+xf:salesforceMarcaViajeroTCIn($consultaDatosTarjetaCreditoResponse1,
+    $sjMarcaViajeroTC)]]></con:xquery>
+    <con:dependency location="../../../../../Business_Resources/tarjetaCredito/ConsultaDatosTarjetaCredito/consultaDatosTarjetaCreditoTypes.xsd">
+        <con:schema ref="Middleware/Business_Resources/tarjetaCredito/ConsultaDatosTarjetaCredito/consultaDatosTarjetaCreditoTypes"/>
+    </con:dependency>
+    <con:dependency location="../xsd/sjMarcaViajeroTCHNTypes.xsd">
+        <con:schema ref="Middleware/v2/BusinessServices/SJS/marcaViajeroTCHN/xsd/sjMarcaViajeroTCHNTypes"/>
+    </con:dependency>
+    <con:dependency location="../../../../Resources/SalesforceMarcaViajeroTC/xsd/salesforceMarcaViajeroTCTypes.xsd">
+        <con:schema ref="Middleware/v2/Resources/SalesforceMarcaViajeroTC/xsd/salesforceMarcaViajeroTCTypes"/>
+    </con:dependency>
+</con:xqueryEntry>

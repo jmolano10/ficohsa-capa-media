@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/ColocacionPrestamoATM/wsdl/colocacionPrestamoATMPS"/>
+            <con:binding>
+                <con:name>colocacionPrestamoATMPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/colocacionPrestamoATMPS</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-5617945660811577750-3b20310d.19340b2a83a.-2be1" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="request" name="ColocacionPrestamoATM_request">
+            <con:stage name="ValidationXSD">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/colocacionPrestamoATMTypes" prefix="col"/>
+                </con:context>
+                <con:actions>
+                    <con1:validate>
+                        <con2:id>_ActionId-5617945660811577750-3b20310d.19340b2a83a.-2be2</con2:id>
+                        <con1:schema ref="Middleware/v2/Resources/ColocacionPrestamoATM/xsd/colocacionPrestamoATMTypes"/>
+                        <con1:schemaElement xmlns:col="http://www.ficohsa.com.hn/middleware.services/colocacionPrestamoATMTypes">col:colocacionPrestamoATMRequest</con1:schemaElement>
+                        <con1:varName>body</con1:varName>
+                        <con1:location>
+                            <con2:xpathText>./col:colocacionPrestamoATMRequest</con2:xpathText>
+                        </con1:location>
+                    </con1:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ObtenerClienteTarjeta">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/colocacionPrestamoATMTypes" prefix="col"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7e39</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/tarjetasDebito/Resources/tarjetasDebitoBS" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>ConsultaMaestraTarjetaDebito</con1:operation>
+                        <con1:request>
+                            <con1:body>REQConsultaMaestraTarjetaDebito</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPConsultaMaestraTarjetaDebito</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQConsultaMaestraTarjetaDebito">
+                                <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7e3b</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/ColocacionPrestamoATM/xq/consultaMaestraTarjetaDebitoIn"/>
+                                        <con2:param name="password">
+                                            <con2:path>fn:data($header/aut:RequestHeader/Authentication/Password)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="userName">
+                                            <con2:path>fn:data($header/aut:RequestHeader/Authentication/UserName)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="colocacionPrestamoATMRequest">
+                                            <con2:path>$body/col:colocacionPrestamoATMRequest</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7dee</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if (fn:exists($RSPConsultaMaestraTarjetaDebito/WSFICODEBITCARDCUSTOMERType/ZERORECORDS)) then (
+	'NO RECORDS'
+) else (
+	fn:data($RSPConsultaMaestraTarjetaDebito/Status/successIndicator)
+)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7dd7</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>if (fn:upper-case($errorCode) = 'SUCCESS') then (
+	''
+) else (
+	fn:string-join($RSPConsultaMaestraTarjetaDebito/Status/messages, ', ')
+)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="legalId">
+                                <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7e3a</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>fn:string($RSPConsultaMaestraTarjetaDebito/WSFICODEBITCARDCUSTOMERType/gWSFICODEBITCARDCUSTOMERDetailType/mWSFICODEBITCARDCUSTOMERDetailType/CUSTOMERLEGALID/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="RegistrarColocacion-Prestamo">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/registrarColocacionPrestamo_db" prefix="col1"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/colocacionPrestamoATMTypes" prefix="col"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7dc7</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7dc3</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ATM/RegistrarColocacion/Prestamo/biz/registrarColocacionPrestamo_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>registrarColocacionPrestamo_db</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQRegistrarColocacionPrestamo_db</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPRegistrarColocacionPrestamo_db</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQRegistrarColocacionPrestamo_db">
+                                            <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7dc4</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/ColocacionPrestamoATM/xq/registrarColocacionPrestamo_dbIn"/>
+                                                    <con2:param name="legalId">
+                                                        <con2:path>$legalId</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="colocacionPrestamoATMRequest">
+                                                        <con2:path>$body/col:colocacionPrestamoATMRequest</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7db3</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>fn:string($RSPRegistrarColocacionPrestamo_db/col1:PV_SUCCESS_INDICATOR/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7d9e</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>fn:string($RSPRegistrarColocacionPrestamo_db/col1:PV_ERROR_CODE/text())</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default/>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ColocacionPrestamoATM_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/registrarColocacionPrestamo_db" prefix="reg"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/colocacionPrestamoATMTypes" prefix="col"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7e10</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$validationMessage = ''</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace varName="header" contents-only="true">
+                                    <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7e0f</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace contents-only="true" varName="header">
+                                <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7e0e</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>{ $errorCode }</successIndicator>
+      <messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7d9c</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;col:colocacionPrestamoATMResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-5617945660811577750-3b20310d.19340b2a83a.-2be1">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/colocacionExtraATMTypes" prefix="col"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="errorCode">
+                        <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7efb</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="errorMessage">
+                        <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7efa</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7ef7</con2:id>
+                        <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>mapeoErrores</con1:operation>
+                        <con1:request>
+                            <con1:body>reqMapeoErrores</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>respMapeoErrores</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="reqMapeoErrores">
+                                <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7ef9</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con2:param name="CODIGO_ERROR">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                        <con2:param name="MENSAJE_ERROR">
+                                            <con2:path>fn:concat("FICBCO0252", "$#$", $errorMessage)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7ef8</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con2:param name="mapeoErroresResponse1">
+                                            <con2:path>$respMapeoErrores</con2:path>
+                                        </con2:param>
+                                        <con2:param name="successIndicator">
+                                            <con2:path>$errorCode</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7ef6</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;col:colocacionExtraATMResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-8693907615871589350-65cd17c2.193452514f5.-7ef5</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ColocacionPrestamoATM">
+                <con:request>ColocacionPrestamoATM_request</con:request>
+                <con:response>ColocacionPrestamoATM_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

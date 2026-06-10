@@ -1,0 +1,667 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/RegistrarTransaccionTC/wsdl/RegistrarTransaccionTCPS"/>
+            <con:binding>
+                <con:name>registrarTransaccionTCPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/registrarTransaccionTCPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-8117322222277923218-306da0a3.1785af060cd.-7b91" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+        <con:pipeline type="request" name="RegistrarTansaccionTC_request">
+            <con:stage name="Variables">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/RegistrarTransaccionTCTypes" prefix="reg"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="org">
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7dbd</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>''</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                </con:actions>
+            </con:stage>
+            <con:stage name="FechaExpiracion_y_Org">
+                <con:comment>Esta etapa solo es ejecutada si la fecha de ejecución no viene en el request.</con:comment>
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/conDatoTarjeta" prefix="con"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/RegistrarTransaccionTCTypes" prefix="reg"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="codigoPais">
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7d2b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                                <con1:param name="sentidoConversion">
+                                    <con1:path>'OSB-ISO3'</con1:path>
+                                </con1:param>
+                                <con1:param name="codigoPais">
+                                    <con1:path>string($header/aut:RequestHeader/Region/SourceBank/text())</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:comment/>
+                        <con1:id>_ActionId-4358797762662633276-319b8a89.178667d459b.-7f00</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>string($body/reg:RegistrarTransaccionTC/EXPIRATION_DATE/text() = "0000")
+or
+string($body/reg:RegistrarTransaccionTC/ORG/text() = "-999")</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4358797762662633276-319b8a89.178667d459b.-7ef4</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterData/conDatoTarjeta/biz/conDatoTarjeta_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>conDatoTarjeta</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConDatoTarjeta</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConDatoTarjeta</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConDatoTarjeta">
+                                            <con1:id>_ActionId-4358797762662633276-319b8a89.178667d459b.-7ef9</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MasterData/xq/conDatoTarjetaIn"/>
+                                                    <con1:param name="cardNumber">
+                                                        <con1:path>string($body/reg:RegistrarTransaccionTC/CREDITCARD_NUMBER/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="codigoPais">
+                                                        <con1:path>$codigoPais</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="org">
+                                                        <con1:path>$org</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-4358797762662633276-319b8a89.178667d459b.-7ef8</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPConDatoTarjeta/con:CodigoError/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-4358797762662633276-319b8a89.178667d459b.-7ef7</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>(: error != -1 y -2 :)
+if($errorCode = ('-1','-2')) then (
+	""
+)else(
+	fn:string($RSPConDatoTarjeta/con:MensajeError/text())
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="fechaVencimiento">
+                                            <con1:id>_ActionId-4358797762662633276-319b8a89.178667d459b.-7ef6</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>(: if (&lt;defaultValue>) then concat(MM,YY) :)
+if (fn:string-length(string($body/reg:RegistrarTransaccionTC/EXPIRATION_DATE)) = 0)  then
+(
+	fn:concat(
+		fn:substring($RSPConDatoTarjeta/con:RowSet/con:Row[1]/con:Column[upper-case(@name) = 'FECEXPIRA']/text(), 6, 2)
+		, fn:substring($RSPConDatoTarjeta/con:RowSet/con:Row[1]/con:Column[upper-case(@name) = 'FECEXPIRA']/text(), 3, 2))
+)
+else
+(
+	$body/reg:RegistrarTransaccionTC/EXPIRATION_DATE/text()
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="org">
+                                            <con1:id>_ActionId-4358797762662633276-319b8a89.178667d459b.-7ef5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>(: if (&lt;defaultValue>) then RSPConDatoTarjeta.ORG :)
+if (fn:string-length(string($body/reg:RegistrarTransaccionTC/ORG)) = 0)  then
+(
+	for $row in $RSPConDatoTarjeta/con:RowSet/con:Row
+		where $row/con:Column[upper-case(@name) = 'CODMONEDA' and  text() = string($body/reg:RegistrarTransaccionTC/TRANSACTION_CURRENCY/text())]
+		return $row/con:Column[upper-case(@name) = 'ORG']/text()
+)
+else
+(
+	string($body/reg:RegistrarTransaccionTC/ORG/text())
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:assign varName="validationMessage">
+                                <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-458d</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>""</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="fechaVencimiento">
+                                <con1:id>_ActionId-8430629719381960843--79486ed2.1786bf0bb97.-452f</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($body/reg:RegistrarTransaccionTC/EXPIRATION_DATE/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="org">
+                                <con1:id>_ActionId-8430629719381960843--79486ed2.1786bf0bb97.-44f6</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>string($body/reg:RegistrarTransaccionTC/ORG/text())</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="OrgSequence">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/osbConOrgSequence" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/RegistrarTransaccionTCTypes" prefix="reg"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4555</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4541</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/MasterData/conOrgSequence/biz/osbConOrgSequence_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>osbConOrgSequence</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQosbConOrgSequence</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPosbConOrgSequence</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQosbConOrgSequence">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4545</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MasterData/xq/osbOrgConSequenceIn_StringParams"/>
+                                                    <con1:param name="currency">
+                                                        <con1:path>$body/reg:RegistrarTransaccionTC/TRANSACTION_CURRENCY/text()</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="creditCard">
+                                                        <con1:path>$body/reg:RegistrarTransaccionTC/CREDITCARD_NUMBER/text()</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4544</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPconOrgSequence/osb:CodigoError/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4543</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if($errorCode != '0')then (
+
+string($RSPosbConOrgSequence/osb:MensajeError/text())
+
+)else('')</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="numeroSecuencia">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4542</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RSPosbConOrgSequence/osb:SequenceValue/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="RegistroTransaccionVP">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/RegistrarTransaccionTCTypes" prefix="reg"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4509</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ""</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-44ff</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlus/onlineTransactions_v4/biz/onlineTransactions_v4" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>OnlinePaymentV4</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQOnlinePayment</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RESOnlinePayment</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQOnlinePayment">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4503</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/VisionPlus/xq/onlineTransactionsV4In_StringParams"/>
+                                                    <con1:param name="numeroSecuencia">
+                                                        <con1:path>$numeroSecuencia</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MCCType">
+                                                        <con1:path>$body/reg:RegistrarTransaccionTC/MCCType/text()</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="installments">
+                                                        <con1:path>string($body/reg:RegistrarTransaccionTC/INSTALLMENTS/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="requestType">
+                                                        <con1:path>$body/reg:RegistrarTransaccionTC/REQUEST_TYPE/text()</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="transactionAmount">
+                                                        <con1:path>string($body/reg:RegistrarTransaccionTC/TRANSACTION_AMOUNT/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="authorizationCode">
+                                                        <con1:path>string($body/reg:RegistrarTransaccionTC/AUTHORIZATION_CODE/text())</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="cardNumber">
+                                                        <con1:path>$body/reg:RegistrarTransaccionTC/CREDITCARD_NUMBER/text()</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="MerchantNumber">
+                                                        <con1:path>$body/reg:RegistrarTransaccionTC/MERCHANT_NUMBER/text()</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="fechaVencimientoTarjeta">
+                                                        <con1:path>$fechaVencimiento</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="org">
+                                                        <con1:path>$org</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:assign varName="errorCode">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-44a6</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RESOnlinePayment/VPrespCode/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="validationMessage">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-44e0</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>if(fn-bea:trim(string($RESOnlinePayment/ActionDescription/text())) = 'APPROVED')then
+(
+  ''
+)
+else
+(
+  string($RESOnlinePayment/ActionDescription/text())
+)</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="RRN37">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4502</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$RESOnlinePayment/RRN37/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="dateTimeAut">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4501</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn-bea:dateTime-to-string-with-format("yyyy-MM-dd-HH:mm",fn:adjust-dateTime-to-timezone(fn:current-dateTime()))</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="autCode">
+                                            <con1:id>_ActionId-7607489349153445643--6a24da7d.178a3b8084e.-4500</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>string($RESOnlinePayment/AuthorizationCode/text())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="RegistrarTansaccionTC_response">
+            <con:stage name="Response">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/RegistrarTransaccionTCTypes" prefix="reg"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace varName="header" contents-only="true">
+                        <con1:id>_ActionId-1462035896785214899-38899782.1786fdc5ef5.-422e</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+{
+   if($validationMessage = '')then (
+	<messageId>{ string($RSPOnlinePaymentV4/VPrespCode/text()) }</messageId>,
+	<successIndicator>Success</successIndicator>,
+	<messages>{ string($RSPOnlinePaymentV4/ActionDescription/text()) }</messages>
+	)else(
+	<messageId>{ $errorCode }</messageId>,
+	<successIndicator>{ $validationMessage }</successIndicator>
+	)
+}	
+</aut:ResponseHeader>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-5876667446183456627--3f4a54e5.177f5a4334d.-4545</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:replace varName="body" contents-only="true">
+                                    <con1:id>_ActionId-5876667446183456627--3f4a54e5.177f5a4334d.-450d</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryTransform>
+                                            <con1:resource ref="Middleware/v2/Resources/RegistrarTransaccionTC/xq/RegistrarTransaccionTCOut"/>
+                                            <con1:param name="DateTimeAut">
+                                                <con1:path>$dateTimeAut</con1:path>
+                                            </con1:param>
+                                            <con1:param name="CoreAut">
+                                                <con1:path>''</con1:path>
+                                            </con1:param>
+                                            <con1:param name="RRN37">
+                                                <con1:path>$RRN37</con1:path>
+                                            </con1:param>
+                                            <con1:param name="AuthorizationCode">
+                                                <con1:path>$autCode</con1:path>
+                                            </con1:param>
+                                        </con1:xqueryTransform>
+                                    </con2:expr>
+                                </con2:replace>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:replace varName="body" contents-only="true">
+                                <con1:id>_ActionId-5876667446183456627--3f4a54e5.177f5a4334d.-3e59</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>&lt;reg:RegistrarTransaccionTCResponse/></con1:xqueryText>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/RegistrarTransaccionTCTypes" prefix="reg"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="serviceID">
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7aa7</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>"FICBCO0463"</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:validate>
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7c98</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/RegistrarTransaccionTC/xsd/RegistrarTransaccionTCTypes"/>
+                        <con2:schemaElement xmlns:reg="http://www.ficohsa.com.hn/middleware.services/RegistrarTransaccionTCTypes">reg:RegistrarTransaccionTC</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./reg:RegistrarTransaccionTC</con1:xpathText>
+                        </con2:location>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegional">
+                <con:context xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/RegistrarTransaccionTCTypes" prefix="reg"/>
+                </con:context>
+                <con:actions xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con3:wsCallout>
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7a26</con1:id>
+                        <con3:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>ValidaServicioRegional</con3:operation>
+                        <con3:request>
+                            <con3:body>REQvalidaServicioRegional</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPvalidaServicioRegional</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQvalidaServicioRegional">
+                                <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7a2c</con1:id>
+                                <con3:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con1:param name="serviceId">
+                                            <con1:path>$serviceID</con1:path>
+                                        </con1:param>
+                                        <con1:param name="requestHeader1">
+                                            <con1:path>$header/aut:RequestHeader</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:ifThenElse>
+                                <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7a2b</con1:id>
+                                <con3:case>
+                                    <con3:condition>
+                                        <con1:xqueryText>fn:string($RSPvalidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                                    </con3:condition>
+                                    <con3:actions>
+                                        <con3:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7a2a</con1:id>
+                                            <con3:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>ERROR</successIndicator>
+    <messages>{fn:string($RSPvalidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con3:expr>
+                                        </con3:replace>
+                                        <con3:replace varName="body" contents-only="true">
+                                            <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7a29</con1:id>
+                                            <con3:expr>
+                                                <con1:xqueryText>&lt;reg:RegistrarTransaccionTCResponse/></con1:xqueryText>
+                                            </con3:expr>
+                                        </con3:replace>
+                                        <con1:reply>
+                                            <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7a28</con1:id>
+                                        </con1:reply>
+                                    </con3:actions>
+                                </con3:case>
+                                <con3:default>
+                                    <con3:replace contents-only="true" varName="header">
+                                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7a27</con1:id>
+                                        <con3:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con1:param name="requestHeader">
+                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con3:expr>
+                                    </con3:replace>
+                                </con3:default>
+                            </con3:ifThenElse>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="MapeoError">
+                <con:context xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con3:ifThenElse>
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7c23</con1:id>
+                        <con3:case>
+                            <con3:condition>
+                                <con1:xqueryText>fn:upper-case(string($header/aut:ResponseHeader/successIndicator/text())) != 'SUCCESS'</con1:xqueryText>
+                            </con3:condition>
+                            <con3:actions>
+                                <con3:wsCallout>
+                                    <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7c20</con1:id>
+                                    <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con3:operation>mapeoErrores</con3:operation>
+                                    <con3:request>
+                                        <con3:body>REQmapeoErrores</con3:body>
+                                    </con3:request>
+                                    <con3:response>
+                                        <con3:body>RSPmapeoErrores</con3:body>
+                                    </con3:response>
+                                    <con3:requestTransform>
+                                        <con3:assign varName="REQmapeoErrores">
+                                            <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7c22</con1:id>
+                                            <con3:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con1:param name="MENSAJE_ERROR">
+                                                        <con1:path>fn:concat($serviceID,"$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="CODIGO_ERROR">
+                                                        <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:assign>
+                                    </con3:requestTransform>
+                                    <con3:responseTransform>
+                                        <con3:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7c21</con1:id>
+                                            <con3:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con1:param name="mapeoErroresResponse1">
+                                                        <con1:path>$RSPmapeoErrores</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="successIndicator">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con3:expr>
+                                        </con3:replace>
+                                    </con3:responseTransform>
+                                </con3:wsCallout>
+                            </con3:actions>
+                        </con3:case>
+                        <con3:default/>
+                    </con3:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-8117322222277923218-306da0a3.1785af060cd.-7b91">
+            <con:stage name="ManejoError">
+                <con:context xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/RegistrarTransaccionTCTypes" prefix="reg"/>
+                </con:context>
+                <con:actions xmlns:con4="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config">
+                    <con3:assign varName="errorCode">
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7b53</con1:id>
+                        <con3:expr>
+                            <con1:xqueryText>string($fault/ctx:errorCode/text())</con1:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:assign varName="errorMessage">
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7b52</con1:id>
+                        <con3:expr>
+                            <con1:xqueryText>string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con3:expr>
+                    </con3:assign>
+                    <con3:wsCallout>
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7b4f</con1:id>
+                        <con3:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con3:operation>mapeoErrores</con3:operation>
+                        <con3:request>
+                            <con3:body>REQmapeoErrores</con3:body>
+                        </con3:request>
+                        <con3:response>
+                            <con3:body>RSPmapeoErrores</con3:body>
+                        </con3:response>
+                        <con3:requestTransform>
+                            <con3:assign varName="REQmapeoErrores">
+                                <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7b51</con1:id>
+                                <con3:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con1:param name="MENSAJE_ERROR">
+                                            <con1:path>fn:concat($serviceID, "$#$", $errorMessage)</con1:path>
+                                        </con1:param>
+                                        <con1:param name="CODIGO_ERROR">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con3:expr>
+                            </con3:assign>
+                        </con3:requestTransform>
+                        <con3:responseTransform>
+                            <con3:replace varName="header" contents-only="true">
+                                <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7b50</con1:id>
+                                <con3:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con1:param name="mapeoErroresResponse1">
+                                            <con1:path>$RSPmapeoErrores</con1:path>
+                                        </con1:param>
+                                        <con1:param name="successIndicator">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con3:expr>
+                            </con3:replace>
+                        </con3:responseTransform>
+                    </con3:wsCallout>
+                    <con3:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7a09</con1:id>
+                        <con3:expr>
+                            <con1:xqueryText>&lt;reg:RegistrarTransaccionTCResponse/></con1:xqueryText>
+                        </con3:expr>
+                    </con3:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-8117322222277923218-306da0a3.1785af060cd.-7b4d</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:pipeline-node name="RegistrarTansaccionTC">
+                <con:request>RegistrarTansaccionTC_request</con:request>
+                <con:response>RegistrarTansaccionTC_response</con:response>
+            </con:pipeline-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

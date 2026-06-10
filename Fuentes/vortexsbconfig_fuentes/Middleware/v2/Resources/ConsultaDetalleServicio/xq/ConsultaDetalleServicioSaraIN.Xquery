@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:xqueryEntry xmlns:con="http://www.bea.com/wli/sb/resources/config">
+    <con:xquery>xquery version "2004-draft" encoding "Cp1252";
+(:: pragma bea:global-element-return element="ns3:GetServicePaymentEntitiesWithTagsForSaraMessageIn" location="../wsdl/consultaDetalleServicioPS.wsdl" ::)
+
+declare namespace xf = "http://tempuri.org/Middleware/v2/BusinessServices/ICB/SaraService/xq/ConsultaDetalleServicioSaraIN";
+declare namespace ns2 = "http://schemas.microsoft.com/2003/10/Serialization/Arrays";
+declare namespace ns1 = "urn:infocorp.framework.businessentities.security";
+declare namespace ns4 = "urn:infocorp.framework.businessentities.common";
+declare namespace ns3 = "urn:tailored.icbanking.services.sara";
+declare namespace ns0 = "urn:infocorp.framework.services.common";
+
+declare function xf:ConsultaDetalleServicioSaraIN($paymentEntity as xs:string)
+    as element(ns3:GetServicePaymentEntityForSaraByIdMessageIn) {
+        &lt;ns3:GetServicePaymentEntityForSaraByIdMessageIn>
+         &lt;ns3:ServicePaymentEntityId>{ data($paymentEntity) }&lt;/ns3:ServicePaymentEntityId>
+      &lt;/ns3:GetServicePaymentEntityForSaraByIdMessageIn>
+};
+
+declare variable $paymentEntity as xs:string external;
+
+xf:ConsultaDetalleServicioSaraIN($paymentEntity)</con:xquery>
+    <con:dependency location="../wsdl/consultaDetalleServicioPS.wsdl">
+        <con:wsdl ref="Middleware/v2/Resources/ConsultaDetalleServicio/wsdl/consultaDetalleServicioPS"/>
+    </con:dependency>
+</con:xqueryEntry>

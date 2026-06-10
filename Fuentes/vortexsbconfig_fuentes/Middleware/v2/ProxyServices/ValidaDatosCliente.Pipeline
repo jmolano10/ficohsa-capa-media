@@ -1,0 +1,2110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/AperturaProductos/wsdl/aperturaProductosPS"/>
+            <con:binding>
+                <con:name>aperturaProductosPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/aperturaProductosPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="true" aggregationInterval="360" level="action"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-4366618786892684376--217584.171330021f5.-7f28" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con3="http://www.bea.com/wli/sb/services/security/config">
+        <con:pipeline type="request" name="ValidacionesGenerales_request">
+            <con:stage name="ValidacionXSD">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con2:validate>
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f8c</con1:id>
+                        <con2:schema ref="Middleware/v2/Resources/AperturaProductos/xsd/aperturaProductosTypes"/>
+                        <con2:schemaElement xmlns:trib="http://www.ficohsa.com.hn/middleware.services/tributosTypes" xmlns:aper="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes">aper:validaDatosCliente</con2:schemaElement>
+                        <con2:varName>body</con2:varName>
+                        <con2:location>
+                            <con1:xpathText>./aper:validaDatosCliente</con1:xpathText>
+                        </con2:location>
+                        <con2:resultVarName/>
+                    </con2:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionServicioRegional">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ValidaServicioRegional" prefix="val"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f85</con1:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ValidaServicioRegional/biz/ValidaServicioRegional_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>ValidaServicioRegional</con2:operation>
+                        <con2:request>
+                            <con2:body>reqValidaServicioRegional</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respValidaServicioRegional</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqValidaServicioRegional">
+                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f8b</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/Generales/xq/validaServicioRegionalIn"/>
+                                        <con1:param name="requestHeader1">
+                                            <con1:path>$header/aut:RequestHeader</con1:path>
+                                        </con1:param>
+                                        <con1:param name="serviceId">
+                                            <con1:path>"FICBCO0403"</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f8a</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>fn:string($respValidaServicioRegional/val:PV_CODIGO_ERROR/text()) != 'SUCCESS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:replace contents-only="true" varName="header">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f89</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+      <successIndicator>ERROR</successIndicator>
+      <messages>{fn:string($respValidaServicioRegional/val:PV_MENSAJE_ERROR/text())}</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con2:replace contents-only="true" varName="body">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f88</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>&lt;aper:validaDatosClienteResponse/></con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:replace>
+                                        <con1:reply>
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f87</con1:id>
+                                        </con1:reply>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:replace contents-only="true" varName="header">
+                                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f86</con1:id>
+                                        <con2:expr>
+                                            <con1:xqueryTransform>
+                                                <con1:resource ref="Middleware/v2/Resources/Generales/xq/aplicarValoresPorDefectoRegion"/>
+                                                <con1:param name="requestHeader">
+                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                </con1:param>
+                                            </con1:xqueryTransform>
+                                        </con2:expr>
+                                    </con2:replace>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionesGenerales_response">
+            <con:stage name="MapeoError">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f84</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) != "SUCCESS"</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f81</con1:id>
+                                    <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>mapeoErrores</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQMapeoErrores</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPMapeoErrores</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQMapeoErrores">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f83</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                                    <con1:param name="MENSAJE_ERROR">
+                                                        <con1:path>fn:concat("FICBCO0403","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="CODIGO_ERROR">
+                                                        <con1:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:replace varName="header" contents-only="true">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7f82</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                                    <con1:param name="mapeoErroresResponse1">
+                                                        <con1:path>$RSPMapeoErrores</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="successIndicator">
+                                                        <con1:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:replace>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-4366618786892684376--217584.171330021f5.-7f28">
+            <con:stage name="ManejoError">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/tributosTypes" prefix="trib"/>
+                </con:context>
+                <con:actions>
+                    <con2:assign varName="errorCode">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7eea</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="errorMessage">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7ee9</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:wsCallout>
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7ee6</con1:id>
+                        <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>mapeoErrores</con2:operation>
+                        <con2:request>
+                            <con2:body>reqMapeoErrores</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>respMapeoErrores</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="reqMapeoErrores">
+                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7ee8</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                        <con1:param name="CODIGO_ERROR">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                        <con1:param name="MENSAJE_ERROR">
+                                            <con1:path>fn:concat("FICBCO0403", "$#$", $errorMessage)</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:replace contents-only="true" varName="header">
+                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7ee7</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryTransform>
+                                        <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                        <con1:param name="mapeoErroresResponse1">
+                                            <con1:path>$respMapeoErrores</con1:path>
+                                        </con1:param>
+                                        <con1:param name="successIndicator">
+                                            <con1:path>$errorCode</con1:path>
+                                        </con1:param>
+                                    </con1:xqueryTransform>
+                                </con2:expr>
+                            </con2:replace>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                    <con2:replace varName="body" contents-only="true">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7ee5</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;aper:validaDatosClienteResponse/></con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con1:reply>
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7ee4</con1:id>
+                    </con1:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="ValidacionDatosCliente_request">
+            <con:stage name="FlujodeEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaActivosPasivosCliente" prefix="sjc"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaListasCliente" prefix="cons"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-4780285559497282762--2c40e96c.1749c63a4be.-7d76</con1:id>
+                        <con2:location>
+                            <con1:xpathText>./aper:validaDatosCliente/LEGAL_ID</con1:xpathText>
+                        </con2:location>
+                        <con2:expr>
+                            <con1:xqueryText>replace($body/aper:validaDatosCliente/LEGAL_ID/text(),'-','')</con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:assign varName="LegalID">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7822</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/aper:validaDatosCliente/LEGAL_ID/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-77a1</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>(count($body/aper:validaDatosCliente/CUSTOMER_NAME/text())>0)</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="CustomerName">
+                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-752f</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>$body/aper:validaDatosCliente/CUSTOMER_NAME/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:assign varName="CustomerName">
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-752d</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>''</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con2:assign varName="isUser">
+                        <con1:id>_ActionId-7193741021269798991--22f0615e.173b7295e69.-76b7</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'NO'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="isList">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7dc8</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'NO'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="ErrorCode">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7a20</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'Success'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="isCostumer">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7daf</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'NO'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="isAssets">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7d99</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'NO'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="isLiability ">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7d76</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'NO'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="NumeroInteraciones">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7d1b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/aper:validaDatosCliente</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="AssetType">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-29a9</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'ALL'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="LiabilityType">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-2a05</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'ALL'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="RSPConsultaActivosPasivos">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-2995</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText><![CDATA[<sjc:sjConsultaActivosPasivosClienteResponse>
+    <sjc:ASSETS_STATUS/>
+	<sjc:ASSETS_INFORMATION/>
+	<sjc:LIABILITIES_STATUS/>
+	<sjc:LIABILITIES_INFORMATION/>
+</sjc:sjConsultaActivosPasivosClienteResponse>]]></con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="RSPConsListasCliente">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-2980</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>&lt;cons:sjConsultaListasClienteResponse>
+     &lt;cons:consultaListaClienteResponse>
+     &lt;/cons:consultaListaClienteResponse>
+&lt;/cons:sjConsultaListasClienteResponse></con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:foreach>
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7d32</con1:id>
+                        <con2:variable>NumeroInteraciones</con2:variable>
+                        <con2:expression>
+                            <con1:xpathText>./VALIDATION_LIST/VALIDATION_ITEM</con1:xpathText>
+                        </con2:expression>
+                        <con2:value-variable>numeroIntento</con2:value-variable>
+                        <con2:index-variable>index</con2:index-variable>
+                        <con2:total-variable>count</con2:total-variable>
+                        <con2:actions>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7ced</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$body/aper:validaDatosCliente/VALIDATION_LIST/VALIDATION_ITEM[$index]/NAME='ASSOCIATIONS_LIST'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="isList">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7c19</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>'YES'</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-7193741021269798991--22f0615e.173b7295e69.-7542</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$body/aper:validaDatosCliente/VALIDATION_LIST/VALIDATION_ITEM[$index]/NAME='USER_INFORMATION'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="isUser">
+                                            <con1:id>_ActionId-7193741021269798991--22f0615e.173b7295e69.-7541</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>'YES'</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-72d6</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$body/aper:validaDatosCliente/VALIDATION_LIST/VALIDATION_ITEM[$index]/NAME='CUSTOMER_INFORMATION'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="isCostumer">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-72d5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>'YES'</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-72d2</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$body/aper:validaDatosCliente/VALIDATION_LIST/VALIDATION_ITEM[$index]/NAME='ASSETS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="isAssets">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-72d1</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>'YES'</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="AssetType">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-72ad</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$body/aper:validaDatosCliente/VALIDATION_LIST/VALIDATION_ITEM[NAME='ASSETS']/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-72ce</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$body/aper:validaDatosCliente/VALIDATION_LIST/VALIDATION_ITEM[$index]/NAME='LIABILITY'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="isLiability">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-72cd</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>'YES'</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="LiabilityType">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-728d</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$body/aper:validaDatosCliente/VALIDATION_LIST/VALIDATION_ITEM[NAME='LIABILITY']/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                        </con2:actions>
+                    </con2:foreach>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaListaCliente">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaListasCliente" prefix="cons"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7be4</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$isList='YES'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7be2</con1:id>
+                                    <con2:service ref="Middleware/v2/Resources/ConsultaListasCliente/sj/sjConsultaListasCliente" xsi:type="con4:FlowRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con4="http://www.bea.com/alsb/flow/resources/config"/>
+                                    <con2:operation>consultaListasCliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsListasCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsListasCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQConsListasCliente">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7bc8</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/ConsultaListasClienteSjIn"/>
+                                                    <con1:param name="requestHeaderIN">
+                                                        <con1:path>$header/aut:RequestHeader</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="validaDatosClienteIN">
+                                                        <con1:path>$body/aper:validaDatosCliente</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:ifThenElse>
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7b25</con1:id>
+                                            <con2:case>
+                                                <con2:condition>
+                                                    <con1:xqueryText>fn:count($RSPConsListasCliente/cons:consultaListaClienteResponse[fn:upper-case(cons:successIndicator/text()) = "SUCCESS"])</con1:xqueryText>
+                                                </con2:condition>
+                                                <con2:actions/>
+                                            </con2:case>
+                                            <con2:default>
+                                                <con2:assign varName="ErrorCode">
+                                                    <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-79cc</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>'ERROR'</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:assign varName="ValidationMessage">
+                                                    <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7b1f</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>'CUSTOMER LISTS UNAVAILABLE'</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:default>
+                                        </con2:ifThenElse>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaCliente">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7bac</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$isCostumer='YES' or $isAssets ='YES' or $isLiability='YES'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7b92</con1:id>
+                                    <con2:service ref="Middleware/v3/BusinessServices/ConsultasCliente/flow/sjConsultaClienteResiliencia" xsi:type="con4:FlowRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con4="http://www.bea.com/alsb/flow/resources/config"/>
+                                    <con2:operation>Consultadecliente</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQconsultaCliente</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPconsultaCliente</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQconsultaCliente">
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7b6b</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/ConsultaClienteIn"/>
+                                                    <con1:param name="requestHeaderIN">
+                                                        <con1:path>$header/aut:RequestHeader</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="validaDatosClienteIN">
+                                                        <con1:path>$body/aper:validaDatosCliente</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:ifThenElse>
+                                            <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7b05</con1:id>
+                                            <con2:case>
+                                                <con2:condition>
+                                                    <con1:xqueryText>empty($RSPconsultaCliente/WSCUSTOMERType[1]/ZERORECORDS/text())</con1:xqueryText>
+                                                </con2:condition>
+                                                <con2:actions>
+                                                    <con2:ifThenElse>
+                                                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7acb</con1:id>
+                                                        <con2:case>
+                                                            <con2:condition>
+                                                                <con1:xqueryText>$RSPconsultaCliente/Status/successIndicator/text()='Success'</con1:xqueryText>
+                                                            </con2:condition>
+                                                            <con2:actions>
+                                                                <con2:assign varName="existCustomer">
+                                                                    <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7ac9</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>'YES'</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                                <con2:assign varName="CustomerID">
+                                                                    <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7443</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>$RSPconsultaCliente/WSCUSTOMERType[1]/gWSCUSTOMERDetailType/mWSCUSTOMERDetailType[1]/CUSTOMER/text()</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                            </con2:actions>
+                                                        </con2:case>
+                                                        <con2:default>
+                                                            <con2:assign varName="CustomerID">
+                                                                <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7b4c</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>''</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:assign varName="ValidationMessage">
+                                                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7a53</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>$RSPconsultaCliente/Status/messages/text()</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:assign varName="ErrorCode">
+                                                                <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7942</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>'ERROR'</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:assign varName="existCustomer">
+                                                                <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-78ef</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>'ERROR'</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                        </con2:default>
+                                                    </con2:ifThenElse>
+                                                </con2:actions>
+                                            </con2:case>
+                                            <con2:default>
+                                                <con2:assign varName="existCustomer">
+                                                    <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-79ca</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>'NO'</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:assign varName="CustomerID">
+                                                    <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7b12</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>''</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:default>
+                                        </con2:ifThenElse>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaUsuario">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-7193741021269798991--22f0615e.173b7295e69.-7528</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$isUser='YES'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7dd0</con1:id>
+                                    <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/ConsultaUsuario" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>consultaUsuario</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsultaUsuario</con2:body>
+                                        <con2:header>REQHeaderConsultaUsuario</con2:header>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsultaUsuario</con2:body>
+                                        <con2:header>RSPHeaderConsultaUsuario</con2:header>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="REQHeaderConsultaUsuario">
+                                            <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7dbc</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$header</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="REQConsultaUsuario">
+                                            <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7da5</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/ConsultaUsuarioIN"/>
+                                                    <con1:param name="validaDatosClienteIN">
+                                                        <con1:path>$body/aper:validaDatosCliente</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:ifThenElse>
+                                            <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7d91</con1:id>
+                                            <con2:case>
+                                                <con2:condition>
+                                                    <con1:xqueryText>$RSPHeaderConsultaUsuario/aut:ResponseHeader/successIndicator/text()='Success'</con1:xqueryText>
+                                                </con2:condition>
+                                                <con2:actions>
+                                                    <con2:assign varName="userID">
+                                                        <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7c9f</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>$RSPConsultaUsuario/USER_NAME/text()</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="existUsername">
+                                                        <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7c9d</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>'YES'</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="ValidationMessageUN">
+                                                        <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7c9b</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>''</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:actions>
+                                            </con2:case>
+                                            <con2:default>
+                                                <con2:assign varName="userID">
+                                                    <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7d50</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>''</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:assign varName="existUsername">
+                                                    <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7d4e</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>'NO'</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:assign varName="ValidationMessageUN">
+                                                    <con1:id>_ActionId-2226350570954076423-72c2c2e9.17474aa91ca.-7d4c</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>''</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:default>
+                                        </con2:ifThenElse>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:assign varName="userID">
+                                <con1:id>_ActionId-7193741021269798991--22f0615e.173b7295e69.-746c</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>''</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="existUsername">
+                                <con1:id>_ActionId-7193741021269798991--22f0615e.173b7295e69.-7470</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>'NO'</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="ValidationMessageUN">
+                                <con1:id>_ActionId-7193741021269798991--22f0615e.173b7295e69.-7416</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>''</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ConsultaActivosPasivosCliente">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaActivosPasivosCliente" prefix="cons"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7df2</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$existCustomer='YES'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7ded</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$isLiability='YES' or $isAssets='YES'</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:assign varName="TypeSearch">
+                                                <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7dec</con1:id>
+                                                <con2:expr>
+                                                    <con1:xqueryText>if($isLiability='YES'and $isAssets='YES')then(
+'ASSET/LYBILITY')
+elseif($isLiability='NO'and $isAssets='YES') then
+('ASSET')
+elseif($isLiability='YES'and $isAssets='NO') then
+('LIABILITY')
+else()</con1:xqueryText>
+                                                </con2:expr>
+                                            </con2:assign>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7dea</con1:id>
+                                                <con2:service ref="Middleware/v2/BusinessServices/SJS/consultaActivosPasivosCliente/flow/sjConsultaActivosPasivosCliente" xsi:type="con4:FlowRef" xmlns:ref="http://www.bea.com/wli/sb/reference" xmlns:con4="http://www.bea.com/alsb/flow/resources/config"/>
+                                                <con2:operation>ConsultaActivosPasivosCliente</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQConsultaActivosPasivos</con2:body>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPConsultaActivosPasivos</con2:body>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQConsultaActivosPasivos">
+                                                        <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7deb</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/consultaPasivosActivosIN"/>
+                                                                <con1:param name="CustomerID">
+                                                                    <con1:path>$CustomerID</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="TypeSearch">
+                                                                    <con1:path>$TypeSearch</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="LiabilitySearch">
+                                                                    <con1:path>$LiabilityType</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="requestHeaderIN">
+                                                                    <con1:path>$header/aut:RequestHeader</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="AssetSearch">
+                                                                    <con1:path>$AssetType</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform/>
+                                            </con2:wsCallout>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default/>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:assign varName="isLiability ">
+                                <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7ca0</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>'NO'</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="isAssets">
+                                <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-7c9e</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>'NO'</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:default>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidacionDatosCliente_response">
+            <con:stage name="FlujodeSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7a3b</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/validaDatosClienteHeaderOut"/>
+                                <con1:param name="Message">
+                                    <con1:path>$ValidationMessage</con1:path>
+                                </con1:param>
+                                <con1:param name="ErrorCode">
+                                    <con1:path>$ErrorCode</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-5898372149158001500--5be66da.171af90ced9.-79ca</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/validaDatosClienteOut"/>
+                                <con1:param name="isCostumer">
+                                    <con1:path>$isCostumer</con1:path>
+                                </con1:param>
+                                <con1:param name="User_Error_Message">
+                                    <con1:path>$ValidationMessageUN</con1:path>
+                                </con1:param>
+                                <con1:param name="Customer_Error_Message">
+                                    <con1:path>$ValidationMessage</con1:path>
+                                </con1:param>
+                                <con1:param name="LegalID">
+                                    <con1:path>$LegalID</con1:path>
+                                </con1:param>
+                                <con1:param name="sjConsultaActivosPasivosClienteResponseIN">
+                                    <con1:path>$RSPConsultaActivosPasivos</con1:path>
+                                </con1:param>
+                                <con1:param name="existsUsername">
+                                    <con1:path>$existUsername</con1:path>
+                                </con1:param>
+                                <con1:param name="sjConsultaListasClienteResponseIN">
+                                    <con1:path>$RSPConsListasCliente</con1:path>
+                                </con1:param>
+                                <con1:param name="UserID">
+                                    <con1:path>$userID</con1:path>
+                                </con1:param>
+                                <con1:param name="CostumerID">
+                                    <con1:path>$CustomerID</con1:path>
+                                </con1:param>
+                                <con1:param name="isAssets">
+                                    <con1:path>$isAssets</con1:path>
+                                </con1:param>
+                                <con1:param name="CustomerName">
+                                    <con1:path>$CustomerName</con1:path>
+                                </con1:param>
+                                <con1:param name="isLiability">
+                                    <con1:path>$isLiability</con1:path>
+                                </con1:param>
+                                <con1:param name="isList">
+                                    <con1:path>$isList</con1:path>
+                                </con1:param>
+                                <con1:param name="existsCustomer">
+                                    <con1:path>$existCustomer</con1:path>
+                                </con1:param>
+                                <con1:param name="isUser">
+                                    <con1:path>$isUser</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="Default_ValidacionDatosCliente_request">
+            <con:stage name="FlujoEntrada">
+                <con:context/>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="Default_ValidacionDatosCliente_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:Error>
+                        <con1:id>_ActionId-4366618786892684376--217584.171330021f5.-7e09</con1:id>
+                        <con2:errCode>MW-0008</con2:errCode>
+                        <con2:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con2:message>
+                    </con2:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="ValidaDatosCliente_request">
+            <con:stage name="FlujodeEntrada">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaActivosPasivosCliente" prefix="sjc"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaListasCliente" prefix="cons"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f5b</con1:id>
+                        <con2:location>
+                            <con1:xpathText>./aper:validaDatosCliente/LEGAL_ID</con1:xpathText>
+                        </con2:location>
+                        <con2:expr>
+                            <con1:xqueryText>replace($body/aper:validaDatosCliente/LEGAL_ID/text(),'-','')</con1:xqueryText>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:assign varName="LegalID">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f5a</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/aper:validaDatosCliente/LEGAL_ID/text()</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7697</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>(count($body/aper:validaDatosCliente/CUSTOMER_NAME/text())>0)</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:assign varName="CustomerName">
+                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7531</con1:id>
+                                    <con2:expr>
+                                        <con1:xqueryText>$body/aper:validaDatosCliente/CUSTOMER_NAME/text()</con1:xqueryText>
+                                    </con2:expr>
+                                </con2:assign>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default>
+                            <con2:assign varName="CustomerName">
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7533</con1:id>
+                                <con2:expr>
+                                    <con1:xqueryText>''</con1:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:default>
+                    </con2:ifThenElse>
+                    <con2:assign varName="NivelRiesgoCobis">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-706f</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'LOW'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="IsFiscanValue">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7059</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'NO'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="isFiscan">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f58</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'NO'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="isCobisRisk">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f57</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'NO'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="ErrorCode">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f56</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'Success'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="NumeroInteraciones">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f52</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>$body/aper:validaDatosCliente</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="Currency">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-6fcc</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'NIO'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:foreach>
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f41</con1:id>
+                        <con2:variable>NumeroInteraciones</con2:variable>
+                        <con2:expression>
+                            <con1:xpathText>./VALIDATION_LIST/VALIDATION_ITEM</con1:xpathText>
+                        </con2:expression>
+                        <con2:value-variable>numeroIntento</con2:value-variable>
+                        <con2:index-variable>index</con2:index-variable>
+                        <con2:total-variable>count</con2:total-variable>
+                        <con2:actions>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f4d</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$body/aper:validaDatosCliente/VALIDATION_LIST/VALIDATION_ITEM[$index]/NAME='FISCAN_LIST'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="isFiscan">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f4c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>'YES'</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f4b</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$body/aper:validaDatosCliente/VALIDATION_LIST/VALIDATION_ITEM[$index]/NAME='COBIS_LIST'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="isCobisRisk">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3f4a</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>'YES'</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7912</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='BENEFICIARY_NAME'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="BeneficiaryName">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7911</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-790a</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='COUNTRY'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="Country">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7909</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7906</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='RELATIONSHIP'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="Relationship">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7905</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7902</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='DOCUMENT_TYPE'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="DocumentType">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7901</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-78fe</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='DOCUMENT_NUMBER'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="DocumentNumber">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-78fd</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7641</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='ACCOUNT_PURPOSE'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="accountPropose">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7640</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-763d</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='FOUNDS_SOURCE'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="FoundSource">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-763c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7639</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='NUMBER_DEBIT_TRANSACTIONS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="numberTrxDebit">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7638</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7635</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='AMOUNT_DEBIT_AVERAGE'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="amountAvgDebit">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7634</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7631</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='NUMBER_CREDIT_TRANSACTIONS'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="numberTrxCredit">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7630</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-762d</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='AMOUNT_CREDIT_AVERAGE'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="amountAvgCredit">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-762c</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-731c</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='CUSTOMER_ID'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="CustomerID">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-731b</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                            <con2:ifThenElse>
+                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-71e3</con1:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con1:xqueryText>$numeroIntento/NAME/text()='CURRENCY'</con1:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="Currency">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-71e2</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$numeroIntento/VALUE/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default/>
+                            </con2:ifThenElse>
+                        </con2:actions>
+                    </con2:foreach>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ObtenerParemtrizacion">
+                <con:context>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con2:wsCallout xmlns:con3="http://www.bea.com/wli/sb/stages/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config">
+                        <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75d8</con4:id>
+                        <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/Business_Resources/general/Resources/ObtenerParametrizacion/ObtenerParametrizacion" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con2:operation>obtenerParametrizacion</con2:operation>
+                        <con2:request>
+                            <con2:body>REQObtenerParametrizacion</con2:body>
+                        </con2:request>
+                        <con2:response>
+                            <con2:body>RSPObtenerParametrizacion</con2:body>
+                        </con2:response>
+                        <con2:requestTransform>
+                            <con2:assign varName="TrxFiscan">
+                                <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75e6</con4:id>
+                                <con2:expr>
+                                    <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">'FICBCO0403.TRX.FISCAN'</con4:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="Channel">
+                                <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75e4</con4:id>
+                                <con2:expr>
+                                    <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">concat('FICBCO0403.CHANNEL.',fn:upper-case($header/aut:RequestHeader/Authentication/UserName/text()))</con4:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="TransactionType">
+                                <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75e3</con4:id>
+                                <con2:expr>
+                                    <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">'FICBCO0403.TRX.TYPE'</con4:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="FiscanTrxSeq">
+                                <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-754d</con4:id>
+                                <con2:expr>
+                                    <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">'FICBCO0403.SEQ.FISCAN'</con4:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="CobisRiskTrx">
+                                <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-74c1</con4:id>
+                                <con2:expr>
+                                    <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">'FICBCO0403.TRX.RISK.COBIS'</con4:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="CurrencyCode">
+                                <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-72c8</con4:id>
+                                <con2:expr>
+                                    <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">concat('FICBCO0403.CURRENCY.',$Currency)</con4:xqueryText>
+                                </con2:expr>
+                            </con2:assign>
+                            <con2:assign varName="REQObtenerParametrizacion">
+                                <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75e2</con4:id>
+                                <con2:expr>
+                                    <con4:xqueryTransform xmlns:con4="http://www.bea.com/wli/sb/stages/config">
+                                        <con4:resource ref="Middleware/Business_Resources/general/Parametrizacion/obtenerParametrizacionIn"/>
+                                        <con4:param name="nombreParametros">
+                                            <con4:path>fn:concat($TrxFiscan,"||",$StatusResponse,"||",$Channel,"||",$TransactionType,"||",$FiscanTrxSeq,"||",$CobisRiskTrx,"||",$CurrencyCode)</con4:path>
+                                        </con4:param>
+                                    </con4:xqueryTransform>
+                                </con2:expr>
+                            </con2:assign>
+                        </con2:requestTransform>
+                        <con2:responseTransform>
+                            <con2:ifThenElse>
+                                <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75e1</con4:id>
+                                <con2:case>
+                                    <con2:condition>
+                                        <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">$RSPObtenerParametrizacion/osb:ERROR_CODE/text()='SUCCESS'</con4:xqueryText>
+                                    </con2:condition>
+                                    <con2:actions>
+                                        <con2:assign varName="ErrorCode">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75e0</con4:id>
+                                            <con2:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">'Success'</con4:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="ValidationMessage">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75df</con4:id>
+                                            <con2:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">''</con4:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="TrxFiscanValue">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75de</con4:id>
+                                            <con2:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$TrxFiscan]/osb:VALUE/text())</con4:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="TransactionTypeValue">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75dc</con4:id>
+                                            <con2:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$TransactionType]/osb:VALUE/text())</con4:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="FiscanTrxSeqValue">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-7535</con4:id>
+                                            <con2:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$FiscanTrxSeq]/osb:VALUE/text())</con4:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="CobisRiskTrxValue">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-74ab</con4:id>
+                                            <con2:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$CobisRiskTrx]/osb:VALUE/text())</con4:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="ChannelValue">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75db</con4:id>
+                                            <con2:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$Channel]/osb:VALUE/text())</con4:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="CurrencyCodeValue">
+                                            <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-71c4</con4:id>
+                                            <con2:expr>
+                                                <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">string($RSPObtenerParametrizacion/osb:CONFIGURACIONES/osb:CONFIGURACIONES_ITEM[osb:NAME=$CurrencyCode]/osb:VALUE/text())</con4:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:actions>
+                                </con2:case>
+                                <con2:default>
+                                    <con2:assign varName="ErrorCode">
+                                        <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75da</con4:id>
+                                        <con2:expr>
+                                            <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">"ERROR"</con4:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                    <con2:assign varName="ValidationMessage">
+                                        <con4:id xmlns:con4="http://www.bea.com/wli/sb/stages/config">_ActionId-3242537739536122548-3082f576.17a1b598489.-75d9</con4:id>
+                                        <con2:expr>
+                                            <con4:xqueryText xmlns:con4="http://www.bea.com/wli/sb/stages/config">string($RSPobtenerParametrizacion/osb:ERROR_MESSAGE/text())</con4:xqueryText>
+                                        </con2:expr>
+                                    </con2:assign>
+                                </con2:default>
+                            </con2:ifThenElse>
+                        </con2:responseTransform>
+                    </con2:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ValidacionFiscan" errorHandler="_onErrorHandler-3242537739536122548-3082f576.179a4a417c7.855">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/sjConsultaListasCliente" prefix="cons"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/ORA_BANK/OSB_GET_CONFIG/" prefix="osb"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ConsultaClienteFiscan_db" prefix="con"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ConsultaDetalleClienteFiscan" prefix="cob"/>
+                    <con1:userNsDecl namespace="http://dto.srvaplcobisentitiesfinscan.ecobis.cobiscorp" prefix="con3"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.-3fb2</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$isFiscan='YES'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-795f</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$RSPObtenerParametrizacion/osb:ERROR_CODE/text()='SUCCESS'</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7951</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/Cobis/Fiscan/biz/ConsultaClienteFiscan_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>ConsultaClienteFiscan_db</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQConsultaFiscan</con2:body>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPConsultaFiscan</con2:body>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="SourceBank">
+                                                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-78e5</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text()</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="User">
+                                                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-78ca</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>$header/aut:RequestHeader/Authentication/UserName/text()</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="Date">
+                                                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-78a8</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>fn-bea:date-to-string-with-format("yyyy-MM-dd",fn:current-date())</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="REQConsultaFiscan">
+                                                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7957</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/ObtenerSecuencialFiscanIN"/>
+                                                                <con1:param name="Date">
+                                                                    <con1:path>$Date</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="TrxCode">
+                                                                    <con1:path>$FiscanTrxSeqValue</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="Channel">
+                                                                    <con1:path>$ChannelValue</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="User">
+                                                                    <con1:path>$User</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="Country">
+                                                                    <con1:path>$SourceBank</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con2:ifThenElse>
+                                                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7956</con1:id>
+                                                        <con2:case>
+                                                            <con2:condition>
+                                                                <con1:xqueryText>$RSPConsultaFiscan/con:o_desc_error/text()='SUCCESS'</con1:xqueryText>
+                                                            </con2:condition>
+                                                            <con2:actions>
+                                                                <con2:assign varName="SecuencialFiscan">
+                                                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7955</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>$RSPConsultaFiscan/con:o_id/text()</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                                <con2:assign varName="ValidationMessage">
+                                                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7954</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>''</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                            </con2:actions>
+                                                        </con2:case>
+                                                        <con2:default>
+                                                            <con2:assign varName="ErrorCode">
+                                                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7953</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>'ERROR'</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:assign varName="ValidationMessage">
+                                                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7952</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>$RSPConsultaFiscan/con:o_desc_error/text()</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                        </con2:default>
+                                                    </con2:ifThenElse>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default/>
+                                </con2:ifThenElse>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-3963695453942570549--49814890.17aef1cf898.-7a08</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$RSPConsultaFiscan/con:o_desc_error/text()='SUCCESS'</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-3963695453942570549--49814890.17aef1cf898.-7a06</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/CTS/Fiscan/biz/consultaFiscan" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>OpLookup</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQConsultaFiscanCTS</con2:body>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPConsultaFiscanCTS</con2:body>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQConsultaFiscanCTS">
+                                                        <con1:id>_ActionId-3963695453942570549--49814890.17aef1cf898.-79ef</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/consultaCTSFiscan"/>
+                                                                <con1:param name="Name">
+                                                                    <con1:path>$BeneficiaryName</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="Sequence">
+                                                                    <con1:path>$SecuencialFiscan</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con2:ifThenElse>
+                                                        <con1:id>_ActionId-3963695453942570549--49814890.17aef1cf898.-79de</con1:id>
+                                                        <con2:case>
+                                                            <con2:condition>
+                                                                <con1:xqueryText>$RSPConsultaFiscanCTS/con3:contextoRespuesta/con3:codTipoRespuesta/text()='0'</con1:xqueryText>
+                                                            </con2:condition>
+                                                            <con2:actions>
+                                                                <con2:assign varName="CTSFiscanValue">
+                                                                    <con1:id>_ActionId-3963695453942570549--49814890.17aef1cf898.-7920</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>$RSPConsultaFiscanCTS/con3:status/text()</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                                <con2:assign varName="ValidationMessage">
+                                                                    <con1:id>_ActionId-3963695453942570549--49814890.17aef1cf898.-77f7</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>''</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                            </con2:actions>
+                                                        </con2:case>
+                                                        <con2:default>
+                                                            <con2:assign varName="ErrorCode">
+                                                                <con1:id>_ActionId-3963695453942570549--49814890.17aef1cf898.-7939</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>'ERROR'</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:assign varName="ValidationMessage">
+                                                                <con1:id>_ActionId-3963695453942570549--49814890.17aef1cf898.-78f1</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>$RSPConsultaFiscanCTS/con3:contextoRespuesta/con3:valDescripcionRespuesta/text()='Success'</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:assign varName="CTSFiscanValue">
+                                                                <con1:id>_ActionId-3963695453942570549--49814890.17aef1cf898.-790e</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>''</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                        </con2:default>
+                                                    </con2:ifThenElse>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default/>
+                                </con2:ifThenElse>
+                                <con2:ifThenElse>
+                                    <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.a35</con1:id>
+                                    <con2:case>
+                                        <con2:condition>
+                                            <con1:xqueryText>$RSPConsultaFiscan/con:o_desc_error/text()='SUCCESS' and $RSPConsultaFiscanCTS/con3:contextoRespuesta/con3:codTipoRespuesta/text()='0'</con1:xqueryText>
+                                        </con2:condition>
+                                        <con2:actions>
+                                            <con2:wsCallout>
+                                                <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.a37</con1:id>
+                                                <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/Cobis/Fiscan/biz/ConsultaDetalleClienteFiscan_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                                <con2:operation>ConsultaDetalleClienteFiscan</con2:operation>
+                                                <con2:request>
+                                                    <con2:body>REQConsultaDetalleClienteFiscan</con2:body>
+                                                </con2:request>
+                                                <con2:response>
+                                                    <con2:body>RSPConsultaDetalleClienteFiscan</con2:body>
+                                                </con2:response>
+                                                <con2:requestTransform>
+                                                    <con2:assign varName="REQConsultaDetalleClienteFiscan">
+                                                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7db4</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryTransform>
+                                                                <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/ValidaDatosClienteFiscanIN"/>
+                                                                <con1:param name="statusResponse">
+                                                                    <con1:path>$CTSFiscanValue</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="CountryBenefiarry">
+                                                                    <con1:path>$Country</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="DocumentType">
+                                                                    <con1:path>$DocumentType</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="Date">
+                                                                    <con1:path>$Date</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="TrxType">
+                                                                    <con1:path>$TransactionTypeValue</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="SecuncialFiscan">
+                                                                    <con1:path>$SecuencialFiscan</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="TrxCode">
+                                                                    <con1:path>$TrxFiscanValue</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="BeneficiaryName">
+                                                                    <con1:path>$BeneficiaryName</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="User">
+                                                                    <con1:path>$User</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="Channel">
+                                                                    <con1:path>$ChannelValue</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="DocumentNumber">
+                                                                    <con1:path>$DocumentNumber</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="Country">
+                                                                    <con1:path>$SourceBank</con1:path>
+                                                                </con1:param>
+                                                                <con1:param name="RelationCode">
+                                                                    <con1:path>$Relationship</con1:path>
+                                                                </con1:param>
+                                                            </con1:xqueryTransform>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:requestTransform>
+                                                <con2:responseTransform>
+                                                    <con2:ifThenElse>
+                                                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7d9d</con1:id>
+                                                        <con2:case>
+                                                            <con2:condition>
+                                                                <con1:xqueryText>$RSPConsultaDetalleClienteFiscan/cob:o_desc_error/text()='SUCCESS'</con1:xqueryText>
+                                                            </con2:condition>
+                                                            <con2:actions>
+                                                                <con2:assign varName="IsFiscanValue">
+                                                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7d4d</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>'NO'</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                                <con2:assign varName="ValidationMessage">
+                                                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7870</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>''</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                            </con2:actions>
+                                                        </con2:case>
+                                                        <con2:case>
+                                                            <con2:condition>
+                                                                <con1:xqueryText>$RSPConsultaDetalleClienteFiscan/cob:o_num_error/text()='1880023'</con1:xqueryText>
+                                                            </con2:condition>
+                                                            <con2:actions>
+                                                                <con2:assign varName="IsFiscanValue">
+                                                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7bcb</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>'YES'</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                                <con2:assign varName="ValidationMessage">
+                                                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-788d</con1:id>
+                                                                    <con2:expr>
+                                                                        <con1:xqueryText>''</con1:xqueryText>
+                                                                    </con2:expr>
+                                                                </con2:assign>
+                                                            </con2:actions>
+                                                        </con2:case>
+                                                        <con2:default>
+                                                            <con2:assign varName="IsFiscanValue">
+                                                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7b91</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>'ERROR'</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:assign varName="ErrorCode">
+                                                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7b47</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>'ERROR'</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                            <con2:assign varName="ValidationMessage">
+                                                                <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7b6e</con1:id>
+                                                                <con2:expr>
+                                                                    <con1:xqueryText>$RSPConsultaDetalleClienteFiscan/cob:o_desc_error/text()</con1:xqueryText>
+                                                                </con2:expr>
+                                                            </con2:assign>
+                                                        </con2:default>
+                                                    </con2:ifThenElse>
+                                                </con2:responseTransform>
+                                            </con2:wsCallout>
+                                        </con2:actions>
+                                    </con2:case>
+                                    <con2:default/>
+                                </con2:ifThenElse>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="RiesgoCobis" errorHandler="_onErrorHandler-3242537739536122548-3082f576.17a1b598489.-7058">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con1:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/ConsultaRiesgoCobis" prefix="con"/>
+                </con:context>
+                <con:actions>
+                    <con2:ifThenElse>
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-74f4</con1:id>
+                        <con2:case>
+                            <con2:condition>
+                                <con1:xqueryText>$isCobisRisk='YES'</con1:xqueryText>
+                            </con2:condition>
+                            <con2:actions>
+                                <con2:wsCallout>
+                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-74d0</con1:id>
+                                    <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/Cobis/ConsultaRiesgoCobis/biz/ConsultaRiesgoCobis_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con2:operation>ConsultaRiesgoCobis</con2:operation>
+                                    <con2:request>
+                                        <con2:body>REQConsultaRiesgoCobis</con2:body>
+                                    </con2:request>
+                                    <con2:response>
+                                        <con2:body>RSPConsultaRiesgoCobis</con2:body>
+                                    </con2:response>
+                                    <con2:requestTransform>
+                                        <con2:assign varName="Date">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-72de</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>fn-bea:date-to-string-with-format("yyyy-MM-dd",fn:current-date())</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="User">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-72dd</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$header/aut:RequestHeader/Authentication/UserName/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="SourceBank">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-72dc</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryText>$header/aut:RequestHeader/Region/SourceBank/text()</con1:xqueryText>
+                                            </con2:expr>
+                                        </con2:assign>
+                                        <con2:assign varName="REQConsultaRiesgoCobis">
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-71a0</con1:id>
+                                            <con2:expr>
+                                                <con1:xqueryTransform>
+                                                    <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/consultaRiesgoCobisIN"/>
+                                                    <con1:param name="Date">
+                                                        <con1:path>$Date</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="AmountAvgCredit">
+                                                        <con1:path>$amountAvgCredit</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="ProposeAccount">
+                                                        <con1:path>$accountPropose</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="CostumerID">
+                                                        <con1:path>$CustomerID</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="NumDebitTrx">
+                                                        <con1:path>$numberTrxDebit</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="orignsFounds">
+                                                        <con1:path>$FoundSource</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="AmountAvgDebit">
+                                                        <con1:path>$amountAvgDebit</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Channel">
+                                                        <con1:path>$ChannelValue</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="User">
+                                                        <con1:path>$User</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="RiskCobisTrx">
+                                                        <con1:path>$CobisRiskTrxValue</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Country">
+                                                        <con1:path>$SourceBank</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="NumCreditTrx">
+                                                        <con1:path>$numberTrxCredit</con1:path>
+                                                    </con1:param>
+                                                    <con1:param name="Currency">
+                                                        <con1:path>$CurrencyCodeValue</con1:path>
+                                                    </con1:param>
+                                                </con1:xqueryTransform>
+                                            </con2:expr>
+                                        </con2:assign>
+                                    </con2:requestTransform>
+                                    <con2:responseTransform>
+                                        <con2:ifThenElse>
+                                            <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-70d0</con1:id>
+                                            <con2:case>
+                                                <con2:condition>
+                                                    <con1:xqueryText>$RSPConsultaRiesgoCobis/con:o_desc_error/text()='SUCCESS'</con1:xqueryText>
+                                                </con2:condition>
+                                                <con2:actions>
+                                                    <con2:assign varName="NivelRiesgoCobis">
+                                                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-70cf</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>$RSPConsultaRiesgoCobis/con:o_riesgo_nivel/text()</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                    <con2:assign varName="ValidationMessage">
+                                                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-70ce</con1:id>
+                                                        <con2:expr>
+                                                            <con1:xqueryText>''</con1:xqueryText>
+                                                        </con2:expr>
+                                                    </con2:assign>
+                                                </con2:actions>
+                                            </con2:case>
+                                            <con2:default>
+                                                <con2:assign varName="ErrorCode">
+                                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-70cd</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>'ERROR'</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                                <con2:assign varName="ValidationMessage">
+                                                    <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-70cc</con1:id>
+                                                    <con2:expr>
+                                                        <con1:xqueryText>$RSPConsultaRiesgoCobis/con:o_desc_error/text()</con1:xqueryText>
+                                                    </con2:expr>
+                                                </con2:assign>
+                                            </con2:default>
+                                        </con2:ifThenElse>
+                                    </con2:responseTransform>
+                                </con2:wsCallout>
+                            </con2:actions>
+                        </con2:case>
+                        <con2:default/>
+                    </con2:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="ValidaDatosCliente_response">
+            <con:stage name="FlujodeSalida">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/aperturaProductosTypes" prefix="aper"/>
+                </con:context>
+                <con:actions>
+                    <con2:replace contents-only="true" varName="header">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7aa0</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/validaDatosClienteHeaderOut"/>
+                                <con1:param name="Message">
+                                    <con1:path>$ValidationMessage</con1:path>
+                                </con1:param>
+                                <con1:param name="ErrorCode">
+                                    <con1:path>$ErrorCode</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:replace>
+                    <con2:replace contents-only="true" varName="body">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-7a9f</con1:id>
+                        <con2:expr>
+                            <con1:xqueryTransform>
+                                <con1:resource ref="Middleware/v2/Resources/ValidaDatosCliente/xq/validaDatosClienteNIOUT"/>
+                                <con1:param name="LegalID">
+                                    <con1:path>$LegalID</con1:path>
+                                </con1:param>
+                                <con1:param name="CostumerName">
+                                    <con1:path>$CustomerName</con1:path>
+                                </con1:param>
+                                <con1:param name="isFiscanValue">
+                                    <con1:path>$IsFiscanValue</con1:path>
+                                </con1:param>
+                                <con1:param name="isFiscan">
+                                    <con1:path>$isFiscan</con1:path>
+                                </con1:param>
+                                <con1:param name="isCobis">
+                                    <con1:path>$isCobisRisk</con1:path>
+                                </con1:param>
+                                <con1:param name="isCobisValue">
+                                    <con1:path>$NivelRiesgoCobis</con1:path>
+                                </con1:param>
+                            </con1:xqueryTransform>
+                        </con2:expr>
+                    </con2:replace>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-3242537739536122548-3082f576.179a4a417c7.855">
+            <con:stage name="ErrorFiscan">
+                <con:context/>
+                <con:actions>
+                    <con2:assign varName="ErrorCode">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.8ba</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'ERROR'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="ValidationMessage">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.8a4</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con1:resume>
+                        <con1:id>_ActionId-3242537739536122548-3082f576.179a4a417c7.87c</con1:id>
+                    </con1:resume>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-3242537739536122548-3082f576.17a1b598489.-7058">
+            <con:stage name="ErrorCobis">
+                <con:context/>
+                <con:actions>
+                    <con2:assign varName="ErrorCode">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-6fe5</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>'ERROR'</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con2:assign varName="ValidationMessage">
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-6fe4</con1:id>
+                        <con2:expr>
+                            <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+                        </con2:expr>
+                    </con2:assign>
+                    <con1:resume>
+                        <con1:id>_ActionId-3242537739536122548-3082f576.17a1b598489.-6fe3</con1:id>
+                    </con1:resume>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="ValidacionesGenerales">
+                <con:request>ValidacionesGenerales_request</con:request>
+                <con:response>ValidacionesGenerales_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="RegionalizacionPaisEmpresa">
+                <con:context>
+                    <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                    <con:xpath>
+                        <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+                    </con:xpath>
+                    <con:branch name="HN01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'HN01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="ValidacionDatosCliente">
+                                <con:request>ValidacionDatosCliente_request</con:request>
+                                <con:response>ValidacionDatosCliente_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="NI01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'NI01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="ValidaDatosCliente">
+                                <con:request>ValidaDatosCliente_request</con:request>
+                                <con:response>ValidaDatosCliente_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_ValidacionDatosCliente">
+                                <con:request>Default_ValidacionDatosCliente_request</con:request>
+                                <con:response>Default_ValidacionDatosCliente_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>

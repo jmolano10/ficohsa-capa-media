@@ -1,0 +1,853 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:pipelineEntry xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oper="http://xmlns.oracle.com/servicebus/pipeline/operations">
+    <con:coreEntry>
+        <con:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType">
+            <con:wsdl ref="Middleware/v2/Resources/GenerarCuponRetiro/wsdl/generarCuponRetiroPS"/>
+            <con:binding>
+                <con:name>generaCuponRetiroPSSOAP</con:name>
+                <con:namespace>http://www.ficohsa.com.hn/middleware.services/generaCuponRetiroPS/</con:namespace>
+            </con:binding>
+        </con:binding>
+        <oper:operations>
+            <oper:monitoring enabled="false" aggregationInterval="10" level="pipeline"/>
+            <oper:tracingEnabled>false</oper:tracingEnabled>
+            <oper:reporting>true</oper:reporting>
+            <oper:logging enabled="true" level="debug"/>
+            <oper:sla-alerting enabled="true" level="normal"/>
+            <oper:pipeline-alerting enabled="true" level="normal"/>
+        </oper:operations>
+    </con:coreEntry>
+    <con:router errorHandler="_onErrorHandler-5656691700730765979-1f7bbe00.19683831b1c.-76b3" xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+        <con:pipeline type="request" name="GenerarCuponRetiro_request">
+            <con:stage name="ValidaciónXSD">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                </con:context>
+                <con:actions>
+                    <con1:validate>
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7ade</con2:id>
+                        <con1:schema ref="Middleware/v2/Resources/RetiroSinTarjetaDebito/xsd/retiroSinTarjetaDebitoTypes"/>
+                        <con1:schemaElement xmlns:ret="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes">ret:generarCuponRetiro</con1:schemaElement>
+                        <con1:varName>body</con1:varName>
+                        <con1:location>
+                            <con2:xpathText>./ret:generarCuponRetiro</con2:xpathText>
+                        </con1:location>
+                    </con1:validate>
+                </con:actions>
+            </con:stage>
+            <con:stage name="GeneracionUUID">
+                <con:context/>
+                <con:actions>
+                    <con6:assign varName="uuid" xmlns:con3="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con="http://www.bea.com/wli/sb/services/security/config" xmlns:con5="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con4="http://www.bea.com/wli/sb/stages/publish/config" xmlns:con1="http://www.bea.com/wli/sb/pipeline/config" xmlns:con6="http://www.bea.com/wli/sb/stages/transform/config">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-1fe5</con2:id>
+                        <con6:expr>
+                            <con2:xqueryTransform>
+                                <con2:resource ref="Middleware/Business_Resources/general/UUID/obtenerUUID"/>
+                            </con2:xqueryTransform>
+                        </con6:expr>
+                    </con6:assign>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GenerarCuponRetiro_response">
+            <con:stage name="FlujoSalida">
+                <con:context>
+                    <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/movilDigitizationCardsTypes" prefix="mov"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7a68</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>$errorCode = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:replace varName="header" contents-only="true">
+                                    <con2:id>_ActionId-5416684245907369159-11cd8d54.1971cbe3142.-7fc0</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>Success</successIndicator>
+	<transactionId>{$transactionId}</transactionId>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                    </con1:expr>
+                                </con1:replace>
+                                <con1:replace contents-only="true" varName="body">
+                                    <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7a67</con2:id>
+                                    <con1:expr>
+                                        <con2:xqueryTransform>
+                                            <con2:resource ref="Middleware/v2/Resources/GenerarCuponRetiro/xq/generarCuponRetiroOut"/>
+                                            <con2:param name="cupon">
+                                                <con2:path>$cupon</con2:path>
+                                            </con2:param>
+                                            <con2:param name="fechaVencimiento">
+                                                <con2:path>$fechaExpira</con2:path>
+                                            </con2:param>
+                                            <con2:param name="uuid">
+                                                <con2:path>$uuid</con2:path>
+                                            </con2:param>
+                                            <con2:param name="qr">
+                                                <con2:path>$QRBase64</con2:path>
+                                            </con2:param>
+                                        </con2:xqueryTransform>
+                                    </con1:expr>
+                                </con1:replace>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con1:replace varName="header" contents-only="true">
+                                <con2:id>_ActionId-5416684245907369159-11cd8d54.1971cbe3142.-7f6c</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{$errorCode}</successIndicator>
+	<messages>{$validationMessage}</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                            <con1:replace varName="body" contents-only="true">
+                                <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7a66</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>&lt;ret:generarCuponRetiroResponse/></con2:xqueryText>
+                                </con1:expr>
+                            </con1:replace>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="request" name="GenerarCuponRetiroHN_request">
+            <con:stage name="PignoracionFondosT24">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-6005042143672890052-26441554.196eabfb902.-7fd0</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/T24/RetiroSinTD/biz/operacionesRetiroSinTD" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>PignoraciondefondosretirosinTD</con1:operation>
+                        <con1:request>
+                            <con1:body>REQPignorarFondos</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPPignorarFondos</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQPignorarFondos">
+                                <con2:id>_ActionId-5416684245907369159-11cd8d54.1971cbe3142.-7d7e</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/GenerarCuponRetiro/xq/pignorarFondosT24In"/>
+                                        <con2:param name="requestHeader">
+                                            <con2:path>$header/aut:RequestHeader</con2:path>
+                                        </con2:param>
+                                        <con2:param name="generarCuponRetiro">
+                                            <con2:path>$body/ret:generarCuponRetiro</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="codigoDespignoracion">
+                                <con2:id>_ActionId-5416684245907369159-11cd8d54.1971cbe3142.-7ff0</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>$RSPPignorarFondos/Status/transactionId/text()</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-5416684245907369159-11cd8d54.1971cbe3142.-7fd7</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>fn:upper-case($RSPPignorarFondos/Status/successIndicator/text())</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:assign varName="validationMessage">
+                                <con2:id>_ActionId-5416684245907369159-11cd8d54.1971cbe3142.-7fc2</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>for $messages in $RSPPignorarFondos/Status/messages
+return
+fn:concat(string(data($messages)),'||')</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="GenerarCupon" errorHandler="_onErrorHandler-5419201925109777653-450543d9.198bed92e19.-7c9e">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/generacionCupones" prefix="db"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d78</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>upper-case($errorCode) = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d66</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/OperacionesTarjetaDebito/GenerarCupon_db/biz/generacionCupones_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>generacionCupones</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQgeneracionCupon</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPgeneracionCupon</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQgeneracionCupon">
+                                            <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d6e</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/GenerarCuponRetiro/xq/generacionCuponesIn"/>
+                                                    <con2:param name="user">
+                                                        <con2:path>data($header/aut:RequestHeader/Authentication/UserName)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="generarCuponRetiro">
+                                                        <con2:path>$body/ret:generarCuponRetiro</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="codDespignorar">
+                                                        <con2:path>$codigoDespignoracion</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="uuid">
+                                                        <con2:path>$uuid</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="pais">
+                                                        <con2:path>data($header/aut:RequestHeader/Region/SourceBank)</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d6d</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>data($RSPgeneracionCupon/db:PV_COD_ERROR)</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:ifThenElse>
+                                            <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d6c</con2:id>
+                                            <con1:case>
+                                                <con1:condition>
+                                                    <con2:xqueryText>upper-case($errorCode) = 'SUCCESS'</con2:xqueryText>
+                                                </con1:condition>
+                                                <con1:actions>
+                                                    <con1:assign varName="banderaDespignorar">
+                                                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7ca4</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>'no'</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="validationMessage">
+                                                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d6b</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>''</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="cupon">
+                                                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d6a</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>data($RSPgeneracionCupon/db:PV_TICKET)</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:assign varName="fechaExpira">
+                                                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d69</con2:id>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>data($RSPgeneracionCupon/db:PD_FECHA_VENCIMIENTO)</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:assign>
+                                                    <con1:javaCallout varName="QRBase64">
+                                                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d68</con2:id>
+                                                        <con1:archive ref="Middleware/v2/Resources/Utilities/Java/ConvertirTextoToQR"/>
+                                                        <con1:className>com.ficohsa.generarQR.Application</con1:className>
+                                                        <con1:method>public static java.lang.String generarCodigoQRBase64(java.lang.String, int, int)</con1:method>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>$cupon</con2:xqueryText>
+                                                        </con1:expr>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>1000</con2:xqueryText>
+                                                        </con1:expr>
+                                                        <con1:expr>
+                                                            <con2:xqueryText>1000</con2:xqueryText>
+                                                        </con1:expr>
+                                                    </con1:javaCallout>
+                                                </con1:actions>
+                                            </con1:case>
+                                            <con1:default>
+                                                <con1:assign varName="banderaDespignorar">
+                                                    <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7c9f</con2:id>
+                                                    <con1:expr>
+                                                        <con2:xqueryText>'si'</con2:xqueryText>
+                                                    </con1:expr>
+                                                </con1:assign>
+                                                <con1:assign varName="validationMessage">
+                                                    <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d67</con2:id>
+                                                    <con1:expr>
+                                                        <con2:xqueryText>data($RSPgeneracionCupon/db:PV_MENSAJE_ERROR)</con2:xqueryText>
+                                                    </con1:expr>
+                                                </con1:assign>
+                                            </con1:default>
+                                        </con1:ifThenElse>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con2:skip>
+                                <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d52</con2:id>
+                            </con2:skip>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="DespignorarFondosT24">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7d3c</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>upper-case($errorCode) != 'SUCCESS'
+and
+$banderaDespignorar = 'si'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7a85</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/T24/RetiroSinTD/biz/operacionesRetiroSinTD" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>DespignorarfondosretirosinTD</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQDespignorarFondos</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPDespignorarFondos</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQDespignorarFondos">
+                                            <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7a89</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/GenerarCuponRetiro/xq/despignorarFondosT24In"/>
+                                                    <con2:param name="requestHeader">
+                                                        <con2:path>$header/aut:RequestHeader</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="codigoDespignorar">
+                                                        <con2:path>$codigoDespignoracion</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform/>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>upper-case($errorCode) = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6c97</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/OperacionesTarjetaDebito/GuardarCodigoQR_db/biz/guardarCodigoQR_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>guardarCodigoQR</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQguardarCodigoQR</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPguardarCodigoQR</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQguardarCodigoQR">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6c98</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/GenerarCuponRetiro/xq/guardarCodigoQRIn"/>
+                                                    <con2:param name="user">
+                                                        <con2:path>data($header/aut:RequestHeader/Authentication/UserName)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="cupon">
+                                                        <con2:path>$cupon</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="uuid">
+                                                        <con2:path>$uuid</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="qr">
+                                                        <con2:path>$QRBase64</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="pais">
+                                                        <con2:path>data($header/aut:RequestHeader/Region/SourceBank)</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform/>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con2:skip>
+                                <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6c84</con2:id>
+                            </con2:skip>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GenerarCuponRetiroHN_response"/>
+        <con:pipeline type="request" name="GenerarCuponRetiroNI_request">
+            <con:stage name="GenerarCupon" errorHandler="_onErrorHandler-8538542664760389008--71c86964.199ba35402f.-76b8">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/generacionCupones" prefix="db"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:wsCallout>
+                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bcd</con2:id>
+                        <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/OperacionesTarjetaDebito/GenerarCupon_db/biz/generacionCupones_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                        <con1:operation>generacionCupones</con1:operation>
+                        <con1:request>
+                            <con1:body>REQgeneracionCupon</con1:body>
+                        </con1:request>
+                        <con1:response>
+                            <con1:body>RSPgeneracionCupon</con1:body>
+                        </con1:response>
+                        <con1:requestTransform>
+                            <con1:assign varName="REQgeneracionCupon">
+                                <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bd7</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryTransform>
+                                        <con2:resource ref="Middleware/v2/Resources/GenerarCuponRetiro/xq/generacionCuponesIn"/>
+                                        <con2:param name="user">
+                                            <con2:path>data($header/aut:RequestHeader/Authentication/UserName)</con2:path>
+                                        </con2:param>
+                                        <con2:param name="generarCuponRetiro">
+                                            <con2:path>$body/ret:generarCuponRetiro</con2:path>
+                                        </con2:param>
+                                        <con2:param name="codDespignorar">
+                                            <con2:path>''</con2:path>
+                                        </con2:param>
+                                        <con2:param name="uuid">
+                                            <con2:path>$uuid</con2:path>
+                                        </con2:param>
+                                        <con2:param name="pais">
+                                            <con2:path>data($header/aut:RequestHeader/Region/SourceBank)</con2:path>
+                                        </con2:param>
+                                    </con2:xqueryTransform>
+                                </con1:expr>
+                            </con1:assign>
+                        </con1:requestTransform>
+                        <con1:responseTransform>
+                            <con1:assign varName="errorCode">
+                                <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bd6</con2:id>
+                                <con1:expr>
+                                    <con2:xqueryText>data($RSPgeneracionCupon/db:PV_COD_ERROR)</con2:xqueryText>
+                                </con1:expr>
+                            </con1:assign>
+                            <con1:ifThenElse>
+                                <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bd5</con2:id>
+                                <con1:case>
+                                    <con1:condition>
+                                        <con2:xqueryText>upper-case($errorCode) = 'SUCCESS'</con2:xqueryText>
+                                    </con1:condition>
+                                    <con1:actions>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bd3</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>''</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="cupon">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bd2</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>data($RSPgeneracionCupon/db:PV_TICKET)</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="fechaExpira">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bd1</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>data($RSPgeneracionCupon/db:PD_FECHA_VENCIMIENTO)</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:javaCallout varName="QRBase64">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bd0</con2:id>
+                                            <con1:archive ref="Middleware/v2/Resources/Utilities/Java/ConvertirTextoToQR"/>
+                                            <con1:className>com.ficohsa.generarQR.Application</con1:className>
+                                            <con1:method>public static java.lang.String generarCodigoQRBase64(java.lang.String, int, int)</con1:method>
+                                            <con1:expr>
+                                                <con2:xqueryText>$cupon</con2:xqueryText>
+                                            </con1:expr>
+                                            <con1:expr>
+                                                <con2:xqueryText>1000</con2:xqueryText>
+                                            </con1:expr>
+                                            <con1:expr>
+                                                <con2:xqueryText>1000</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:javaCallout>
+                                    </con1:actions>
+                                </con1:case>
+                                <con1:default>
+                                    <con1:assign varName="validationMessage">
+                                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bce</con2:id>
+                                        <con1:expr>
+                                            <con2:xqueryText>data($RSPgeneracionCupon/db:PV_MENSAJE_ERROR)</con2:xqueryText>
+                                        </con1:expr>
+                                    </con1:assign>
+                                </con1:default>
+                            </con1:ifThenElse>
+                        </con1:responseTransform>
+                    </con1:wsCallout>
+                </con:actions>
+            </con:stage>
+            <con:stage name="PignoracionFondosCobis" errorHandler="_onErrorHandler-8538542664760389008--71c86964.199ba35402f.-6f15">
+                <con:context>
+                    <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/PignoracionSaldo" prefix="cbs"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bca</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>upper-case($errorCode) = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bc1</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/Cobis/RetiroSinTD/PignoracionSaldo/biz/PignoracionSaldo_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>PignoracionSaldo</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQPignorarFondos</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPPignorarFondos</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQPignorarFondos">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bc4</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/GenerarCuponRetiro/xq/pignorarFondosCobisIn"/>
+                                                    <con2:param name="generarCuponRetiro">
+                                                        <con2:path>$body/ret:generarCuponRetiro</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="cuponRetiro">
+                                                        <con2:path>$cupon</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform>
+                                        <con1:assign varName="errorCode">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bc3</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>let $errorNum := $RSPPignorarFondos/cbs:o_num_error/text()
+return
+if ($errorNum = '0') then
+	'SUCCESS'
+else
+	'ERROR_COBIS'</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                        <con1:assign varName="validationMessage">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bc2</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryText>let $message := $RSPPignorarFondos/cbs:o_desc_error/text()
+return
+if($message != 'SUCCESS') then
+	$message
+else
+	''</con2:xqueryText>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:responseTransform>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con2:skip>
+                                <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-7bc9</con2:id>
+                            </con2:skip>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+            <con:stage name="ProcesoFinal">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:ifThenElse>
+                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6f00</con2:id>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>upper-case($errorCode) = 'SUCCESS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6ee2</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/OperacionesTarjetaDebito/GuardarCodigoQR_db/biz/guardarCodigoQR_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>guardarCodigoQR</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQguardarCodigoQR</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPguardarCodigoQR</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQguardarCodigoQR">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6db5</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/GenerarCuponRetiro/xq/guardarCodigoQRIn"/>
+                                                    <con2:param name="user">
+                                                        <con2:path>data($header/aut:RequestHeader/Authentication/UserName)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="cupon">
+                                                        <con2:path>$cupon</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="uuid">
+                                                        <con2:path>$uuid</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="qr">
+                                                        <con2:path>$QRBase64</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="pais">
+                                                        <con2:path>data($header/aut:RequestHeader/Region/SourceBank)</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform/>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:case>
+                            <con1:condition>
+                                <con2:xqueryText>upper-case($errorCode) = 'ERROR_COBIS'</con2:xqueryText>
+                            </con1:condition>
+                            <con1:actions>
+                                <con1:wsCallout>
+                                    <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6e19</con2:id>
+                                    <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/OperacionesTarjetaDebito/EliminarCupon_db/biz/eliminarCupon_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                                    <con1:operation>eliminarCupon</con1:operation>
+                                    <con1:request>
+                                        <con1:body>REQeliminarCupon</con1:body>
+                                    </con1:request>
+                                    <con1:response>
+                                        <con1:body>RSPeliminarCupon</con1:body>
+                                    </con1:response>
+                                    <con1:requestTransform>
+                                        <con1:assign varName="REQeliminarCupon">
+                                            <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6dcd</con2:id>
+                                            <con1:expr>
+                                                <con2:xqueryTransform>
+                                                    <con2:resource ref="Middleware/v2/Resources/GenerarCuponRetiro/xq/eliminarCuponIn"/>
+                                                    <con2:param name="user">
+                                                        <con2:path>data($header/aut:RequestHeader/Authentication/UserName)</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="cupon">
+                                                        <con2:path>$cupon</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="uuid">
+                                                        <con2:path>$uuid</con2:path>
+                                                    </con2:param>
+                                                    <con2:param name="pais">
+                                                        <con2:path>data($header/aut:RequestHeader/Region/SourceBank)</con2:path>
+                                                    </con2:param>
+                                                </con2:xqueryTransform>
+                                            </con1:expr>
+                                        </con1:assign>
+                                    </con1:requestTransform>
+                                    <con1:responseTransform/>
+                                </con1:wsCallout>
+                            </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                            <con2:skip>
+                                <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6e03</con2:id>
+                            </con2:skip>
+                        </con1:default>
+                    </con1:ifThenElse>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="response" name="GenerarCuponRetiroNI_response"/>
+        <con:pipeline type="request" name="Default_RegistraToken_request"/>
+        <con:pipeline type="response" name="Default_RegistraToken_response">
+            <con:stage name="FlujoSalida" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config" xmlns:con4="http://www.bea.com/wli/sb/services/security/config">
+                <con:context/>
+                <con:actions>
+                    <con1:Error>
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7964</con2:id>
+                        <con1:errCode>MW-0008</con1:errCode>
+                        <con1:message>SERVICE NOT IMPLEMENTED YET FOR THIS COUNTRY/COMPANY</con1:message>
+                    </con1:Error>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-5656691700730765979-1f7bbe00.19683831b1c.-76b3">
+            <con:stage name="ManejoDeErrores">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/retiroSinTarjetaDebitoTypes" prefix="ret"/>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                    <con1:replace varName="header" contents-only="true">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-769a</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-7686</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>&lt;ret:generarCuponRetiroResponse/></con2:xqueryText>
+                        </con1:expr>
+                    </con1:replace>
+                    <con2:reply>
+                        <con2:id>_ActionId-5656691700730765979-1f7bbe00.19683831b1c.-766e</con2:id>
+                    </con2:reply>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-5419201925109777653-450543d9.198bed92e19.-7c9e">
+            <con:stage name="ErrorGeneracionCuponBDHN">
+                <con:context/>
+                <con:actions>
+                    <con1:assign varName="errorCode">
+                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7bf6</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'ERROR'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="validationMessage">
+                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7b85</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'Error inesperado al generar el cupon de retiro.'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="banderaDespignorar">
+                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7c4a</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'si'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con2:resume>
+                        <con2:id>_ActionId-5419201925109777653-450543d9.198bed92e19.-7b45</con2:id>
+                    </con2:resume>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-8538542664760389008--71c86964.199ba35402f.-76b8">
+            <con:stage name="ErrorGeneracionCuponBDNI">
+                <con:context/>
+                <con:actions>
+                    <con1:assign varName="errorCode">
+                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-767d</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'ERROR'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="validationMessage">
+                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-767c</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'Error inesperado al generar el cupon de retiro.'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con2:resume>
+                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-767a</con2:id>
+                    </con2:resume>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:pipeline type="error" name="_onErrorHandler-8538542664760389008--71c86964.199ba35402f.-6f15">
+            <con:stage name="ErroresPignoracionCobis">
+                <con:context>
+                    <con2:userNsDecl namespace="http://www.bea.com/wli/sb/stages/transform/config" prefix="ctx1"/>
+                </con:context>
+                <con:actions>
+                    <con1:assign varName="errorCode">
+                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6e35</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>'ERROR_COBIS'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con1:assign varName="validationMessage">
+                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6d5f</con2:id>
+                        <con1:expr>
+                            <con2:xqueryText>let $messageError := data($fault/ctx:details/jca:jca-runtime-fault-detail/jca:eis-error-message | $fault/ctx:details/ctx1:ReceivedFaultDetail/ctx1:detail/jca:jca-runtime-fault-detail/jca:eis-error-message)
+return
+if (string-length(normalize-space($messageError)) > 0) then
+	$messageError
+else
+	'Error inesperado al generar el cupon de retiro.'</con2:xqueryText>
+                        </con1:expr>
+                    </con1:assign>
+                    <con2:resume>
+                        <con2:id>_ActionId-8538542664760389008--71c86964.199ba35402f.-6e1b</con2:id>
+                    </con2:resume>
+                </con:actions>
+            </con:stage>
+        </con:pipeline>
+        <con:flow>
+            <con:pipeline-node name="GenerarCuponRetiro">
+                <con:request>GenerarCuponRetiro_request</con:request>
+                <con:response>GenerarCuponRetiro_response</con:response>
+            </con:pipeline-node>
+            <con:branch-node type="condition" name="Regionalizacion">
+                <con:context>
+                    <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:branch-table variable="header">
+                    <con:xpath>
+                        <con2:xpathText>./aut:RequestHeader/Region/SourceBank</con2:xpathText>
+                    </con:xpath>
+                    <con:branch name="HN01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'HN01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="GenerarCuponRetiroHN">
+                                <con:request>GenerarCuponRetiroHN_request</con:request>
+                                <con:response>GenerarCuponRetiroHN_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:branch name="NI01">
+                        <con:operator>equals</con:operator>
+                        <con:value>'NI01'</con:value>
+                        <con:flow>
+                            <con:pipeline-node name="GenerarCuponRetiroNI">
+                                <con:request>GenerarCuponRetiroNI_request</con:request>
+                                <con:response>GenerarCuponRetiroNI_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:branch>
+                    <con:default-branch>
+                        <con:flow>
+                            <con:pipeline-node name="Default_RegistraToken">
+                                <con:request>Default_RegistraToken_request</con:request>
+                                <con:response>Default_RegistraToken_response</con:response>
+                            </con:pipeline-node>
+                        </con:flow>
+                    </con:default-branch>
+                </con:branch-table>
+            </con:branch-node>
+        </con:flow>
+    </con:router>
+</con:pipelineEntry>
