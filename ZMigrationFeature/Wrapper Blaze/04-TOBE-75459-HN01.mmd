@@ -1,0 +1,141 @@
+sequenceDiagram
+    autonumber
+    participant Client as API Consumidora
+    participant wrapper as Wrapper Blaze <br/> ms-ic-blaze-wrapper <br/> HU 75459: POST /wrapper-blaze/v1/execute
+    participant homologar as Librería de homologación
+    participant lambda as Librería de Parámetros (Método getParameters)
+    participant parameter as Parameter Store
+    participant secret as Secret Manager
+    participant cache as Caché Local
+    participant redis as Redis Caché (AWS ElastiCache) <br/> Token por país <br/> key: wrapper-blaze:token:{sourceBank-homologado}
+    participant iam as IAM Blaze - Generación de Token <br/> https://iam-svc.dms.uset2.ficoanalyticcloud.com/registration/rest/client/token
+    participant blaze as Operación Blaze a consumir
+
+    Note over Client, blaze: Flujo Wrapper Blaze - Gestión de Token y consumo de operaciones Blaze <br/> Sin regionalización - Habilitado para todos los países (actualmente operando solo HN01)
+
+    Client->>wrapper: REST Request
+    Note right of Client: headers: <br/> Authorization <br/> Source-Bank <br/> Application-Id <br/> Caller-Service <br/> Correlation-Id <br/> body: payload de la operación Blaze
+
+    wrapper->>wrapper: Validar Request
+    Note over wrapper: Valida headers y campos obligatorios según ET <br/> Si falla retorna Error 400
+
+    wrapper->>wrapper: Validación exitosa
+    
+    Note over wrapper, iam: Gestión de Token Blaze - Se almacena un token por cada país (sourceBank homologado)
+
+    wrapper->>redis: Consulta token en Redis caché
+    Note right of wrapper: key = wrapper-blaze:token:{sourceBank-homologado} <br/> ejemplo: wrapper-blaze:token:HND
+
+    alt Token no existe en Redis
+
+        redis->>wrapper: Token no encontrado
+
+        wrapper->>homologar: Homologar header.sourceBank
+        Note right of wrapper: params: resolve(arr, 'header.sourceBank', 'Ficohsa', 'ISO3')
+
+        homologar->>wrapper: Obtiene sourceBank homologado
+        Note left of homologar: HN01 = HND <br/> GT01 = GTM <br/> Otros códigos de país...
+
+        wrapper->>lambda: Consultar parámetros en librería de parámetros
+        Note right of wrapper: country = header.sourceBank (Homologado) <br/> name = header.caller-service <br/> domain = "WRAPPER_BLAZE" <br/> version = "0001"
+        Note over lambda: Existe una configuración Dynamo por cada país <br/> El wrapper queda habilitado para todos los países <br/> aunque inicialmente solo opera Honduras
+
+        lambda->>wrapper: Obtiene parámetros de librería de parámetros
+        Note left of lambda: param-name, secret-name
+
+        wrapper->>cache: Almacena parámetros de librería de parámetros en caché local
+        Note right of wrapper: Almacena param-name, secret-name
+
+        wrapper->>parameter: Consultar parámetros en Parameter Store
+        Note right of wrapper: paramName = libparam.param-name
+
+        parameter->>wrapper: Obtiene parámetros de Parameter Store
+        Note left of parameter: URL completa de la operación Blaze a consumir <br/> Tipo de operación (GET, POST, PUT, DELETE)
+
+        wrapper->>cache: Almacena parámetros del Parameter Store en caché local
+        Note right of wrapper: Almacena url, operationType
+
+        wrapper->>secret: Consulta secretos para generación de token Blaze
+        Note right of wrapper: secretName = libparam.secret-name
+
+        secret->>wrapper: Retorna secretos
+        Note left of secret: clientId, secret <br/> Existe un secreto por cada país <br/> HN01 y GT01 actualmente comparten los mismos valores <br/> pero pueden cambiar posteriormente
+
+        wrapper->>cache: Almacena secretos del Secret Manager en caché local
+        Note right of wrapper: Almacena clientId, secret
+
+        wrapper->>iam: POST /registration/rest/client/token
+        Note right of wrapper: headers: <br/> Content-Type: application/json <br/> Accept: application/json <br/> body: { clientId = secret.clientId, secret = secret.secret }
+
+        iam->>wrapper: Retorna token
+        Note left of iam: Token de acceso para operaciones Blaze
+
+        wrapper->>wrapper: Calcula TTL del token
+        Note over wrapper: TTL = hora actual + segundos parametrizados en ConfigMap <br/> (ejemplo: 3000 segundos)
+
+        wrapper->>redis: Almacena token en Redis caché
+        Note right of wrapper: key = wrapper-blaze:token:{sourceBank-homologado} <br/> value = token <br/> TTL = TTL calculado
+
+    else Token existe en Redis
+        
+        redis->>wrapper: Retorna token vigente
+    
+    end
+
+    wrapper->>wrapper: Construye Request operación Blaze
+    Note over wrapper: url = parameter.url <br/> method = parameter.operationType (GET, POST, PUT, DELETE) <br/> Authorization = Bearer token <br/> payload = request.body (passthrough)
+
+    wrapper->>blaze: Consume operación Blaze
+    Note right of wrapper: method, url, Authorization Bearer token, payload
+
+    blaze->>wrapper: Response operación Blaze
+    Note over blaze: Respuesta del motor de riesgo Blaze
+
+    alt Response 401 - Token inválido o expirado
+        Note over wrapper, blaze: Se debe hacer solamente una nueva generación del token <br/> La generación del nuevo token es transparente para el consumidor <br/> No se retorna error por token inválido o expirado ante un primer intento fallido
+
+        wrapper->>iam: Genera nuevo Token - POST /registration/rest/client/token
+        Note right of wrapper: headers: <br/> Content-Type: application/json <br/> Accept: application/json <br/> body: { clientId = secret.clientId, secret = secret.secret }
+
+        iam->>wrapper: Retorna nuevo token
+        Note left of iam: Token de acceso para operaciones Blaze
+
+        wrapper->>wrapper: Calcula TTL del token
+        Note over wrapper: TTL = hora actual + segundos parametrizados en ConfigMap <br/> (ejemplo: 3000 segundos)
+
+        wrapper->>redis: Almacena nuevo token en Redis caché
+        Note right of wrapper: key = wrapper-blaze:token:{sourceBank-homologado} <br/> value = token <br/> TTL = TTL calculado <br/> Reemplaza el token inválido o expirado
+
+        wrapper->>blaze: Reintenta consumo de operación Blaze
+        Note right of wrapper: method, url, Authorization Bearer nuevo token, payload
+
+        blaze->>wrapper: Response operación Blaze
+
+    end
+
+    alt Response operación Blaze exitoso
+        wrapper->>wrapper: Construye response Wrapper
+        Note over wrapper: data.outputParameters = Mapeo de los campos <br/> de la respuesta de la operación Blaze <br/> metadata { <br/> executionTime = responseTime <br/> timestamp = currentDateTime (YYYY-MM-DDTHH:MM:SS)}
+
+        wrapper->>Client: Response Exitoso
+        Note left of wrapper: HTTP 200: Response Body
+
+    else Response operación Blaze con error
+        Note over wrapper, blaze: Aplica si el reintento por token inválido o expirado vuelve a fallar <br/> o si Blaze responde con cualquier otro tipo de error
+
+        wrapper->>wrapper: Construye response de error
+        Note over wrapper: success = false <br/> error { <br/> code = código de error de la respuesta Blaze <br/> message = mensaje descriptivo del error <br/> details = descripción detallada del error } <br/> metadata { timestamp, path }
+
+        wrapper->>Client: Response Fallido
+        Note left of wrapper: HTTP 4xx / 5xx: Response Body de error
+    end
+
+    Note over Client, blaze: Flujo Alternativo - Error
+    activate wrapper
+    alt Exception occurs
+        activate Client
+            wrapper-->>Client: Retorna error
+        deactivate Client
+        Note over Client, blaze: Diagrama guía de manejo de errores <br/> http://bit.ly/4rpKVIU
+    end
+    deactivate wrapper
