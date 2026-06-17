@@ -1,0 +1,67 @@
+
+
+CREATE PROCEDURE [HN_ONBASE].[AlmacenaInformacionOfertaHonduras]
+@IDENTIDAD	VARCHAR(100),
+@XML		XML
+AS
+
+/**************************************************************************************************
+ DESCRIPCION: Procedimiento Dummy
+
+ REVISIONES:
+ Ver	Fecha		Autor			Descripcion
+ ====	==========	============	===============================================================
+ 1.0	30/09/2025	jpicado		    Creacion del procedimiento
+***************************************************************************************************/
+
+BEGIN
+
+--SELECT TOP 5 * FROM ANDROMEDA.CREDITOS_RIESGOS.[GT_ONBASE].[ma_solicitante]
+
+ 
+	SET NOCOUNT ON;
+
+	-- Declarando variables
+    DECLARE @FechaActual DATE = CAST(GETDATE() AS DATE);
+	DECLARE @FechaInsert DATETIME = GETDATE();
+	DECLARE @Contador INT;
+
+    -- Validar que el XML sea válido
+    IF @XML IS NULL
+    BEGIN
+        PRINT 'El XML recibido no es válido.';
+        RETURN;
+    END
+
+    -- Contar cuántos registros existen para esa IDENTIDAD en el día actual
+    SELECT 
+		@Contador = COUNT(*)
+    FROM HN_ONBASE.ConsultaOfertaHonduras
+    WHERE IDENTIDAD = @IDENTIDAD AND 
+		  CONVERT(DATE, FECHA) = @FechaActual;
+
+    IF @Contador < 5
+    BEGIN
+        -- Si hay menos de 5 registros, se permite insertar
+        INSERT INTO HN_ONBASE.ConsultaOfertaHonduras (IDENTIDAD, FECHA, [XML])
+        VALUES (@IDENTIDAD, @FechaInsert, @XML);
+    END
+    ELSE
+	BEGIN
+        -- Seleccionar el último registro del día
+        ;WITH UltimoRegistro AS (
+            SELECT TOP 1 *
+            FROM HN_ONBASE.ConsultaOfertaHonduras
+            WHERE IDENTIDAD = @IDENTIDAD 
+              AND CONVERT(DATE, FECHA) = @FechaActual
+            ORDER BY FECHA DESC
+        )
+        UPDATE UltimoRegistro
+        SET [XML] = @XML,
+            FECHA = GETDATE();
+    END
+
+
+END
+
+

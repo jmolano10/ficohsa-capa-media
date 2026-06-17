@@ -1,0 +1,117 @@
+sequenceDiagram
+  autonumber
+  participant Client as Client
+  participant APIGW as API Gateway <br/> ban-xrs-apigw
+  participant API as Customer Offer Retrieves - Product <br/> ms-cpm-co-customer_offer_retrieves-product <br> HU 71475 <br> POST - /sales/customer-offer-retrieves/v1/retrieve-consumer-credit
+  participant CL as Caché Local
+  participant Lambda as Librería de parámetros <br/> lib-java-webflux_core-xrs
+  participant WrapperBlaze as Wrapper Blaze <br/> ms-ic-blaze-wrapper <br/> HU 75459: POST /wrapper-blaze/v1/execute
+  participant Event as Event Bridge <br/> Bus de Eventos
+  participant Errors as Lib Errores <br/> lib-java-webflux_core-xrs v. 2.4.3-SNAPSHOT
+
+  Note over Client, Errors: HU 71475 - CustomerOfferRetrieves - Product / retrieve-consumer-credit <br/> Region habilitada: HN01 (Honduras)
+
+  Client ->> APIGW: POST /sales/customer-offer-retrieves/v1/retrieve-consumer-credit
+  Note right of Client: Headers: Authorization, Source-Bank, <br/> Application-Id, Correlation-Id, ... <br/> Body: { data: { perfil cliente, referencias, <br/> tarjetas, prestamos, scores ... } }
+
+  rect rgb(250, 250, 250)
+    Note over Client, APIGW: Autenticacion y Autorizacion
+
+    APIGW ->> APIGW: Validar Token Bearer
+
+    alt Token invalido o ausente
+      APIGW -->> Client: Error 401
+    end
+
+    alt Sin permisos suficientes
+      APIGW -->> Client: Error 403
+    end
+
+    APIGW ->> API: Forward Request
+  end
+
+  rect rgb(250, 250, 250)
+    Note over API, Client: Validacion Campos Obligatorios
+    API ->> API: ValidacionEsquema OpenAPI
+    API ->> API: Validar Headers obligatorios <br/> Source-Bank, Authorization, Application-Id
+    API ->> API: Validar Body obligatorios <br/> data.age, data.employmentDurationYears, data.customerMatchRating, <br/> data.amount, data.term, data.totalSalary, data.netSalary, data.scoreInfo
+    alt Errores de validación
+      API -->> Client: Error 400
+    end
+  end
+
+  alt Consulta parametros en caché local
+    API ->> CL: Consultar parámetros Librería de parámetros caché local
+    Note right of API: Domain: "CUSTOMER_OFFER_RETRIEVES" <br/> name: "retrieve-consumer-credit" <br/> country: XRS
+
+    CL ->> API: Obtiene parámetros de Librería de parámetros en Caché Local
+    Note left of CL: Obtiene parámetros de regionalización y negocio
+
+  else Consulta parametros en Librería de parámetros
+    API ->> Lambda: Consultar parámetros en librería de parámetros
+    Note right of API: Domain: "CUSTOMER_OFFER_RETRIEVES" <br/> name: "retrieve-consumer-credit" <br/> country: XRS
+
+    Lambda ->> API: Obtiene parámetros Librería de parámetros
+    Note left of Lambda: Obtiene parámetros de regionalización y negocio
+
+    API ->> CL: Guarda parámetros lambda en caché local
+    Note right of API: Almacena parámetros de regionalización y negocio
+  end
+
+  Note over API: Uso del Patrón Strategy
+
+  API ->> API: Selecciona Estrategia por Source-Bank
+
+  alt Source-Bank = HN01
+    Note over API, WrapperBlaze: Generacion de oferta — Motor de riesgo FICO Blaze via Wrapper Blaze
+
+    API ->> API: Preparar Payload — Wrapper Blaze (execute)
+    Note over API: Caller-Service: CUSTOMER_OFFER_RETRIEVES-PRODUCT-RETRIEVE_CONSUMER_CREDIT <br/> payload: request de evaluacion crediticia en formato XML <br/> (perfil, referencias, tarjetas, prestamos, scores) <br> Mapeo de campos según tabla de mapeo request Blaze
+
+    API ->> WrapperBlaze: POST /wrapper-blaze/v1/execute
+    Note over WrapperBlaze: Tercero: FICO Blaze Cloud (motor de riesgo) <br/> El wrapper gestiona token (IAM Blaze) y consume Blaze <br/> URI DEV: app.dms.uset2.ficoanalyticcloud.com/.../RmaDynamicWebService <br/> Passthrough REST (payload XML sin transformacion)
+
+	WrapperBlaze ->> API: Response Wrapper Blaze
+
+    API ->> API: Evaluar Payload — Wrapper Blaze
+    Note over API: data.outputParameters = respuesta XML de Blaze <br/> (RCI, NDE, scores, resolutionOffers, segmentacion)
+
+    alt HTTP Code != 200
+
+      API -->> Client: Error generado por el Wrapper
+
+    else HTTP Code == 200
+
+      Note over API, Event: Almacenamiento asincrono de la oferta (fire-and-forget)
+
+      API ->> API: Preparar Evento — CustomerOfferAdmin-Sys
+      Note over API: data.customerLegalReference: request.data.customerReference <br/> data.payload: responseWrapper.data.outputParameters
+
+      API ->> Event: Publica evento (PutEvents)
+      Note over Event: Evento asincrono — Consumido por <br/> CustomerOfferAdmin-Sys (HU 73443) via SQS <br/> POST /customer-offer-admin/v1/register <br/> Persiste oferta en SQL Server (SP AlmacenaInformacionOfertaHonduras)
+
+      Event -->> API: Confirma recepcion del evento (ack)
+
+      API ->> API: Construye response API Producto
+      Note over API: Realiza homologación entre el XML recibido en data.outputParameters del Wrapper <br> Mapeo de campos según tabla de mapeo response Blaze
+
+      API -->> Client: 200 OK — Response retrieve-consumer-credit
+      Note over Client, API: { data: { caseId, resolutionOffers[], resolutions[], <br/> generalIncomeCapacityRatio (RCI), currentDebtLevel / projectedDebtLevel (NDE), <br/> internalScore, customerSegment ... } }
+
+    end
+	
+  end
+
+  activate API
+    alt Exception occurs
+      note over Errors: Error Library Handler
+      activate Errors
+        API ->> Errors: BusinessCoreException(apiMethod, applicationBackend, errorMessage, errorCode)
+        Errors -->> API: Retorna httpCode, businessErrorCode, shortDesc, longDesc
+      deactivate Errors
+      activate Client
+        API -->> Client: Retorna error
+      deactivate Client
+    end
+  deactivate API
+  Note over Client, Errors: Diagrama guía de manejo de errores <br/> http://bit.ly/4rpKVIU

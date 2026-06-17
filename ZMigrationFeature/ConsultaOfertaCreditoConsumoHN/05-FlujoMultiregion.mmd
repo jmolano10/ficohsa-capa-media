@@ -1,0 +1,86 @@
+flowchart TD
+    A[Cliente/Aplicación] -->|SOAP Request<br/>consultaOfertaCreditoConsumo| B[ConsultaOfertaCreditoConsumo.proxy]
+
+    B --> C[ConsultaOfertaCreditoConsumo.pipeline<br/>Router Principal]
+
+    C --> D[Stage: ValidacionXSD]
+    D -->|Validación XSD contra<br/>consultaOfertaCreditoConsumoTypes.xsd| E{XSD Válido?}
+
+    E -->|No| F[Error Handler Global]
+    F --> G[wsCallout MapeoErrores]
+    G --> H[Reply ERROR al Cliente]
+
+    E -->|Sí| I[Stage: ConsultaRutaRegional]
+    I -->|wsCallout consultaRutaRegional_db<br/>ServiceId: FICBCO0399<br/>Version: V2| J{PV_CODIGO_ERROR = SUCCESS?}
+
+    J -->|No| K[Reply ERROR:<br/>PV_MENSAJE_ERROR]
+
+    J -->|Sí| L[Obtener $ubicacion =<br/>PV_UBICACION]
+    L --> M{Dynamic Route<br/>por $ubicacion}
+
+    %% ========== FLUJO HN ==========
+    M -->|HN01: ConsultaOfertaCreditoConsumoHN| N[Pipeline HN]
+
+    N --> N1[Stage: Obtener Identidad]
+    N1 -->|$identidad = CUSTOMER_INFO/ID| N2[Stage: ConsultaConsolidadaRiesgoCliente]
+
+    N2 -->|wsCallout<br/>XQ: consultaConsolidadoRiesgoClienteIn.xqy<br/>Param: customerLegalID| N2A[ConsultaConsolidadaRiesgoClienteHN]
+    N2A -->|$RESConsultaConsRiesgoCliente| N3[Stage: ObtenerToken]
+
+    N3 -->|wsCallout<br/>TokenizacionProcesamientoBlazeProxyService| N3A{tokenApi != '' ?}
+
+    N3A -->|No| N3B[$ErrorCode = 'Error']
+    N3B --> N5[Response: ProcesamientoSalida]
+
+    N3A -->|Sí| N4[Stage: ProcesamientoEntradaCloud]
+    N4 -->|Header: Authorization Bearer $tokenApi<br/>XQ: consultaOfertaCreditoConsumoCloudIn.xqy<br/>Params: request + riesgoCliente| N4A[wsCallout blazeCloudApiRestBS<br/>Op: epOriginacionesHonduras<br/>URL: https://app.dms.uset2.ficoanalyticcloud.com/...]
+
+    N4A -->|Error HTTP| N4B[Error Handler:<br/>$ErrorCode = http-response-code<br/>resume]
+    N4B --> N5
+
+    N4A -->|Exitoso| N4C[$RSPBlazeCloudApi]
+    N4C --> N5
+
+    N5 --> N5A{$ErrorCode existe?}
+    N5A -->|Sí| N5B[Response ERROR<br/>401: Token inválido<br/>503: Servicio no disponible<br/>Error: No se obtuvo token<br/>Otro: Error general HTTP]
+
+    N5A -->|No| N5C[XQ: consultaOfertaCreditoConsumoCloudOut.xqy<br/>→ consultaOfertaCreditoConsumoResponse<br/>Header: Success]
+    N5C --> N6[Stage: Almacenar Oferta]
+
+    N6 -->|publish fire-and-forget<br/>XQ: almacenaInformacionHondurasIN.xqy<br/>Params: xml=serialize, identidad| N6A[AlmacenaInformacionOfertaHonduras_db<br/>Conexión: ConnectionCustomerCreditRisk<br/>Schema: CREDITOS_RIESGOS<br/>Package: HN_ONBASE<br/>SP: AlmacenaInformacionOfertaHonduras]
+
+    N5B --> N7[Response al Router]
+    N6 --> N7
+
+    %% ========== FLUJO GT ==========
+    M -->|GT01: ConsultaOfertaCreditoConsumoGT| O[Pipeline GT]
+
+    O --> O1[Stage: ObtenerToken]
+    O1 -->|wsCallout<br/>TokenizacionProcesamientoBlaze| O1A{successIndicator = SUCCESS?}
+
+    O1A -->|No| O1B[$validationMessage = messages]
+    O1B --> O3[Response: ProcesamientoSalida]
+
+    O1A -->|Sí| O2[Stage: OriginacionesGT]
+    O2 -->|$token = RSP/TOKEN<br/>XQ: processWithDecisionFlow2In.xqy<br/>Params: request + token<br/>Campos: consultaTuca, referencias,<br/>antiguedades=0, estados=0| O2A[wsCallout originacionesGT<br/>Op: processWithDecisionFlow2<br/>URL: https://oic.ocservices.ficohsa.com/.../EPORIGINACIONESG_SOAP/1.0/<br/>Auth: HTTP Basic DEVCLOUD]
+
+    O2A -->|$RSPprocessWithDecisionFlow2| O3
+
+    O3 --> O3A{auditSteps type=ERROR<br/>en respuesta?}
+    O3A -->|No| O3B[XQ: consultaOfertaCreditoConsumoGTOut.xqy<br/>→ consultaOfertaCreditoConsumoResponse<br/>Header: Success]
+    O3A -->|Sí| O3C[Response ERROR:<br/>messages = stepMessage de<br/>cada auditStep ERROR]
+
+    O3B --> O4[Response al Router]
+    O3C --> O4
+
+    %% ========== RESPONSE COMÚN ==========
+    N7 --> P[Router Response Pipeline]
+    O4 --> P
+
+    P --> P1{successIndicator = SUCCESS?}
+    P1 -->|Sí| P2[Pass-through]
+    P1 -->|No| P3[wsCallout MapeoErrores<br/>FICBCO0399 + messages]
+    P3 --> P4[Header normalizado]
+
+    P2 --> Q[SOAP Response al Cliente]
+    P4 --> Q

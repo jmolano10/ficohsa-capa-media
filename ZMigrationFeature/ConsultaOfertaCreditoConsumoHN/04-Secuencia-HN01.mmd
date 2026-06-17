@@ -1,0 +1,98 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Router as OSB Router<br/>(ConsultaOfertaCreditoConsumo.pipeline)
+    participant HNPS as OSB Pipeline HN<br/>(ConsultaOfertaCreditoConsumoHN.pipeline)
+    participant RiesgoSvc as ConsultaConsolidadaRiesgoClienteHN
+    participant TokenSvc as TokenizacionProcesamientoBlazeProxyService
+    participant BlazeAPI as FICO Blaze Cloud API<br/>(blazeCloudApiRestBS)
+    participant AlmacenaDB as AlmacenaInformacionOfertaHonduras_db
+    participant ErrorMapper as MapeoErrores
+
+    Note over Client, AlmacenaDB: Flujo Honduras (HN01) - ConsultaOfertaCreditoConsumo
+
+    Client->>Router: SOAP Request (consultaOfertaCreditoConsumo)
+    Note right of Client: Header: SourceBank=HN01<br/>Body: consultaOfertaCreditoConsumoRequest
+
+    Router->>Router: Validar XSD contra consultaOfertaCreditoConsumoTypes.xsd
+    Note right of Router: Validate element:<br/>con:consultaOfertaCreditoConsumoRequest
+
+    alt Validación XSD Fallida
+        Router->>ErrorMapper: wsCallout mapeoErrores
+        ErrorMapper-->>Router: Error formateado
+        Router-->>Client: SOAP Response (ERROR)
+    end
+
+    Router->>Router: wsCallout consultaRutaRegional_db
+    Note right of Router: ServiceId: FICBCO0399<br/>Version: V2<br/>Operation: consultaOfertaCreditoConsumo
+
+    alt Ruta Regional No Válida (PV_CODIGO_ERROR != SUCCESS)
+        Router-->>Client: SOAP Response (ERROR: PV_MENSAJE_ERROR)
+    end
+
+    Router->>Router: Obtener $ubicacion = PV_UBICACION
+    Note right of Router: $ubicacion = Middleware/v2/ProxyServices/<br/>ConsultaOfertaCreditoConsumoHN
+
+    Router->>HNPS: Dynamic Route → pipeline HN
+    Note right of Router: Enrutamiento dinámico por $ubicacion
+
+    HNPS->>HNPS: Stage "Obtener Identidad para Guardado de Oferta"
+    Note right of HNPS: $identidad = $body/.../CUSTOMER_INFO/ID<br/>Valor: "0801199900001"
+
+    HNPS->>RiesgoSvc: wsCallout consultaConsolidadaRiesgoCliente
+    Note right of HNPS: XQ: consultaConsolidadoRiesgoClienteIn.xqy<br/>Param: customerLegalID = $identidad<br/>Request: CUSTOMER_LEGAL_ID=0801199900001
+    RiesgoSvc-->>HNPS: $RESConsultaConsRiesgoCliente
+    Note left of RiesgoSvc: Respuesta con datos de riesgo<br/>consolidado del cliente
+
+    HNPS->>TokenSvc: wsCallout tokenizacionProcesamientoBlaze
+    Note right of HNPS: Request: body + header<br/>Obtener Bearer token
+    TokenSvc-->>HNPS: $RSPTokenizacion
+    Note left of TokenSvc: $tokenApi = data($RSPTokenizacion)
+
+    HNPS->>HNPS: Stage "ProcesamientoEntradaCloud"
+
+    alt $tokenApi != '' (Token obtenido exitosamente)
+        HNPS->>HNPS: Preparar header Authorization
+        Note right of HNPS: Authorization: Bearer {$tokenApi}
+
+        HNPS->>HNPS: Transformar Request
+        Note right of HNPS: XQ: consultaOfertaCreditoConsumoCloudIn.xqy<br/>Params: consultaOfertaCreditoConsumoRequest<br/>+ consultaConsolidadaRiesgoClienteResponse<br/>→ epOriginacionesHonduras/arg0
+
+        HNPS->>BlazeAPI: wsCallout epOriginacionesHonduras (POST)
+        Note right of HNPS: Endpoint: https://app.dms.uset2.ficoanalyticcloud.com<br/>/34ahtjvkip/.../RmaDynamicWebService<br/>Timeout: 60s | ConnTimeout: 65s
+
+        alt Error HTTP (401, 503, otro)
+            BlazeAPI-->>HNPS: HTTP Error
+            Note left of BlazeAPI: Error handler captura:<br/>$ErrorCode = http-response-code<br/>resume flujo
+        else Respuesta exitosa
+            BlazeAPI-->>HNPS: $RSPBlazeCloudApi (epOriginacionesHondurasResponse)
+            Note left of BlazeAPI: Contiene: ofertas, scores,<br/>resoluciones, tarjetas, métricas
+        end
+
+    else $tokenApi = '' (Token vacío)
+        HNPS->>HNPS: $ErrorCode = 'Error'
+        Note right of HNPS: No se obtuvo token de entrada
+    end
+
+    HNPS->>HNPS: Stage "ProcesamientoSalida" (Response Pipeline)
+
+    alt $ErrorCode existe y != ''
+        HNPS->>HNPS: Construir respuesta de error
+        Note right of HNPS: Body: consultaOfertaCreditoConsumoResponse vacío<br/>Header: successIndicator=ERROR<br/>Messages según código:<br/>401='Token inválido o vencido'<br/>503='Servicio o Api no disponible'<br/>'Error'='No se obtuvo token de entrada'<br/>otro='Error general [Código HTTP: X]'
+    else Sin error (flujo exitoso)
+        HNPS->>HNPS: Transformar Response
+        Note right of HNPS: XQ: consultaOfertaCreditoConsumoCloudOut.xqy<br/>Param: epOriginacionesHondurasResponse<br/>→ consultaOfertaCreditoConsumoResponse<br/>Header: successIndicator=Success
+    end
+
+    HNPS->>HNPS: Stage "Almacenar Oferta"
+    Note right of HNPS: $xmlSalida = $RSPBlazeCloudApi
+
+    HNPS->>AlmacenaDB: publish (fire-and-forget)
+    Note right of HNPS: XQ: almacenaInformacionHondurasIN.xqy<br/>Params: xml=serialize($xmlSalida), identidad=$identidad<br/>SP: CREDITOS_RIESGOS.HN_ONBASE.AlmacenaInformacionOfertaHonduras<br/>Conexión: jca://eis/DB/ConnectionCustomerCreditRisk
+    Note over AlmacenaDB: Operación asíncrona<br/>No espera respuesta
+
+    HNPS-->>Router: Response pipeline HN completado
+    Router->>Router: Stage "MapeoError" (Response)
+    Note right of Router: Si successIndicator != SUCCESS:<br/>wsCallout MapeoErrores<br/>para normalizar error
+
+    Router-->>Client: SOAP Response
+    Note left of Router: Header: ResponseHeader<br/>Body: consultaOfertaCreditoConsumoResponse

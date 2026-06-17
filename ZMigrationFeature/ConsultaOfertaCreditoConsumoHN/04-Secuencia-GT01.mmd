@@ -1,0 +1,74 @@
+sequenceDiagram
+    participant Client as Cliente/Aplicación
+    participant Router as OSB Router<br/>(ConsultaOfertaCreditoConsumo.pipeline)
+    participant GTPS as OSB Pipeline GT<br/>(ConsultaOfertaCreditoConsumoGT.pipeline)
+    participant TokenSvc as TokenizacionProcesamientoBlaze
+    participant OICGT as OIC originacionesGT<br/>(processWithDecisionFlow2)
+    participant ErrorMapper as MapeoErrores
+
+    Note over Client, OICGT: Flujo Guatemala (GT01) - ConsultaOfertaCreditoConsumo
+
+    Client->>Router: SOAP Request (consultaOfertaCreditoConsumo)
+    Note right of Client: Header: SourceBank=GT01<br/>Body: consultaOfertaCreditoConsumoRequest
+
+    Router->>Router: Validar XSD contra consultaOfertaCreditoConsumoTypes.xsd
+    Note right of Router: Validate element:<br/>con:consultaOfertaCreditoConsumoRequest
+
+    alt Validación XSD Fallida
+        Router->>ErrorMapper: wsCallout mapeoErrores
+        ErrorMapper-->>Router: Error formateado
+        Router-->>Client: SOAP Response (ERROR)
+    end
+
+    Router->>Router: wsCallout consultaRutaRegional_db
+    Note right of Router: ServiceId: FICBCO0399<br/>Version: V2<br/>Operation: consultaOfertaCreditoConsumo
+
+    alt Ruta Regional No Válida (PV_CODIGO_ERROR != SUCCESS)
+        Router-->>Client: SOAP Response (ERROR: PV_MENSAJE_ERROR)
+    end
+
+    Router->>Router: Obtener $ubicacion = PV_UBICACION
+    Note right of Router: $ubicacion = Middleware/v2/ProxyServices/<br/>ConsultaOfertaCreditoConsumoGT
+
+    Router->>GTPS: Dynamic Route → pipeline GT
+    Note right of Router: Enrutamiento dinámico por $ubicacion
+
+    GTPS->>TokenSvc: wsCallout tokenizacionProcesamientoBlaze
+    Note right of GTPS: Request: body + header original<br/>Obtener token para OIC
+    TokenSvc-->>GTPS: Response con header + body
+    Note left of TokenSvc: $errorCode = successIndicator<br/>$validationMessage = messages (si no SUCCESS)<br/>$token = RSPtokenizacionProcesamientoBlaze/TOKEN
+
+    GTPS->>GTPS: Stage "OriginacionesGT"
+
+    alt $validationMessage = "" (Token OK)
+        GTPS->>GTPS: $token = $RSPtokenizacionProcesamientoBlaze/TOKEN
+
+        GTPS->>GTPS: Transformar Request
+        Note right of GTPS: XQ: processWithDecisionFlow2In.xqy<br/>Params: consultaOfertaCreditoConsumoRequest + $token<br/>Mapeo: datos cliente, referencias, scores,<br/>tarjetas, consultaTuca (con conversión fechas)<br/>Campos constantes: antiguedades=0, estados=0
+
+        GTPS->>OICGT: wsCallout processWithDecisionFlow2 (POST/SOAP)
+        Note right of GTPS: Endpoint: https://oic.ocservices.ficohsa.com<br/>/ic/ws/integration/v1/flows/soap/<br/>EPORIGINACIONESG_SOAP/1.0/<br/>Auth: HTTP Basic (Service Account DEVCLOUD)<br/>Timeout: 70s | ConnTimeout: 65s
+
+        OICGT-->>GTPS: $RSPprocessWithDecisionFlow2
+        Note left of OICGT: Contiene: return/accion (métricas),<br/>return/oferta (ofertas), return/audit (steps)
+
+    else $validationMessage != "" (Token Fallido)
+        Note right of GTPS: No se invoca motor de decisión<br/>Se continúa al response pipeline
+    end
+
+    GTPS->>GTPS: Stage "ProcesamientoSalida" (Response Pipeline)
+
+    alt No hay auditSteps[type='ERROR'] en respuesta
+        GTPS->>GTPS: Transformar Response
+        Note right of GTPS: XQ: consultaOfertaCreditoConsumoGTOut.xqy<br/>Param: processWithDecisionFlow2Response<br/>→ consultaOfertaCreditoConsumoResponse<br/>Mapeo: noSolicitud→CASE_ID, rciFinal→GENERAL_RCI,<br/>rciMax→GENERAL_RCI_MAX, ofertas, tarjetas...<br/>Header: successIndicator=Success
+    else Hay auditSteps[type='ERROR']
+        GTPS->>GTPS: Construir respuesta de error
+        Note right of GTPS: Header: successIndicator=ERROR<br/>Messages: stepMessage de cada auditStep ERROR<br/>Body: consultaOfertaCreditoConsumoResponse vacío
+    end
+
+    GTPS-->>Router: Response pipeline GT completado
+    Router->>Router: Stage "MapeoError" (Response)
+    Note right of Router: Si successIndicator != SUCCESS:<br/>wsCallout MapeoErrores<br/>FICBCO0399 + messages
+
+    Router-->>Client: SOAP Response
+    Note left of Router: Header: ResponseHeader<br/>Body: consultaOfertaCreditoConsumoResponse
