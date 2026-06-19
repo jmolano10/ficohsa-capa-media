@@ -1,0 +1,106 @@
+sequenceDiagram
+  autonumber
+  participant Client
+  participant APIGW as API Gateway <br> ban-xrs-apigw
+  participant API as RewardPointsAccountAdmin-Product <br> ms-lc-rpa-reward_points_account_admin-product
+  participant Param as Lib Regionalizacion <br> lib-java-webflux_core-xrs v. 2.4.3-SNAPSHOT
+  participant Wrapper as Wrapper Abanks Multiconexion <br> HU 16254
+  participant Errors as Lib Errores <br> lib-java-webflux_core-xrs v. 2.4.3-SNAPSHOT
+
+
+
+  Client->>APIGW: DELETE /account-management/reward-points-account-admin/v1/{campaignReference}/remove-reward-points
+  Note right of Client: Headers: Source-Bank, Authorization, Application-Id <br> Path Param: campaignReference
+
+  rect rgb(250, 250, 250)
+    Note over Client,APIGW: Autenticacion y Autorizacion
+    APIGW->>APIGW: Validar Token Bearer
+    alt Token invalido o ausente
+      APIGW-->>Client: Error 401
+    end
+    alt Sin permisos suficientes
+      APIGW-->>Client: Error 403
+    end
+    APIGW->>API: Forward Request
+  end
+
+  rect rgb(250, 250, 250)
+    Note over API,Client: Validacion Campos Obligatorios
+    API->>API: ValidacionEsquema OpenAPI
+    API->>API: Validar Headers obligatorios <br> Source-Bank, Authorization, Application-Id
+    API->>API: Validar Path Param obligatorio <br> campaignReference (minimo 1 caracter)
+    alt Errores de validacion
+      API-->>Client: Error 400
+    end
+  end
+
+  rect rgb(250, 250, 250)
+    Note over Client,Param: Proceso Validacion Regional
+    API->>API: Cache Local <br> key: remove-reward-points
+    alt Cache Config Not Found
+      API->>Param: Solicitud Validacion
+      Note over Param: Consulta config regional Dynamo <br> COUNTRY#XRS#DOMAIN#REWARD_POINTS_ACCOUNT_ADMIN#PARAM#remove-reward-points
+      Param-->>API: Respuesta Validacion
+      alt Param o servicio de config no disponible
+        API-->>Client: Error 502 (PARAMETER_SERVICE_UNAVAILABLE)
+      end
+      API->>API: Almacenar Config Dynamo (TTL 24h) Cache Local
+    end
+    alt Destination-Bank nulo o vacio
+      Note over API: Destination-Bank = Source-Bank
+    end
+    API->>API: Construir clave region = Source-Bank + Destination-Bank
+    API->>API: Validar region habilitada
+    Note over API: Regiones disponibles: <br> HN01-HN01, GT01-GT01, PA01-PA01, NI01-NI01
+    alt Region no encontrada o disabled
+      API-->>Client: Error 422 (REGION_NOT_CONFIGURED / REGION_NOT_ENABLED)
+    end
+  end
+
+  Note over API: Uso del Patron Strategy
+  API->>API: Selecciona estrategia por Source-Bank
+
+  Note over API: Strategy por Source-Bank — procesamiento identico para todas las regiones <br> solo cambia la conexion/esquema de BD por pais.
+
+  alt Source-Bank = HN01, GT01, PA01, NI01
+    rect rgb(250, 250, 250)
+      Note over API,Wrapper: Configuracion conexion por pais (SI APLICA)
+      API->>API: Resolver param_name / secret_name del config regional
+      Note over API: param_name: ban-{iso3}-ic-comp-parm-wrapper-abanks-db-{env} <br> secret_name: ban-{iso3}-ic-comp-secm-wrapper-abanks-db-{env}
+    end
+
+    rect rgb(250, 250, 250)
+      Note over API,Wrapper: Eliminar Factor de Canje (operacion de escritura)
+      API->>API: Preparar Payload Eliminar Factor Canje
+      Note over API: campaignReference -> PV_IDPROMOCION <br> upper-case(Application-User) -> PV_USUARIO
+      API->>Wrapper: POST /wrapper-abanks/v1/execute-procedure <br> [operationType: update]
+      Note over Wrapper: connectionType: jca <br> SP: PL_P_ELIMINAR_FACTOR_CANJE <br> Conexion por pais: ConnectionProxyAbanksHN / GT / PA / ConnectionProxyNI
+      alt Fallo integracion Wrapper Abanks
+        Wrapper-->>API: Error homologado del wrapper
+        API-->>Client: Retorna error homologado
+      else Integracion exitosa
+        Wrapper-->>API: OutputParameters (PV_CODIGOMENSAJE, PV_DESCRIPCIONMENSAJE)
+        API->>API: Evaluar Payload Eliminar Factor Canje
+        alt PV_CODIGOMENSAJE != SUCCESS
+          API-->>Client: Error 422
+        else PV_CODIGOMENSAJE = SUCCESS
+          API-->>Client: 200 OK
+          Note right of Client: data: { transactionDateTime, reference, userApplication }
+        end
+      end
+    end
+  end
+
+  activate API
+    alt Exception occurs
+      note over Errors: Error Library Handler
+      activate Errors
+        API ->> Errors: BusinessCoreException(apiMethod, applicationBackend, errorMessage, errorCode)
+        Errors -->> API: httpCode, businessErrorCode, shortDesc, longDesc
+      deactivate Errors
+      activate Client
+        API -->> Client: Retorna error
+      deactivate Client
+    end
+  deactivate API
+  Note over Client,Errors: Diagrama guia de manejo de errores <br> http://bit.ly/4rpKVIU

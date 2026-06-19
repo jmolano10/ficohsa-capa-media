@@ -1,0 +1,60 @@
+-- =============================================
+-- Owner:		<Banco Ficohsa Nicaragua>
+-- Author:		<Julio E. Márquez>
+-- Create date: <21/08/2018>
+-- Description:	<Obtener la informacion de la Tarjeta solicitada por medio del Parametro @NumTarjeta>
+-- Para el Bus
+-- ======================================================
+-- Cambio 001        : 30/10/2019 - Banco Ficohsa - NI927517: Se cambia llamado de SP para obtener la base de datos de manera dinamica
+-- ======================================================
+
+
+CREATE PROCEDURE [dbo].[OSBConEncabezadoEstadoCuenta]
+	(
+	 @Pais						VARCHAR(3),				--  Pais de la Organizacion
+	 @Org						VARCHAR(3) = null,		--  Numero de Organizacion
+	 @NumCuenta 				VARCHAR(19),			--  Numero de Tarjeta
+	 @CodigoError				INT OUTPUT,
+	 @MensajeError				VARCHAR(4000) OUTPUT
+	)
+AS
+BEGIN
+
+	BEGIN TRY
+
+		DECLARE @Consulta		NVARCHAR(4000)
+		DECLARE @Parametros		NVARCHAR(4000)        
+		DECLARE @BaseDatos		NVARCHAR(50)
+
+		SET @BaseDatos = (SELECT [dbo].[BaseDatosActiva] (@Pais))
+      
+		SET @Parametros = '@Pais VARCHAR(3), 
+						@Org VARCHAR(3), 
+						@NumCuenta VARCHAR(19), 
+						@CodigoError INT OUTPUT, 
+						@MensajeError VARCHAR(4000) OUTPUT'
+				       
+		SET @Consulta = 'EXECUTE ' + @BaseDatos + '..[OSBConEncabezadoEstadoCuenta_MD] 
+						@Pais, 
+						@Org, 
+						@NumCuenta, 
+						@CodigoError OUTPUT, 
+						@MensajeError OUTPUT'
+
+		EXECUTE sp_executesql @Consulta, @Parametros
+					  ,@Pais = @Pais
+					  ,@Org = @Org
+					  ,@NumCuenta = @NumCuenta
+					  ,@CodigoError = @CodigoError OUTPUT 
+					  ,@MensajeError = @MensajeError OUTPUT
+
+	END TRY
+	BEGIN CATCH
+		
+		SET @CodigoError = ERROR_NUMBER()
+		SET @MensajeError = ERROR_MESSAGE()		
+
+	END CATCH
+	
+END
+
