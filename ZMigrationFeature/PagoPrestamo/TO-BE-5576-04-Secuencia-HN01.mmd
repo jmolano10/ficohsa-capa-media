@@ -1,171 +1,107 @@
-
 sequenceDiagram
-    autonumber
-    participant Consumidor as Consumidore/Aplicación
-    participant API as API Ejectuar Pago Prestamo HN <br> Epica 2267: PagoPrestamo <br> HU 5576:  POST - /payments/payment-execution-maintenance/v1/execute-loan-repayment
-    participant CL as Caché Local
-    participant Lambda as Librería de parámetros <br> lib-java-webflux_core-xrs
-    participant Lib as Librería Pipeline (ConfigMap)
-    participant Idempotencia as Componente de Idempotencia <br> POST: integrity-handler/v1/idempotency/generate
-    participant wrapper as Wrapper ProxyAbanks Multiconexión <br/> SP: TOPLEVEL$OSB_PAG_PRESTAMO_CAJ <br/> SP: OSB_PAG_PRESTAMO_T24
-    participant event as AWS EventBridge <br> Componente de Idempotencia 
-    participant Errors as Control de Errores <br> <<Librería de mapeo de errores>>
-    
-    Note over Consumidor, Errors: Flujo Honduras (HN01) - ConsultaPuntosTransaccion Alcance
+autonumber
+participant Client
+participant APIGW as API Gateway <br/> ban-xrs-ap-pex-apig-payment-execution-remittance-admin-product-{env}
+participant API as Payment Execution Remittance Admin - Product<br/>ms-ap-pex-payment_execution_remittance_admin-prod
+participant Param as Lib Regionalizacion <br/> lib-java-webflux_core-xrs v. 2.4.3-SNAPSHOT
+participant WrapperTNW as Wrapper TransNetwork <br/> ms-ic-wpr-transnetwork-remittances-wrapper
+participant Errors as Lib Errores <br/> lib-java-webflux_core-xrs v. 2.4.3-SNAPSHOT
 
-    Consumidor->>API: REST Request
-    Note right of Consumidor: body: loanId, <br> paymentAmount, <br> currencyCode, <br> paymentType, <br> accountNumber, <br> interfaceReferenceNumber, <br> transactionReference, <br> transactionReferenceBC, <br> paymentDescription
+Client ->> APIGW: POST /payments/payment-execution-remittance-admin/v1/retrieve
+Note right of Client: Headers: Authorization, Source-Bank, <br/> Application-Id, Correlation-Id, x-api-key, x-apigw-api-id <br/> Body: { data: transferClaimNumber, businessUnitId, <br/> businessUnitLocationId, operator }
 
-    API->>API: Validar Request
-    Note over API: Valida campos obligatorios según contrato OpenAPI 
+rect rgb(250, 250, 250)
+Note over Client, APIGW: Autenticacion y Autorizacion
+APIGW ->> APIGW: Validar Token Bearer
+alt Token invalido o ausente
+  APIGW -->> Client: Error 401
+end
+alt Sin permisos suficientes
+  APIGW -->> Client: Error 403
+end
+APIGW ->> API: Forward Request
+end
 
-    API->>API: Valida Combinación de campos
-    Note over API: If paymentMethod = "ACCOUNT_DEBIT" <br> then repaymentAccountDebit es obligatorio
+rect rgb(250, 250, 250)
+Note over API, Client: Validacion Campos Obligatorios
+API ->> API: ValidacionEsquema OpenAPI
+API ->> API: Validar Headers obligatorios <br/> Source-Bank, Authorization, Application-Id, <br/> x-api-key, x-apigw-api-id
+API ->> API: Validar Body obligatorios <br/> data.transferClaimNumber, data.businessUnitId, <br/> data.businessUnitLocationId
+alt Errores de validación
+  API -->> Client: Error 400
+end
+end
 
-    API->>API: Validación exitosa
+rect rgb(250, 250, 250)
+Note over Client, Param: Proceso Validacion Regional
+API ->> API: Cache Local <br/> key: retrieve <br/> TTL 24h
+API ->> Param: Solicitud Validacion
+Note over API: DynamoDB — domain: PAYMENT_EXECUTION, <br/> name: retrieve, version: 0001 <br/> Regiones Disponibles de Dynamo: <br/> NI01-NI01
+Param -->> API: Respuesta Validacion
+Note over Param: El item declara las 4 regiones. <br/> NI01-NI01 enabled true <br/> HN01-HN01 enabled false <br/> GT01-GT01 enabled false <br/> PA01-PA01 enabled false <br/> HN01 y GT01 se habilitan cuando TransNetwork entregue credenciales <br/> y autorice la IP de salida del pais. PA01 no esta en el alcance funcional
+alt Región no encontrada o enabled: false
+  API -->> Client: Error 422 (REGION_NOT_CONFIGURED / REGION_NOT_ENABLED)
+end
+end
 
-    alt Consulta parametros en caché local
+Note over API: Uso del Patrón Strategy
+API ->> API: Selecciona Estrategia por Source-Bank
 
-        API->>CL: Consultar parámetros Librería de parámetros caché local
-        Note right of API: Domain: "PAYMENT_EXECUTION_MAINTENANCE" <br> name: "execute-loan-repayment" <br> country: XRS 
+alt Source-Bank = NI01
 
-        CL->>API: Obtiene parámetros Librería de parámetros Cahé Local
-        Note left of CL: Obtiene parámetros de regionalización y negocio
+  Note over API: Nota Técnica: Sin Parameter Store ni Secrets Manager en la capa Producto. <br/> La baseUrl de TransNetwork y las credenciales UserName y Password <br/> las resuelve el Wrapper por Caller-Service desde su propio PS y SM. <br/> El Producto nunca envia ni conoce las credenciales del proveedor
+  Note over API: Nota Técnica: Este metodo es el primer paso del flujo de ventanilla. <br/> Su salida FieldInfoList declara que campos del beneficiario son obligatorios <br/> en el pago posterior (execute-payment, HU 103799)
 
-    else Consulta  parametros en Librería de parámetros / Parameter Store
+  Note over API, WrapperTNW: Consultar el detalle de la remesa internacional en TransNetwork
+  API ->> API: Preparar Payload — Wrapper TransNetwork / TransferInfo
+  Note over API: Envelope del Wrapper: <br/> data.operation = TransferInfo, valor tomado del ConfigMap <br/> data.params = objeto vacio <br/> data.query = objeto vacio
+  Note over API: Mapeo uno a uno del request de la API hacia data.body. <br/> Tabla completa campo a campo en la ET seccion 4.2.5 Transformaciones y Mapeos. <br/> Estructura destino: ClaimNumber, BusinessUnitId, LocationId y Operator
+  Note over API: UserName y Password NO se mapean: los inyecta el Wrapper <br/> desde Secrets Manager. Si el Producto los enviara serian sobrescritos
 
-        API->>Lambda: Consultar parámetros en librería de parámetros
-        Note right of API: Domain: "PAYMENT_EXECUTION_MAINTENANCE" <br> name: "execute-loan-repayment" <br> country: XRS 
+  API ->> WrapperTNW: POST /transnetwork-wrapper/v1/execute
+  Note over WrapperTNW: Tercero: TransNetwork API Pagadores (EXT-TRANSNETWORK) <br/> Operacion: TransferInfo <br/> POST /remittances/Payers/TransferInfo <br/> URI DEV QA STG: https://stage.tnoperations.com <br/> Header Caller-Service: payment_execution_remittance_admin-product-retrieve <br/> Auth: UserName y Password en el body, inyectados por el Wrapper <br/> Resiliencia: Circuit Breaker en este Producto, sin reintentos, timeout maximo 60s
 
-        Lambda->>API: Obtiene parámetros Librería de parámetros
-        Note left of Lambda: Obtiene parámetros de regionalización y negocio
+  Note over API, Errors: SIN HOMOLOGACION DE ERRORES. <br/> El Manejo de Errores v3 se usa unicamente para REGISTRAR el error que entrega el Wrapper. <br/> No traduce codigos, no reescribe mensajes y no cambia el status HTTP. <br/> Lo que el Wrapper entrega al Producto es lo que el Producto entrega al consumidor
 
-        API->>CL: Guarda parámetros lambda Parámetros en caché local
-        Note right of API: value.param-name 
+  alt Fallo en integracion Wrapper TransNetwork
+    WrapperTNW -->> API: Error del Wrapper o de TransNetwork (4xx / 5xx)
+    API ->> Errors: Registrar error recibido del Wrapper — Manejo de Errores v3
+    Note over Errors: Solo registro y trazabilidad. <br/> Persiste apiMethod, applicationBackend, status, body y Correlation-Id. <br/> No devuelve un codigo homologado que reemplace al del Wrapper
+    Errors -->> API: Error registrado
+    API -->> Client: Mismo status y mismo body que entrego el Wrapper
+    Note over API: Se propagan tal cual, incluidos <br/> 502 CALLER_NOT_CONFIGURED si falta el registro Dynamo del Caller-Service, <br/> 502 OPERATION_NOT_FOUND si no se declaro TransferInfo, <br/> 502 PARAMETER_SERVICE_UNAVAILABLE y 504 por timeout hacia TransNetwork
+  else Integracion exitosa
+    WrapperTNW -->> API: 200 OK — Response nativo de TransNetwork
+    API ->> API: Evaluar Payload — Wrapper TransNetwork / TransferInfo
+    Note over API: { ReturnCode, Message, Description, <br/> Transfer.Info, Transfer.PaymentInfo, <br/> Transfer.Client, Transfer.Beneficiary, Transfer.FieldInfoList }
 
+    alt ReturnCode != 11000
+      Note over API: TransNetwork responde HTTP 200 tambien en error de negocio. <br/> El resultado se lee en ReturnCode, nunca en el status HTTP. <br/> Casos frecuentes: 19000 transferencia no encontrada, 19101 numero de reclamo invalido, <br/> 19400 transferencia ya pagada, 19998 credenciales invalidas del Wrapper
+      API ->> Errors: Registrar ReturnCode de error — Manejo de Errores v3
+      Errors -->> API: Error registrado
+      API -->> Client: 200 OK — ReturnCode de error sin homologar
+      Note right of Client: { data.returnCode, data.statusMessage, data.responseDescription } <br/> El canal consumidor evalua returnCode contra 11000. <br/> El Producto no lo convierte en 4xx ni reescribe los mensajes
+    else ReturnCode = 11000
+      API ->> API: Preparar Response — Wrapper TransNetwork / TransferInfo
+      Note over API: Mapeo uno a uno de la respuesta de TransNetwork hacia el contrato de la API. <br/> Tabla completa campo a campo en la ET seccion 4.2.5 Transformaciones y Mapeos. <br/> Estructura destino: data.transfer.paymentTransactionDetails, data.transfer.paymentDetails, <br/> data.transfer.customerDetails, data.transfer.beneficiaryDetails y data.fieldDetailsList
+      API -->> Client: 200 OK — Response NI01
+      Note right of Client: { data.returnCode, data.transfer.paymentTransactionDetails, <br/> data.transfer.paymentDetails, data.transfer.customerDetails, <br/> data.transfer.beneficiaryDetails, data.fieldDetailsList }
     end
+  end
+end
 
-    API->>API: Validar Servicio Regional
-    Note over API: Usando parámetros de regionalización obtenidos
+Note over API, Errors: El bloque siguiente aplica solo a excepciones propias del Producto <br/> como validacion no capturada o error de runtime. <br/> Los errores originados en el Wrapper nunca entran aqui: se propagan sin homologar
 
-    API->>API: Validación Regional Exitosa
-    Note over API: Servicio habilitado para HN01 
-
-    API->>Lib: Consulta Constantes
-    
-    Lib->>API: Retorna constantes necesarias
-    Note left of Lib: Constantes: <br> catalogueName <br> packageCB <br> procedureNameCB <br> procedureNameT24 <br> caller-service
-
-    API->>Idempotencia: Consume API Idempotencia 
-    Note right of API: Mapeo de Campos: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> "methodVersion": "1.0" <br> dataPayload: {request}
-
-    Idempotencia->>API: Response API Idempotencia 
-    Note left of Idempotencia: Response: data {status, code, tittle, detail, correlation-id}
-
-    API->>API: Evalua response API Idempotencia
-
-    alt If data.code != 0
-
-        API->> Errors: Mapear código de error
-
-        Errors ->> API: Retorna código mapeado
-
-        API->> Consumidor: Retorna error
-        Note left of API: HTTP 422: Transacción efectuada previamente
-
-    else If data.code == 0
-
-        alt If request.transactionReferenceBC != vacío (Significa que la transacción viene de un corresponsal bancario)
-
-            API->>API: Construye Request Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
-            Note over API: Mapeo: <br> connection { <br> parm = libparam.param-name <br> secm = libparam.secret-name } <br> connectionType = const.connectionType <br> operationType  = const.operationType <br> catalogueName = const.catalogeName <br> procedureName = const.procedureNameCB <br> package = const.packageCB <br> params : { <br> LOAN_NUMBER = request.loanId <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.accountNumber <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> DESCRIPTION = request.paymentDescription <br> USERNAME = header.application-user <br> TRANSACTIONID = request.transactionReference <br> PAYMENT_METHOD = request.paymentType  <br> PAYMENT_TYPE = request.transactionReferenceBC <br> }
-
-            API->>wrapper: Consume Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
-            Note right of API: connection, connectionType <br> operationType, catalogueName <br> params: { <br> LOAN_NUMBER, PAYMENT_AMOUNT, <br> DEBIT_ACCOUNT, INTERFACE_REFERENCE_NO, <br> DESCRIPTION, USERNAME <br> TRANSACTIONID, PAYMENT_METHOD, PAYMENT_TYPE }
-
-            wrapper->>API: Response Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
-            Note over wrapper: Response: <br> success, data
-
-            API->>API: Evalúa Response Wrapper ProxyAbanks Multiconexión - SP TOPLEVEL$OSB_PAG_PRESTAMO_CAJ
-
-            alt If success == true 
-
-                API->>API: Construye response API
-                Note over API: Mapeo uno a uno campos del response Wrapper
-
-                API->>event: Envía envento al eventBridge API Idempotencia 
-                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {transactionReference, transactionType} <br> Transaccion: Success  
-
-                API->>Consumidor: Response Exitoso
-                Note left of API: HTTP 200: Response Body 
-
-            else If success != true 
-
-                API->>event: Envía envento al eventBridge API Idempotencia 
-                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: const.caller-service <br> detail-type: "provider.response" <br> request: {transactionReference, transactionType} <br> Transaccion: TimeOut <br> CODIGOERROR
-
-                API->> Errors: Mapear código de error
-
-                Errors ->> API: Retorna código mapeado
-
-                API->> Consumidor: Retorna error
-                Note left of API: HTTP 422 + mensajeError
-
-            end
-
-        else If request.transactionReferenceBC == vacío o no presente (Significa que la transacción la transacción viene de un canal diferente a corresponsal bancario)
-
-            API->>API: Construye Request Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
-            Note over API: Mapeo: <br> connection { <br> parm = libparam.param-name <br> secm = libparam.secret-name } <br> connectionType = const.connectionType <br> operationType  = const.operationType <br> catalogueName = const.catalogeName <br> procedureName = const.procedureNameT24 <br> params : { <br> LOAN_NUMBER = request.loanId <br> PAYMENT_AMOUNT = request.paymentAmount <br> DEBIT_ACCOUNT = request.accountNumber <br> INTERFACE_REFERENCE_NO = request.interfaceReferenceNumber <br> USERNAME = header.application-user <br> TRANSACTIONID = request.transactionReference <br> }
-
-            API->>wrapper: Consume Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
-            Note right of API: connection, connectionType <br> operationType, catalogueName <br> params: { <br> LOAN_NUMBER, PAYMENT_AMOUNT, <br> DEBIT_ACCOUNT, INTERFACE_REFERENCE_NO, <br> USERNAME, TRANSACTIONID }
-
-            wrapper->>API: Response Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
-            Note over wrapper: Response: <br> success, data
-
-            API->>API: Evalúa Response Wrapper ProxyAbanks Multiconexión - SP OSB_PAG_PRESTAMO_T24
-
-            alt If success == true 
-
-                API->>API: Construye response API
-                Note over API: Mapeo uno a uno campos del response Wrapper
-
-                API->>event: Envía envento al eventBridge API Idempotencia 
-                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: $caller-service <br> payload: {request} <br> transactionStatus: success 
-
-                API->>Consumidor: Response Exitoso
-                Note left of API: HTTP 200: Response Body 
-
-            else If success != true 
-
-                API->>event: Envía envento al eventBridge API Idempotencia 
-                Note right of API: Mensaje: <br> Correlation-Id: header.Correlation-Id <br> Caller-Service: $caller-service <br> payload: {request} <br> transactionStatus: timeOut
-
-                API->> Errors: Mapear código de error
-                
-                Errors ->> API: Retorna código mapeado
-                
-                API->> Consumidor: Retorna error
-                Note left of API: HTTP 422 + mensajeError
-
-            end
-
-        end
-
-    end 
-
-    Note over Consumidor, Errors: Flujo Alternativo - Error
-    activate API
+activate API
     alt Exception occurs
         note over Errors: Error Library Handler
         activate Errors
-            API->> Errors: Mapear código de error
-            Errors ->> API: Retorna código mapeado
+            API ->> Errors: BusinessCoreException(apiMethod, applicationBackend, errorMessage, errorCode)
+            Errors -->> API: Retorna httpCode, businessErrorCode, shortDesc, longDesc
         deactivate Errors
-        activate Consumidor
-            API-->> Consumidor: Retorna error
-        deactivate Consumidor
-        Note over Consumidor,Errors: Diagrama guía de manejo de errores <br> http://bit.ly/4rpKVIU
+        activate Client
+            API -->> Client: Retorna error
+        deactivate Client
     end
-    deactivate API
+deactivate API
+Note over Client,Errors: Diagrama guía de manejo de errores <br/> http://bit.ly/4rpKVIU

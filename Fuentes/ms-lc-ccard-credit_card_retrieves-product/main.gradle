@@ -1,0 +1,298 @@
+apply plugin: 'info.solidsoft.pitest.aggregator'
+
+allprojects {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven { url = "https://repo.spring.io/snapshot" }
+        maven { url = "https://repo.spring.io/milestone" }
+        maven {
+            url = "${azuredo_url}"
+            credentials {
+                username = "${azuredo_user}"
+                password = "${azuredo_pass}"
+            }
+        }
+    }
+
+    configurations.configureEach {
+        resolutionStrategy {
+            force "org.springframework:spring-webflux:${springWebfluxVersion}"
+        }
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'jacoco'
+    apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'info.solidsoft.pitest'
+    apply plugin: 'org.sonarqube'
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    test {
+        useJUnitPlatform()
+        javaLauncher.set(javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(21)
+        })
+    }
+
+    dependencies {
+        implementation libs.reactor.core
+
+        // [Ficohsa Libraries]
+        implementation libs.ficohsa.logging
+        implementation libs.ficohsa.core
+
+        // [AWS STS - Required for IRSA/WebIdentityToken credentials in EKS]
+        implementation libs.aws.sts
+
+        testImplementation libs.reactor.test
+        testRuntimeOnly    libs.platform.launcher
+        testImplementation libs.boot.test
+
+        compileOnly             "org.projectlombok:lombok:${lombokVersion}"
+        annotationProcessor     "org.projectlombok:lombok:${lombokVersion}"
+        testCompileOnly         "org.projectlombok:lombok:${lombokVersion}"
+        testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+        implementation platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
+
+        constraints {
+            implementation("commons-io:commons-io:${commonsIoVersion}")
+            implementation("org.apache.commons:commons-lang3:${commonsLang3Version}")
+            implementation("com.google.guava:guava:${guavaVersion}")
+        }
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        }
+        dependencies {
+            dependency "io.netty:netty-bom:${nettyBomVersion}"
+            dependency "org.apache.commons:commons-lang3:${commonsLang3Version}"
+            dependency "com.fasterxml.jackson.core:jackson-core:${jacksonCoreVersion}"
+            dependency "com.fasterxml.jackson.core:jackson-databind:${jacksonCoreVersion}"
+        }
+    }
+
+    configurations.configureEach {
+        exclude group: 'commons-logging', module: 'commons-logging'
+
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == "io.netty") {
+                details.useVersion("${nettyBomVersion}")
+                details.because("Fix CVE – enforced Netty LTS")
+            }
+            if (details.requested.group == "com.fasterxml.jackson.core" && details.requested.name != "jackson-annotations") {
+                details.useVersion("${jacksonCoreVersion}")
+                details.because("Fix CVE-2026-54512 through CVE-2026-54518")
+            }
+            if (details.requested.group == "com.fasterxml.jackson.core" && details.requested.name == "jackson-annotations") {
+                details.useVersion("2.22")
+                details.because("Fix CVE-2026-54512 through CVE-2026-54518")
+            }
+            if (details.requested.group == "commons-fileupload") {
+                details.useVersion("${commonsFileUpload}")
+            }
+            if (details.requested.group == "org.bouncycastle") {
+                details.useVersion("1.84")
+                details.because("Fix CVE-2026-0636, CVE-2026-5598")
+            }
+        }
+    }
+
+    tasks.withType(Test).configureEach {
+        if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_13)) {
+            jvmArgs += [
+                    "-XX:+AllowRedefinitionToAddDeleteMethods",
+                    "-XX:+EnableDynamicAgentLoading",
+                    "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+                    "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED",
+                    "--add-opens", "java.base/java.util=ALL-UNNAMED"
+            ]
+        }
+    }
+
+    test.finalizedBy(project.tasks.jacocoTestReport)
+
+    pitest {
+        targetClasses = ['com.ficohsa.*']
+        excludedClasses = []
+        excludedTestClasses = []
+        pitestVersion = '1.20.6'
+        verbose = false
+        outputFormats = ['XML', 'HTML']
+        threads = 8
+        exportLineCoverage = true
+        useClasspathFile = true
+        timestampedReports = false
+        fileExtensionsToFilter.addAll('xml', 'orbit')
+        junit5PluginVersion = '1.2.3'
+        failWhenNoMutations = false
+        jvmArgs = [
+            "-XX:+EnableDynamicAgentLoading",
+            "-XX:+AllowRedefinitionToAddDeleteMethods"
+        ]
+    }
+
+    sonarqube {
+        properties {
+            property "sonar.coverage.exclusions", [
+                    "**/config/**",
+                    "**/configuration/**",
+                    "**/MainApplication.java",
+                    '**/*Config.java',
+                    "**/models/**",
+                    "**/model/**",
+                    "**/dto/**",
+                    "**/mapper/**",
+                    "**/mappers/**",
+                    "**/openapi/**",
+                    "**/logger/**",
+                    '**/*MapperImpl.java',
+                    '**/*Mapper.java',
+                    "**/entity/**",
+                    "**/exception/consts/**",
+                    '**/com/ficohsa/lib/**',
+                    "**/*\$Builder.java",
+                    "**/Test.java",
+                    "**/Tests.java",
+                    "**/TestCase.java",
+                    "**/CreditCardRoutes.java",
+                    "**/*Properties.java",
+                    "**/schemas/**"
+            ].join(",")
+
+            property "sonar.cpd.exclusions", [
+                    "**/config/**",
+                    "**/configuration/**",
+                    "**/*Config.java",
+                    "**/*Properties.java",
+                    "**/*RestConfig.java",
+                    "**/dto/**",
+                    "**/mapper/**",
+                    "**/mappers/**",
+                    "**/openapi/**",
+                    "**/logger/**",
+                    "**/*MapperImpl.java",
+                    '**/*Mapper.java',
+                    "**/consts/**",
+                    "**/constants/**",
+                    "**/enums/**",
+                    "**/model/**",
+                    "**/models/**",
+                    "**/repository/**",
+                    "**/strategy/**"
+            ].join(",")
+        }
+    }
+
+    jacocoTestReport {
+        dependsOn test
+        reports {
+            html.required = true
+            html.outputLocation = layout.buildDirectory.dir('reports/jacoco/test/html')
+            xml.required = true
+            xml.outputLocation = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml')
+            csv.required = false
+        }
+        afterEvaluate {
+            classDirectories.setFrom(files(classDirectories.files.collect {
+                fileTree(dir: it, exclude: [
+                        '**/config/**',
+                        '**/configuration/**',
+                        '**/MainApplication.class',
+                        '**/*Config.class',
+                        '**/models/**',
+                        '**/model/**',
+                        '**/dto/**',
+                        '**/mapper/**',
+                        '**/*$Builder.class',
+                        '**/*MapperImpl.class',
+                        '**/*Mapper.class',
+                        '**/mapper/**',
+                        '**/mappers/**',
+                        '**/RouterRest.class',
+                        '**/com/ficohsa/lib/**',
+                        '**/Test.class',
+                        '**/Tests.class',
+                        '**/TestCase.class',
+                        '**/RouterRest.class'
+                ])
+            }))
+        }
+    }
+
+    jacocoTestCoverageVerification {
+        dependsOn jacocoTestReport
+
+        onlyIf {
+            file("${project.projectDir}/src/test/java").exists() &&
+            !project.projectDir.path.contains("driven-adapters")
+        }
+
+        afterEvaluate {
+            classDirectories.setFrom(files(classDirectories.files.collect {
+                fileTree(dir: it, exclude: [
+                        '**/config/**',
+                        '**/configuration/**',
+                        '**/MainApplication.class',
+                        '**/*Config.class',
+                        '**/models/**',
+                        '**/model/**',
+                        '**/dto/**',
+                        '**/mapper/**',
+                        '**/*$Builder.class',
+                        '**/*MapperImpl.class',
+                        '**/*Mapper.class',
+                        '**/mapper/**',
+                        '**/mappers/**',
+                        '**/RouterRest.class',
+                        '**/com/ficohsa/lib/**',
+                        '**/Test.class',
+                        '**/Tests.class',
+                        '**/TestCase.class',
+                        '**/openapi/**',
+                        '**/*Properties.class'
+                ])
+            }))
+        }
+
+        violationRules {
+            rule {
+                enabled = true
+                element = 'BUNDLE'
+                limit {
+                    counter = 'LINE'
+                    value = 'COVEREDRATIO'
+                    minimum = 0.85
+                }
+            }
+        }
+    }
+
+    check.dependsOn jacocoTestCoverageVerification
+
+}
+
+jacoco {
+    toolVersion = "${jacocoPluginVersion}"
+    reportsDirectory.set(layout.buildDirectory.dir("reports"))
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs = [
+            '-parameters',
+            '-Amapstruct.suppressGeneratorTimestamp=true'
+    ]
+}
+
+tasks.named('wrapper') {
+    gradleVersion = '8.14.3'
+}
