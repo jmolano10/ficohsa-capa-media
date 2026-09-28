@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpel:process name="sjPagoCobranzasH2H"
+              targetNamespace="http://www.example.com/flow/MWHostToHost/v1/BusinessServices/SJS/pagoCobranzasH2H/flow/sjPagoCobranzasH2H"
+              xmlns:tns="http://www.example.com/flow/MWHostToHost/v1/BusinessServices/SJS/pagoCobranzasH2H/flow/sjPagoCobranzasH2H"
+              xmlns:bpel="http://docs.oasis-open.org/wsbpel/2.0/process/executable"
+              xmlns:rescon="http://www.bea.com/alsb/flow/resources/config"
+              xmlns:bea="http://www.bea.com/bpel/ui/extensions"
+              xmlns:ext="http://www.bea.com/bpel/extensions"
+              xmlns:expr="http://www.bea.com/wli/sb/stages/config"
+              xmlns:trf="http://www.bea.com/wli/sb/stages/transform/config"
+              xmlns:bind="http://www.ficohsa.com.hn/middleware.services/sjPagoCobranzasH2HPS/" 
+              bea:name="sjPagoCobranzasH2H" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:cbr="http://xmlns.oracle.com/pcbpel/adapter/db/sp/consultaParametrosCBR" xmlns:ns1="http://xmlns.oracle.com/pcbpel/adapter/db/Application1/Project1/consultaParametrosCBR" xmlns:ns0="http://www.ficohsa.com.hn/middleware.services/pagoRecaudo/" xmlns:pag="http://www.ficohsa.com.hn/middleware.services/pagoRecaudoTypes" xmlns:aut="http://www.ficohsa.com.hn/middleware.services/autType">
+    <bpel:partnerLinks>
+        <bpel:partnerLink name="sjPagoCobranzasH2H" partnerLinkType="tns:sjPagoCobranzasH2H"
+                          myRole="sjPagoCobranzasH2H">
+	       </bpel:partnerLink>
+	   <bpel:partnerLink name="consultaParametrosCBR_db"
+		partnerLinkType="tns:consultaParametrosCBR_db_plnkType"
+		partnerRole="consultaParametrosCBR_db_PartnerRole">
+	   </bpel:partnerLink>
+	   <bpel:partnerLink name="pagoRecaudo_v2"
+	   	partnerLinkType="tns:pagoRecaudo_v2_plnkType"
+	   	partnerRole="pagoRecaudo_v2_PartnerRole">
+	   </bpel:partnerLink></bpel:partnerLinks>
+
+	   <bpel:variables>
+        <bpel:variable name="request"
+	                      messageType="bind:sjPagoCobranzasH2HRequest">
+	       </bpel:variable>
+	       <bpel:variable name="response"
+                       messageType="bind:sjPagoCobranzasH2HResponse">
+	       </bpel:variable>
+    <bpel:variable name="errorAmount" type="xsd:anyType"></bpel:variable>
+    <bpel:variable name="successAmount" type="xsd:anyType"></bpel:variable></bpel:variables>
+
+    <bpel:sequence>
+        <bpel:receive partnerLink="sjPagoCobranzasH2H" operation="sjPago" variable="request" createInstance="yes">
+	           <rescon:receiveInfo>
+                <rescon:wsdl ref="MWHostToHost/v1/BusinessServices/SJS/pagoCobranzasH2H/wsdl/sjPagoCobranzasH2H" binding="bind:sjPagoCobranzasH2HPSSOAP"/>
+            </rescon:receiveInfo>
+        </bpel:receive>
+        <bpel:scope bea:name="PrepararParámetros">
+        	<bpel:sequence>
+        		<bpel:assign>
+        			<bpel:extensionAssignOperation bea:name="Salida">
+        				<trf:assign varName="response.outputParameters">
+        					<trf:expr>
+        						<expr:xqueryText>&lt;outputParameters&gt;
+	&lt;SUCCESS_INDICATOR&gt;SUCCESS&lt;/SUCCESS_INDICATOR&gt;
+	&lt;SERVICES/&gt;
+&lt;/outputParameters&gt;</expr:xqueryText></trf:expr></trf:assign>
+        			</bpel:extensionAssignOperation>
+        		<bpel:extensionAssignOperation bea:name="errorAmount">
+		<trf:assign varName="errorAmount">
+			<trf:expr>
+				<expr:xqueryText>&lt;NODE/&gt;</expr:xqueryText></trf:expr></trf:assign>
+        		</bpel:extensionAssignOperation>
+        		<bpel:extensionAssignOperation bea:name="successAmount">
+        			<trf:assign varName="successAmount">
+        				<trf:expr>
+        					<expr:xqueryText>&lt;NODE/&gt;</expr:xqueryText></trf:expr></trf:assign>
+        		</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        </bpel:scope>
+        <bpel:scope>
+        	<bpel:variables>
+        		<bpel:variable name="successIndicator"
+        			type="xsd:string">
+        		</bpel:variable>
+        		<bpel:variable name="validationMessage"
+        			type="xsd:string">
+        		</bpel:variable></bpel:variables>
+        	<bpel:sequence>
+        		<bpel:forEach parallel="yes" counterName="serviceIndex">
+        			<bpel:startCounterValue>1</bpel:startCounterValue>
+        			<bpel:finalCounterValue>count($request.inputParameters/SERVICES/SERVICE)</bpel:finalCounterValue>
+        			<bpel:scope bea:name="Scope">
+        				<bpel:variables>
+        					<bpel:variable
+        						name="REQConsultaParametrosCBR"
+        						messageType="ns1:args_in_msg">
+        					</bpel:variable>
+        					<bpel:variable
+        						name="RSPConsultaParametrosCBR"
+        						messageType="ns1:args_out_msg">
+        					</bpel:variable>
+        					<bpel:variable name="serviceId"
+        						type="xsd:string">
+        					</bpel:variable>
+        					<bpel:variable name="service"
+        						type="xsd:anyType">
+        					</bpel:variable></bpel:variables>
+        				<bpel:faultHandlers>
+        					
+        					<bpel:catch faultName="tns:NO_RECORDS">
+        						<bpel:sequence>
+        							<bpel:empty></bpel:empty>
+        						<bpel:assign>
+		<bpel:extensionAssignOperation bea:name="errorService">
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./SERVICES</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>&lt;SERVICE&gt;
+	&lt;SUCCESS_INDICATOR&gt;NO RECORDS&lt;/SUCCESS_INDICATOR&gt;
+	&lt;ERROR_MESSAGE&gt;Ningún contrato asociado al servicio devolvió información&lt;/ERROR_MESSAGE&gt;
+	&lt;ID&gt;{string($request.inputParameters/SERVICES/SERVICE[xs:int($serviceIndex)]/ID/text())}&lt;/ID&gt;
+&lt;/SERVICE&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation>
+		<bpel:extensionAssignOperation bea:name="errorAmount">
+			<trf:insert varName="errorAmount">
+				<trf:location>
+					<expr:xpathText>.</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+			<trf:expr>
+				<expr:xqueryText>let $num := count($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR)
+for $i in 1 to $num
+	return
+		&lt;ERROR&gt;Error&lt;/ERROR&gt;</expr:xqueryText></trf:expr></trf:insert>
+		</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        					</bpel:catch>
+        					<bpel:catch faultName="tns:ERROR">
+        						<bpel:sequence>
+        							<bpel:empty></bpel:empty>
+        						<bpel:assign>
+		<bpel:extensionAssignOperation bea:name="errorService">
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./SERVICES</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>&lt;SERVICE&gt;
+	&lt;SUCCESS_INDICATOR&gt;ERROR&lt;/SUCCESS_INDICATOR&gt;
+	&lt;ERROR_MESSAGE&gt;Se produjo un error al consultar la información general del servicio.&lt;/ERROR_MESSAGE&gt;
+	&lt;ID&gt;{string($request.inputParameters/SERVICES/SERVICE[xs:int($serviceIndex)]/ID/text())}&lt;/ID&gt;
+&lt;/SERVICE&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation>
+		<bpel:extensionAssignOperation bea:name="errorAmount">
+			<bpel:documentation></bpel:documentation>
+			<trf:insert varName="errorAmount">
+				<trf:location>
+					<expr:xpathText>.</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>let $num := count($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR)
+for $i in 1 to $num
+	return
+		&lt;ERROR&gt;Error&lt;/ERROR&gt;</expr:xqueryText></trf:expr></trf:insert>
+		</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        					</bpel:catch>
+        					<bpel:catch faultName="tns:CUENTA_INVALIDA">
+        						<bpel:sequence>
+        							<bpel:empty></bpel:empty>
+        						<bpel:assign>
+		<bpel:extensionAssignOperation bea:name="errorService">
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./SERVICES</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>&lt;SERVICE&gt;
+	&lt;SUCCESS_INDICATOR&gt;ERROR&lt;/SUCCESS_INDICATOR&gt;
+	&lt;ERROR_MESSAGE&gt;La cuenta no esta permitida para realizar pagos del cliente.&lt;/ERROR_MESSAGE&gt;
+	&lt;ID&gt;{string($request.inputParameters/SERVICES/SERVICE[xs:int($serviceIndex)]/ID/text())}&lt;/ID&gt;
+&lt;/SERVICE&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation>
+		<bpel:extensionAssignOperation bea:name="errorAmount">
+			<bpel:documentation></bpel:documentation>
+			<trf:insert varName="errorAmount">
+				<trf:location>
+					<expr:xpathText>.</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>let $num := count($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR)
+for $i in 1 to $num
+	return
+		&lt;ERROR&gt;Error&lt;/ERROR&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        					</bpel:catch>
+        					<bpel:catchAll>
+        						<bpel:sequence>
+        							<bpel:empty></bpel:empty>
+        						<bpel:assign>
+		<bpel:extensionAssignOperation bea:name="errorService">
+			<trf:insert varName="response.outputParameters">
+				<trf:location>
+					<expr:xpathText>./SERVICES</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>&lt;SERVICE&gt;
+	&lt;SUCCESS_INDICATOR&gt;ERROR&lt;/SUCCESS_INDICATOR&gt;
+	&lt;ERROR_MESSAGE&gt;FALLÓ EL PAGO DE RECAUDOS.&lt;/ERROR_MESSAGE&gt;
+	&lt;ID&gt;{string($request.inputParameters/SERVICES/SERVICE[xs:int($serviceIndex)]/ID/text())}&lt;/ID&gt;
+&lt;/SERVICE&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation>
+		<bpel:extensionAssignOperation bea:name="errorAmount">
+			<bpel:documentation></bpel:documentation>
+			<trf:insert varName="errorAmount">
+				<trf:location>
+					<expr:xpathText>.</expr:xpathText></trf:location>
+				<trf:where>last-child</trf:where>
+				<trf:expr>
+					<expr:xqueryText>let $num := count($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR)
+for $i in 1 to $num
+	return
+		&lt;ERROR&gt;Error&lt;/ERROR&gt;</expr:xqueryText></trf:expr></trf:insert>
+		</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        					</bpel:catchAll></bpel:faultHandlers>
+        				<bpel:sequence>
+        					
+        					
+        					<bpel:if>
+        						<bpel:condition>count($request.inputParameters/SERVICES/SERVICE[number($serviceIndex)]/ACCOUNT) &gt; 0</bpel:condition>
+        						<bpel:sequence>
+        							<bpel:empty></bpel:empty>
+        						<bpel:if>
+		<bpel:condition>count($request.inputParameters/SERVICES/SERVICE[number($serviceIndex)]/CONTRACT_ID) &gt; 0
+</bpel:condition>
+		<bpel:sequence>
+			<bpel:empty></bpel:empty>
+			<bpel:scope bea:name="ConsultaParámetroCBR">
+				<bpel:sequence>
+					<bpel:assign>
+						<bpel:extensionAssignOperation
+							bea:name="serviceId">
+							<bpel:documentation></bpel:documentation>
+							<trf:assign varName="serviceId">
+								<trf:expr>
+									<expr:xqueryText>string($request.inputParameters/SERVICES/SERVICE[xs:int($serviceIndex)]/ID/text())</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+						<bpel:extensionAssignOperation
+							bea:name="Request">
+							<bpel:documentation></bpel:documentation>
+							<trf:assign
+								varName="REQConsultaParametrosCBR.InputParameters">
+								<trf:expr>
+									<expr:xqueryText>&lt;InputParameters&gt;
+	&lt;cbr:PV_IDSERVICIO&gt;{$serviceId}&lt;/cbr:PV_IDSERVICIO&gt;
+	&lt;cbr:PV_OPERACION&gt;PAG&lt;/cbr:PV_OPERACION&gt;
+&lt;/InputParameters&gt;</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+					<bpel:invoke
+						inputVariable="REQConsultaParametrosCBR"
+						partnerLink="consultaParametrosCBR_db"
+						operation="consultaParametrosCBR"
+						outputVariable="RSPConsultaParametrosCBR">
+						<rescon:invokeInfo>
+							<rescon:service isProxy="false"
+								ref="MWHostToHost/v1/BusinessServices/ABKHN/consultaParametrosCBR/biz/consultaParametrosCBR_db"></rescon:service></rescon:invokeInfo></bpel:invoke>
+					<bpel:assign>
+						<bpel:extensionAssignOperation
+							bea:name="successIndicator">
+							<trf:assign varName="successIndicator">
+								<trf:expr>
+									<expr:xqueryText>string($RSPConsultaParametrosCBR.OutputParameters/cbr:PV_CODIGOMENSAJE/text())</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign></bpel:sequence></bpel:scope>
+			<bpel:if>
+				<bpel:condition>$successIndicator = 'SUCCESS'</bpel:condition>
+				<bpel:sequence>
+					<bpel:empty></bpel:empty>
+					<bpel:assign>
+						<bpel:extensionAssignOperation
+							bea:name="Service">
+							<trf:assign varName="service">
+								<trf:expr>
+									<expr:xqueryText>&lt;NODE&gt;
+	&lt;SERVICE&gt;
+		&lt;SUCCESS_INDICATOR&gt;Success&lt;/SUCCESS_INDICATOR&gt;
+		&lt;ID&gt;{ $serviceId }&lt;/ID&gt;
+		&lt;NAME&gt;{ string($request.inputParameters/SERVICES/SERVICE[xs:int($serviceIndex)]/NAME/text())}&lt;/NAME&gt;
+		&lt;DEBTORS/&gt;
+	&lt;/SERVICE&gt;
+&lt;/NODE&gt;</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+					<bpel:forEach parallel="yes"
+						counterName="debtorIndex">
+						<bpel:startCounterValue>1</bpel:startCounterValue>
+						<bpel:finalCounterValue>count($request.inputParameters/SERVICES/SERVICE[ $serviceIndex ]/DEBTORS/DEBTOR)</bpel:finalCounterValue>
+						<bpel:scope>
+							<bpel:variables>
+								<bpel:variable
+									messageType="ns0:pagoRecaudoRequest" name="REQPagoRecaudo"></bpel:variable>
+								<bpel:variable
+									messageType="ns0:pagoRecaudoResponse" name="RSPPagoRecaudo"></bpel:variable>
+								<bpel:variable name="trace"
+									type="xsd:string"></bpel:variable>
+								<bpel:variable name="code"
+									type="xsd:string"></bpel:variable></bpel:variables>
+							<bpel:faultHandlers>
+								<bpel:catchAll>
+									<bpel:sequence>
+										<bpel:empty></bpel:empty>
+										<bpel:assign>
+											<bpel:extensionAssignOperation
+												bea:name="errorDebtor">
+												<trf:insert
+													varName="service">
+													<trf:location>
+														<expr:xpathText>./SERVICE/DEBTORS</expr:xpathText></trf:location>
+													<trf:where>last-child</trf:where>
+													<trf:expr>
+														<expr:xqueryText>&lt;DEBTOR&gt;
+	&lt;SUCCESS_INDICATOR&gt;ERROR&lt;/SUCCESS_INDICATOR&gt;
+	&lt;ERROR_MESSAGE&gt;Falló la invocación del servicio pago de recaudo.&lt;/ERROR_MESSAGE&gt;
+	&lt;TRACE&gt;{ string($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR[ xs:int($debtorIndex) ]/TRACE/text()) }&lt;/TRACE&gt;
+	&lt;CODE&gt;{ string($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR[ xs:int($debtorIndex) ]/CODE/text()) }&lt;/CODE&gt;
+&lt;/DEBTOR&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation>
+											<bpel:extensionAssignOperation
+												bea:name="errorAmount">
+												<bpel:documentation></bpel:documentation>
+												<trf:insert
+													varName="errorAmount">
+													<trf:location>
+														<expr:xpathText>.</expr:xpathText></trf:location>
+													<trf:where>last-child</trf:where>
+													<trf:expr>
+														<expr:xqueryText>&lt;ERROR&gt;Error&lt;/ERROR&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence></bpel:catchAll></bpel:faultHandlers>
+							<bpel:sequence>
+								<bpel:assign>
+									<bpel:extensionAssignOperation
+										bea:name="trace">
+										<trf:assign varName="trace">
+											<trf:expr>
+												<expr:xqueryText>string($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR[ xs:int($debtorIndex) ]/TRACE/text())</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+									<bpel:extensionAssignOperation
+										bea:name="code">
+										<trf:assign varName="code">
+											<trf:expr>
+												<expr:xqueryText>string($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR[ xs:int($debtorIndex) ]/CODE/text())</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation>
+									<bpel:extensionAssignOperation
+										bea:name="REQPagoRecaudoBody">
+										<trf:assign
+											varName="REQPagoRecaudo.parameters">
+											<trf:expr>
+												<expr:xqueryTransform>
+													<expr:resource
+														ref="MWHostToHost/v1/BusinessServices/SJS/pagoCobranzasH2H/xq/pagoRecaudoIn"></expr:resource>
+													<expr:param
+														name="PAYMENT_INFORMATION">
+														<expr:path>$request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/PAYMENT_INFORMATION</expr:path></expr:param>
+													<expr:param
+														name="PT_CAMPOSPORSERVICIO">
+														<expr:path>$RSPConsultaParametrosCBR.OutputParameters/cbr:PT_CAMPOSPORSERVICIO</expr:path></expr:param>
+													<expr:param
+														name="DEBTOR">
+														<expr:path>$request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR[ xs:int($debtorIndex) ]</expr:path></expr:param>
+													<expr:param
+														name="contractID">
+														<expr:path>fn:string($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/CONTRACT_ID/text())</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+								<bpel:if>
+									<bpel:condition>count($REQPagoRecaudo.parameters/CONTRACT_ID) &gt; 0</bpel:condition>
+									<bpel:sequence>
+										<bpel:empty></bpel:empty>
+										<bpel:assign>
+											<bpel:extensionAssignOperation
+												bea:name="REQPagoRecaudoHeader">
+												<trf:assign
+													varName="REQPagoRecaudo.RequestHeader">
+													<trf:expr>
+														<expr:xqueryText>&lt;aut:RequestHeader&gt;
+	&lt;Authentication&gt;
+		&lt;UserName&gt;{ upper-case(string($request.inputParameters/USER_NAME/text())) }&lt;/UserName&gt;
+		&lt;Password&gt;{ string($request.inputParameters/PASSWORD/text()) }&lt;/Password&gt;
+	&lt;/Authentication&gt;
+	&lt;Region&gt;
+		&lt;SourceBank&gt;{ string($request.inputParameters/SOURCE_BANK/text()) }&lt;/SourceBank&gt;
+		&lt;DestinationBank&gt;&lt;/DestinationBank&gt;
+	&lt;/Region&gt;
+&lt;/aut:RequestHeader&gt;</expr:xqueryText></trf:expr></trf:assign></bpel:extensionAssignOperation></bpel:assign>
+										<bpel:invoke
+											inputVariable="REQPagoRecaudo" partnerLink="pagoRecaudo_v2"
+											operation="pagoRecaudo" outputVariable="RSPPagoRecaudo">
+											<rescon:invokeInfo>
+												<rescon:service
+													isProxy="false"
+													ref="MWHostToHost/v1/BusinessServices/OSB/pagoRecaudo_v2/biz/pagoRecaudo_v2"></rescon:service></rescon:invokeInfo></bpel:invoke>
+										<bpel:assign>
+											<bpel:extensionAssignOperation
+												bea:name="DEBTOR">
+												<bpel:documentation></bpel:documentation>
+												<trf:insert
+													varName="service">
+													<trf:location>
+														<expr:xpathText>./SERVICE/DEBTORS</expr:xpathText></trf:location>
+													<trf:where>last-child</trf:where>
+													<trf:expr>
+														<expr:xqueryTransform>
+															<expr:resource
+																ref="MWHostToHost/v1/BusinessServices/SJS/pagoCobranzasH2H/xq/pagoRecaudoOut"></expr:resource>
+															<expr:param
+																name="code">
+																<expr:path>$code</expr:path></expr:param>
+															<expr:param
+																name="responseHeader">
+																<expr:path>$RSPPagoRecaudo.ResponseHeader</expr:path></expr:param>
+															<expr:param
+																name="trace">
+																<expr:path>$trace</expr:path></expr:param>
+															<expr:param
+																name="pagoRecaudoResponse">
+																<expr:path>$RSPPagoRecaudo.result</expr:path></expr:param></expr:xqueryTransform></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign>
+										<bpel:if>
+											<bpel:condition>string($RSPPagoRecaudo.ResponseHeader/successIndicator/text()) != 'Success'</bpel:condition>
+											<bpel:sequence>
+												<bpel:empty></bpel:empty>
+												<bpel:assign>
+													<bpel:extensionAssignOperation>
+														<trf:insert
+															varName="errorAmount">
+															<trf:location>
+																<expr:xpathText>.</expr:xpathText></trf:location>
+															<trf:where>last-child</trf:where>
+															<trf:expr>
+																<expr:xqueryText>&lt;ERROR&gt;Error&lt;/ERROR&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+											<bpel:else>
+												<bpel:sequence>
+													<bpel:empty></bpel:empty>
+													<bpel:assign>
+														<bpel:extensionAssignOperation>
+															<trf:insert
+																varName="successAmount">
+																<trf:location>
+																	<expr:xpathText>.</expr:xpathText></trf:location>
+																<trf:where>last-child</trf:where>
+																<trf:expr>
+																	<expr:xqueryText>&lt;SUCCESS&gt;Success&lt;/SUCCESS&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence></bpel:else></bpel:if></bpel:sequence>
+									<bpel:else>
+										<bpel:sequence>
+											<bpel:empty></bpel:empty>
+											<bpel:assign>
+												<bpel:extensionAssignOperation
+													bea:name="errorDebtor">
+													<trf:insert
+														varName="service">
+														<trf:location>
+															<expr:xpathText>./SERVICE/DEBTORS</expr:xpathText></trf:location>
+														<trf:where>last-child</trf:where>
+														<trf:expr>
+															<expr:xqueryText>&lt;DEBTOR&gt;
+	&lt;SUCCESS_INDICATOR&gt;ERROR&lt;/SUCCESS_INDICATOR&gt;
+	&lt;ERROR_MESSAGE&gt;Falló la invocación del servicio pago de recaudo.&lt;/ERROR_MESSAGE&gt;
+	&lt;TRACE&gt;{ string($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR[ xs:int($debtorIndex) ]/TRACE/text()) }&lt;/TRACE&gt;
+	&lt;CODE&gt;{ string($request.inputParameters/SERVICES/SERVICE[ xs:int($serviceIndex) ]/DEBTORS/DEBTOR[ xs:int($debtorIndex) ]/CODE/text()) }&lt;/CODE&gt;
+&lt;/DEBTOR&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation>
+												<bpel:extensionAssignOperation
+													bea:name="errorAmount">
+													<bpel:documentation></bpel:documentation>
+													<trf:insert
+														varName="errorAmount">
+														<trf:location>
+															<expr:xpathText>.</expr:xpathText></trf:location>
+														<trf:where>last-child</trf:where>
+														<trf:expr>
+															<expr:xqueryText>&lt;ERROR&gt;Error&lt;/ERROR&gt;</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence></bpel:else></bpel:if></bpel:sequence></bpel:scope></bpel:forEach>
+					<bpel:assign>
+						<bpel:extensionAssignOperation
+							bea:name="Salida">
+							<bpel:documentation></bpel:documentation>
+							<trf:insert
+								varName="response.outputParameters">
+								<trf:location>
+									<expr:xpathText>./SERVICES</expr:xpathText></trf:location>
+								<trf:where>last-child</trf:where>
+								<trf:expr>
+									<expr:xqueryText>$service/*</expr:xqueryText></trf:expr></trf:insert></bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+				<bpel:else>
+					<bpel:sequence>
+						<bpel:empty></bpel:empty>
+						<bpel:throw faultName="tns:ERROR"
+							bea:name="ERROR"></bpel:throw></bpel:sequence></bpel:else></bpel:if></bpel:sequence>
+		<bpel:else>
+			<bpel:sequence>
+				<bpel:empty></bpel:empty>
+				<bpel:throw faultName="tns:NO_RECORDS"
+					bea:name="NO_RECORDS"></bpel:throw></bpel:sequence></bpel:else></bpel:if></bpel:sequence>
+        						<bpel:else>
+        							<bpel:sequence>
+        								<bpel:empty></bpel:empty>
+        							<bpel:throw
+		faultName="tns:CUENTA_INVALIDA" bea:name="CUENTA_INVALIDA">
+        							</bpel:throw></bpel:sequence>
+        						</bpel:else>
+        					</bpel:if>
+        					
+        					
+        					
+        					
+        					
+        					</bpel:sequence>
+        			</bpel:scope>
+        		</bpel:forEach>
+        		<bpel:assign>
+        			<bpel:extensionAssignOperation bea:name="updateSuccess">
+        				<trf:insert varName="response.outputParameters">
+        					<trf:location>
+        						<expr:xpathText>./SUCCESS_INDICATOR</expr:xpathText></trf:location>
+        					<trf:where>after</trf:where>
+        				<trf:expr>
+        					<expr:xqueryText>&lt;SUCCESS_AMOUNT&gt;{ count($successAmount/SUCCESS) }&lt;/SUCCESS_AMOUNT&gt;</expr:xqueryText></trf:expr></trf:insert>
+        			</bpel:extensionAssignOperation>
+        		<bpel:extensionAssignOperation bea:name="updateError">
+		<trf:insert varName="response.outputParameters">
+			<trf:location>
+				<expr:xpathText>./SUCCESS_AMOUNT</expr:xpathText></trf:location>
+			<trf:where>after</trf:where>
+		<trf:expr>
+			<expr:xqueryText>&lt;ERROR_AMOUNT&gt;{ count($errorAmount/ERROR) }&lt;/ERROR_AMOUNT&gt;</expr:xqueryText></trf:expr></trf:insert>
+        		</bpel:extensionAssignOperation></bpel:assign></bpel:sequence>
+        </bpel:scope>
+        <bpel:reply partnerLink="sjPagoCobranzasH2H" operation="sjPago" variable="response"></bpel:reply>
+    </bpel:sequence>
+</bpel:process>

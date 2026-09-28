@@ -1,0 +1,24 @@
+(:: pragma bea:global-element-return element="ns0:EmbosserUpdateR8V7Request" location="../../../BusinessServices/VisionPlus/visionPlus/xsd/XMLSchema_769155616.xsd" ::)
+
+declare namespace ns0 = "http://www.procesa.com/fdcs";
+declare namespace xf = "http://tempuri.org/Middleware/v2/Resources/ActualizaProductoTC/xq/embosserUpdateR8V7OldIn/";
+
+declare function xf:embosserUpdateR8V7OldIn($org as xs:string,
+    $cardNumber as xs:string)
+    as element(ns0:EmbosserUpdateR8V7Request) {
+        <ns0:EmbosserUpdateR8V7Request>
+            <ARXEUI-ORG>{ data($org) }</ARXEUI-ORG>
+            <ARXEUI-CARD-NBR>{ data($cardNumber) }</ARXEUI-CARD-NBR>
+            <ARXEUI-CARD-SEQ>1</ARXEUI-CARD-SEQ>
+            <ARXEUI-FOREIGN-USE>0</ARXEUI-FOREIGN-USE>
+            <ARXEUI-USER-1 xsi:nil="true"/>
+        </ns0:EmbosserUpdateR8V7Request>
+};
+
+declare variable $org as xs:string external;
+declare variable $cardNumber as xs:string external;
+declare variable $productType as xs:string external;
+declare variable $updateValue as xs:string external;
+
+xf:embosserUpdateR8V7OldIn($org,
+    $cardNumber)

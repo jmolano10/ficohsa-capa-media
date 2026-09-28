@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config">
+  <ser:coreEntry isProxy="true" isEnabled="true">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/OperacionesCAP/wsdl/operacionesCAPPS"/>
+      <con:port>
+        <con:name>operacionesCAPPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/operacionesCAPPS</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-7428214519097003654-6de05f9f.195eec58288.-2929">
+    <con:pipeline type="error" name="_onErrorHandler-7428214519097003654-6de05f9f.195eec58288.-2929">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesCAPTypes" prefix="oper"/>
+        </con:context>
+        <con:actions>
+          <con1:replace varName="header" contents-only="true">
+            <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2a2b</con2:id>
+            <con1:expr>
+              <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<messageId>-1</messageId>
+	<successIndicator>{ string($fault/ctx:errorCode/text()) }</successIndicator>
+	<messages>{ string($fault/ctx:reason/text()) }</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con1:replace contents-only="true" varName="body">
+            <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2a19</con2:id>
+            <con1:expr>
+              <con2:xqueryText>&lt;oper:modificacionCAPResponse/></con2:xqueryText>
+            </con1:expr>
+          </con1:replace>
+          <con2:reply>
+            <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2a05</con2:id>
+          </con2:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ModificacionCAPHN_request">
+      <con:stage name="ModificacionCAPHN">
+        <con:context>
+          <con2:userNsDecl namespace="http://xmlns.oracle.com/pcbpel/adapter/db/sp/modificacionCAP" prefix="mod"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesCAPTypes" prefix="oper"/>
+        </con:context>
+        <con:actions>
+          <con1:assign varName="countryCode">
+            <con2:id>_ActionId-7428214519097003654-6de05f9f.195eec58288.-2915</con2:id>
+            <con1:expr>
+              <con2:xqueryText>data($header/aut:RequestHeader/Region/SourceBank/text())</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:wsCallout>
+            <con2:id>_ActionId-7428214519097003654-6de05f9f.195eec58288.-28ff</con2:id>
+            <con1:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/ModificacionCAP/biz/modificacionCAP_db" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con1:operation>modificacionCAP</con1:operation>
+            <con1:request>
+              <con1:body>$REQModificacionCAP</con1:body>
+            </con1:request>
+            <con1:response>
+              <con1:body>RSPModificacionCAP</con1:body>
+            </con1:response>
+            <con1:requestTransform>
+              <con1:assign varName="REQModificacionCAP">
+                <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2aca</con2:id>
+                <con1:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/OperacionesCAP/xq/modificacionCAPIn"/>
+                    <con2:param name="codigoPais">
+                      <con2:path>$countryCode</con2:path>
+                    </con2:param>
+                    <con2:param name="modificacionCAPRequest">
+                      <con2:path>$body/oper:modificacionCAPRequest</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+            </con1:requestTransform>
+            <con1:responseTransform>
+              <con1:assign varName="errorCode">
+                <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2ac1</con2:id>
+                <con1:expr>
+                  <con2:xqueryText>data($RSPModificacionCAP/mod:PV_CODIGO_ERROR/text())</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+              <con1:assign varName="validationMessage">
+                <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2ab4</con2:id>
+                <con1:expr>
+                  <con2:xqueryText>data($RSPModificacionCAP/mod:PV_MENSAJE_ERROR/text())</con2:xqueryText>
+                </con1:expr>
+              </con1:assign>
+            </con1:responseTransform>
+          </con1:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ModificacionCAPHN_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/operacionesCAPTypes" prefix="oper"/>
+        </con:context>
+        <con:actions>
+          <con1:ifThenElse>
+            <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2a95</con2:id>
+            <con1:case>
+              <con1:condition>
+                <con2:xqueryText>$errorCode = "SUCCESS"</con2:xqueryText>
+              </con1:condition>
+              <con1:actions>
+                <con1:replace varName="header" contents-only="true">
+                  <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2a87</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                  </con1:expr>
+                </con1:replace>
+                <con1:replace contents-only="true" varName="body">
+                  <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2a6e</con2:id>
+                  <con1:expr>
+                    <con2:xqueryText>&lt;oper:modificacionCAPResponse/></con2:xqueryText>
+                  </con1:expr>
+                </con1:replace>
+              </con1:actions>
+            </con1:case>
+            <con1:default>
+              <con1:replace varName="header" contents-only="true">
+                <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2a5a</con2:id>
+                <con1:expr>
+                  <con2:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{$errorCode}</successIndicator>
+	<messages>{$validationMessage}</messages>
+</aut:ResponseHeader>]]></con2:xqueryText>
+                </con1:expr>
+              </con1:replace>
+              <con1:replace contents-only="true" varName="body">
+                <con2:id>_ActionId-536269359731270424-7ae183b5.195f7d91cad.-2a48</con2:id>
+                <con1:expr>
+                  <con2:xqueryText>&lt;oper:modificacionCAPResponse/></con2:xqueryText>
+                </con1:expr>
+              </con1:replace>
+            </con1:default>
+          </con1:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:pipeline-node name="ModificacionCAPHN">
+        <con:request>ModificacionCAPHN_request</con:request>
+        <con:response>ModificacionCAPHN_response</con:response>
+      </con:pipeline-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

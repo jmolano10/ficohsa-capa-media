@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/transform/config" xmlns:con2="http://www.bea.com/wli/sb/stages/config" xmlns:con3="http://www.bea.com/wli/sb/stages/routing/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isTracingEnabled="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/ProcesoPrestamoATMFacade/wsdl/procesoPrestamoATMFacadePS"/>
+      <con:port>
+        <con:name>procesoPrestamoATMFacadePSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/procesoPrestamoATMFacadePS</con:namespace>
+      </con:port>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-5307194225059936582--1657dd98.1932b2869a1.-7cf3">
+    <con:pipeline type="error" name="_onErrorHandler-5307194225059936582--1657dd98.1932b2869a1.-7cf3">
+      <con:stage name="ManejoError">
+        <con:context/>
+        <con:actions>
+          <con1:assign varName="errorCode">
+            <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7b6a</con2:id>
+            <con1:expr>
+              <con2:xqueryText>fn:string($fault/ctx:errorCode/text())</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:assign varName="errorMessage">
+            <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7b61</con2:id>
+            <con1:expr>
+              <con2:xqueryText>fn:string($fault/ctx:reason/text())</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+          <con1:wsCallout>
+            <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7b3c</con2:id>
+            <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con1:operation>mapeoErrores</con1:operation>
+            <con1:request>
+              <con1:body>$reqMapeoErrores</con1:body>
+            </con1:request>
+            <con1:response>
+              <con1:body>respMapeoErrores</con1:body>
+            </con1:response>
+            <con1:requestTransform>
+              <con1:assign varName="reqMapeoErrores">
+                <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7b16</con2:id>
+                <con1:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con2:param name="CODIGO_ERROR">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                    <con2:param name="MENSAJE_ERROR">
+                      <con2:path>fn:concat("FICBCO0259", "$#$", $errorMessage)</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:assign>
+            </con1:requestTransform>
+            <con1:responseTransform>
+              <con1:replace varName="header" contents-only="true">
+                <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7aff</con2:id>
+                <con1:expr>
+                  <con2:xqueryTransform>
+                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con2:param name="mapeoErroresResponse1">
+                      <con2:path>$respMapeoErrores</con2:path>
+                    </con2:param>
+                    <con2:param name="successIndicator">
+                      <con2:path>$errorCode</con2:path>
+                    </con2:param>
+                  </con2:xqueryTransform>
+                </con1:expr>
+              </con1:replace>
+            </con1:responseTransform>
+          </con1:wsCallout>
+          <con1:replace contents-only="true" varName="body">
+            <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7add</con2:id>
+            <con1:expr>
+              <con2:xqueryTransform>
+                <con2:resource ref="Middleware/v2/Resources/ProcesoPrestamoATMFacade/xq/procesoPrestamoATMFacadeOut"/>
+                <con2:param name="availableAmount">
+                  <con2:path>'0'</con2:path>
+                </con2:param>
+                <con2:param name="procesaMensajeGenericoSwitchFacadeRequest1">
+                  <con2:path>$originalBody</con2:path>
+                </con2:param>
+                <con2:param name="successIndicator">
+                  <con2:path>'ERROR'</con2:path>
+                </con2:param>
+              </con2:xqueryTransform>
+            </con1:expr>
+          </con1:replace>
+          <con2:reply>
+            <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7a92</con2:id>
+          </con2:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ProcessingCodeError_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchFacadeTypes" prefix="proc"/>
+        </con:context>
+        <con:actions>
+          <con1:assign varName="originalBody">
+            <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7ba7</con2:id>
+            <con1:expr>
+              <con2:xqueryText>$body/proc:procesaMensajeGenericoSwitchFacadeRequest</con2:xqueryText>
+            </con1:expr>
+          </con1:assign>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ProcessingCodeError_response">
+      <con:stage name="FlujoSalida">
+        <con:context/>
+        <con:actions>
+          <con1:Error>
+            <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7b88</con2:id>
+            <con1:errCode>MW-0008</con1:errCode>
+            <con1:message>SERVICE NOT IMPLEMENTED YET FOR THIS MTI</con1:message>
+          </con1:Error>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:branch-node type="condition" name="ProcesaPrestamoATM">
+        <con:context>
+          <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchFacadeTypes" prefix="proc"/>
+        </con:context>
+        <con:branch-table variable="body">
+          <con:xpath>
+            <con2:xpathText>./proc:procesaMensajeGenericoSwitchFacadeRequest/ISO8583/ISO8583_XML_CONTENT/ProcessingCode_003</con2:xpathText>
+          </con:xpath>
+          <con:branch name="ConsultaPrestamoATM">
+            <con:operator>equals</con:operator>
+            <con:value>920000</con:value>
+            <con:flow>
+              <con:route-node name="ConsultaPrestamoATM">
+                <con:context>
+                  <con2:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/consultaPrestamoATMTypes" prefix="con"/>
+                  <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchFacadeTypes" prefix="proc"/>
+                  <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                  <con3:route>
+                    <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7d3e</con2:id>
+                    <con3:service ref="Middleware/v2/ProxyServices/ConsultaPrestamoATM" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con3:operation>consultaPrestamoATM</con3:operation>
+                    <con3:outboundTransform>
+                      <con1:assign varName="originalBody">
+                        <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7d15</con2:id>
+                        <con1:expr>
+                          <con2:xqueryText>$body/proc:procesaMensajeGenericoSwitchFacadeRequest</con2:xqueryText>
+                        </con1:expr>
+                      </con1:assign>
+                      <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7cf5</con2:id>
+                        <con1:expr>
+                          <con2:xqueryTransform>
+                            <con2:resource ref="Middleware/v2/Resources/ProcesoPrestamoATMFacade/xq/consultaPrestamoATMIn"/>
+                            <con2:param name="procesaMensajeGenericoSwitchFacadeRequest1">
+                              <con2:path>$body/proc:procesaMensajeGenericoSwitchFacadeRequest</con2:path>
+                            </con2:param>
+                          </con2:xqueryTransform>
+                        </con1:expr>
+                      </con1:replace>
+                    </con3:outboundTransform>
+                    <con3:responseTransform>
+                      <con1:ifThenElse>
+                        <con2:id>_ActionId-5307194225059936582--1657dd98.1932b2869a1.-7ca9</con2:id>
+                        <con1:case>
+                          <con1:condition>
+                            <con2:xqueryText>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text())) = "SUCCESS"</con2:xqueryText>
+                          </con1:condition>
+                          <con1:actions>
+                            <con1:replace contents-only="true" varName="header">
+                              <con2:id>_ActionId-613152517924330010-516465fd.195ecf8d070.-7dd2</con2:id>
+                              <con1:expr>
+                                <con2:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                              </con1:expr>
+                            </con1:replace>
+                            <con1:assign varName="availableAmount">
+                              <con2:id>_ActionId-4362943008240077096-59b63537.19665724e2f.-7fe3</con2:id>
+                              <con1:expr>
+                                <con2:xqueryText>fn:string($body/con:consultaPrestamoATMResponse/AVAILABLE_AMOUNT/text())</con2:xqueryText>
+                              </con1:expr>
+                            </con1:assign>
+                          </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                          <con1:wsCallout>
+                            <con2:id>_ActionId-613152517924330010-516465fd.195ecf8d070.-7def</con2:id>
+                            <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                            <con1:operation>mapeoErrores</con1:operation>
+                            <con1:request>
+                              <con1:body>$REQmapeoErrores</con1:body>
+                            </con1:request>
+                            <con1:response>
+                              <con1:body>RSPmapeoErrores</con1:body>
+                            </con1:response>
+                            <con1:requestTransform>
+                              <con1:assign varName="REQmapeoErrores">
+                                <con2:id>_ActionId-613152517924330010-516465fd.195ecf8d070.-7df1</con2:id>
+                                <con1:expr>
+                                  <con2:xqueryTransform>
+                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                    <con2:param name="CODIGO_ERROR">
+                                      <con2:path>fn:upper-case(fn:string($header/aut:ResponseHeader/successIndicator/text()))</con2:path>
+                                    </con2:param>
+                                    <con2:param name="MENSAJE_ERROR">
+                                      <con2:path>fn:concat("FICBCO0259","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con2:path>
+                                    </con2:param>
+                                  </con2:xqueryTransform>
+                                </con1:expr>
+                              </con1:assign>
+                            </con1:requestTransform>
+                            <con1:responseTransform>
+                              <con1:replace contents-only="true" varName="header">
+                                <con2:id>_ActionId-613152517924330010-516465fd.195ecf8d070.-7df0</con2:id>
+                                <con1:expr>
+                                  <con2:xqueryTransform>
+                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                    <con2:param name="mapeoErroresResponse1">
+                                      <con2:path>$RSPmapeoErrores</con2:path>
+                                    </con2:param>
+                                    <con2:param name="successIndicator">
+                                      <con2:path>fn:string($header/aut:ResponseHeader/successIndicator/text())</con2:path>
+                                    </con2:param>
+                                  </con2:xqueryTransform>
+                                </con1:expr>
+                              </con1:replace>
+                            </con1:responseTransform>
+                          </con1:wsCallout>
+                          <con1:assign varName="availableAmount">
+                            <con2:id>_ActionId-4362943008240077096-59b63537.19665724e2f.-7fcc</con2:id>
+                            <con1:expr>
+                              <con2:xqueryText>'0'</con2:xqueryText>
+                            </con1:expr>
+                          </con1:assign>
+                        </con1:default>
+                      </con1:ifThenElse>
+                      <con1:replace varName="body" contents-only="true">
+                        <con2:id>_ActionId-613152517924330010-516465fd.195ecf8d070.-7dd0</con2:id>
+                        <con1:expr>
+                          <con2:xqueryTransform>
+                            <con2:resource ref="Middleware/v2/Resources/ProcesoPrestamoATMFacade/xq/procesoPrestamoATMFacadeOut"/>
+                            <con2:param name="availableAmount">
+                              <con2:path>$availableAmount</con2:path>
+                            </con2:param>
+                            <con2:param name="procesaMensajeGenericoSwitchFacadeRequest1">
+                              <con2:path>$originalBody</con2:path>
+                            </con2:param>
+                            <con2:param name="successIndicator">
+                              <con2:path>fn:data($header/aut:ResponseHeader/successIndicator)</con2:path>
+                            </con2:param>
+                          </con2:xqueryTransform>
+                        </con1:expr>
+                      </con1:replace>
+                    </con3:responseTransform>
+                  </con3:route>
+                </con:actions>
+              </con:route-node>
+            </con:flow>
+          </con:branch>
+          <con:branch name="ColocacionPrestamoATM">
+            <con:operator>equals</con:operator>
+            <con:value>920001</con:value>
+            <con:flow>
+              <con:route-node name="ColocacionPrestamoATM">
+                <con:context>
+                  <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/procesaMensajeGenericoSwitchFacadeTypes" prefix="proc"/>
+                  <con2:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+                </con:context>
+                <con:actions>
+                  <con3:route>
+                    <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7f49</con2:id>
+                    <con3:service ref="Middleware/v2/ProxyServices/ColocacionPrestamoATM" xsi:type="ref:ProxyRef" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                    <con3:operation>colocacionPrestamoATM</con3:operation>
+                    <con3:outboundTransform>
+                      <con1:assign varName="originalBody">
+                        <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7f2c</con2:id>
+                        <con1:expr>
+                          <con2:xqueryText>$body/proc:procesaMensajeGenericoSwitchFacadeRequest</con2:xqueryText>
+                        </con1:expr>
+                      </con1:assign>
+                      <con1:replace contents-only="true" varName="body">
+                        <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7f12</con2:id>
+                        <con1:expr>
+                          <con2:xqueryTransform>
+                            <con2:resource ref="Middleware/v2/Resources/ProcesoPrestamoATMFacade/xq/colocacionPrestamoATMIn"/>
+                            <con2:param name="procesaMensajeGenericoSwitchFacadeRequest">
+                              <con2:path>$body/proc:procesaMensajeGenericoSwitchFacadeRequest</con2:path>
+                            </con2:param>
+                          </con2:xqueryTransform>
+                        </con1:expr>
+                      </con1:replace>
+                    </con3:outboundTransform>
+                    <con3:responseTransform>
+                      <con1:ifThenElse>
+                        <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7f02</con2:id>
+                        <con1:case>
+                          <con1:condition>
+                            <con2:xqueryText>fn:upper-case($header/aut:ResponseHeader/successIndicator/text()) = 'SUCCESS'</con2:xqueryText>
+                          </con1:condition>
+                          <con1:actions>
+                            <con1:replace contents-only="true" varName="header">
+                              <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7ef2</con2:id>
+                              <con1:expr>
+                                <con2:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con2:xqueryText>
+                              </con1:expr>
+                            </con1:replace>
+                          </con1:actions>
+                        </con1:case>
+                        <con1:default>
+                          <con1:wsCallout>
+                            <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7edf</con2:id>
+                            <con1:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+                            <con1:operation>mapeoErrores</con1:operation>
+                            <con1:request>
+                              <con1:body>$REQmapeoErrores</con1:body>
+                            </con1:request>
+                            <con1:response>
+                              <con1:body>RSPmapeoErrores</con1:body>
+                            </con1:response>
+                            <con1:requestTransform>
+                              <con1:assign varName="REQmapeoErrores">
+                                <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7ecd</con2:id>
+                                <con1:expr>
+                                  <con2:xqueryTransform>
+                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                                    <con2:param name="MENSAJE_ERROR">
+                                      <con2:path>fn:concat("FICBCO0259","$#$",fn:string-join($header/aut:ResponseHeader/messages, '||'))</con2:path>
+                                    </con2:param>
+                                    <con2:param name="CODIGO_ERROR">
+                                      <con2:path>fn:data($header/aut:ResponseHeader/successIndicator)</con2:path>
+                                    </con2:param>
+                                  </con2:xqueryTransform>
+                                </con1:expr>
+                              </con1:assign>
+                            </con1:requestTransform>
+                            <con1:responseTransform>
+                              <con1:replace contents-only="true" varName="header">
+                                <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7ebb</con2:id>
+                                <con1:expr>
+                                  <con2:xqueryTransform>
+                                    <con2:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                                    <con2:param name="mapeoErroresResponse1">
+                                      <con2:path>$RSPmapeoErrores</con2:path>
+                                    </con2:param>
+                                    <con2:param name="successIndicator">
+                                      <con2:path>fn:data($header/aut:ResponseHeader/successIndicator)</con2:path>
+                                    </con2:param>
+                                  </con2:xqueryTransform>
+                                </con1:expr>
+                              </con1:replace>
+                            </con1:responseTransform>
+                          </con1:wsCallout>
+                        </con1:default>
+                      </con1:ifThenElse>
+                      <con1:replace contents-only="true" varName="body">
+                        <con2:id>_ActionId-3367989824445107035--5c928d65.195fc1d0bc0.-7e90</con2:id>
+                        <con1:expr>
+                          <con2:xqueryTransform>
+                            <con2:resource ref="Middleware/v2/Resources/ProcesoPrestamoATMFacade/xq/procesoPrestamoATMFacadeOut"/>
+                            <con2:param name="availableAmount">
+                              <con2:path>''</con2:path>
+                            </con2:param>
+                            <con2:param name="procesaMensajeGenericoSwitchFacadeRequest1">
+                              <con2:path>$originalBody</con2:path>
+                            </con2:param>
+                            <con2:param name="successIndicator">
+                              <con2:path>fn:data($header/aut:ResponseHeader/successIndicator)</con2:path>
+                            </con2:param>
+                          </con2:xqueryTransform>
+                        </con1:expr>
+                      </con1:replace>
+                    </con3:responseTransform>
+                  </con3:route>
+                </con:actions>
+              </con:route-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow>
+              <con:pipeline-node name="ProcessingCodeError">
+                <con:request>ProcessingCodeError_request</con:request>
+                <con:response>ProcessingCodeError_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>

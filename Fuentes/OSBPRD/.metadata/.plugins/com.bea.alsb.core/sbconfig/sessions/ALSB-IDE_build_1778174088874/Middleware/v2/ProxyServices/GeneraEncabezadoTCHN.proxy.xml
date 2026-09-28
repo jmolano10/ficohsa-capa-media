@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xml-fragment xmlns:ser="http://www.bea.com/wli/sb/services" xmlns:tran="http://www.bea.com/wli/sb/transports" xmlns:env="http://www.bea.com/wli/config/env" xmlns:http="http://www.bea.com/wli/sb/transports/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:con="http://www.bea.com/wli/sb/pipeline/config" xmlns:con1="http://www.bea.com/wli/sb/stages/config" xmlns:con2="http://www.bea.com/wli/sb/stages/transform/config">
+  <ser:coreEntry isProxy="true" isEnabled="true" isAutoPublish="false" isTracingEnabled="false">
+    <ser:binding type="SOAP" isSoap12="false" xsi:type="con:SoapBindingType" xmlns:con="http://www.bea.com/wli/sb/services/bindings/config">
+      <con:wsdl ref="Middleware/v2/Resources/GeneraEncabezadoTC/wsdl/generaEncabezadoTCPS"/>
+      <con:binding>
+        <con:name>generaEncabezadoTCPSSOAP</con:name>
+        <con:namespace>http://www.ficohsa.com.hn/middleware.services/generaEstadoCuentaTCPS/</con:namespace>
+      </con:binding>
+      <con:selector type="SOAP body"/>
+    </ser:binding>
+    <ser:monitoring isEnabled="false">
+      <ser:aggregationInterval>10</ser:aggregationInterval>
+      <ser:pipelineMonitoringLevel>Pipeline</ser:pipelineMonitoringLevel>
+    </ser:monitoring>
+    <ser:reporting>true</ser:reporting>
+    <ser:logging isEnabled="true">
+      <ser:logLevel>debug</ser:logLevel>
+    </ser:logging>
+    <ser:sla-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:sla-alerting>
+    <ser:pipeline-alerting isEnabled="true">
+      <ser:alertLevel>normal</ser:alertLevel>
+    </ser:pipeline-alerting>
+    <ser:ws-policy>
+      <ser:binding-mode>wsdl-policy-attachments</ser:binding-mode>
+    </ser:ws-policy>
+  </ser:coreEntry>
+  <ser:endpointConfig>
+    <tran:provider-id>local</tran:provider-id>
+    <tran:inbound>true</tran:inbound>
+    <tran:inbound-properties/>
+    <tran:all-headers>true</tran:all-headers>
+  </ser:endpointConfig>
+  <ser:router errorHandler="_onErrorHandler-972313088766258770--7776b4b.17ae319e04d.-73f3">
+    <con:pipeline type="error" name="_onErrorHandler-972313088766258770--7776b4b.17ae319e04d.-73f3">
+      <con:stage name="ManejoError">
+        <con:context>
+          <con1:userNsDecl namespace="http://www.bea.com/wli/sb/stages/transform/config" prefix="tns"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/generaEstadoCuentaTypes" prefix="gen"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:actions>
+          <con2:assign varName="errorCode">
+            <con1:id>_ActionId-972313088766258770--7776b4b.17ae319e04d.-7378</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:errorCode/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:assign varName="errorMessage">
+            <con1:id>_ActionId-972313088766258770--7776b4b.17ae319e04d.-7377</con1:id>
+            <con2:expr>
+              <con1:xqueryText>fn:string($fault/ctx:reason/text())</con1:xqueryText>
+            </con2:expr>
+          </con2:assign>
+          <con2:wsCallout>
+            <con1:id>_ActionId-972313088766258770--7776b4b.17ae319e04d.-7374</con1:id>
+            <con2:service xsi:type="ref:ProxyRef" ref="Middleware/v2/ProxyServices/MapeoErrores" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>mapeoErrores</con2:operation>
+            <con2:request>
+              <con2:body>$reqMapeoErrores</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>respMapeoErrores</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="reqMapeoErrores">
+                <con1:id>_ActionId-972313088766258770--7776b4b.17ae319e04d.-7376</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageIn"/>
+                    <con1:param name="CODIGO_ERROR">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                    <con1:param name="MENSAJE_ERROR">
+                      <con1:path>fn:concat("FICBCO0407", "$#$", $errorMessage)</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:replace varName="header" contents-only="true">
+                <con1:id>_ActionId-972313088766258770--7776b4b.17ae319e04d.-7375</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/MapeoErrores/xq/mapeoErroresUsageOut"/>
+                    <con1:param name="mapeoErroresResponse1">
+                      <con1:path>$respMapeoErrores</con1:path>
+                    </con1:param>
+                    <con1:param name="successIndicator">
+                      <con1:path>$errorCode</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:replace>
+            </con2:responseTransform>
+          </con2:wsCallout>
+          <con2:replace contents-only="true" varName="body">
+            <con1:id>_ActionId-972313088766258770--7776b4b.17ae319e04d.-7373</con1:id>
+            <con2:expr>
+              <con1:xqueryText>&lt;gen:generaEncabezadoTCResponse /></con1:xqueryText>
+            </con2:expr>
+          </con2:replace>
+          <con1:reply>
+            <con1:id>_ActionId-972313088766258770--7776b4b.17ae319e04d.-7372</con1:id>
+          </con1:reply>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ObtenerEncabezadosHN_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:userNsDecl namespace="http://tempuri.org/" prefix="tem"/>
+          <con1:userNsDecl namespace="http://schemas.datacontract.org/2004/07/BF.Tarjetas.bfemEstadosCuentas.DataContracts" prefix="bf"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/generaEstadoCuentaTypes" prefix="gen"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f50</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlusHN/obtenerSerializado/biz/bfemEECCHistorico" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>ObtenerEncabezadosV2</con2:operation>
+            <con2:request>
+              <con2:body>$REQObtenerEncabezadosV2</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPObtenerEncabezadosV2</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="pais">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f54</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                    <con1:param name="codigoPais">
+                      <con1:path>$header/aut:RequestHeader/Region/SourceBank/text()</con1:path>
+                    </con1:param>
+                    <con1:param name="sentidoConversion">
+                      <con1:path>'OSB-ISO3'</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="REQObtenerEncabezadosV2">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f53</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/GeneraEncabezadoTCHN/xq/obtenerEncabezadosHNIn"/>
+                    <con1:param name="generaEncabezadoTC">
+                      <con1:path>$body/gen:generaEncabezadoTC</con1:path>
+                    </con1:param>
+                    <con1:param name="pais">
+                      <con1:path>$pais</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="errorCode">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f52</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>$RSPObtenerEncabezadosV2/tem:ObtenerEncabezadosV2Result/bf:Codigo/text()</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="validationMessage">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f51</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>if($errorCode != '0') then(
+	$RSPObtenerEncabezadosV2/tem:ObtenerEncabezadosV2Result/bf:Mensaje/text()
+)else('')</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ObtenerEncabezadosHN_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/generaEstadoCuentaTypes" prefix="gen"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f4f</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f4e</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace varName="body" contents-only="true">
+                  <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f4d</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/GeneraEncabezadoTCHN/xq/obtenerEncabezadoHNOut"/>
+                      <con1:param name="obtenerEncabezadosV2Response">
+                        <con1:path>$RSPObtenerEncabezadosV2</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f4c</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7f4b</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;gen:generaEncabezadoTCResponse /></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="request" name="ObtenerEncabezadosREG_request">
+      <con:stage name="FlujoEntrada">
+        <con:context>
+          <con1:userNsDecl namespace="http://tempuri.org/" prefix="tem"/>
+          <con1:userNsDecl namespace="http://schemas.datacontract.org/2004/07/BF.Tarjetas.bfemEstadosCuentas.DataContracts" prefix="bf"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/generaEstadoCuentaTypes" prefix="gen"/>
+        </con:context>
+        <con:actions>
+          <con2:wsCallout>
+            <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7ec6</con1:id>
+            <con2:service xsi:type="ref:BusinessServiceRef" ref="Middleware/v2/BusinessServices/VisionPlusREG/obtenerSerializado/biz/bfemEECCHistorico" xmlns:ref="http://www.bea.com/wli/sb/reference"/>
+            <con2:operation>ObtenerEncabezadosV2</con2:operation>
+            <con2:request>
+              <con2:body>$REQObtenerEncabezadosV2</con2:body>
+            </con2:request>
+            <con2:response>
+              <con2:body>RSPObtenerEncabezadosV2</con2:body>
+            </con2:response>
+            <con2:requestTransform>
+              <con2:assign varName="pais">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7eca</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/Generales/xq/convertirCodigoPais"/>
+                    <con1:param name="codigoPais">
+                      <con1:path>$header/aut:RequestHeader/Region/SourceBank/text()</con1:path>
+                    </con1:param>
+                    <con1:param name="sentidoConversion">
+                      <con1:path>'OSB-ISO3'</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="REQObtenerEncabezadosV2">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7ec9</con1:id>
+                <con2:expr>
+                  <con1:xqueryTransform>
+                    <con1:resource ref="Middleware/v2/Resources/GeneraEncabezadoTCHN/xq/obtenerEncabezadosREGIn"/>
+                    <con1:param name="pais">
+                      <con1:path>$pais</con1:path>
+                    </con1:param>
+                    <con1:param name="generaEncabezadoTC">
+                      <con1:path>$body/gen:generaEncabezadoTC</con1:path>
+                    </con1:param>
+                  </con1:xqueryTransform>
+                </con2:expr>
+              </con2:assign>
+            </con2:requestTransform>
+            <con2:responseTransform>
+              <con2:assign varName="errorCode">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7ec8</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>$RSPObtenerEncabezadosV2/tem:ObtenerEncabezadosV2Result/bf:Codigo/text()</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+              <con2:assign varName="validationMessage">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7ec7</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>if($errorCode != '0') then(
+	$RSPObtenerEncabezadosV2/tem:ObtenerEncabezadosV2Result/bf:Mensaje/text()
+)else('')</con1:xqueryText>
+                </con2:expr>
+              </con2:assign>
+            </con2:responseTransform>
+          </con2:wsCallout>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:pipeline type="response" name="ObtenerEncabezadosREG_response">
+      <con:stage name="FlujoSalida">
+        <con:context>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+          <con1:varNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/generaEstadoCuentaTypes" prefix="gen"/>
+        </con:context>
+        <con:actions>
+          <con2:ifThenElse>
+            <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7ec5</con1:id>
+            <con2:case>
+              <con2:condition>
+                <con1:xqueryText>$validationMessage = ''</con1:xqueryText>
+              </con2:condition>
+              <con2:actions>
+                <con2:replace varName="header" contents-only="true">
+                  <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7ec4</con1:id>
+                  <con2:expr>
+                    <con1:xqueryText>&lt;aut:ResponseHeader>
+	&lt;successIndicator>Success&lt;/successIndicator>
+&lt;/aut:ResponseHeader></con1:xqueryText>
+                  </con2:expr>
+                </con2:replace>
+                <con2:replace varName="body" contents-only="true">
+                  <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7ec3</con1:id>
+                  <con2:expr>
+                    <con1:xqueryTransform>
+                      <con1:resource ref="Middleware/v2/Resources/GeneraEncabezadoTCHN/xq/obtenerEncabezadoREGOut"/>
+                      <con1:param name="obtenerEncabezadosV2Response">
+                        <con1:path>$RSPObtenerEncabezadosV2</con1:path>
+                      </con1:param>
+                    </con1:xqueryTransform>
+                  </con2:expr>
+                </con2:replace>
+              </con2:actions>
+            </con2:case>
+            <con2:default>
+              <con2:replace contents-only="true" varName="header">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7ec2</con1:id>
+                <con2:expr>
+                  <con1:xqueryText><![CDATA[<aut:ResponseHeader>
+	<successIndicator>{ $errorCode }</successIndicator>
+	<messages>{ $validationMessage }</messages>
+</aut:ResponseHeader>]]></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+              <con2:replace contents-only="true" varName="body">
+                <con1:id>_ActionId-934732538771332736--31cf57bb.18121bcee32.-7ec1</con1:id>
+                <con2:expr>
+                  <con1:xqueryText>&lt;gen:generaEncabezadoTCResponse /></con1:xqueryText>
+                </con2:expr>
+              </con2:replace>
+            </con2:default>
+          </con2:ifThenElse>
+        </con:actions>
+      </con:stage>
+    </con:pipeline>
+    <con:flow>
+      <con:branch-node type="condition" name="BranchNode1">
+        <con:context>
+          <con1:userNsDecl namespace="http://www.ficohsa.com.hn/middleware.services/autType" prefix="aut"/>
+        </con:context>
+        <con:branch-table variable="header">
+          <con:xpath>
+            <con1:xpathText>./aut:RequestHeader/Region/SourceBank</con1:xpathText>
+          </con:xpath>
+          <con:branch name="HN01">
+            <con:operator>equals</con:operator>
+            <con:value>'HN01'</con:value>
+            <con:flow>
+              <con:pipeline-node name="ObtenerEncabezadosHN">
+                <con:request>ObtenerEncabezadosHN_request</con:request>
+                <con:response>ObtenerEncabezadosHN_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:branch>
+          <con:default-branch>
+            <con:flow>
+              <con:pipeline-node name="ObtenerEncabezadosREG">
+                <con:request>ObtenerEncabezadosREG_request</con:request>
+                <con:response>ObtenerEncabezadosREG_response</con:response>
+              </con:pipeline-node>
+            </con:flow>
+          </con:default-branch>
+        </con:branch-table>
+      </con:branch-node>
+    </con:flow>
+  </ser:router>
+</xml-fragment>
